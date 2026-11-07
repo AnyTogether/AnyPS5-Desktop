@@ -26,6 +26,9 @@ env:
   # libpulse-dev: flutter_webrtc's Linux loopback capture (share play's Opus track) builds only
   # with it; the bundle then needs libpulse0, which PulseAudio and PipeWire systems have.
   LINUX_PACKAGES: clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libsdl2-2.0-0 libpulse-dev file
+  # libmpv-dev: the in-app clip player (media_kit_video links libmpv); patchelf: the bundle carries
+  # that libmpv and what it needs in lib/ (packaging/linux/bundle-libmpv.sh).
+  CLIP_PLAYER_PACKAGES: libmpv-dev patchelf
 
 jobs:
   test:
@@ -106,13 +109,38 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends $LINUX_PACKAGES
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends $LINUX_PACKAGES $CLIP_PLAYER_PACKAGES
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
       - run: flutter build linux --release
+        env:
+          # The bundle has to carry libmpv here: no patchelf or no libmpv fails the build.
+          ANYPS5_REQUIRE_LIBMPV: 1
+      - name: Bundle size and the libraries carried for the clip player
+        run: |
+          du -sh build/linux/x64/release/bundle build/linux/x64/release/bundle/lib
+          ls build/linux/x64/release/bundle/lib | grep -c . | xargs echo "files in lib/:"
+          ls build/linux/x64/release/bundle/lib/libmpv.so.*
+      # Ubuntu 24.04 has libmpv.so.2, not the 22.04 build machine's libmpv.so.1: the clip player's
+      # plugin and the libmpv it carries have to find everything they link in lib/ or in what a
+      # GTK desktop has.
+      - name: Check the clip player's libraries resolve on Ubuntu 24.04 without libmpv
+        run: |
+          docker run --rm -v "$PWD/build/linux/x64/release/bundle:/bundle:ro" ubuntu:24.04 bash -euc '
+            apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+              libgtk-3-0t64 libegl1 libgl1 libgbm1 libdrm2 libasound2t64 libpipewire-0.3-0t64 libusb-1.0-0 \
+              libsm6 libice6 libgmp10 libgpg-error0 libpulse0 >/dev/null
+            if ldconfig -p | grep -q "libmpv\.so"; then echo "this image has a libmpv"; exit 1; fi
+            missing=$(for f in /bundle/lib/libmedia_kit_video_plugin.so /bundle/lib/libmpv.so.*; do ldd "$f" | grep "not found" || true; done | sort -u)
+            if [ -n "$missing" ]; then echo "$missing"; exit 1; fi
+            echo "every library resolves:"
+            ldd /bundle/lib/libmpv.so.* | grep -c "/bundle/lib/" | xargs echo "  from the bundle:"
+            ldd /bundle/lib/libmpv.so.* | grep -vc "/bundle/lib/" | xargs echo "  from the system:"
+          '
       - name: Package the AppImage, the .deb and the .tar.gz
         if: github.event_name != 'pull_request'
         run: |
@@ -141,6 +169,16 @@ jobs:
           channel: stable
           cache: true
       - run: flutter build windows --release
+      # The clip player's libmpv and ANGLE (media_kit_libs_windows_video) beside the launcher: the
+      # installer and the .zip take the whole folder.
+      - name: Check the clip player's libraries are beside the launcher
+        shell: pwsh
+        run: |
+          $release = "build\windows\x64\runner\Release"
+          foreach ($dll in "libmpv-2.dll", "libEGL.dll", "libGLESv2.dll", "media_kit_video_plugin.dll") {
+            if (-not (Test-Path (Join-Path $release $dll))) { Write-Error "no $dll in $release"; exit 1 }
+          }
+          Get-ChildItem $release -Filter *.dll | Sort-Object Length -Descending | Select-Object -First 8 Name, @{n = "MiB"; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize
       - name: Package the installer (Inno Setup 6)
         if: github.event_name != 'pull_request'
         shell: pwsh

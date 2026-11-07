@@ -70,6 +70,10 @@ set_target_properties(${BINARY_NAME}
 )
 
 
+# media_kit_libs_linux would download and build mimalloc for the executable to link; the
+# launcher keeps the system's allocator, so it is not fetched.
+set(MIMALLOC_USE_STATIC_LIBS OFF)
+
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
 include(flutter/generated_plugins.cmake)
@@ -137,3 +141,15 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
   install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     COMPONENT Runtime)
 endif()
+
+# The clip player's libmpv and the libraries it needs that the launcher does not, into lib/
+# (packaging/linux/bundle-libmpv.sh): the bundle then starts where the system has another libmpv,
+# or none. Last, once the plugins are in lib/.
+install(CODE "
+  execute_process(
+    COMMAND bash \"${CMAKE_CURRENT_SOURCE_DIR}/../packaging/linux/bundle-libmpv.sh\" \"${CMAKE_INSTALL_PREFIX}\"
+    RESULT_VARIABLE BUNDLE_LIBMPV_RESULT)
+  if(NOT BUNDLE_LIBMPV_RESULT EQUAL 0)
+    message(FATAL_ERROR \"bundle-libmpv.sh failed (\${BUNDLE_LIBMPV_RESULT})\")
+  endif()
+  " COMPONENT Runtime)

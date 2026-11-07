@@ -10,6 +10,7 @@ import '../core/replay_buffer.dart';
 import '../core/screenshots.dart';
 import '../core/trophies.dart';
 import 'app_model.dart';
+import 'clip_player.dart';
 import 'components.dart';
 import 'glass.dart';
 import 'level_badge.dart';
@@ -2003,17 +2004,34 @@ class GalleryView extends StatelessWidget {
                         SizedBox(width: 32 * scale),
                       SizedBox(width: 16 * scale),
                       Expanded(
-                        child: Pressable(
-                          key: const ValueKey('shot-large'),
-                          pressScale: 1,
-                          onTap: () => model.handle(Command.back),
-                          builder: (context, _) => ClipRRect(
-                            borderRadius: BorderRadius.circular(12 * scale),
-                            child: Screenshots.isClip(shots[index])
-                                ? _ClipTile(path: shots[index], accent: model.accentChoice.color)
-                                : ArtworkImage(path: shots[index], fit: BoxFit.contain, cacheWidth: 1920),
-                          ),
-                        ),
+                        child: Screenshots.isClip(shots[index])
+                            // A clip plays from the start, over and over, as on the Mac; a click on
+                            // it does not close it (its bar is under the pointer).
+                            ? Center(
+                                child: AspectRatio(
+                                  aspectRatio: 16 / 9,
+                                  child: ClipRRect(
+                                    key: const ValueKey('shot-large'),
+                                    borderRadius: BorderRadius.circular(12 * scale),
+                                    child: ClipPlayerView(
+                                      source: shots[index],
+                                      create: model.services.clipPlayback,
+                                      onFailed: model.playClipOutside,
+                                      accent: model.accentChoice.color,
+                                      poster: _ClipTile(path: shots[index], accent: model.accentChoice.color),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Pressable(
+                                key: const ValueKey('shot-large'),
+                                pressScale: 1,
+                                onTap: () => model.handle(Command.back),
+                                builder: (context, _) => ClipRRect(
+                                  borderRadius: BorderRadius.circular(12 * scale),
+                                  child: ArtworkImage(path: shots[index], fit: BoxFit.contain, cacheWidth: 1920),
+                                ),
+                              ),
                       ),
                       SizedBox(width: 16 * scale),
                       if (arrows)
@@ -2119,7 +2137,7 @@ class GalleryView extends StatelessWidget {
 }
 
 /// A clip in the gallery: the picture of its last moment (when ffmpeg made one) under a play
-/// badge and its length's mark; ✕ or a click opens it in the system's player.
+/// badge and its length's mark; ✕ or a click plays it over the whole screen.
 class _ClipTile extends StatelessWidget {
   const _ClipTile({required this.path, required this.accent});
 

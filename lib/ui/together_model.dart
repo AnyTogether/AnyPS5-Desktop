@@ -54,6 +54,7 @@ import 'package:path/path.dart' as p;
 import '../core/trophies.dart';
 import '../core/game_settings.dart';
 import 'app_model.dart';
+import 'clip_player.dart' show ViewedMedia, mediaAspect;
 import 'compare_view.dart';
 import 'family_gate.dart';
 import 'livekit_room.dart';
@@ -272,6 +273,9 @@ class TogetherModel {
   int? messageCursor;
   MessageMenu? messageMenu;
 
+  /// Messages: a picture or clip from the thread over the whole screen (a clip plays).
+  ViewedMedia? chatViewing;
+
   /// Messages: the encryption sheet over the open conversation (its lock, safety number and
   /// devices) and the row the keys are on in it; sealed files opened here, by message.
   bool lockSheet = false;
@@ -423,6 +427,7 @@ class TogetherModel {
       groupName = '';
       messageCursor = null;
       messageMenu = null;
+      chatViewing = null;
       replyingTo = null;
       editingMessage = null;
       partyChatKeys
