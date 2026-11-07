@@ -5,6 +5,11 @@ release when it is made.
 
 ## Next release
 
+- **Clips play inside the launcher**, as on the Mac. A clip in a game's gallery, a clip post in
+  Captures and a clip in a chat play over the whole screen, from the start and over again, with
+  their sound. In the gallery ← and → move to the next picture or clip, and ✕ or ○ close it. The
+  pointer brings a bar to pause and move through the clip. A clip the launcher cannot open goes to
+  the system's video player, as before. Photos in chats open over the whole screen too.
 - **Share play for more than four viewers**, as on the Mac. With AnyTogether's media server
   (up to 16 viewers now), the Viewers row goes up to what the server takes. Past four, the
   game's picture and sound go once to the media server and everyone watches from there, while

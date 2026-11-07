@@ -44,10 +44,12 @@ system_library() {
   return 1
 }
 
-# What the launcher links already, without the clip player: what every other library in the
-# bundle resolves to here, and the launcher's own direct needs (ldd on it would follow the plugin).
+# What the launcher links already, without the clip player: what the engine, the other plugins
+# and the native assets resolve to here, and the launcher's own direct needs (ldd on it would
+# follow the plugin). Not SDL2's (lib/libSDL2-2.0.so.0): the launcher opens it only if it can,
+# while libmpv cannot start without the libraries it links.
 declare -A base=()
-for file in "$LIB"/*.so "$LIB"/*.so.*; do
+for file in "$LIB"/*.so; do
   case "$(basename "$file")" in libmedia_kit_video_plugin.so|libmpv.so*) continue ;; esac
   [ -f "$file" ] || continue
   while read -r name; do base["$name"]=1; done < <(ldd "$file" 2>/dev/null | awk '$2 == "=>" {print $1}')
@@ -74,6 +76,16 @@ for name in "${!origin[@]}"; do
 done
 # shellcheck disable=SC2016
 patchelf --set-rpath '$ORIGIN' "$PLUGIN"
+# A library of libmpv's that the bundle had already (SDL2) looks beside itself too, for what it
+# links in turn.
+while read -r name; do
+  case " ${copied[*]} " in *" $name "*) continue ;; esac
+  case "$name" in libflutter_linux_gtk.so) continue ;; esac
+  if [ -f "$LIB/$name" ]; then
+    # shellcheck disable=SC2016
+    patchelf --set-rpath '$ORIGIN' "$LIB/$name"
+  fi
+done < <(ldd "$mpv" | awk '$2 == "=>" {print $1}')
 
 # The copyright files of the packages they came from (Debian and Ubuntu).
 if command -v dpkg >/dev/null; then
