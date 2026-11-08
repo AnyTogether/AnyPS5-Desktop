@@ -17,6 +17,34 @@ struct Variable {
   const char* key;
   const char* value;
 };
+struct ExtendedMessage {
+  const char* text;
+  unsigned duration, priority;
+  int level, target, type;
+  int8_t progress;
+};
+struct CoreOptionValue {
+  const char* value;
+  const char* label;
+};
+struct CoreOptionDefinition {
+  const char* key;
+  const char* title;
+  const char* category_title;
+  const char* description;
+  const char* category_description;
+  const char* category;
+  CoreOptionValue values[128];
+  const char* default_value;
+};
+struct CoreOptionsV2 {
+  const void* categories;
+  const CoreOptionDefinition* definitions;
+};
+struct CoreOptionsV2Intl {
+  const CoreOptionsV2* english;
+  const CoreOptionsV2* localized;
+};
 struct Geometry {
   unsigned width, height, max_width, max_height;
   float aspect;
@@ -45,7 +73,9 @@ enum EnvironmentCommand {
   kSetGeometry = 37, kAudioVideoEnable = 47 | 0x10000, kFastForward = 49,
   kCoreOptionsVersion = 52, kSetHardware = 14, kHardwareInterface = 41 | 0x10000,
   kHardwareNegotiation = 43 | 0x10000,
-  kPreferredHardware = 56,
+  kPreferredHardware = 56, kSetCoreOptionsV2 = 67, kSetCoreOptionsV2Intl = 68,
+  kMessageVersion = 59, kExtendedMessage = 60,
+  kFrontendCompileProgress = 0x20000 | 0x4150,
 };
 enum PixelFormat {
   kRgb1555 = 0,

@@ -2,6 +2,7 @@
 #include "libretro_abi.h"
 #include "retro_frame.h"
 #include "retro_session.h"
+#include "retro_vulkan_video.h"
 
 #include <windows.h>
 #include <d3d11.h>
@@ -252,6 +253,11 @@ class WindowsVideo final : public Video {
   HardwareVideo hardware_;
 };
 
+std::unique_ptr<Video> CreateWindowsVideo(Console console) {
+  if (console == Console::kPs3) return CreateVulkanVideo();
+  return std::make_unique<WindowsVideo>();
+}
+
 std::optional<Options> ReadOptions(const Map* options) {
   if (!options) return std::nullopt;
   Options result;
@@ -269,7 +275,7 @@ Map EncodeStatus(const SessionStatus& status) {
   for (const auto& [key, option] : status.options) {
     options.emplace(Value(key), Value(Map{
         {Value("values"), Value(List(option.values.begin(), option.values.end()))},
-        {Value("labels"), Value(List())},
+        {Value("labels"), Value(List(option.labels.begin(), option.labels.end()))},
         {Value("title"), Value(option.title)},
         {Value("restart"), Value(option.restart)},
         {Value("selected"), Value(option.selected)},
@@ -288,8 +294,8 @@ Map EncodeStatus(const SessionStatus& status) {
       {Value("frameHeight"), Value(status.frame_height)},
       {Value("resolutionError"), Value(status.resolution_error)},
       {Value("graphicsPending"), Value(status.graphics_pending)},
-      {Value("progressLabel"), Value()},
-      {Value("progressPercent"), Value()},
+      {Value("progressLabel"), status.progress_label ? Value(*status.progress_label) : Value()},
+      {Value("progressPercent"), status.progress_percent ? Value(*status.progress_percent) : Value()},
       {Value("options"), Value(std::move(options))},
       {Value("tuningTelemetry"), Value(Map{
           {Value("clockMs"), Value(telemetry.clock_ms)},
@@ -310,7 +316,7 @@ class RetroCoreSession {
   RetroCoreSession(flutter::TextureRegistrar* registrar, SessionConfig config)
       : registrar_(registrar),
         texture_(flutter::PixelBufferTexture([this](size_t, size_t) { return CopyFrame(); })),
-        session_(config, std::make_unique<WindowsVideo>(),
+        session_(config, CreateWindowsVideo(ConsoleForCore(config.core)),
                  std::make_unique<StereoOutput>(), [this] { registrar_->MarkTextureFrameAvailable(texture_id_); }) {}
 
   bool Start() {
@@ -379,7 +385,7 @@ void RetroCoreHost::Handle(const flutter::MethodCall<Value>& call,
       result->Error("argument", "The core, disc and storage paths are required");
       return;
     }
-    if (ConsoleForCore(*core) != Console::kPs1 && ConsoleForCore(*core) != Console::kPs2) {
+    if (ConsoleForCore(*core) == Console::kUnknown) {
       result->Error("unsupportedCore", "This emulator core is unavailable");
       return;
     }

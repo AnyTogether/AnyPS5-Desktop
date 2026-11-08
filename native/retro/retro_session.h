@@ -15,7 +15,7 @@
 
 namespace anyps5::retro {
 
-enum class Console { kPs1, kPs2, kUnknown };
+enum class Console { kPs1, kPs2, kPs3, kUnknown };
 Console ConsoleForCore(const std::string& path);
 
 using Options = std::map<std::string, std::string>;
@@ -26,7 +26,7 @@ struct SessionConfig {
 };
 
 struct OptionStatus {
-  std::vector<std::string> values;
+  std::vector<std::string> values, labels;
   std::string title, active_value;
   bool restart;
   int32_t selected;
@@ -43,6 +43,8 @@ struct SessionStatus {
   int32_t frame_width = 0, frame_height = 0;
   double aspect = 4.0 / 3.0;
   std::string error, resolution_error;
+  std::optional<std::string> progress_label;
+  std::optional<int32_t> progress_percent;
   std::map<std::string, OptionStatus> options;
   Telemetry telemetry{};
 };
@@ -60,9 +62,11 @@ class Video {
   virtual void GeometryChanged(const Geometry&) {}
   virtual void Reset(const HardwareCallbacks& callbacks) = 0;
   virtual void Clear() = 0;
+  virtual void BeforeCoreDeinit(const HardwareCallbacks&) {}
   virtual void Close() = 0;
   virtual std::shared_ptr<Frame> Read(unsigned width, unsigned height,
                                       const HardwareCallbacks& callbacks) = 0;
+  virtual bool UnsupportedSync() const { return false; }
 };
 
 class Audio {

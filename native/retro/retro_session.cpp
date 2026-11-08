@@ -6,6 +6,8 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <mutex>
@@ -20,6 +22,8 @@
 
 namespace anyps5::retro {
 namespace {
+constexpr char kPs3Resolution[] = "rpcs3_resolution_scale";
+
 bool ResolutionOption(const std::string& key) {
   return key == "swanstation_GPU_ResolutionScale" || key == "pcsx2_upscale_multiplier";
 }
@@ -35,7 +39,8 @@ bool Ps1GraphicsOption(const std::string& key) {
 }
 
 bool TrialOption(const std::string& key) {
-  return Ps1GraphicsOption(key) || key == kPs2Resolution || key == kPs2Anisotropy || key == kPs2Trilinear;
+  return Ps1GraphicsOption(key) || key == kPs2Resolution || key == kPs2Anisotropy || key == kPs2Trilinear ||
+         key == kPs3Resolution || key == "rpcs3_anisotropic_filter";
 }
 
 bool LiveCoreOption(const std::string& key, bool hardware) {
@@ -49,6 +54,11 @@ bool BootCoreOption(const std::string& key) {
       "swanstation_CDROM_PreCacheCHD", "swanstation_CDROM_ReadThread",
       "swanstation_CDROM_ReadaheadSectors", "pcsx2_renderer", "pcsx2_mtvu",
       "pcsx2_fastcdvd", "pcsx2_sw_renderer_threads", "pcsx2_disable_shader_cache",
+      "rpcs3_ppu_decoder", "rpcs3_spu_decoder", "rpcs3_preferred_spu_threads",
+      "rpcs3_llvm_threads", "rpcs3_shader_compiler_threads", "rpcs3_llvm_precompilation",
+      "rpcs3_emulate_hdd_speed", "rpcs3_emulate_bdvd_speed", "rpcs3_disk_cache_size",
+      "rpcs3_spu_cache", "rpcs3_master_volume", "rpcs3_language", "rpcs3_license_area",
+      "rpcs3_enter_button",
   };
   return std::find(std::begin(keys), std::end(keys), key) != std::end(keys);
 }
@@ -61,7 +71,7 @@ bool SupportedBootValue(const std::string& key, std::string_view value, std::str
     return value == "Software (SW)" || value == "Software (HW)" ||
            (!renderer.empty() && value == renderer);
   }
-  return true;
+  return key != "rpcs3_disk_cache_size" || value != "wipe";
 }
 
 void RestoreCard(const std::filesystem::path& path, void* data, size_t size) {
@@ -99,6 +109,7 @@ Console ConsoleForCore(const std::string& path) {
   const auto name = std::filesystem::u8path(path).stem().u8string();
   if (name == "swanstation_libretro") return Console::kPs1;
   if (name == "pcsx2_libretro") return Console::kPs2;
+  if (name == "rpcs3_libretro") return Console::kPs3;
   return Console::kUnknown;
 }
 
@@ -107,7 +118,7 @@ class Session::Impl {
   Impl(SessionConfig config, std::unique_ptr<Video> video, std::unique_ptr<Audio> audio,
        std::function<void()> frame_available)
       : config_(std::move(config)), content_(std::filesystem::u8path(config_.disc).parent_path().u8string()),
-        console_(ConsoleForCore(config_.core)),
+        console_(ConsoleForCore(config_.core)), ps3_(console_ == Console::kPs3),
         frame_available_(std::move(frame_available)), video_(std::move(video)), audio_(std::move(audio)) {}
 
   ~Impl() { Stop(); Join(); }
@@ -147,9 +158,14 @@ class Session::Impl {
     status.frame_height = static_cast<int32_t>(frame_height_.load());
     status.resolution_error = resolution_error_;
     status.graphics_pending = graphics_queued_ || graphics_applying_;
+    if (std::chrono::steady_clock::now() < progress_until_) {
+      status.progress_label = progress_label_;
+      if (progress_percent_ >= 0) status.progress_percent = progress_percent_;
+    }
     for (const auto& [key, option] : options_) {
-      if (!option.boot && !LiveCoreOption(key, hardware_frame_)) continue;
-      status.options.emplace(key, OptionStatus{option.values, option.title, option.values[option.selected], option.boot,
+      if (!option.graphics && !option.boot && !LiveCoreOption(key, hardware_frame_)) continue;
+      status.options.emplace(key, OptionStatus{option.values, option.labels, option.title,
+          option.values[option.selected], option.boot || (option.graphics && !TrialOption(key)),
           static_cast<int32_t>(option.pending.value_or(option.selected))});
     }
     status.telemetry = TuningTelemetry();
@@ -166,7 +182,7 @@ class Session::Impl {
     std::lock_guard<std::mutex> lock(settings_mutex_);
     const auto option = options_.find(key);
     if (option == options_.end() ||
-        (!option->second.boot && !LiveCoreOption(key, hardware_frame_))) return false;
+        (!option->second.graphics && !option->second.boot && !LiveCoreOption(key, hardware_frame_))) return false;
     auto& data = option->second;
     const auto choice = std::find(data.values.begin(), data.values.end(), value);
     if (choice == data.values.end()) return false;
@@ -176,7 +192,7 @@ class Session::Impl {
       data.pending = selected;
       graphics_queued_ = true;
       resolution_error_.clear();
-    } else if (data.boot) {
+    } else if (data.boot || (data.graphics && !TrialOption(key))) {
       data.pending = selected;
     } else if (selected != data.selected) {
       data.selected = selected;
@@ -220,11 +236,46 @@ class Session::Impl {
  private:
   struct Option {
     std::vector<std::string> values;
+    std::vector<std::string> labels;
     std::string title;
+    bool graphics = false;
     bool boot = false;
     size_t selected = 0;
     std::optional<size_t> pending;
   };
+
+  void SetCoreOptions(const CoreOptionsV2* options) {
+    if (!ps3_ || !options || !options->definitions) return;
+    std::lock_guard<std::mutex> lock(settings_mutex_);
+    for (auto* row = options->definitions; row->key; ++row) {
+      const std::string key = row->key;
+      if (options_.count(key)) continue;
+      Option option;
+      if (row->title) option.title = row->title;
+      option.graphics = row->category && std::strcmp(row->category, "gpu") == 0 &&
+                        key != "rpcs3_renderer";
+      option.boot = BootCoreOption(key);
+      std::string preferred = row->default_value ? row->default_value : "";
+      if (key == "rpcs3_renderer") preferred = "vulkan";
+      if (option.graphics || option.boot) {
+        const auto saved = config_.initial_graphics.find(key);
+        if (saved != config_.initial_graphics.end()) preferred = saved->second;
+      }
+      for (const auto& value : row->values) {
+        if (!value.value) break;
+        if (!SupportedBootValue(key, value.value, hardware_available_ ? video_->PreferredRenderer() : std::string_view{})) continue;
+        if (key == kPs3Resolution && std::atoi(value.value) > 200) continue;
+        option.values.emplace_back(value.value);
+        option.labels.emplace_back(value.label ? value.label : value.value);
+      }
+      auto choice = std::find(option.values.begin(), option.values.end(), preferred);
+      if (choice == option.values.end() && row->default_value) {
+        choice = std::find(option.values.begin(), option.values.end(), row->default_value);
+      }
+      if (choice != option.values.end()) option.selected = static_cast<size_t>(choice - option.values.begin());
+      if (!option.values.empty()) options_.emplace(key, std::move(option));
+    }
+  }
 
   template <typename Reopen>
   void ApplyCheckpointGraphics(const DynamicLibrary& core, const Reopen& reopen, void (*step)(), bool ps1,
@@ -415,6 +466,26 @@ class Session::Impl {
     }
     if (!data) return false;
     switch (command) {
+      case kMessageVersion:
+        if (!ps3_) return false;
+        *static_cast<unsigned*>(data) = 1;
+        return true;
+      case kFrontendCompileProgress:
+        *static_cast<bool*>(data) = ps3_;
+        return ps3_;
+      case kExtendedMessage: {
+        if (!ps3_) return false;
+        const auto& message = *static_cast<const ExtendedMessage*>(data);
+        if (message.type != 3 || message.target == 2 || !message.text ||
+            message.progress < -1 || message.progress > 100)
+          return false;
+        std::lock_guard<std::mutex> lock(settings_mutex_);
+        progress_label_ = message.text;
+        progress_percent_ = message.progress;
+        progress_until_ = std::chrono::steady_clock::now() +
+            std::chrono::milliseconds(std::min(message.duration, 5000u));
+        return true;
+      }
       case kSetHardware: {
         auto& callbacks = *static_cast<HardwareCallbacks*>(data);
         if (!hardware_available_ || !video_->Bind(callbacks)) return false;
@@ -487,8 +558,14 @@ class Session::Impl {
         *static_cast<unsigned*>(data) = 3;
         return true;
       case kCoreOptionsVersion:
-        *static_cast<unsigned*>(data) = 0;
+        *static_cast<unsigned*>(data) = ps3_ ? 2u : 0u;
         return true;
+      case kSetCoreOptionsV2:
+        SetCoreOptions(static_cast<const CoreOptionsV2*>(data));
+        return ps3_;
+      case kSetCoreOptionsV2Intl:
+        SetCoreOptions(static_cast<const CoreOptionsV2Intl*>(data)->english);
+        return ps3_;
       default:
         return false;
     }
@@ -520,6 +597,8 @@ class Session::Impl {
     }
     try {
       hardware_available_ = video_->Open();
+      if (ps3_ && !hardware_available_)
+        throw std::runtime_error("PS3 requires a working Vulkan driver.");
       const auto path = std::filesystem::u8path(config_.core);
       const auto& core = library.emplace(path);
       if (core.Get<unsigned (*)()>("retro_api_version")() != 1)
@@ -568,6 +647,13 @@ class Session::Impl {
         hardware_callbacks_ = {};
         init();
         initialized = true;
+        if (ps3_ && hardware_callbacks_.context_type != video_->PreferredContext())
+          throw std::runtime_error("The PS3 core did not request a Vulkan context.");
+        if (ps3_) {
+          const auto controller = core.Get<void (*)(unsigned, unsigned)>("retro_set_controller_port_device");
+          controller(0, 1);
+          for (unsigned port = 1; port < 7; ++port) controller(port, 0);
+        }
         loaded = load(&game);
         if (loaded && hardware_callbacks_.reset) {
           AvInfo av{};
@@ -614,7 +700,7 @@ class Session::Impl {
       while (!stop_) {
         if (ps1 || ps2)
           ApplyCheckpointGraphics(core, reopen, step, ps1, card, card_size, card_path);
-        if (hardware_callbacks_.reset && !frame_ready_ && Clock::now() > hardware_deadline) {
+        if (!ps3_ && hardware_callbacks_.reset && !frame_ready_ && Clock::now() > hardware_deadline) {
           if (!use_native_resolution()) {
             std::lock_guard<std::mutex> lock(settings_mutex_);
             auto& renderer = options_.at(ps2 ? "pcsx2_renderer" : "swanstation_GPU_Renderer");
@@ -638,6 +724,8 @@ class Session::Impl {
         }
         step();
         if (!paused_) ++steps_;
+        if (video_->UnsupportedSync())
+          throw std::runtime_error("This RPCS3 core uses Vulkan synchronization AnyPS5 does not support.");
         next += frame_time;
         const auto now = Clock::now();
         if (next < now - frame_time) next = now;
@@ -649,6 +737,7 @@ class Session::Impl {
       error_ = failure.what();
     }
     if (loaded) unload();
+    video_->BeforeCoreDeinit(hardware_callbacks_);
     if (initialized) deinit();
     video_->Close();
     audio_->Close();
@@ -661,6 +750,7 @@ class Session::Impl {
   const SessionConfig config_;
   const std::string content_;
   const Console console_;
+  const bool ps3_;
   const std::function<void()> frame_available_;
   std::thread worker_;
   std::unique_ptr<Video> video_;
@@ -690,6 +780,9 @@ class Session::Impl {
   bool graphics_queued_ = false;
   bool graphics_applying_ = false;
   std::atomic<bool> suppress_frame_{false};
+  std::chrono::steady_clock::time_point progress_until_{};
+  std::string progress_label_;
+  int32_t progress_percent_ = -1;
   std::string error_, resolution_error_;
 };
 
