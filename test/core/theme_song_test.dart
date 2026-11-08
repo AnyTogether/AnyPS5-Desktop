@@ -86,7 +86,7 @@ Uint8List at9File({
   return file.takeBytes();
 }
 
-Game game(String name, {String? music}) => Game(
+Game game(String name, {String? music, RetroDisc? retro}) => Game(
   folder: '/games/$name',
   titleId: 'PPSA00001',
   name: name,
@@ -95,6 +95,7 @@ Game game(String name, {String? music}) => Game(
   version: '01.000.000',
   executable: ExecutableKind.elf,
   music: music,
+  retro: retro,
 );
 
 double rms(Iterable<double> samples) {
@@ -187,6 +188,61 @@ void main() {
 
   group('ThemeMusic', () {
     PlayableSong song(String path) => PlayableSong(Uint8List.fromList(path.codeUnits), const Duration(seconds: 2));
+
+    test('a console cue plays once per selection and gives way to looping game music', () {
+      fakeAsync((async) {
+        final out = FakeAudio();
+        final music = ThemeMusic(out);
+        const cue = '/console-audio/ps1-startup.wav';
+
+        music.play(null, startupCue: cue);
+        async.elapse(const Duration(milliseconds: 219));
+        expect(out.voices, isEmpty);
+        async.elapse(const Duration(milliseconds: 2));
+        final startup = out.voices.single;
+        expect(startup.sound.name, cue);
+        expect(startup.loop, isFalse);
+        music.play(null, startupCue: cue);
+        async.elapse(const Duration(seconds: 12));
+        expect(out.voices, [startup]);
+
+        final retro = game(
+          'Crash 2',
+          music: '/games/crash2/theme.wav',
+          retro: (platform: RetroPlatform.ps1, path: '/disc'),
+        );
+        music.play(retro);
+        async.elapse(const Duration(seconds: 2));
+        expect(startup.stopped, isTrue);
+        expect(out.voices.last.sound.name, '/games/crash2/theme.wav');
+        expect(out.voices.last.loop, isTrue);
+
+        music.play(null, startupCue: cue);
+        async.elapse(const Duration(milliseconds: 250));
+        expect(out.voices.last.sound.name, cue);
+        expect(out.voices.last.loop, isFalse);
+        expect(out.voices, hasLength(3));
+      });
+    });
+
+    test('PS1 and PS2 preview music uses ordinary file playback and the existing fades', () {
+      for (final platform in RetroPlatform.ps1AndPs2) {
+        fakeAsync((async) {
+          final out = FakeAudio();
+          final music = ThemeMusic(out, decode: (_) => throw StateError('A retro song is ordinary audio.'));
+          music.play(
+            game(platform.name, music: '/${platform.name}/theme.wav', retro: (platform: platform, path: '/disc')),
+          );
+          async.elapse(const Duration(seconds: 3));
+          expect(out.voices.single.sound.name, '/${platform.name}/theme.wav');
+          expect(out.voices.single.loop, isTrue);
+          expect(out.voices.single.volume, closeTo(0.5, 1e-9));
+          music.play(null);
+          async.elapse(const Duration(seconds: 1));
+          expect(out.voices.single.stopped, isTrue);
+        });
+      }
+    });
 
     test('a game\'s song comes in after the selection rests, then fades in to the volume', () {
       fakeAsync((async) {

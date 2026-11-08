@@ -380,10 +380,10 @@ class _FolderStep extends StatelessWidget {
                 model.onboardingConfirm();
               },
             ),
-            if (folder != null) ...[
+            if (folder != null || model.managedRetroAvailable) ...[
               SizedBox(width: 18 * scale),
               ConsoleButton(
-                title: T.text('continueAction'),
+                title: T.text(folder == null ? 'skip' : 'continueAction'),
                 icon: Icons.arrow_forward_rounded,
                 focused: model.onboardingChoice == 1,
                 prominent: true,

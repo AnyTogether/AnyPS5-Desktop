@@ -39,6 +39,16 @@ class AppPaths {
   /// The usual folders for [system], read from [environment] (Platform.environment by default).
   factory AppPaths.forSystem(HostSystem system, {Map<String, String>? environment}) {
     final env = environment ?? Platform.environment;
+    final experiment = env['ANYPS5_DESKTOP_EXPERIMENT_HOME'];
+    if (experiment != null && p.isAbsolute(experiment)) {
+      return AppPaths(
+        config: p.join(experiment, 'Config'),
+        logs: p.join(experiment, 'Logs'),
+        cache: p.join(experiment, 'Cache'),
+        pictures: p.join(experiment, 'Pictures'),
+        toolkits: p.join(experiment, 'Toolkits'),
+      );
+    }
     if (system == HostSystem.windows) {
       final profile = env['USERPROFILE'] ?? r'C:\Users\Public';
       final roaming = env['APPDATA'] ?? p.windows.join(profile, 'AppData', 'Roaming');

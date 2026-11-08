@@ -62,11 +62,12 @@ extension SettingsSearch on AppModel {
     final words = _fold(settingsQuery).split(RegExp(r'\s+')).where((word) => word.isNotEmpty).toList();
     final seen = <String>{};
     final found = <PanelRow>[];
-    for (final section in sections) {
+    final searchable = [...sections, if (system == HostSystem.windows) ..._emulatorMenu.searchSections()];
+    for (final section in searchable) {
       for (final row in section.rows) {
-        if (!row.focusable || row.title.isEmpty || !seen.add(row.id)) continue;
-        final text = _fold('${row.title} ${row.detail ?? ''}');
-        if (!words.every(text.contains)) continue;
+        if (!row.focusable || row.title.isEmpty) continue;
+        final text = _fold('${row.title} ${row.detail ?? ''} ${section.id.startsWith('retro-') ? section.title : ''}');
+        if (!words.every(text.contains) || !seen.add(row.id)) continue;
         // Where it lives, before what it says.
         found.add(
           PanelRow(

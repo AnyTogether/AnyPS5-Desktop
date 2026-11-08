@@ -430,6 +430,7 @@ abstract final class AssetDownload {
     void Function(int received)? onProgress,
     DownloadCancel? cancel,
     HttpClient Function()? client,
+    bool httpsOnly = false,
   }) async {
     // A file finished by an earlier try that stopped later is kept when it still checks out.
     final done = File(target);
@@ -446,7 +447,7 @@ abstract final class AssetDownload {
       part.deleteSync();
       have = 0;
     }
-    if (have < size) await _receive(url, part, have, size, onProgress, cancel, client ?? HttpClient.new);
+    if (have < size) await _receive(url, part, have, size, onProgress, cancel, client ?? HttpClient.new, httpsOnly);
     onProgress?.call(size);
     cancel?._check();
     final length = part.lengthSync();
@@ -475,6 +476,7 @@ abstract final class AssetDownload {
     void Function(int)? onProgress,
     DownloadCancel? cancel,
     HttpClient Function() makeClient,
+    bool httpsOnly,
   ) async {
     final client = makeClient()
       ..connectionTimeout = const Duration(seconds: 20)
@@ -487,6 +489,9 @@ abstract final class AssetDownload {
       var location = url;
       HttpClientResponse? response;
       for (var hop = 0; hop < 6; hop++) {
+        if (httpsOnly && location.scheme != 'https') {
+          throw ToolkitFailure(ToolkitFailureKind.network, 'the download redirected away from HTTPS');
+        }
         final request = await client.getUrl(location);
         request
           ..followRedirects = false

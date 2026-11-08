@@ -523,7 +523,7 @@ class TogetherModel {
 
   /// The game's trophy set as read now: the earned ones not sent yet go to AnyTogether.
   void recordTrophies(Game game, TrophySet set, {bool flush = true}) {
-    if (!signedIn || set.trophies.isEmpty) return;
+    if (!signedIn || set.trophies.isEmpty || game.retro?.platform == RetroPlatform.ps3) return;
     final tag = ConsoleLanguage.tag(T.language.consoleLanguage);
     sync.recordTrophies(
       SyncTrophySet(

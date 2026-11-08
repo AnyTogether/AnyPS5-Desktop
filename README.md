@@ -32,6 +32,48 @@ Japanese, Hindi, Bengali, Bhojpuri, Arabic and Urdu, one JSON file each in `asse
 and Urdu read right to left, but the screens are not mirrored yet. A new language is one more
 file there, no code: see [TRANSLATING.md](TRANSLATING.md).
 
+## Optional PS1, PS2 and PS3 play on Windows
+
+This source preview adds PlayStation, PlayStation 2 and PlayStation 3 games to Home.
+Open **Settings → Emulators**, choose a console, and follow **Setup**. Once a core is
+installed, **Show as folders** can group its games in a second row below the main carousel.
+Games rendered by the embedded cores use the launcher window and its Quick Menu.
+
+| Console | Embedded core | Setup |
+| --- | --- | --- |
+| PS1 | SwanStation | Install from Setup, then select your dumped BIOS and games folder. |
+| PS2 | LRPS2 | Install from Setup, then select your dumped BIOS and games folder. |
+| PS3 | RPCS3 Libretro | Requires a verified preview core package, official firmware and a Vulkan driver. |
+
+During play, press **PS / Guide** or **Escape** to open the Quick Menu. The available
+live graphics settings and **Tune This Game** return to the same session. The launcher
+remembers graphics settings per title. **Restart Trials** are a separate workflow for
+settings that take effect on startup. PS3 trophies are read from the local RPCS3 profile.
+
+The preview is for Windows x64. Its PS3 core is currently available only to testers who
+already have the verified package. See the [emulator configuration guide](docs/AnyPS5%20Desktop%20-%20Emulator%20Configuration.md)
+for supported dumps, artwork and audio, controller behavior, live graphics and what
+still needs review before general distribution.
+
+### Screenshots from the Windows experiment
+
+![AnyPS5 Home with the PlayStation folder highlighted and its four games visible below](docs/media/anyps5-retro-library-preview.jpg)
+
+Console folders in the Home carousel. This capture shows locally supplied artwork.
+The review branch uses text console indicators and the launcher theme for folders.
+
+![Crash Team Racing rendering its Naughty Dog intro inside the AnyPS5 game viewport](docs/media/anyps5-retro-ps1-startup.jpg)
+
+Crash Team Racing's intro in the embedded PS1 viewport.
+
+![Grand Theft Auto Vice City rendering its opening credits inside the AnyPS5 game viewport](docs/media/anyps5-retro-ps2-intro.jpg)
+
+Vice City's opening sequence in the embedded PS2 viewport.
+
+![LittleBigPlanet starting in AnyPS5 with RPCS3's SPU cache at 99 percent](docs/media/anyps5-retro-ps3-loading.jpg)
+
+LittleBigPlanet GOTY reports SPU cache progress on the launcher’s own startup screen.
+
 ## Layout
 
 - `lib/core/` platform-independent logic in pure Dart (no Flutter), unit tested:

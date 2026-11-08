@@ -7,9 +7,11 @@
 #include <flutter/method_channel.h>
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "win32_window.h"
+#include "retro_core_host.h"
 
 // A window that does nothing but host a Flutter view.
 class FlutterWindow : public Win32Window {
@@ -39,6 +41,7 @@ class FlutterWindow : public Win32Window {
 
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
+  std::unique_ptr<RetroCoreHost> retro_core_;
 
   // "anyps5/window": the launcher asks for full screen and back (F11, its setting).
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> window_channel_;
@@ -50,9 +53,14 @@ class FlutterWindow : public Win32Window {
   // The title bar's Maximize turned into the launcher's full screen.
   void MaximizeToFullscreen();
 
+  bool MoveToDisplay(const std::wstring& id, std::optional<DWORD> pid);
+  bool SetRetroMenuRegion(const flutter::EncodableValue* arguments);
+  bool retro_menu_clipped_ = false;
+
   std::wstring run_marker_;
 
   bool fullscreen_ = false;
+  bool fullscreen_monitor_moved_ = false;
   LONG_PTR windowed_style_ = 0;
   WINDOWPLACEMENT windowed_placement_{};
 };

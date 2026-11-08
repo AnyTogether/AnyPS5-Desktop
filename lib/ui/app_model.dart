@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi' show Abi;
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:math' as math;
@@ -55,6 +56,8 @@ import '../core/remote/remote_protocol.dart';
 import '../core/remote/remote_server.dart';
 import '../core/remote/usb_tunnel.dart';
 import '../core/replay_buffer.dart';
+import '../core/retro_optimizer.dart';
+import '../core/managed_retro.dart';
 import '../core/save_backup.dart';
 import '../core/steam/steam_launch.dart';
 import '../core/screenshots.dart';
@@ -94,6 +97,12 @@ import 'glass.dart';
 import 'power_model.dart';
 import 'profile_picture.dart';
 import 'save_sync_model.dart';
+import 'retro_settings_model.dart';
+import 'retro_restart_tuning.dart';
+import 'retro_game_tuning.dart' show RetroTuningSample;
+import 'ps3_settings_model.dart';
+import 'retro_tuning_panel.dart';
+import 'embedded_retro_game.dart';
 import 'sharing_model.dart';
 import 'strings.dart';
 import 'theme.dart';
@@ -102,6 +111,9 @@ import 'together_model.dart';
 import 'update_model.dart';
 import 'trophy_card.dart';
 
+part 'emulator_menu.dart';
+part 'retro_home_folders.dart';
+part 'retro_restart_workflow.dart';
 part 'profiles_model.dart';
 part 'settings_search.dart';
 part 'themes_model.dart';
@@ -127,6 +139,19 @@ class Preferences {
     ..menuMusicFile = json['menuMusicFile'] as String?
     ..profileName = json['profileName'] as String? ?? ''
     ..gamesFolders = _folders(json['gamesFolders'], json['gamesFolder'])
+    ..displayDevice = json['displayDevice'] as String?
+    ..retroEmulators = _pathsByConsole(json['retroEmulators'])
+    ..retroSetupFolders = _pathsByConsole(json['retroSetupFolders'])
+    ..retroBiosSources = _pathsByConsole(json['retroBiosSources'])
+    ..pendingRetroGraphics = {
+      if (json['pendingRetroGraphics'] case final Map<String, dynamic> profiles)
+        for (final profile in profiles.entries)
+          if (profile.value case final Map<String, dynamic> values)
+            profile.key: {
+              for (final option in values.entries)
+                if (option.value is String) option.key: option.value as String,
+            },
+    }
     ..toolkitFolder = json['toolkitFolder'] as String?
     ..onboarded = json['onboarded'] as bool? ?? false
     ..gameArtwork = json['gameArtwork'] as bool? ?? true
@@ -202,6 +227,17 @@ class Preferences {
       for (final entry in (json['compatAsked'] as Map<String, dynamic>? ?? const {}).entries)
         if (entry.value is String) entry.key: entry.value as String,
     }
+    ..retroInternalResolution = switch (json['retroInternalResolution']) {
+      final Map<Object?, Object?> saved => {
+        for (final entry in saved.entries)
+          if (entry.key is String && entry.value is String) entry.key as String: entry.value as String,
+      },
+      _ => {},
+    }
+    ..showRetroFolders = json['showRetroFolders'] == true
+    ..retroPs3Defaults = _readRetroOptions(json['retroPs3Defaults'])
+    ..retroPs3Graphics = _readRetroGraphics(json['retroPs3Graphics'])
+    ..retroEmbeddedGraphics = _readRetroGraphics(json['retroEmbeddedGraphics'])
     ..lastPlayed = {
       for (final entry in (json['lastPlayed'] as Map<String, dynamic>? ?? const {}).entries)
         entry.key: entry.value as String,
@@ -232,6 +268,11 @@ class Preferences {
   /// The games folders in order (a library over several drives); the first holds the store, where
   /// games are unlocked. A folder whose drive is unplugged stays in the list.
   List<String> gamesFolders = [];
+  String? displayDevice;
+  Map<String, String> retroEmulators = {};
+  Map<String, String> retroSetupFolders = {};
+  Map<String, String> retroBiosSources = {};
+  Map<String, Map<String, String>> pendingRetroGraphics = {};
   String? toolkitFolder;
   bool onboarded = false;
   bool gameArtwork = true;
@@ -290,6 +331,32 @@ class Preferences {
   /// silent, null is 100. Games keep their own volume.
   int? launcherVolume;
   Map<String, String> lastPlayed = {};
+  Map<String, String> retroInternalResolution = {};
+  bool showRetroFolders = false;
+  Map<String, String> retroPs3Defaults = {};
+
+  static Map<String, String> _readRetroOptions(Object? saved) => switch (saved) {
+    final Map<Object?, Object?> options => {
+      for (final entry in options.entries)
+        if (entry.key is String && entry.value is String) entry.key as String: entry.value as String,
+    },
+    _ => {},
+  };
+
+  static Map<String, Map<String, String>> _readRetroGraphics(Object? saved) => switch (saved) {
+    final Map<Object?, Object?> titles => {
+      for (final entry in titles.entries)
+        if (entry.key is String && entry.value is Map<Object?, Object?>)
+          entry.key as String: {
+            for (final option in (entry.value as Map<Object?, Object?>).entries)
+              if (option.key is String && option.value is String) option.key as String: option.value as String,
+          },
+    },
+    _ => {},
+  };
+
+  Map<String, Map<String, String>> retroEmbeddedGraphics = {};
+  Map<String, Map<String, String>> retroPs3Graphics = {};
 
   /// Which engine the settings offer: 'upstream' (boykopovar/AnyPS5) or 'arm' (AnyPS5-ARM's,
   /// with the phone controller, full screen and window size).
@@ -400,6 +467,11 @@ class Preferences {
     'menuMusicFile': menuMusicFile,
     'profileName': profileName,
     'gamesFolders': gamesFolders,
+    if (displayDevice != null) 'displayDevice': displayDevice,
+    if (retroEmulators.isNotEmpty) 'retroEmulators': retroEmulators,
+    if (retroSetupFolders.isNotEmpty) 'retroSetupFolders': retroSetupFolders,
+    if (retroBiosSources.isNotEmpty) 'retroBiosSources': retroBiosSources,
+    if (pendingRetroGraphics.isNotEmpty) 'pendingRetroGraphics': pendingRetroGraphics,
     // The first one under the old name too, for an older launcher started again.
     'gamesFolder': gamesFolders.firstOrNull,
     'toolkitFolder': toolkitFolder,
@@ -426,6 +498,11 @@ class Preferences {
     'musicVolume': musicVolume,
     if (launcherVolume != null) 'launcherVolume': launcherVolume,
     'lastPlayed': lastPlayed,
+    if (retroInternalResolution.isNotEmpty) 'retroInternalResolution': retroInternalResolution,
+    if (showRetroFolders) 'showRetroFolders': true,
+    if (retroPs3Defaults.isNotEmpty) 'retroPs3Defaults': retroPs3Defaults,
+    if (retroPs3Graphics.isNotEmpty) 'retroPs3Graphics': retroPs3Graphics,
+    if (retroEmbeddedGraphics.isNotEmpty) 'retroEmbeddedGraphics': retroEmbeddedGraphics,
     'engineSource': engineSource,
     if (updateChannel != null) 'updateChannel': updateChannel,
     'engineGitBeforePlay': engineGitBeforePlay,
@@ -462,6 +539,12 @@ class Preferences {
 
   /// The saved list of games folders, or a file from before with one (`gamesFolder`) as a list of
   /// one; what is not a path, and a folder listed twice, is left out.
+  static Map<String, String> _pathsByConsole(Object? value) => {
+    if (value case final Map<String, dynamic> paths)
+      for (final entry in paths.entries)
+        if (entry.value is String) entry.key: entry.value as String,
+  };
+
   static List<String> _folders(Object? list, Object? single) {
     final folders = <String>[];
     for (final folder in list is List<dynamic> ? list : [single]) {
@@ -493,6 +576,23 @@ class Preferences {
     for (final locale in PlatformDispatcher.instance.locales) locale.toLanguageTag(),
     Platform.localeName,
   ];
+
+  void _saveTuning(String path) {
+    final file = File(path);
+    file.parent.createSync(recursive: true);
+    final staging = file.parent.createTempSync('preferences-');
+    try {
+      final staged = File(p.join(staging.path, 'preferences.json'));
+      staged.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(toJson()), flush: true);
+      staged.renameSync(file.path);
+    } finally {
+      try {
+        staging.deleteSync(recursive: true);
+      } on FileSystemException {
+        // A leftover staging directory does not change the saved preferences.
+      }
+    }
+  }
 
   void save(String file) {
     try {
@@ -592,7 +692,8 @@ class WaitingForEngine extends GameState {
 
 /// Being started: the launcher prepares its fonts and settings and starts its process.
 class Starting extends GameState {
-  const Starting();
+  const Starting([this.detail]);
+  final String? detail;
 }
 
 /// Its process, started by this launcher, runs.
@@ -705,6 +806,8 @@ enum Layer {
   library,
   settings,
   gameSettings,
+  retroGraphics,
+  emulatorMenu,
   controls,
 
   /// A game's Advanced page: its sticks, the mouse as the camera, the keyboard's ramps, the
@@ -840,6 +943,8 @@ class PanelRow {
     this.person,
     this.level,
     this.icon,
+    this.previewGames = const [],
+    this.pinToBottom = false,
   });
 
   final String id;
@@ -858,6 +963,8 @@ class PanelRow {
 
   /// A sign drawn before the title where no one's picture is (a challenge's notifications).
   final PanelIcon? icon;
+  final List<Game> previewGames;
+  final bool pinToBottom;
 
   bool get focusable => kind is! InfoRow;
 }
@@ -874,9 +981,10 @@ class ChoiceRow extends RowKind {
 }
 
 class ToggleRow extends RowKind {
-  const ToggleRow(this.value, this.set);
+  const ToggleRow(this.value, this.set, {this.checkbox = false});
   final bool value;
   final void Function(bool) set;
+  final bool checkbox;
 }
 
 class StepperRow extends RowKind {
@@ -1034,6 +1142,11 @@ class LauncherServices {
     this.armEngineReleases,
     this.pads,
     this.systemProbe,
+    this.retroHardware,
+    this.displays,
+    this.moveToDisplay,
+    this.gameWindowReady,
+    this.retroMenuRegion,
     this.desktop,
     this.backdrop,
     this.renderTrophyCard,
@@ -1127,6 +1240,11 @@ class LauncherServices {
   /// What the controller troubleshooter asks the system (running programs, drivers, Steam's
   /// setting, permissions); nothing asked when not given.
   final SystemProbe Function()? systemProbe;
+  final Future<RetroHardware?> Function()? retroHardware;
+  final Future<List<LauncherDisplay>> Function()? displays;
+  final Future<bool> Function(String id, {int? pid})? moveToDisplay;
+  final Future<bool> Function(int pid)? gameWindowReady;
+  final RetroMenuRegion? retroMenuRegion;
 
   /// The game's window, its picture and the trophy card over it; nothing when not given.
   final DesktopWindows? desktop;
@@ -1212,6 +1330,8 @@ class LauncherServices {
 }
 
 /// The launcher's state and everything the interface does with it.
+enum _GameWindowState { ready, exited, timedOut }
+
 class AppModel extends ChangeNotifier {
   AppModel({
     required this.paths,
@@ -1452,6 +1572,7 @@ class AppModel extends ChangeNotifier {
     if (active == value) return;
     active = value;
     _shownInFront = launcherInFront;
+    _syncEmbeddedPlayback(focused: _shownInFront);
     // Behind a game (or any other window) the pad is the game's: the motors stop at once, and a
     // direction held on it lets go.
     haptics.launcherInFront = value;
@@ -1470,6 +1591,12 @@ class AppModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  late final _consoleStartupSounds = <RetroPlatform, String>{
+    for (final platform in RetroPlatform.values)
+      if (File(p.join(paths.config, 'ConsoleAudio', '${platform.name}-startup.wav')).existsSync())
+        platform: p.join(paths.config, 'ConsoleAudio', '${platform.name}-startup.wav'),
+  };
+
   /// The selected game's song while the launcher is in front and idle, silence otherwise (the
   /// first start, a game starting or playing, the volume at 0); the interface sounds are quiet
   /// while a game is in front.
@@ -1482,7 +1609,11 @@ class AppModel extends ChangeNotifier {
         musicVolume == 0 ||
         launcherVolume == 0;
     // The theme's (or the user's own) menu music when the selected game has no song.
-    music.play(quiet ? null : selectedGame, fallback: quiet ? null : menuMusic);
+    music.play(
+      quiet ? null : homePreviewGame,
+      fallback: quiet ? null : menuMusic,
+      startupCue: quiet ? null : _consoleStartupSounds[selectedHomeFolder],
+    );
     // With the game in front, the launcher says nothing.
     sounds.muted = running != null && !active;
   }
@@ -1624,7 +1755,7 @@ class AppModel extends ChangeNotifier {
       padCommand,
       shortcuts: preferences.shortcuts,
       isPlayStation: (pad) => controllers.roster.pad(pad)?.kind.isPlayStation ?? false,
-    );
+    )..reservesGuide = () => _retroSession;
     _navigator = navigator;
     _applyPadPreferences();
     return navigator;
@@ -1673,9 +1804,14 @@ class AppModel extends ChangeNotifier {
   /// A controller's event past the gate: to the navigator, or to Settings › Shortcuts while it
   /// waits for buttons.
   void _padEvent(PadEvent event) {
+    if (event case PadButtonEvent(button: PadButton.guide) when _retroSession) return _navigator?.handle(event);
+    if (embeddedGame != null && overlay == null && event is PadButtonEvent) return;
+    if (embeddedGame != null && overlay == null && event is PadAxisEvent) return;
     if (shortcutCapture != null && event is PadButtonEvent) return _capturePad(event);
     _navigator?.handle(event);
   }
+
+  bool get _retroSession => running?.$1.retro != null || starting?.retro != null;
 
   /// What the user moved the launcher with last: the controller's hints or the keys'.
   InputMode inputMode = InputMode.keyboardMouse;
@@ -1694,6 +1830,13 @@ class AppModel extends ChangeNotifier {
   /// and the in-game shortcuts (the quick menu, Share) count.
   void padCommand(PadCommand command) {
     final inFront = launcherInFront;
+    if (command == PadCommand.home && _retroSession) {
+      _pulses.pad = _navigator?.lastPad;
+      _usedInput(InputMode.pad);
+      if (inFront) haptics.padInUse = true;
+      _padLog?.call('retro: PS button');
+      return this.command(Command.home);
+    }
     final Command mapped;
     switch (command) {
       case PadCommand.homeHold || PadCommand.quickMenu || PadCommand.screenshot || PadCommand.saveClip:
@@ -1732,6 +1875,7 @@ class AppModel extends ChangeNotifier {
         if (overlay == null && preferences.onboarded && inFront && pairing == null && starting == null) {
           haptics.padInUse = true;
           _usedInput(InputMode.pad);
+          if (focus.isTiles && selectedHomeFolder != null) return this.command(Command.select);
           return openProfileMenu();
         }
       case PadCommand.previousGame:
@@ -1951,6 +2095,16 @@ class AppModel extends ChangeNotifier {
 
   /// Zips dropped into the games folders and updates added from a folder.
   late final GameFilesModel files = GameFilesModel(this);
+  late final _emulatorMenu = _EmulatorMenu(this);
+  late final _retroRestartTrials = _RetroRestartTrials(this);
+  Completer<void>? _retroSettled;
+
+  late final RetroSettingsModel retroSettings = RetroSettingsModel(
+    this,
+    refresh: () {
+      if (!_disposed) _changed();
+    },
+  );
 
   // The launcher's own crashes and stalls (core/launcher_health.dart).
 
@@ -2176,6 +2330,7 @@ class AppModel extends ChangeNotifier {
 
   List<Game> games = [];
   int selected = 0;
+  RetroPlatform? _homeRetroFolder;
   int libraryIndex = 0;
   HomeFocus focus = HomeFocus.tiles;
   Layer? overlay;
@@ -2361,6 +2516,21 @@ class AppModel extends ChangeNotifier {
   String? _playAfterInstall;
 
   Game? starting;
+  String? _retroSetupDetail;
+  int? _retroSetupPercent;
+
+  ({String label, int? percent})? get retroSetupProgress => switch (_retroSetupDetail) {
+    final String label => (label: label, percent: _retroSetupPercent),
+    null => null,
+  };
+
+  void _setRetroSetup(String? detail, {int? percent}) {
+    if (_retroSetupDetail == detail && _retroSetupPercent == percent) return;
+    _retroSetupDetail = detail;
+    _retroSetupPercent = percent;
+    _changed();
+  }
+
   (Game, RunningGame)? running;
 
   /// A short message at the bottom of the screen, with a trophy level's badge before it when
@@ -2472,6 +2642,7 @@ class AppModel extends ChangeNotifier {
   /// second: Flutter's own focus report does not change on Windows when a game takes over).
   void checkFront() {
     final front = launcherInFront;
+    _syncEmbeddedPlayback(focused: front);
     // The own profile, read again every few minutes while the launcher is in front.
     if (front) together.refreshOwnProfile(age: TogetherModel.ownProfileAge);
     if (front == _shownInFront) return;
@@ -2495,9 +2666,19 @@ class AppModel extends ChangeNotifier {
   /// The game back in front, the launcher behind it (or minimized again, with Hide the
   /// launcher while a game runs).
   Future<void> _showGame(RunningGame run) async {
+    if (run is EmbeddedRetroGame) {
+      _syncEmbeddedPlayback();
+      return;
+    }
     final shown = await desktop.focusGame(run.pid);
     _padLog?.call('PS: game ${shown ? 'in front' : 'could not be brought in front'}');
-    if (preferences.hideWhilePlaying && running?.$2 == run) await _hideForGame();
+    if (running?.$2 == run) {
+      if (shown && preferences.hideWhilePlaying) await _hideForGame();
+      if (!shown && running?.$1.retro != null) {
+        open(Layer.quickMenu);
+        await raiseLauncher();
+      }
+    }
     checkFront();
   }
 
@@ -2617,10 +2798,15 @@ class AppModel extends ChangeNotifier {
   Map<String, int?> folderCounts = {};
 
   void _changed() {
+    _syncEmbeddedPlayback();
     if (launcherProblem != null) offerLauncherReport();
     notifyListeners();
     _publishLibrary();
     _prepareWhenChanged();
+  }
+
+  void _syncEmbeddedPlayback({bool? focused}) {
+    embeddedGame?.playback(playing: overlay == null && !stopping, focused: focused ?? launcherInFront);
   }
 
   void savePreferences() {
@@ -2708,6 +2894,10 @@ class AppModel extends ChangeNotifier {
     records.clear();
     trophies.clear();
     for (final game in games) {
+      if (game.retro != null) {
+        if (game.retro!.platform == RetroPlatform.ps3) _loadTrophies(game);
+        continue;
+      }
       final installed = Installer.installedFolder(game, rootOf(game)!);
       final record = Installer.record(installed, system: system);
       if (record != null) records[game.id] = record;
@@ -2758,12 +2948,15 @@ class AppModel extends ChangeNotifier {
     if (folder == null) return;
     final installed = Installer.installedFolder(game, folder);
     final language = ConsoleLanguage.tag(T.language.consoleLanguage);
-    final set = Trophies.load(game, installed: installed, languages: [?language]);
+    final ps3 = game.retro?.platform == RetroPlatform.ps3;
+    final set = ps3
+        ? Trophies.loadPs3(game, system: _managedRetro.systemPath, languages: [?language])
+        : Trophies.load(game, installed: installed, languages: [?language]);
     if (set == null) {
       trophies.remove(game.id);
     } else {
       trophies[game.id] = set;
-      together.recordTrophies(game, set);
+      if (!ps3) together.recordTrophies(game, set);
     }
   }
 
@@ -2829,11 +3022,12 @@ class AppModel extends ChangeNotifier {
   }
 
   GameState stateOf(Game game) {
+    if (starting?.id == game.id && !stopping) return Starting(_retroSetupDetail);
     if (running case (final Game playing, final RunningGame run) when playing.id == game.id) {
       return stopping ? Stopping(run.pid) : Running(run.pid);
     }
-    if (starting?.id == game.id) return const Starting();
     if (together.family.ageLock(game) case final FamilyLocked lock) return lock;
+    if (game.retro != null) return const Installed();
     final installed = records.containsKey(game.id);
     final current = progress[game.id];
     if (current != null) {
@@ -2895,14 +3089,50 @@ class AppModel extends ChangeNotifier {
 
   /// Settings › Game Library › Add Folder and Select on the empty shelf: another games folder,
   /// after the others (one already in the list is said, not added again).
-  Future<void> addGamesFolder() async {
-    final folder = await services.pickFolder?.call(T.text('chooseFolder'));
+  Future<void> addGamesFolder({RetroPlatform? console}) async {
+    final label = console == null ? null : ManagedRetro.platformName(console);
+    final folder = await services.pickFolder?.call(
+      label == null ? T.text('chooseFolder') : 'Choose your $label games folder',
+    );
     if (folder == null) return;
-    if (preferences.gamesFolders.any((known) => p.equals(known, folder))) {
+    final alreadyAdded = preferences.gamesFolders.any((known) => p.equals(known, folder));
+    if (alreadyAdded && console == null) {
       show(T.text('folderAlreadyAdded'));
       return;
     }
-    _setGamesFolders([...preferences.gamesFolders, folder]);
+    if (console != null) preferences.retroSetupFolders[console.name] = folder;
+    if (alreadyAdded) {
+      savePreferences();
+      rescan();
+    } else {
+      _setGamesFolders([...preferences.gamesFolders, folder]);
+    }
+    if (console != null) {
+      final found = retroGamesInFolder(console, folder).isNotEmpty;
+      show(
+        found
+            ? '$label games folder ready.'
+            : 'No playable $label games found here yet. Extract any archives before playing.',
+      );
+    }
+  }
+
+  List<Game> retroGamesInFolder(RetroPlatform platform, String folder) => [
+    for (final game in games)
+      if (game.retro?.platform == platform && (p.equals(folder, game.folder) || p.isWithin(folder, game.folder))) game,
+  ];
+
+  String? retroSetupFolder(RetroPlatform platform) {
+    final chosen = preferences.retroSetupFolders[platform.name];
+    final folders = preferences.gamesFolders;
+    if (chosen != null && folders.any((folder) => p.equals(folder, chosen))) return chosen;
+    return folders.where((folder) => retroGamesInFolder(platform, folder).isNotEmpty).firstOrNull;
+  }
+
+  void finishRetroSetup(RetroPlatform platform) {
+    final index = games.indexWhere((game) => game.retro?.platform == platform);
+    if (index >= 0) select(index);
+    _dismissOverlay();
   }
 
   /// The copy warning's folder fixes: the picked folder becomes the first (the one unlocked games
@@ -2971,7 +3201,7 @@ class AppModel extends ChangeNotifier {
       case Installed(:final outdated):
         void go() => outdated ? open(Layer.updateChoice) : unawaited(play(game));
         // Settings › AnyPS5 Engine › Update from Git Before Playing: the checkout's remote first.
-        engine.git.updatesBeforePlay ? unawaited(engine.git.beforePlay(game, go)) : go();
+        game.retro == null && engine.git.updatesBeforePlay ? unawaited(engine.git.beforePlay(game, go)) : go();
       case WaitingForEngine(:final forThisGame):
         // The engine is being built in place: its relinker and libraries are not whole yet.
         show(forThisGame ? T.format('gameStartsAfterEngine', [game.name]) : T.text('gameWaitsForEngine'));
@@ -3502,6 +3732,10 @@ class AppModel extends ChangeNotifier {
 
   /// Plays [game]; [trace] turns detailed logging on for this start only.
   Future<void> play(Game game, {bool trace = false}) async {
+    if (game.retro case final RetroDisc disc) {
+      await _playRetro(game, disc);
+      return;
+    }
     final folder = rootOf(game);
     if (folder == null || starting != null || running != null || saveSync.syncing != null) return;
     // The profile's own saves and trophies in the game's folder before anything reads them.
@@ -3598,8 +3832,8 @@ class AppModel extends ChangeNotifier {
       final began = DateTime.now();
       // Upstream's engine does not read ANYPS5_FULLSCREEN or ANYPS5_WINDOW_SIZE: the launcher
       // sizes its window or presses its F11 once the window is open.
-      if (!engine.readsDisplaySettings) {
-        unawaited(desktop.applyDisplay(run.pid, fullscreen: settings.fullscreen, windowSize: settings.windowSize));
+      if (preferences.displayDevice != null || !engine.readsDisplaySettings) {
+        unawaited(_placePs5Window(run, settings));
       }
       // Settings › Behaviour › Hide the launcher while a game runs.
       if (preferences.hideWhilePlaying) unawaited(_hideForGame());
@@ -3651,6 +3885,428 @@ class AppModel extends ChangeNotifier {
       show('${T.text('startFailed')}: $error');
       _changed();
     }
+  }
+
+  ManagedRetro get _managedRetro => ManagedRetro(
+    p.join(p.dirname(paths.toolkits), 'Emulators'),
+    packageDirectory: (services.environment ?? Platform.environment)['ANYPS5_MANAGED_CORE_PACKAGES'],
+  );
+  bool get managedRetroAvailable => system == HostSystem.windows && Abi.current() == Abi.windowsX64;
+  String? get retroCoreOverride => (services.environment ?? Platform.environment)['ANYPS5_LIBRETRO_HOME'];
+
+  ({bool installed, bool systemReady}) managedRetroStatus(RetroPlatform platform) {
+    final managed = _managedRetro;
+    return (
+      installed: managed.isInstalled(platform),
+      systemReady: platform == RetroPlatform.ps3 ? managed.hasPs3Firmware : managed.hasBios(platform),
+    );
+  }
+
+  Future<bool> chooseManagedBios(RetroPlatform platform) async {
+    final label = ManagedRetro.platformName(platform);
+    final selected = await services.pickFile?.call('Select your $label BIOS', ['bin', 'rom', 'rom0']);
+    if (selected == null) return false;
+    await _managedRetro.importBios(platform, selected);
+    preferences.retroBiosSources[platform.name] = selected;
+    savePreferences();
+    return true;
+  }
+
+  String? managedBiosPath(RetroPlatform platform) {
+    final source = preferences.retroBiosSources[platform.name];
+    return source != null && File(source).existsSync() ? source : _managedRetro.biosPath(platform);
+  }
+
+  RetroPlatform? managedSetupConsole;
+
+  Future<void> setupManagedRetro(RetroPlatform platform) async {
+    if (!managedRetroAvailable ||
+        (platform != RetroPlatform.ps3 && retroCoreOverride != null) ||
+        managedSetupConsole != null ||
+        starting != null ||
+        running != null) {
+      return;
+    }
+    final label = ManagedRetro.platformName(platform);
+    final managed = _managedRetro;
+    final origin = spot;
+    managedSetupConsole = platform;
+    try {
+      final installed = managed.isInstalled(platform);
+      if (!installed || platform == RetroPlatform.ps3) await _installManagedCore(managed, platform);
+      if (platform == RetroPlatform.ps3) {
+        await _downloadPs3Firmware(managed);
+      } else if (!managed.hasBios(platform)) {
+        if (!installed) {
+          show('Select your $label BIOS to continue setup.');
+          return;
+        }
+        _setRetroSetup('Select your $label BIOS');
+        if (!await chooseManagedBios(platform)) return;
+      }
+      show('$label emulator ready. Add games now or finish setup.');
+    } catch (error) {
+      show('$label setup failed: $error');
+    } finally {
+      managedSetupConsole = null;
+      _setRetroSetup(null);
+      if (origin?.layer == Layer.emulatorMenu && spot == origin) {
+        _skipToFocusable();
+        _changed();
+      }
+    }
+  }
+
+  Future<void> _installManagedCore(ManagedRetro managed, RetroPlatform platform) async {
+    final label = ManagedRetro.platformName(platform);
+    _setRetroSetup('Preparing $label emulator');
+    await managed.install(
+      platform,
+      progress: (bytes, total) => _setRetroSetup(
+        'Installing $label emulator',
+        percent: total > 0 ? (bytes * 100 ~/ total).clamp(0, 100) : null,
+      ),
+    );
+  }
+
+  Future<void> _downloadPs3Firmware(ManagedRetro managed) async {
+    _setRetroSetup('Checking PS3 firmware');
+    await managed.installPs3Firmware(
+      progress: (bytes, total) =>
+          _setRetroSetup('Downloading PS3 firmware', percent: total > 0 ? (bytes * 100 ~/ total).clamp(0, 100) : null),
+    );
+  }
+
+  bool get managedPs3FirmwareDownloaded => _managedRetro.hasPs3FirmwarePackage;
+
+  Future<void> _playRetro(
+    Game game,
+    RetroDisc disc, {
+    Map<String, String> trialOptions = const {},
+    Completer<EmbeddedRetroGame?>? booted,
+    bool Function()? canBoot,
+  }) async {
+    if (managedSetupConsole != null || starting != null || running != null || canBoot?.call() == false) return;
+    final allowed = together.family.beforePlay(game);
+    if (!(allowed is bool ? allowed : await allowed) ||
+        managedSetupConsole != null ||
+        starting != null ||
+        running != null ||
+        canBoot?.call() == false) {
+      return;
+    }
+    final ps3 = disc.platform == RetroPlatform.ps3;
+    final override = ps3 ? null : retroCoreOverride;
+    final program = retroSettings.program(disc.platform);
+    final standalone = program != null && File(program).existsSync();
+    final managed = override == null && !standalone && managedRetroAvailable ? _managedRetro : null;
+    final embeddedHome = override ?? managed?.root;
+    if (embeddedHome == null && !standalone) {
+      show(
+        ps3
+            ? 'Embedded PS3 play requires Windows x64.'
+            : '${T.text('startFailed')}: choose ${disc.platform.emulator} in Settings.',
+      );
+      return;
+    }
+    if (!File(disc.path).existsSync()) {
+      show(T.text('dumpMoved'));
+      return;
+    }
+
+    final settled = Completer<void>();
+    _retroSettled = settled;
+    final launchTime = Stopwatch()..start();
+    sounds.play(Cue.select);
+    starting = game;
+    _changed();
+    try {
+      if (managed != null) {
+        final label = ManagedRetro.platformName(disc.platform);
+        if (ps3) {
+          await _installManagedCore(managed, disc.platform);
+          await _downloadPs3Firmware(managed);
+        } else if (!managed.hasBios(disc.platform)) {
+          _setRetroSetup('Select your $label BIOS');
+          if (!await chooseManagedBios(disc.platform)) {
+            starting = null;
+            if (overlay == Layer.quickMenu) overlay = null;
+            _setRetroSetup(null);
+            show('Select a $label BIOS to play ${game.name}.');
+            return;
+          }
+        }
+        if (!ps3) await _installManagedCore(managed, disc.platform);
+        _setRetroSetup(null);
+      }
+      if (canBoot?.call() == false) {
+        starting = null;
+        _changed();
+        return;
+      }
+      final RunningGame run;
+      if (embeddedHome != null) {
+        final graphics = ps3 ? preferences.retroPs3Graphics : preferences.retroEmbeddedGraphics;
+        final graphicsId = ps3 ? game.titleId : game.id;
+        final tuningOriginals = <String, String?>{};
+        const tuningResolutionKeys = {'swanstation_GPU_ResolutionScale', 'pcsx2_upscale_multiplier'};
+        run = await EmbeddedRetroGame.start(
+          embeddedHome,
+          disc,
+          internalResolution: preferences.retroInternalResolution[game.id],
+          graphics: {if (ps3) ...preferences.retroPs3Defaults, ...?graphics[graphicsId], ...trialOptions},
+          onGraphicsSelected: (key, value) {
+            if (trialOptions.isNotEmpty) return;
+            final options = graphics.putIfAbsent(graphicsId, () => {});
+            if (options[key] == value) return;
+            options[key] = value;
+            savePreferences();
+          },
+          onTuningApplied: (previous, values, {required undo}) {
+            if (trialOptions.isNotEmpty) throw StateError('Finish the restart trial first.');
+            final priorOptions = graphics[graphicsId];
+            final priorResolution = preferences.retroInternalResolution[game.id];
+            final options = {...?priorOptions};
+            final originals = {...tuningOriginals};
+            var resolution = priorResolution;
+            for (final entry in values.entries) {
+              final key = entry.key;
+              final isResolution = tuningResolutionKeys.contains(key);
+              final current = isResolution ? resolution : options[key];
+              if (undo && current != previous[key]) continue;
+              final next = undo ? originals.remove(key) : entry.value;
+              if (!undo) originals[key] = current;
+              if (isResolution) {
+                resolution = next;
+              } else if (next == null) {
+                options.remove(key);
+              } else {
+                options[key] = next;
+              }
+            }
+            void write(Map<String, String>? settings, String? scale) {
+              if (settings == null || settings.isEmpty) {
+                graphics.remove(graphicsId);
+              } else {
+                graphics[graphicsId] = settings;
+              }
+              if (scale == null) {
+                preferences.retroInternalResolution.remove(game.id);
+              } else {
+                preferences.retroInternalResolution[game.id] = scale;
+              }
+            }
+
+            write(options, resolution);
+            try {
+              if (persist) preferences._saveTuning(paths.preferencesFile);
+            } on FileSystemException {
+              write(priorOptions, priorResolution);
+              rethrow;
+            }
+            tuningOriginals
+              ..clear()
+              ..addAll(originals);
+            _changed();
+          },
+          onResolutionSelected: (value) {
+            if (trialOptions.isNotEmpty) return;
+            if (preferences.retroInternalResolution[game.id] == value) return;
+            preferences.retroInternalResolution[game.id] = value;
+            savePreferences();
+          },
+          readPad: () {
+            final player = controllers.playerOne ?? controllers.pads.firstOrNull;
+            return player == null ? PadState.idle : controllers.stateOf(player.id) ?? PadState.idle;
+          },
+          changed: _changed,
+        );
+      } else {
+        retroSettings.applyQueuedGraphics(program!, disc.platform);
+        run = await startRetroGame(
+          installed: p.dirname(program),
+          program: program,
+          arguments: ['-nogui', '--', disc.path],
+          logFile: paths.logFile(game.titleId),
+        );
+      }
+      running = (game, run);
+      _stopped = false;
+      stopping = false;
+      final cancelled = canBoot?.call() == false;
+      if (cancelled) unawaited(stopRunningGame());
+      together.family.followGame();
+      if (ps3) _watchPs3Trophies(game);
+      if (run is EmbeddedRetroGame) {
+        _padLog?.call('retro: ${disc.platform.name} embedded texture ${run.textureId} started');
+      } else {
+        _padLog?.call('retro: ${disc.platform.name} process ${run.pid} started');
+      }
+      _changed();
+      final window = cancelled
+          ? _GameWindowState.exited
+          : run is EmbeddedRetroGame
+          ? await run.ready.timeout(retroStartTimeout, onTimeout: () => false)
+                ? _GameWindowState.ready
+                : _GameWindowState.timedOut
+          : await _waitForGameWindow(run);
+      if (window == _GameWindowState.ready && !stopping && run is! EmbeddedRetroGame) {
+        await _placeGameOnDisplay(run);
+      }
+      starting = null;
+      if (window == _GameWindowState.timedOut && !stopping) {
+        final reason = run is EmbeddedRetroGame && run.error.isNotEmpty
+            ? run.error
+            : 'The emulator did not produce a game view in time.';
+        show(reason);
+        unawaited(stopRunningGame());
+      }
+      if (window == _GameWindowState.ready && !stopping) {
+        _padLog?.call('retro: ${disc.platform.name} window ready after ${launchTime.elapsedMilliseconds} ms');
+        if (run is EmbeddedRetroGame) {
+          final renderer = ps3
+              ? 'Vulkan'
+              : run.hardwareRendering
+              ? 'D3D11'
+              : 'software';
+          _padLog?.call('retro: ${disc.platform.name} rendering via $renderer');
+        }
+        preferences.lastPlayed[game.id] = DateTime.now().toIso8601String();
+        savePreferences();
+        if (overlay == null && run is! EmbeddedRetroGame) {
+          try {
+            final focused = await desktop.focusGame(run.pid);
+            _padLog?.call(
+              'retro: ${disc.platform.name} startup focus ${focused ? 'acquired' : 'unavailable'} for ${run.pid}',
+            );
+            if (focused && running?.$2 == run && !stopping && overlay == null && preferences.hideWhilePlaying) {
+              unawaited(_hideForGame());
+            }
+          } on Object catch (error) {
+            _padLog?.call('retro: ${disc.platform.name} startup focus failed for ${run.pid}: $error');
+          }
+        }
+      }
+      _changed();
+      if (booted != null && !booted.isCompleted) {
+        booted.complete(window == _GameWindowState.ready && !stopping && run is EmbeddedRetroGame ? run : null);
+      }
+      final code = await run.exitCode;
+      if (ps3) {
+        _trophyWatch?.cancel();
+        _loadTrophies(game);
+      }
+      running = null;
+      together.family.followGame();
+      together.family.played(run.started, DateTime.now(), reported: false);
+      stopping = false;
+      _stopTimer?.cancel();
+      _stopTimer = null;
+      if (hiddenForGame) {
+        hiddenForGame = false;
+        unawaited(services.window?.restore());
+      }
+      if (overlay == Layer.quickMenu ||
+          overlay == Layer.closeGame ||
+          overlay == Layer.retroGraphics ||
+          (overlay == Layer.emulatorMenu && _emulatorMenu.fromGraphics)) {
+        overlay = null;
+      }
+      if (run is EmbeddedRetroGame && run.error.isNotEmpty) {
+        show(run.error);
+      } else if (!_stopped && (code != 0 || window != _GameWindowState.ready)) {
+        show('${T.text('startFailed')}: ${game.name} (exit $code).');
+      }
+    } on Object catch (error) {
+      starting = null;
+      _retroSetupDetail = null;
+      _retroSetupPercent = null;
+      if (running == null && overlay == Layer.quickMenu) overlay = null;
+      show('${T.text('startFailed')}: $error');
+    } finally {
+      if (booted != null && !booted.isCompleted) booted.complete(null);
+      if (identical(_retroSettled, settled)) _retroSettled = null;
+      settled.complete();
+    }
+    _changed();
+  }
+
+  EmbeddedRetroGame? get embeddedGame => switch (running?.$2) {
+    final EmbeddedRetroGame game => game,
+    _ => null,
+  };
+
+  Game? get launchCardGame {
+    final session = embeddedGame;
+    if (session == null) return starting;
+    return !session.presented || session.progress != null ? running?.$1 : null;
+  }
+
+  Duration retroStartTimeout = const Duration(minutes: 3);
+
+  Future<_GameWindowState> _waitForGameWindow(RunningGame run) async {
+    final nativeReady = services.gameWindowReady;
+    final areas = switch (desktop) {
+      final GameAreas areas => areas,
+      _ => null,
+    };
+    if (nativeReady == null && areas == null) return _GameWindowState.ready;
+    var exited = false;
+    unawaited(run.process.exitCode.then<void>((_) => exited = true));
+    final waiting = Stopwatch()..start();
+    while (!exited && waiting.elapsed < retroStartTimeout) {
+      final visible = nativeReady == null ? areas!.gameArea(run.pid) != null : await nativeReady(run.pid);
+      if (visible && !exited) return _GameWindowState.ready;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    return exited ? _GameWindowState.exited : _GameWindowState.timedOut;
+  }
+
+  Future<void> _placePs5Window(RunningGame run, GameSettings settings) async {
+    if (preferences.displayDevice != null) {
+      if (await _waitForGameWindow(run) != _GameWindowState.ready) return;
+      await _placeGameOnDisplay(run);
+    }
+    if (!engine.readsDisplaySettings && running?.$2 == run) {
+      await desktop.applyDisplay(run.pid, fullscreen: settings.fullscreen, windowSize: settings.windowSize);
+    }
+  }
+
+  Future<void> _placeGameOnDisplay(RunningGame run) async {
+    final id = preferences.displayDevice;
+    if (id == null || running?.$2 != run) return;
+    final requested = await services.moveToDisplay?.call(id, pid: run.pid) ?? false;
+    _padLog?.call('display: game ${run.pid} ${requested ? 'placement requested on' : 'placement unavailable on'} $id');
+  }
+
+  void _watchPs3Trophies(Game game) {
+    _loadTrophies(game);
+    final system = _managedRetro.systemPath;
+    var stamp = Trophies.ps3ProgressStamp(game, system);
+    final seen =
+        trophies[game.id]?.trophies.where((trophy) => trophy.unlocked != null).map((trophy) => trophy.id).toSet() ??
+        <String>{};
+    _trophyWatch?.cancel();
+    _trophyWatch = Timer.periodic(const Duration(seconds: 2), (_) {
+      final current = Trophies.ps3ProgressStamp(game, system);
+      if (current.isEmpty || current == stamp) return;
+      stamp = current;
+      final before = trophies[game.id];
+      _loadTrophies(game);
+      if (before != null && (trophies[game.id]?.unlockedCount ?? 0) < before.unlockedCount) {
+        trophies[game.id] = before;
+        return;
+      }
+      final fresh = trophies[game.id]?.trophies.where((trophy) => trophy.unlocked != null && !seen.contains(trophy.id));
+      if (fresh == null || fresh.isEmpty) return;
+      sounds.play(Cue.unlocked, overGame: true);
+      vibrate(HapticCue.trophy);
+      for (final trophy in fresh) {
+        seen.add(trophy.id);
+        show('${T.text('trophyEarned')} · ${trophy.name}');
+      }
+      _changed();
+    });
   }
 
   /// While a game runs, a trophy it earns shows and goes to the phones.
@@ -3756,6 +4412,20 @@ class AppModel extends ChangeNotifier {
   })
   startGame = GameProcess.start;
 
+  Future<RunningGame> Function({
+    required String installed,
+    required String program,
+    required List<String> arguments,
+    required String logFile,
+  })
+  startRetroGame = ({required installed, required program, required arguments, required logFile}) => GameProcess.start(
+    installed: installed,
+    program: program,
+    arguments: arguments,
+    logFile: logFile,
+    environment: const {},
+  );
+
   /// Stop asked the game playing to close: it is given [stopGrace], then ended.
   bool stopping = false;
   Timer? _stopTimer;
@@ -3764,6 +4434,11 @@ class AppModel extends ChangeNotifier {
   Duration stopGrace = const Duration(seconds: 8);
 
   void stopGame() {
+    _retroRestartTrials.cancelPendingRestart();
+    if (running?.$1.retro != null) {
+      unawaited(stopRunningGame());
+      return;
+    }
     if (running != null) _stopped = true;
     running?.$2.stop();
   }
@@ -3782,7 +4457,7 @@ class AppModel extends ChangeNotifier {
     _stopTimer?.cancel();
     _stopTimer = Timer(stopGrace, () {
       _stopTimer = null;
-      if (running?.$2 == run) run.kill();
+      if (running?.$2 == run && run is! EmbeddedRetroGame) run.kill();
     });
     try {
       await run.close();
@@ -3794,6 +4469,7 @@ class AppModel extends ChangeNotifier {
   /// Asks the game playing to close as its window would (a family limit): the launcher closed
   /// it, so no crash report follows.
   Future<void> closeGame() async {
+    _retroRestartTrials.cancelPendingRestart();
     if (running == null) return;
     _stopped = true;
     await running!.$2.close();
@@ -3801,6 +4477,7 @@ class AppModel extends ChangeNotifier {
 
   /// Ends the game playing at once (a family limit after its grace).
   void killGame() {
+    _retroRestartTrials.cancelPendingRestart();
     if (running != null) _stopped = true;
     running?.$2.kill();
   }
@@ -3836,6 +4513,7 @@ class AppModel extends ChangeNotifier {
     if (next == Layer.settings) {
       settingsQuery = '';
       settingsSearchFocused = false;
+      unawaited(refreshDisplays());
     }
     panelCategory = 0;
     panelSections = false;
@@ -3936,6 +4614,26 @@ class AppModel extends ChangeNotifier {
   }
 
   void closeOverlay() {
+    if (overlay == Layer.emulatorMenu && _emulatorMenu.back()) return;
+    if (_returnsToGame) {
+      resumeGame();
+      return;
+    }
+    _dismissOverlay();
+  }
+
+  bool get _returnsToGame {
+    final playing = running?.$1;
+    if (playing == null) return false;
+    return switch (overlay) {
+      Layer.quickMenu || Layer.closeGame || Layer.retroGraphics => true,
+      Layer.emulatorMenu => _emulatorMenu.fromGraphics,
+      Layer.gameSettings => playing.retro != null && selectedGame?.id == playing.id,
+      _ => false,
+    };
+  }
+
+  void _dismissOverlay() {
     overlay = null;
     // A crop closed some other way (PS) keeps nothing.
     pictureCrop?.image.dispose();
@@ -3960,7 +4658,7 @@ class AppModel extends ChangeNotifier {
     if (index < 0) return show(T.format('steamPlayMissing', [titleId]));
     final game = games[index];
     select(index);
-    if (!records.containsKey(game.id)) return show(T.format('steamPlayLocked', [game.name]));
+    if (game.retro == null && !records.containsKey(game.id)) return show(T.format('steamPlayLocked', [game.name]));
     if (quitAfter) _quitAfterGame = game.id;
     await play(game);
     if (running?.$1 != game && _quitAfterGame == game.id) _quitAfterGame = null;
@@ -3971,6 +4669,7 @@ class AppModel extends ChangeNotifier {
   void select(int index) {
     if (index < 0 || index >= games.length) return;
     selected = index;
+    _homeRetroFolder = preferences.showRetroFolders ? games[index].retro?.platform : null;
     focus = HomeFocus.tiles;
     measureSelected();
     _changed();
@@ -4019,6 +4718,16 @@ class AppModel extends ChangeNotifier {
     // At start a profile is picked first: PS waits.
     if (overlay == Layer.profilePicker && profileFlow.atLaunch && command == Command.home) return sounds.play(Cue.bump);
     if (command == Command.home) {
+      if (embeddedGame != null || (_retroSession && running == null)) {
+        if (_returnsToGame || overlay == Layer.quickMenu) {
+          final front = _frontForGuide;
+          resumeGame();
+          if (!front) unawaited(raiseLauncher());
+        } else {
+          unawaited(openQuickMenu());
+        }
+        return;
+      }
       // PS/Guide: from the game to the launcher and back; behind another window, to the front.
       final run = running?.$2;
       switch (_guide.press(
@@ -4028,12 +4737,11 @@ class AppModel extends ChangeNotifier {
         layerOpen: overlay != null,
       )) {
         case GuideAction.showGame:
-          // The quick menu (or Close Game?) goes with the launcher.
-          if (overlay == Layer.quickMenu || overlay == Layer.closeGame) {
-            overlay = null;
-            _changed();
+          if (_returnsToGame) {
+            resumeGame();
+          } else {
+            unawaited(_showGame(run!));
           }
-          unawaited(_showGame(run!));
         case GuideAction.showLauncher:
           // From the game: the launcher with the quick menu over it, the game paused first.
           unawaited(run != null ? openQuickMenu() : raiseLauncher());
@@ -4051,7 +4759,8 @@ class AppModel extends ChangeNotifier {
               overlay == Layer.controls ||
               overlay == Layer.advanced ||
               overlay == Layer.trophies)) {
-        moveSelection(command == Command.nextGame ? 1 : -1);
+        final delta = command == Command.nextGame ? 1 : -1;
+        overlay == null ? moveHomeSelection(delta) : moveSelection(delta);
       }
       return;
     }
@@ -4207,6 +4916,8 @@ class AppModel extends ChangeNotifier {
         return;
       case Layer.settings ||
           Layer.gameSettings ||
+          Layer.retroGraphics ||
+          Layer.emulatorMenu ||
           Layer.confirmUninstall ||
           Layer.copyWarning ||
           Layer.gameFiles ||
@@ -4251,15 +4962,17 @@ class AppModel extends ChangeNotifier {
     if (focus == const HomeFocus.notice(1) && updates.restartAfterGame) focus = const HomeFocus.notice(0);
     switch ((focus.area, command)) {
       case ('tiles', Command.left):
-        moveSelection(-1);
+        moveHomeSelection(-1);
       case ('tiles', Command.right):
-        moveSelection(1);
+        moveHomeSelection(1);
       case ('tiles', Command.down):
-        _moveFocus(const HomeFocus.actions(0));
+        if (!openSelectedHomeFolder()) _moveFocus(const HomeFocus.actions(0));
+      case ('tiles', Command.back):
+        closeHomeFolder();
       case ('tiles', Command.up):
-        _moveFocus(const HomeFocus.top(1));
+        if (!closeHomeFolder()) _moveFocus(const HomeFocus.top(1));
       case ('tiles', Command.select):
-        primaryAction(game!);
+        if (!openSelectedHomeFolder()) primaryAction(game!);
       case ('top', Command.left) when focus.index == 0 && updates.showsNotice:
         _moveFocus(HomeFocus.notice(updates.restartAfterGame ? 0 : 1));
       case ('top', Command.left):
@@ -4304,7 +5017,7 @@ class AppModel extends ChangeNotifier {
           open(Layer.gameSettings);
         }
       case (_, Command.options):
-        open(Layer.gameSettings);
+        if (selectedHomeFolder == null) open(Layer.gameSettings);
       default:
         break;
     }
@@ -4335,11 +5048,17 @@ class AppModel extends ChangeNotifier {
   /// launcher in front with Resume, Game Settings and Close Game.
   Future<void> openQuickMenu() async {
     final playing = running;
-    if (playing == null || !preferences.onboarded) return;
+    if (!preferences.onboarded) return;
+    if (playing == null) {
+      if (starting?.retro == null) return;
+      open(Layer.quickMenu);
+      if (!_frontForGuide) await raiseLauncher();
+      return;
+    }
     final (game, run) = playing;
     final front = _frontForGuide;
-    quickMenuPaused = false;
-    if (!front && preferences.pauseOnMenu) {
+    quickMenuPaused = run is EmbeddedRetroGame;
+    if (!front && preferences.pauseOnMenu && game.retro == null) {
       // An engine that takes presses: Options held on player 1's pad through the remote pad
       // bridge, whoever drives it (sent three times, 40 ms apart; the menu ~210 ms after the
       // first). Otherwise the key the game's Options is on, typed into its window.
@@ -4370,7 +5089,15 @@ class AppModel extends ChangeNotifier {
   /// PS held: Close Game? over a game in front; the home menu in the launcher.
   void homeHeld() {
     if (!preferences.onboarded) return;
+    if (running == null && starting?.retro != null) {
+      unawaited(openQuickMenu());
+      return;
+    }
     if (overlay == Layer.profilePicker && profileFlow.atLaunch) return;
+    if (embeddedGame != null && launcherInFront) {
+      open(Layer.closeGame);
+      return;
+    }
     final front = _frontForGuide;
     if (running != null && !front) {
       open(Layer.closeGame);
@@ -4385,14 +5112,13 @@ class AppModel extends ChangeNotifier {
   /// Back to the game from the quick menu (or Close Game?): the game in front again. Its pause
   /// menu, if the Options press opened one, stays for the player.
   void resumeGame() {
-    overlay = null;
-    sounds.play(Cue.back);
-    _changed();
+    _dismissOverlay();
     if (running?.$2 case final RunningGame run) unawaited(_showGame(run));
   }
 
   /// Close Game from the quick menu or the question.
   void closeRunningGame() {
+    _retroRestartTrials.cancelPendingRestart();
     overlay = null;
     sounds.play(Cue.select);
     unawaited(stopRunningGame());
@@ -4407,7 +5133,12 @@ class AppModel extends ChangeNotifier {
   /// Escape on the home screen, the games in focus and nothing over them, asks Quit AnyPS5?
   /// (Cancel first); everywhere else Escape keeps its meaning.
   bool askQuit() {
-    if (!preferences.onboarded || overlay != null || pairing != null || starting != null || !focus.isTiles) {
+    if (!preferences.onboarded ||
+        overlay != null ||
+        pairing != null ||
+        starting != null ||
+        activeHomeRetroFolder != null ||
+        !focus.isTiles) {
       return false;
     }
     open(Layer.confirmQuit);
@@ -4416,10 +5147,62 @@ class AppModel extends ChangeNotifier {
 
   /// Quit AnyPS5 (the home menu): the game playing closes with it.
   void quitLauncher() {
+    if (running?.$1.retro != null || starting?.retro != null) {
+      unawaited(_quitLauncher());
+    } else {
+      _quitImmediately();
+    }
+  }
+
+  bool _quitting = false;
+
+  Future<void> _quitLauncher() async {
+    if (_quitting) return;
+    _quitting = true;
+    if (!await prepareToQuit()) {
+      _quitting = false;
+      return;
+    }
+    _quitImmediately();
+  }
+
+  void _quitImmediately() {
     stopGame();
     unawaited(_stopReplay());
     unawaited(discord.close());
     (services.quit ?? exit)(0);
+  }
+
+  Future<bool> prepareToQuit() async {
+    _retroRestartTrials.cancelPendingRestart();
+    if (starting?.retro != null && running == null) {
+      show('The emulator is starting. Wait for the game window before closing the launcher.');
+      return false;
+    }
+    final playing = running;
+    if (playing == null || playing.$1.retro == null) return true;
+    final run = playing.$2;
+    unawaited(stopRunningGame());
+    try {
+      await run.exitCode.timeout(stopGrace + const Duration(seconds: 1));
+    } on TimeoutException {
+      if (run is EmbeddedRetroGame) {
+        show('The embedded game is still closing. Try again when it has finished saving.');
+        return false;
+      }
+      run.kill();
+      try {
+        await run.exitCode.timeout(const Duration(seconds: 3));
+      } on TimeoutException {
+        show('The emulator is still closing. Try again once its memory card has finished saving.');
+        return false;
+      }
+    }
+    if (run is EmbeddedRetroGame && run.error.isNotEmpty) {
+      show(run.error);
+      return false;
+    }
+    return true;
   }
 
   // Captures: Share, the replay buffer, screenshots.
@@ -4598,6 +5381,33 @@ class AppModel extends ChangeNotifier {
 
   // The launcher's window.
 
+  List<LauncherDisplay> displays = const [];
+
+  Future<void> refreshDisplays({bool restoreLauncher = false}) async {
+    final list = services.displays;
+    if (list == null) return;
+    displays = [...await list()]
+      ..sort((left, right) {
+        if (left.primary != right.primary) return left.primary ? -1 : 1;
+        return left.id.compareTo(right.id);
+      });
+    final id = preferences.displayDevice;
+    if (restoreLauncher && id != null && displays.any((display) => display.id == id)) {
+      final placed = await services.moveToDisplay?.call(id) ?? false;
+      _padLog?.call('display: launcher ${placed ? 'placed on' : 'placement unavailable on'} $id');
+    }
+    if (!_disposed) _changed();
+  }
+
+  Future<void> setDisplayDevice(String? id) async {
+    if (id != null && !await (services.moveToDisplay?.call(id) ?? Future.value(false))) {
+      show('That display is unavailable.');
+      return;
+    }
+    preferences.displayDevice = id;
+    savePreferences();
+  }
+
   /// Whether the launcher is full screen (Settings › Appearance › Full Screen; F11).
   bool get launcherFullscreen => preferences.launcherFullscreen ?? true;
 
@@ -4692,13 +5502,174 @@ class AppModel extends ChangeNotifier {
 
   // Panels.
 
+  PanelCategory _embeddedGraphics(EmbeddedRetroGame game) => PanelCategory(
+    id: 'embedded-graphics',
+    title: 'Graphics',
+    rows: [
+      PanelRow(
+        id: 'embedded-filter',
+        title: 'Display filtering',
+        kind: ChoiceRow(['Sharp', 'Smooth'], game.filter, (choice) {
+          game.filter = choice;
+          _changed();
+        }),
+      ),
+      PanelRow(
+        id: 'embedded-framing',
+        title: 'Display aspect ratio',
+        kind: ChoiceRow(['Original', '4:3', '16:9', 'Fill window'], game.framing, (choice) {
+          game.framing = choice;
+          _changed();
+        }),
+      ),
+      for (final option in game.options.entries.where((entry) => !entry.value.restart))
+        PanelRow(
+          id: option.key,
+          title: switch (option.key) {
+            'pcsx2_deinterlace_mode' => 'Deinterlacing',
+            'swanstation_Display_CropMode' => 'Screen crop',
+            'swanstation_GPU_ResolutionScale' || 'pcsx2_upscale_multiplier' => 'Internal resolution',
+            'swanstation_GPU_TextureFilter' => 'Texture filtering',
+            _ => option.value.title.isEmpty ? option.key : option.value.title,
+          },
+          kind: ChoiceRow(
+            option.key == 'swanstation_GPU_ResolutionScale'
+                ? option.value.values.map((value) => '${value}x').toList()
+                : option.value.values,
+            option.value.selected,
+            (choice) => unawaited(game.setOption(option.key, option.value.values[choice])),
+          ),
+        ),
+      if (game.options.values.any((option) => option.restart))
+        PanelRow(
+          id: 'embedded-startup-options',
+          title: 'Startup Options',
+          detail: 'Changes apply the next time you start this game.',
+          kind: ActionRow(() => _emulatorMenu.openPage(() => _embeddedStartupOptions(game))),
+        ),
+      _emulatorMenu.tuningLink(game),
+      if (game.resolutionError.isNotEmpty)
+        PanelRow(id: 'embedded-resolution-error', title: 'Internal resolution', kind: InfoRow(game.resolutionError)),
+    ],
+  );
+
+  PanelCategory _embeddedStartupOptions(EmbeddedRetroGame game) => PanelCategory(
+    id: 'embedded-startup-options',
+    title: 'Startup Options',
+    rows: [
+      for (final option in game.options.entries)
+        if (option.value.restart) _ps3GraphicsRow(game, option.key, option.value),
+    ],
+  );
+
+  PanelCategory _embeddedPs3Graphics(EmbeddedRetroGame game) {
+    const primary = [
+      EmbeddedRetroGame.ps3Resolution,
+      'rpcs3_default_resolution',
+      'rpcs3_anisotropic_filter',
+      'rpcs3_msaa',
+      'rpcs3_frame_limit',
+    ];
+    const textures = {
+      'rpcs3_async_texture_streaming',
+      'rpcs3_shader_mode',
+      'rpcs3_shader_quality',
+      'rpcs3_disable_vertex_cache',
+      'rpcs3_use_rebar',
+    };
+    const timing = {
+      'rpcs3_multithreaded_rsx',
+      'rpcs3_rsx_fifo_accuracy',
+      'rpcs3_driver_wakeup_delay',
+      'rpcs3_vblank_rate',
+    };
+    String categoryFor(String key) {
+      if (textures.contains(key)) return 'Textures & Shaders';
+      if (timing.contains(key)) return 'Frame Timing';
+      return 'Rendering';
+    }
+
+    final advanced = <String, List<String>>{};
+    for (final key in game.options.keys) {
+      if (!primary.contains(key) && Ps3SettingsModel.graphicsKeys.contains(key)) {
+        (advanced[categoryFor(key)] ??= []).add(key);
+      }
+    }
+    return PanelCategory(
+      id: 'embedded-graphics',
+      title: 'Graphics',
+      rows: [
+        const PanelRow(id: 'ps3-renderer', title: 'Renderer', kind: InfoRow('Vulkan')),
+        for (final key in primary)
+          if (game.options[key] case final option?) _ps3GraphicsRow(game, key, option),
+        _emulatorMenu.tuningLink(game),
+        for (final entry in advanced.entries)
+          PanelRow(
+            id: 'ps3-graphics-${entry.key}',
+            title: entry.key,
+            kind: ActionRow(
+              () => _emulatorMenu.openPage(
+                () => PanelCategory(
+                  id: 'ps3-graphics-section',
+                  title: 'PS3 › Graphics › ${entry.key}',
+                  rows: [
+                    for (final key in entry.value)
+                      if (game.options[key] case final option?) _ps3GraphicsRow(game, key, option),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  PanelRow _ps3GraphicsRow(EmbeddedRetroGame game, String key, EmbeddedOption option) => PanelRow(
+    id: key,
+    title: option.title,
+    detail: option.restart ? 'Applies on next launch.' : 'Applies when you resume.',
+    kind: ChoiceRow(
+      option.labels.length == option.values.length ? option.labels : option.values,
+      option.selected,
+      (choice) => unawaited(game.setOption(key, option.values[choice])),
+    ),
+  );
+
   List<PanelCategory> panelCategories() {
     final game = selectedGame;
     switch (overlay) {
       case Layer.settings:
         return _searchedSettings(_settingsCategories());
+      case Layer.emulatorMenu:
+        return _emulatorMenu.categories;
       case Layer.gameSettings when game != null:
-        return [PanelCategory(id: 'game', title: game.name, rows: _gameRows(game))];
+        return [
+          PanelCategory(
+            id: 'game',
+            title: game.name,
+            rows: [
+              ..._gameRows(game),
+              if (game.retro case final RetroDisc disc)
+                PanelRow(
+                  id: 'game-emulators',
+                  title: 'Emulators',
+                  detail: ManagedRetro.platformName(disc.platform),
+                  kind: ActionRow(() => _emulatorMenu.openConsole(disc.platform, game: game)),
+                ),
+            ],
+          ),
+        ];
+      case Layer.retroGraphics when running?.$1.retro != null:
+        if (embeddedGame case final EmbeddedRetroGame session) {
+          if (_retroRestartTrials.isTrial(session)) {
+            return [
+              PanelCategory(id: 'embedded-restart-trial', title: 'Graphics', rows: [_emulatorMenu.tuningLink(session)]),
+            ];
+          }
+          if (running!.$1.retro!.platform == RetroPlatform.ps3) return [_embeddedPs3Graphics(session)];
+          return [_embeddedGraphics(session)];
+        }
+        return [retroSettings.graphicsCategory(running!.$1.retro!.platform)];
       case Layer.controls when game != null:
         return [PanelCategory(id: 'controls', title: game.name, rows: _controlRows(game))];
       case Layer.advanced when game != null:
@@ -4800,19 +5771,38 @@ class AppModel extends ChangeNotifier {
                   detail: T.text('powerQuickUndoDetail'),
                   kind: ActionRow(powerWatch.undo),
                 ),
-              PanelRow(
-                id: 'gameSettings',
-                title: T.text('gameSettings'),
-                kind: ActionRow(() => open(Layer.gameSettings)),
-              ),
-              ...media.gameRows(),
-              ...sharePlay.rows(),
+              if (embeddedGame == null)
+                PanelRow(
+                  id: 'gameSettings',
+                  title: T.text('gameSettings'),
+                  kind: ActionRow(() => open(Layer.gameSettings)),
+                ),
+              if (running?.$1.retro != null)
+                PanelRow(
+                  id: 'retroGraphics',
+                  title: 'Graphics',
+                  detail: embeddedGame == null ? 'Queue changes for the next launch.' : 'Adjust the running game.',
+                  kind: ActionRow(() => open(Layer.retroGraphics)),
+                ),
+              if (embeddedGame == null) ...media.gameRows(),
+              if (embeddedGame == null) ...sharePlay.rows(),
               PanelRow(
                 id: 'closeGame',
                 title: T.text('quickCloseGame'),
                 // Asked first, as PS held asks.
                 kind: ActionRow(() => open(Layer.closeGame), destructive: true),
               ),
+            ],
+          ),
+        ];
+      case Layer.quickMenu when starting?.retro != null:
+        return [
+          PanelCategory(
+            id: 'quickMenu',
+            title: starting!.name,
+            rows: [
+              PanelRow(id: 'retroPreparing', title: _retroSetupDetail ?? T.text('starting'), kind: const InfoRow('')),
+              PanelRow(id: 'resume', title: T.text('quickResume'), kind: ActionRow(resumeGame)),
             ],
           ),
         ];
@@ -5128,6 +6118,21 @@ class AppModel extends ChangeNotifier {
             ]),
             kind: ToggleRow(launcherFullscreen, (value) => unawaited(setLauncherFullscreen(value))),
           ),
+          if (displays.length > 1)
+            PanelRow(
+              id: 'playDisplay',
+              title: 'Launcher and game display',
+              detail: 'Choose where AnyPS5 and games open.',
+              kind: ChoiceRow(
+                [
+                  'Automatic',
+                  for (final (index, display) in displays.indexed)
+                    'Monitor ${index + 1} · ${display.width}×${display.height}${display.primary ? ' (Primary)' : ''}',
+                ],
+                displays.indexWhere((display) => display.id == preferences.displayDevice) + 1,
+                (index) => unawaited(setDisplayDevice(index == 0 ? null : displays[index - 1].id)),
+              ),
+            ),
           PanelRow(
             id: 'windowButtons',
             title: T.text('windowButtons'),
@@ -5362,6 +6367,7 @@ class AppModel extends ChangeNotifier {
           updates.channelRow(),
         ],
       ),
+      if (system == HostSystem.windows) _emulatorMenu.entry,
     ];
   }
 
@@ -5747,6 +6753,16 @@ class AppModel extends ChangeNotifier {
   }
 
   List<PanelRow> _gameRows(Game game) {
+    if (game.retro != null) {
+      return [
+        PanelRow(id: 'log', title: T.text('openLog'), kind: ActionRow(() => open(Layer.log))),
+        PanelRow(
+          id: 'folder',
+          title: T.text('showInFinder'),
+          kind: ActionRow(() => services.openFolder?.call(game.folder)),
+        ),
+      ];
+    }
     final settings = currentSettings(game);
     void change(GameSettings next) => saveSettings(game, next);
     final defaults = preferences.displayDefaults;
@@ -6334,7 +7350,7 @@ class AppModel extends ChangeNotifier {
             set(!value);
             sounds.play(Cue.move);
           default:
-            if (overlay == Layer.settings && categories.length > 1) {
+            if (categories.length > 1) {
               final next = (panelCategory + delta).clamp(0, categories.length - 1);
               if (next != panelCategory) sounds.play(Cue.move);
               panelCategory = next;
@@ -6377,7 +7393,7 @@ class AppModel extends ChangeNotifier {
   /// A controller's command in a panel: the sections' column and edit mode (the keys and the
   /// mouse keep the old ways). True when it was handled here.
   bool _padPanelCommand(Command command, PanelRow? row, List<PanelCategory> categories) {
-    final sections = overlay == Layer.settings && categories.length > 1;
+    final sections = categories.length > 1;
     if (panelSections && sections) {
       switch (command) {
         // ↑ on the first section: onto the search field.
@@ -6568,7 +7584,7 @@ class AppModel extends ChangeNotifier {
   int get _onboardingCount => switch (onboardingStep) {
     0 => T.languages.length,
     1 => LookStyle.values.length,
-    2 => preferences.gamesFolders.isEmpty ? 1 : 2,
+    2 => managedRetroAvailable || preferences.gamesFolders.isNotEmpty ? 2 : 1,
     _ => 3,
   };
 
@@ -6624,7 +7640,7 @@ class AppModel extends ChangeNotifier {
         _previewChoice();
         onboardingStep++;
       case 2:
-        if (onboardingChoice == 1 && preferences.gamesFolders.isNotEmpty) {
+        if (onboardingChoice == 1 && (managedRetroAvailable || preferences.gamesFolders.isNotEmpty)) {
           onboardingStep++;
           _enterToolkitStep();
         } else {

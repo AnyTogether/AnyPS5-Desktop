@@ -59,20 +59,22 @@ class ThemeMusic {
   /// The id of the song playing (or coming in), for tests and the phone.
   String? get playing => _current;
 
-  /// The song of [game], or [fallback] (a theme's menu music) when the game has none, or
-  /// silence; asking again for the music playing changes nothing.
-  void play(Game? game, {String? fallback}) {
+  /// A console cue plays once. Games and the fallback theme loop after the normal selection delay.
+  void play(Game? game, {String? fallback, String? startupCue}) {
     final music = game?.music;
-    final song = music != null
-        ? (id: game!.id, path: music, atrac9: true)
-        : (fallback == null ? null : (id: 'theme:$fallback', path: fallback, atrac9: false));
+    final song = startupCue != null
+        ? (id: 'startup:$startupCue', path: startupCue, atrac9: false, loop: false)
+        : music != null
+        ? (id: game!.id, path: music, atrac9: game.retro == null, loop: true)
+        : (fallback == null ? null : (id: 'theme:$fallback', path: fallback, atrac9: false, loop: true));
     if (song?.id == _wanted) return;
     _wanted = song?.id;
     _pending?.cancel();
     final generation = ++_generation;
     _stop();
     if (song == null || _volume <= 0) return;
-    _pending = Timer(settle, () async {
+    final delay = song.loop ? settle : const Duration(milliseconds: 220);
+    _pending = Timer(delay, () async {
       if (generation != _generation) return;
       var sound = _cache[song.id];
       if (sound == null) {
@@ -82,7 +84,7 @@ class ThemeMusic {
         _remember(song.id, made);
       }
       if (generation != _generation) return;
-      _start(song.id, sound);
+      _start(song.id, sound, loop: song.loop);
     });
   }
 
@@ -98,13 +100,13 @@ class ThemeMusic {
     return sound == null ? null : (sound, song.loopStart);
   }
 
-  void _start(String id, (Object, Duration) sound) {
+  void _start(String id, (Object, Duration) sound, {required bool loop}) {
     final previous = _voice;
     if (previous != null) _out.stop(previous);
-    _voice = _out.play(sound.$1, volume: 0, loop: true, loopStart: sound.$2);
+    _voice = _out.play(sound.$1, volume: 0, loop: loop, loopStart: sound.$2);
     _current = id;
     _level = 0;
-    _ramp(_volume, fadeIn);
+    _ramp(_volume, loop ? fadeIn : const Duration(milliseconds: 96));
   }
 
   void _stop() {

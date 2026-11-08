@@ -24,6 +24,7 @@ import 'core/host.dart';
 import 'core/opened_files.dart';
 import 'core/launcher_health.dart';
 import 'core/release_signing.dart';
+import 'core/retro_optimizer.dart';
 import 'core/steam/steam_launch.dart';
 import 'core/toolkit_download.dart';
 import 'ui/app_model.dart';
@@ -44,6 +45,7 @@ late final AppLifecycleListener _exit;
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
+  final isolatedExperiment = Platform.environment.containsKey('ANYPS5_DESKTOP_EXPERIMENT_HOME');
   final paths = AppPaths.forSystem(HostSystem.current);
   final relayFile = LinkRelay.fileIn(paths.config);
   // A theme file opened while a launcher already runs goes to that one (as anyps5:// links do);
@@ -140,6 +142,15 @@ Future<void> main(List<String> arguments) async {
       // SDL2 (beside the launcher on Windows, the system's on Linux), else XInput and winmm or evdev.
       pads: () => PadReader.open(arguments: arguments),
       systemProbe: () => HostProbe(HostSystem.current),
+      retroHardware: () async {
+        final view = PlatformDispatcher.instance.implicitView;
+        if (!Platform.isWindows || view == null) return null;
+        return RetroHardware(displayHeight: view.display.size.height.round(), adapters: await window.retroAdapters());
+      },
+      displays: window.displays,
+      moveToDisplay: window.moveToDisplay,
+      gameWindowReady: Platform.isWindows ? window.gameWindowReady : null,
+      retroMenuRegion: Platform.isWindows ? window.setRetroMenuRegion : null,
       desktop: desktop,
       backdrop: backdrop,
       window: window,
@@ -156,6 +167,7 @@ Future<void> main(List<String> arguments) async {
   health.runnerRemovesMarker = await window.removeAfterClose(health.markerPath);
   _exit = AppLifecycleListener(
     onExitRequested: () async {
+      if (!await model.prepareToQuit()) return AppExitResponse.cancel;
       closing();
       return AppExitResponse.exit;
     },
@@ -185,6 +197,7 @@ Future<void> main(List<String> arguments) async {
   }
   model.crash.traceAll = options.trace;
   model.steamLaunch = SteamLaunch.detect(arguments, Platform.environment);
+  await model.refreshDisplays(restoreLauncher: true);
   // Full screen the first time, then as the user left it (F11, Settings › Appearance); Steam's
   // --fullscreen and Game Mode keep the whole screen whatever the choice.
   if (!options.fullscreen && !model.steamLaunch.gameMode) unawaited(model.applyLauncherWindow());
@@ -205,7 +218,7 @@ Future<void> main(List<String> arguments) async {
   runApp(AnyPS5App(model: model));
   // .anyps5theme files open with this launcher (the zip, the AppImage and the archive install
   // nothing that would say so); not for a development build.
-  if (!kDebugMode) {
+  if (!kDebugMode && !isolatedExperiment) {
     unawaited(
       ThemeFileType(
         system: HostSystem.current,
@@ -238,7 +251,9 @@ Future<void> main(List<String> arguments) async {
       }),
     ),
   );
-  unawaited(UrlScheme.register());
+  if (!isolatedExperiment) {
+    unawaited(UrlScheme.register());
+  }
 }
 
 class AnyPS5App extends StatelessWidget {

@@ -10,15 +10,17 @@ import 'host.dart';
 class RunningGame {
   /// [exitCode] completes once the game ended and its output is in its log (a stand-in process
   /// in tests).
-  RunningGame(this.process, this.exitCode, this.started);
+  RunningGame(Process process, this.exitCode, this.started) : _process = process;
+  RunningGame.embedded(this.exitCode, this.started) : _process = null;
 
-  final Process process;
+  final Process? _process;
+  Process get process => _process!;
 
   /// Completes with the game's exit code once it ended and its log is written.
   final Future<int> exitCode;
   final DateTime started;
 
-  int get pid => process.pid;
+  int get pid => _process?.pid ?? 0;
 
   /// Asks the game to end (SIGTERM on Linux, TerminateProcess on Windows).
   bool stop() => process.kill();
@@ -53,6 +55,7 @@ abstract final class GameProcess {
     required Map<String, String> environment,
     required String logFile,
     HostSystem? system,
+    String? program,
     List<String> arguments = const [],
     DateTime Function()? clock,
     bool traced = false,
@@ -60,7 +63,7 @@ abstract final class GameProcess {
     List<String> notes = const [],
   }) async {
     final host = system ?? HostSystem.current;
-    final executable = p.join(installed, host.executableName);
+    final executable = program ?? p.join(installed, host.executableName);
     if (!File(executable).existsSync()) {
       throw ProcessException(executable, arguments, 'the game is not installed', 2);
     }

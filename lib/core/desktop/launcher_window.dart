@@ -1,3 +1,16 @@
+import 'dart:ui';
+
+typedef RetroMenuRegion = Future<bool> Function(int? pid, Rect? bounds);
+
+class LauncherDisplay {
+  const LauncherDisplay({required this.id, required this.width, required this.height, required this.primary});
+
+  final String id;
+  final int width;
+  final int height;
+  final bool primary;
+}
+
 /// The launcher's own window, as far as the launcher changes it: full screen or not, minimized,
 /// closed (the runner's "anyps5/window" channel on Windows and Linux).
 abstract class LauncherWindow {

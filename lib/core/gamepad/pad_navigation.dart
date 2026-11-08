@@ -113,6 +113,7 @@ class PadNavigator {
   /// Whether [pad] is a PlayStation controller: its Create button (SDL's Back, which the engine
   /// never gives a game on a PlayStation pad) is Share there, as the Xbox pad's own Share is.
   bool Function(String pad)? isPlayStation;
+  bool Function()? reservesGuide;
 
   /// The face buttons and Options: the launcher's own moves, which no shortcut takes alone.
   static const buttons = {
@@ -171,7 +172,8 @@ class PadNavigator {
 
   /// Whether [button] of [pad] belongs to a shortcut that acts in a game, so it must reach the
   /// navigator while a game is in front ([PadGate]).
-  bool passesInGame(String pad, PadButton button) => _gameButtons.contains(normalize(pad, button));
+  bool passesInGame(String pad, PadButton button) =>
+      (button == PadButton.guide && (reservesGuide?.call() ?? false)) || _gameButtons.contains(normalize(pad, button));
 
   void _send(PadCommand command) {
     lastPad = _sending ?? _repeater.heldBy as String? ?? lastPad;
@@ -213,6 +215,10 @@ class PadNavigator {
 
   void _pressed(String pad, _PadState state, PadButton button) {
     state.disarm();
+    if (button == PadButton.guide && (reservesGuide?.call() ?? false)) {
+      _armShortcut(pad, state, {button}, PadCommand.home, PadCommand.homeHold);
+      return;
+    }
     // A direction held on the D-pad is not part of a chord unless the chord names it.
     var chord = state.pressed;
     if (!_chords.containsKey(PadChord(chord)) && !_chords.containsKey(PadChord(chord, hold: true))) {
@@ -228,13 +234,7 @@ class PadNavigator {
       if (hold == null) {
         _sendFrom(pad, press!);
       } else {
-        state.armed = {...chord};
-        state.armedPress = press;
-        state.timer = Timer(ShortcutTiming.hold, () {
-          state.timer = null;
-          state.armed = null;
-          _sendFrom(pad, hold);
-        });
+        _armShortcut(pad, state, chord, press, hold);
       }
       // A chord of several: its last button does not also do its own move.
       if (chord.length > 1) return;
@@ -248,6 +248,16 @@ class PadNavigator {
       };
     }
     if (command != null) _sendFrom(pad, command);
+  }
+
+  void _armShortcut(String pad, _PadState state, Set<PadButton> chord, PadCommand? press, PadCommand hold) {
+    state.armed = {...chord};
+    state.armedPress = press;
+    state.timer = Timer(ShortcutTiming.hold, () {
+      state.timer = null;
+      state.armed = null;
+      _sendFrom(pad, hold);
+    });
   }
 
   void _released(String pad, _PadState state, PadButton button) {

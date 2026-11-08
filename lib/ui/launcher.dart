@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+import '../core/game_library.dart';
 import '../core/gamepad/feel.dart';
 import '../core/gamepad/shortcuts.dart';
 import '../core/together/levels.dart';
@@ -35,6 +36,8 @@ import 'profile_view.dart';
 import 'onboarding.dart';
 import 'panels.dart';
 import 'profiles_view.dart';
+import 'retro_menu_window.dart';
+import 'embedded_retro_view.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'together_model.dart';
@@ -185,6 +188,19 @@ class _LauncherShellState extends State<LauncherShell> {
 
   KeyEventResult _key(FocusNode node, KeyEvent event) {
     final model = widget.model;
+    final game = model.embeddedGame;
+    if (game != null && model.overlay == null) {
+      if (event.logicalKey == LogicalKeyboardKey.escape) {
+        if (event is KeyDownEvent) unawaited(model.openQuickMenu());
+        return KeyEventResult.handled;
+      }
+      final button = embeddedRetroKeys[event.logicalKey];
+      if (button != null) {
+        if (event is KeyDownEvent || event is KeyUpEvent) game.key(button, event is KeyDownEvent);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey != LogicalKeyboardKey.f11) return KeyEventResult.ignored;
+    }
     // A keyboard's Back and Forward keys (and mouse drivers that send them for the side
     // buttons) are the mouse's side buttons.
     if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.browserBack) {
@@ -422,28 +438,45 @@ class _LauncherShellState extends State<LauncherShell> {
                                     child: Stack(
                                       fit: StackFit.expand,
                                       children: [
-                                        Backdrop(model: model, time: widget.time),
-                                        RepaintBoundary(
-                                          // Glass's see-through window: under a layer the home screen
-                                          // fades out, the layer a pane over the desktop (LayerScrim).
-                                          child: AnimatedOpacity(
-                                            opacity: model.glassWindow.seeThrough && model.overlay != null ? 0 : 1,
-                                            duration: Motion.overlay,
-                                            curve: Motion.settle,
-                                            child: AnimatedSwitcher(
-                                              layoutBuilder: uniqueSwitcherLayout(),
-                                              duration: Motion.fade,
-                                              switchInCurve: Motion.settle,
-                                              child: model.preferences.onboarded
-                                                  ? HomeView(key: const ValueKey('home'), model: model, now: widget.now)
-                                                  : OnboardingView(
-                                                      key: const ValueKey('onboarding'),
-                                                      model: model,
-                                                      time: widget.time,
-                                                    ),
+                                        if (model.embeddedGame case final game?)
+                                          EmbeddedRetroView(game: game)
+                                        else ...[
+                                          Backdrop(model: model, time: widget.time),
+                                          if (model.services.retroMenuRegion != null) RetroMenuWindow(model: model),
+                                          RepaintBoundary(
+                                            // Glass's see-through window: under a layer the home screen
+                                            // fades out, the layer a pane over the desktop (LayerScrim).
+                                            child: AnimatedOpacity(
+                                              opacity: model.glassWindow.seeThrough && model.overlay != null ? 0 : 1,
+                                              duration: Motion.overlay,
+                                              curve: Motion.settle,
+                                              child: AnimatedSwitcher(
+                                                layoutBuilder: uniqueSwitcherLayout(),
+                                                duration: Motion.fade,
+                                                switchInCurve: Motion.settle,
+                                                child: model.preferences.onboarded
+                                                    ? HomeView(
+                                                        key: const ValueKey('home'),
+                                                        model: model,
+                                                        now: widget.now,
+                                                      )
+                                                    : OnboardingView(
+                                                        key: const ValueKey('onboarding'),
+                                                        model: model,
+                                                        time: widget.time,
+                                                      ),
+                                              ),
                                             ),
                                           ),
-                                        ),
+                                        ],
+                                        if (model.overlay != Layer.quickMenu && model.overlay != Layer.closeGame)
+                                          if (model.launchCardGame case final game?)
+                                            _StartingCard(
+                                              key: ValueKey(game.id),
+                                              game: game,
+                                              accent: model.accentChoice.color,
+                                              progress: model.embeddedGame?.progress ?? model.retroSetupProgress,
+                                            ),
                                         RepaintBoundary(
                                           child: AnimatedSwitcher(
                                             layoutBuilder: uniqueSwitcherLayout(),
@@ -511,7 +544,9 @@ class _LauncherShellState extends State<LauncherShell> {
                                             ),
                                           ),
                                         ),
-                                        if (model.starting != null) _StartingCard(model: model),
+                                        if (model.embeddedGame case final session?
+                                            when model.overlay == null && session.tuning.recording)
+                                          RetroTuningIndicator(message: session.tuning.status),
                                         if (model.together.ringing != null && model.pairing == null)
                                           RingingCard(model: model),
                                         if (model.pairing != null) PairingCard(model: model),
@@ -566,16 +601,19 @@ class _WindowBase extends StatelessWidget {
 }
 
 class _StartingCard extends StatelessWidget {
-  const _StartingCard({required this.model});
+  const _StartingCard({super.key, required this.game, required this.accent, this.progress});
 
-  final AppModel model;
+  final Game game;
+  final Color accent;
+  final ({String label, int? percent})? progress;
 
   @override
   Widget build(BuildContext context) {
     final scale = LayoutScale.of(context);
-    final game = model.starting!;
+    final retro = game.retro != null;
+    final percent = progress?.percent;
     return ColoredBox(
-      color: Colors.black.withValues(alpha: 0.6),
+      color: retro ? Colors.black : Colors.black.withValues(alpha: 0.6),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -593,17 +631,43 @@ class _StartingCard extends StatelessWidget {
             SizedBox(height: 12 * scale),
             SizedBox(
               width: 520 * scale,
-              child: Text(
-                T.text('startingText'),
-                textAlign: TextAlign.center,
-                style: AppText.display(16 * scale, color: Colors.white.withValues(alpha: 0.65), height: 1.4),
+              height: retro ? 50 * scale : null,
+              child: Center(
+                child: Text(
+                  progress?.label ?? T.text('startingText'),
+                  maxLines: retro ? 2 : null,
+                  overflow: retro ? TextOverflow.ellipsis : null,
+                  textAlign: TextAlign.center,
+                  style: AppText.display(16 * scale, color: Colors.white.withValues(alpha: 0.65), height: 1.4),
+                ),
               ),
             ),
             SizedBox(height: 24 * scale),
             SizedBox(
               width: 260 * scale,
-              child: IndeterminateLine(color: model.accentChoice.color),
+              child: retro
+                  ? LinearProgressIndicator(
+                      value: percent == null ? null : percent / 100,
+                      color: accent,
+                      minHeight: 3 * scale,
+                      borderRadius: BorderRadius.circular(2 * scale),
+                      semanticsLabel: progress?.label,
+                      semanticsValue: percent == null ? null : '$percent%',
+                    )
+                  : IndeterminateLine(color: accent),
             ),
+            if (retro)
+              SizedBox(
+                height: 27 * scale,
+                child: percent == null
+                    ? null
+                    : Center(
+                        child: Text(
+                          '$percent%',
+                          style: TextStyle(fontSize: 13 * scale, color: Colors.white70),
+                        ),
+                      ),
+              ),
           ],
         ),
       ),

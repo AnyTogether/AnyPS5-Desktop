@@ -33,6 +33,16 @@ void main() {
     expect(game.slug, 'ppsa01234');
   });
 
+  test('an ignore marker excludes a runtime copy from scans without changing direct inspection', () {
+    final dump = makeDump(root.path, 'Dump', titleId: 'PPSA01234');
+    final runtime = makeDump(p.join(root.path, 'Retest', 'runtime'), 'app0', titleId: 'PPSA01234');
+    expect(GameLibrary.scan(root.path), hasLength(2));
+
+    File(p.join(runtime, '.anyps5-ignore')).createSync();
+    expect(GameLibrary.scan(root.path).single.folder, dump);
+    expect(GameLibrary.inspect(runtime)?.titleId, 'PPSA01234');
+  });
+
   test('the age ratings of param.json, when it has them', () {
     final rated = makeDump(root.path, 'Rated', ageLevel: {'default': 16, 'US': 13, 'DE': 12, 'bad': 'x'});
     expect(GameLibrary.inspect(rated)!.ageLevels, {'default': 16, 'US': 13, 'DE': 12});

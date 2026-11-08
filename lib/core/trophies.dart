@@ -3,8 +3,11 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
+import 'package:xml/xml.dart';
 
 import 'game_library.dart';
+
+part 'ps3_trophies.dart';
 
 enum TrophyGrade {
   platinum('P', 300),
@@ -87,6 +90,12 @@ abstract final class Trophies {
 
   /// The engine's ticks are microseconds since 1 January of year 1.
   static const unixEpochTick = 62135596800000000;
+
+  static TrophySet? loadPs3(Game game, {String? system, List<String> languages = const []}) {
+    return _Ps3Trophies.load(game, system, languages);
+  }
+
+  static String ps3ProgressStamp(Game game, String system) => _Ps3Trophies.progressStamp(game, system);
 
   /// The game's trophies in the first of [languages] its packages have, null when it has none.
   /// [installed] is the installed game's folder, which holds the unlocks; before the game is

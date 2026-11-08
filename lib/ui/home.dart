@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../core/audio/tones.dart';
 import '../core/family/family_rules.dart' show TitleVerdict;
 import '../core/game_addons.dart';
 import '../core/game_library.dart';
@@ -20,6 +19,8 @@ import 'level_badge.dart';
 import 'padlock.dart';
 import 'panels.dart' show StatusDot;
 import 'profiles_view.dart' show ProfileTile;
+import 'retro_folder_tile.dart';
+import 'console_badge.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'together_model.dart';
@@ -35,14 +36,16 @@ class Backdrop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final game = model.selectedGame;
+    final game = model.homePreviewGame;
+    final background = game?.background;
+    final backgroundKey = ValueKey(game?.id);
     final artwork =
         model.preferences.onboarded &&
         model.preferences.gameArtwork &&
         model.overlay != Layer.settings &&
         // In the Theme Studio the theme itself is what is looked at.
         model.overlay != Layer.themeStudio &&
-        game?.background != null;
+        background != null;
     // Under a layer the background is blurred and darkened: kept still, the blur is not worked
     // out again on every frame, which is what made opening and closing layers stutter.
     // The Theme Studio is the exception: its changes show behind it as they are made.
@@ -57,7 +60,7 @@ class Backdrop extends StatelessWidget {
           model.preferences.onboarded &&
           model.preferences.glassArtwork &&
           model.overlay != Layer.settings &&
-          game?.background != null;
+          background != null;
       return RepaintBoundary(
         child: AnimatedSwitcher(
           layoutBuilder: uniqueSwitcherLayout(),
@@ -65,9 +68,9 @@ class Backdrop extends StatelessWidget {
           switchInCurve: Motion.settle,
           child: shown
               ? Opacity(
-                  key: ValueKey(game!.id),
+                  key: backgroundKey,
                   opacity: 0.72,
-                  child: GameArtwork(path: game.background!, animated: false),
+                  child: GameArtwork(path: background, animated: false),
                 )
               : const SizedBox.expand(),
         ),
@@ -119,8 +122,8 @@ class Backdrop extends StatelessWidget {
             switchInCurve: Motion.settle,
             child: artwork
                 ? GameArtwork(
-                    key: ValueKey(game!.id),
-                    path: game.background!,
+                    key: backgroundKey,
+                    path: background,
                     animated:
                         !model.preferences.reducedMotion &&
                         time == null &&
@@ -146,7 +149,7 @@ class HomeView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scale = LayoutScale.of(context);
-    final game = model.selectedGame;
+    final game = model.homePreviewGame;
     // Glass's panes on the home screen never overlap: they share one blur of the background.
     return BackdropGroup(
       child: Column(
@@ -161,6 +164,10 @@ class HomeView extends StatelessWidget {
           else ...[
             SizedBox(height: 34 * scale),
             TileRow(model: model),
+            if (model.homeFolderPlatform != null) ...[
+              SizedBox(height: 24 * scale),
+              TileRow(key: const ValueKey('retro-folder-games'), model: model, folderContents: true),
+            ],
             const Spacer(),
             if (game != null)
               AnimatedSwitcher(
@@ -182,9 +189,9 @@ class HomeView extends StatelessWidget {
               ),
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 64 * scale, vertical: 28 * scale),
-              child: const Align(
+              child: Align(
                 alignment: AlignmentDirectional.centerEnd,
-                child: Legible(softness: 14, child: HintBar()),
+                child: Legible(softness: 14, child: HintBar(options: model.selectedHomeFolder == null)),
               ),
             ),
           ],
@@ -642,44 +649,55 @@ class PhoneIndicator extends StatelessWidget {
 /// The row of game tiles: the selected one is larger, sits at the row's start and carries the
 /// game's name beside it, as on the console.
 class TileRow extends StatelessWidget {
-  const TileRow({super.key, required this.model});
+  const TileRow({super.key, required this.model, this.folderContents = false});
 
   final AppModel model;
+  final bool folderContents;
 
   @override
   Widget build(BuildContext context) {
     final scale = LayoutScale.of(context);
-    final small = 118 * scale;
-    final large = 176 * scale;
+    final rowFocused = folderContents == (model.activeHomeRetroFolder != null);
+    final preview = folderContents && !rowFocused;
+    final small = (folderContents ? 112 : 118) * scale;
+    final large = (folderContents ? 148 : 176) * scale;
     final gap = 16 * scale;
     final label = 300 * scale;
     final leading = 64 * scale;
+    final tiles = folderContents ? model.homeFolderTiles : model.homeTiles;
+    final at = preview ? 0 : model.homeTileIndex(tiles, folderContents: folderContents);
     return _TileDrag(
       model: model,
+      folderContents: folderContents,
       step: small + gap,
       child: SizedBox(
         height: large + 10 * scale,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            for (var index = 0; index < model.games.length; index++)
+            for (final (index, tile) in tiles.indexed)
               ...() {
-                final game = model.games[index];
-                final selected = index == model.selected;
-                final offset = index - model.selected;
-                final x = offset < 0
+                final game = model.games[tile.gameIndex];
+                final folder = tile.folder;
+                final console = folder == null ? null : PlayStationConsole.forRetro(folder);
+                final id = folder == null ? game.id : 'folder-${folder.name}';
+                final selected = index == at;
+                final offset = index - at;
+                final x = preview
+                    ? leading + index * (small + gap)
+                    : offset < 0
                     ? leading + offset * (small + gap)
                     : offset == 0
                     ? leading
                     : leading + large + gap + label + (offset - 1) * (small + gap);
-                final size = selected ? large : small;
+                final size = selected && !preview ? large : small;
                 return [
                   AnimatedPositionedDirectional(
-                    key: ValueKey('tile-${game.id}'),
+                    key: ValueKey('tile-$id'),
                     duration: Motion.layout,
                     curve: Motion.settle,
                     start: x,
-                    top: selected ? 0 : (large - small) * 0.18,
+                    top: selected || preview ? 0 : (large - small) * 0.18,
                     width: size,
                     height: size,
                     child: AnimatedOpacity(
@@ -688,27 +706,37 @@ class TileRow extends StatelessWidget {
                       // A click selects at once (a GestureDetector with a double tap would wait to
                       // see whether a second click comes); a second click plays.
                       child: Pressable(
-                        key: ValueKey('tile-press-${game.id}'),
+                        key: ValueKey('tile-press-$id'),
+                        onHover: console != null && !selected && offset >= 0
+                            ? () {
+                                if (!model.panning && model.overlay == null) {
+                                  model.selectHomeTile(index, folderContents: folderContents);
+                                }
+                              }
+                            : null,
                         onTap: () {
-                          if (model.selected != index) model.sounds.play(Cue.move);
-                          model.select(index);
+                          model.selectHomeTile(index, folderContents: folderContents);
+                          if (console != null) model.openSelectedHomeFolder();
                         },
-                        onDoubleTap: () {
-                          model.select(index);
-                          model.primaryAction(game);
+                        onDoubleTap: console == null
+                            ? () {
+                                model.selectHomeTile(index, folderContents: folderContents);
+                                model.primaryAction(game);
+                              }
+                            : null,
+                        builder: (context, _) {
+                          final focused = selected && rowFocused && model.focus.isTiles && model.overlay == null;
+                          if (console != null) {
+                            return RetroFolderTile(console: console, size: size, focused: focused);
+                          }
+                          return GameTile(model: model, game: game, size: size, focused: focused);
                         },
-                        builder: (context, _) => GameTile(
-                          model: model,
-                          game: game,
-                          size: size,
-                          focused: selected && model.focus.isTiles && model.overlay == null,
-                        ),
                       ),
                     ),
                   ),
-                  if (selected)
+                  if (selected && !preview)
                     PositionedDirectional(
-                      key: ValueKey('label-${game.id}'),
+                      key: ValueKey('label-$id'),
                       start: leading + large + gap * 1.4,
                       top: large * 0.32,
                       width: label - gap,
@@ -719,13 +747,13 @@ class TileRow extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              game.nameFor([T.language.code]),
+                              console?.label ?? game.nameFor([T.language.code]),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: AppText.display(22 * scale, weight: FontWeight.w600),
                             ),
                             SizedBox(height: 6 * scale),
-                            StateLabel(model: model, state: model.stateOf(game)),
+                            if (folder == null) StateLabel(model: model, state: model.stateOf(game)),
                           ],
                         ),
                       ),
@@ -743,12 +771,13 @@ class TileRow extends StatelessWidget {
 /// (left for the next, as a finger drags), the row leaning a little after the pointer meanwhile;
 /// let go fast, it carries on a few games, as a list glides.
 class _TileDrag extends StatefulWidget {
-  const _TileDrag({required this.model, required this.step, required this.child});
+  const _TileDrag({required this.model, required this.step, required this.child, required this.folderContents});
 
   final AppModel model;
 
   /// The pixels one game takes in the row.
   final double step;
+  final bool folderContents;
   final Widget child;
 
   @override
@@ -772,11 +801,11 @@ class _TileDragState extends State<_TileDrag> {
     var pending = _pending + (details.primaryDelta ?? details.delta.dx) * _sign;
     while (pending <= -step) {
       pending += step;
-      widget.model.moveSelection(1);
+      widget.model.moveHomeSelection(1, folderContents: widget.folderContents);
     }
     while (pending >= step) {
       pending -= step;
-      widget.model.moveSelection(-1);
+      widget.model.moveHomeSelection(-1, folderContents: widget.folderContents);
     }
     setState(() => _pending = pending);
   }
@@ -784,7 +813,7 @@ class _TileDragState extends State<_TileDrag> {
   void _end(DragEndDetails details) {
     final velocity = (details.primaryVelocity ?? 0) * _sign;
     final games = (-velocity * _glide / widget.step).round().clamp(-_maxGlide, _maxGlide);
-    if (games != 0) widget.model.moveSelection(games);
+    if (games != 0) widget.model.moveHomeSelection(games, folderContents: widget.folderContents);
     _settle();
   }
 
@@ -797,7 +826,9 @@ class _TileDragState extends State<_TileDrag> {
   Widget build(BuildContext context) {
     return DragPanRegion(
       axis: Axis.horizontal,
-      canPan: () => widget.model.games.length > 1,
+      canPan: () => widget.folderContents
+          ? widget.model.activeHomeRetroFolder != null && widget.model.homeFolderTiles.length > 1
+          : widget.model.homeTiles.length > 1,
       onStart: (_) => setState(() => _dragging = true),
       onUpdate: _update,
       onEnd: _end,
@@ -892,7 +923,7 @@ class GameTile extends StatelessWidget {
               Padlock(size: size * 0.13, color: Colors.white),
               if (focused) ...[
                 SizedBox(width: size * 0.03),
-                // A long word ("Заблокировано") fades at the tile's edge instead of overflowing it.
+                // A long word ("Ð—Ð°Ð±Ð»Ð¾ÐºÐ¸Ñ€Ð¾Ð²Ð°Ð½Ð¾") fades at the tile's edge instead of overflowing it.
                 Flexible(
                   child: Text(
                     T.text('locked'),
@@ -1040,7 +1071,7 @@ class StateLabel extends StatelessWidget {
       Failed() => (Icons.warning_rounded, T.text('failed'), Palette.danger),
       Installed(outdated: true) => (Icons.sync_rounded, T.text('updateAvailable'), Palette.warning),
       Installed() => (Icons.check_circle_rounded, T.text('ready'), dim),
-      Starting() => (Icons.hourglass_top_rounded, T.text('starting'), accent),
+      Starting(:final detail) => (Icons.hourglass_top_rounded, detail ?? T.text('starting'), accent),
       Running() => (Icons.play_circle_rounded, T.text('running'), accent),
     };
     return Row(
@@ -1252,11 +1283,13 @@ class HeroInfo extends StatelessWidget {
                 style: AppText.display(16 * scale, weight: FontWeight.w600).copyWith(letterSpacing: 0.4),
               ),
             ),
-            InfoCard(
-              title: T.text('version'),
-              icon: Icons.sell_rounded,
-              child: _VersionText(model: model, game: game),
-            ),
+            if (PlayStationConsole.forGame(game) case final console?) ConsoleBadge(console: console),
+            if (game.retro == null)
+              InfoCard(
+                title: T.text('version'),
+                icon: Icons.sell_rounded,
+                child: _VersionText(model: model, game: game),
+              ),
             if (game.addons.isNotEmpty) _AddonsCard(addons: game.addons),
           ],
         ),

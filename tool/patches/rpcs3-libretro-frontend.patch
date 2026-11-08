@@ -1,0 +1,382 @@
+diff --git a/rpcs3/Emu/Cell/lv2/sys_net/nt_p2p_port.cpp b/rpcs3/Emu/Cell/lv2/sys_net/nt_p2p_port.cpp
+index 59f38b345..45bfe6b6e 100644
+--- a/rpcs3/Emu/Cell/lv2/sys_net/nt_p2p_port.cpp
++++ b/rpcs3/Emu/Cell/lv2/sys_net/nt_p2p_port.cpp
+@@ -1,5 +1,6 @@
+ #include "stdafx.h"
+ #include "Emu/NP/ip_address.h"
++#include "Emu/system_config.h"
+ #include "nt_p2p_port.h"
+ #include "lv2_socket_p2ps.h"
+ #include "sys_net_helpers.h"
+@@ -42,6 +43,7 @@ nt_p2p_port::nt_p2p_port(u16 port)
+ 	: port(port)
+ {
+ 	const bool is_ipv6 = np::is_ipv6_supported();
++	const bool offline = g_cfg.net.net_active == np_internet_status::disabled;
+ 
+ 	// Creates and bind P2P Socket
+ 	p2p_socket = ::socket(is_ipv6 ? AF_INET6 : AF_INET, SOCK_DGRAM, 0);
+@@ -75,15 +77,21 @@ nt_p2p_port::nt_p2p_port(u16 port)
+ 			fmt::throw_exception("Error setsockopt IPV6_V6ONLY on P2P socket: %s", get_last_error(true));
+ 
+ 		::sockaddr_in6 p2p_ipv6_addr{.sin6_family = AF_INET6, .sin6_port = be_port};
++		if (offline)
++		{
++			::sockaddr_in loopback{.sin_family = AF_INET, .sin_port = be_port};
++			loopback.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
++			p2p_ipv6_addr = np::sockaddr_to_sockaddr6(loopback);
++		}
+ 		ret_bind = ::bind(p2p_socket, reinterpret_cast<sockaddr*>(&p2p_ipv6_addr), sizeof(p2p_ipv6_addr));
+ 	}
+ 	else
+ 	{
+ 		::sockaddr_in p2p_ipv4_addr{.sin_family = AF_INET, .sin_port = be_port};
+-		const u32 bind_ip = nph.get_bind_ip();
++		const u32 bind_ip = offline ? htonl(INADDR_LOOPBACK) : nph.get_bind_ip();
+ 		p2p_ipv4_addr.sin_addr.s_addr = bind_ip;
+ 
+-		if (ret_bind = ::bind(p2p_socket, reinterpret_cast<const sockaddr*>(&p2p_ipv4_addr), sizeof(p2p_ipv4_addr)); ret_bind == -1 && bind_ip)
++		if (ret_bind = ::bind(p2p_socket, reinterpret_cast<const sockaddr*>(&p2p_ipv4_addr), sizeof(p2p_ipv4_addr)); ret_bind == -1 && bind_ip && !offline)
+ 		{
+ 			sys_net.error("Failed to bind to %s:%d, falling back to 0.0.0.0:%d", np::ip_to_string(bind_ip), port, port);
+ 			p2p_ipv4_addr.sin_addr.s_addr = 0;
+@@ -94,7 +102,8 @@ nt_p2p_port::nt_p2p_port(u16 port)
+ 	if (ret_bind == -1)
+ 		fmt::throw_exception("Failed to bind DGRAM socket to %d for P2P: %s!", port, get_last_error(true));
+ 
+-	nph.upnp_add_port_mapping(port, "UDP");
++	if (!offline)
++		nph.upnp_add_port_mapping(port, "UDP");
+ 	sys_net.notice("P2P port %d was bound!", port);
+ }
+ 
+diff --git a/rpcs3/Emu/RSX/Overlays/overlay_message_dialog.cpp b/rpcs3/Emu/RSX/Overlays/overlay_message_dialog.cpp
+index cb3661b5e..a314b36bd 100644
+--- a/rpcs3/Emu/RSX/Overlays/overlay_message_dialog.cpp
++++ b/rpcs3/Emu/RSX/Overlays/overlay_message_dialog.cpp
+@@ -58,6 +58,12 @@ namespace rsx
+ 			return_code = CELL_MSGDIALOG_BUTTON_NONE;
+ 		}
+ 
++		bool message_dialog::reports_compile_progress() const
++		{
++			return num_progress_bars && g_emu_callbacks.report_compile_progress &&
++				(m_source == msg_dialog_source::sys_progress || m_source == msg_dialog_source::shader_loading);
++		}
++
+ 		compiled_resource message_dialog::get_compiled()
+ 		{
+ 			if (!visible)
+@@ -70,6 +76,7 @@ namespace rsx
+ 				u16 text_w, text_h;
+ 				text_display.set_pos(90, 364);
+ 				text_display.set_text(text);
++				compile_progress_title = text;
+ 				text_display.measure_text(text_w, text_h);
+ 				text_display.translate(0, -(text_h - 16));
+ 			}
+@@ -79,7 +86,29 @@ namespace rsx
+ 				if (const auto [dirty, text] = ::at32(bar_text_guard, i).get_text(); dirty)
+ 				{
+ 					::at32(progress_bars, i).set_text(text);
++					::at32(compile_progress_details, i) = text;
++				}
++			}
++
++			if (reports_compile_progress())
++			{
++				f32 value = 0.f;
++				f32 limit = 0.f;
++				std::string label = compile_progress_title;
++				std::lock_guard lock(progress_mutex);
++				for (u32 index = 0; index < num_progress_bars; ++index)
++				{
++					const auto& bar = ::at32(progress_bars, index);
++					value += std::min(bar.value(), bar.limit());
++					limit += bar.limit();
++					const auto& detail = ::at32(compile_progress_details, index);
++					if (!detail.empty())
++						label += "\n" + detail;
+ 				}
++				const s32 percent = limit > 0.f
++					? static_cast<s32>(std::clamp(100.f * value / limit, 0.f, 100.f)) : -1;
++				if (g_emu_callbacks.report_compile_progress(label, percent))
++					return {};
+ 			}
+ 
+ 			compiled_resource result;
+@@ -192,6 +221,8 @@ namespace rsx
+ 			}
+ 
+ 			user_interface::close(use_callback, stop_pad_interception);
++			if (reports_compile_progress())
++				g_emu_callbacks.report_compile_progress({}, -1);
+ 		}
+ 
+ 		void message_dialog::update(u64 timestamp_us)
+@@ -449,7 +480,10 @@ namespace rsx
+ 			if (index >= num_progress_bars)
+ 				return CELL_MSGDIALOG_ERROR_PARAM;
+ 
+-			::at32(progress_bars, index).inc(value);
++			{
++				std::lock_guard lock(progress_mutex);
++				::at32(progress_bars, index).inc(value);
++			}
+ 
+ 			if (index == static_cast<u32>(taskbar_index) || taskbar_index == -1)
+ 				g_emu_callbacks.handle_taskbar_progress(1, static_cast<s32>(value));
+@@ -462,7 +496,10 @@ namespace rsx
+ 			if (index >= num_progress_bars)
+ 				return CELL_MSGDIALOG_ERROR_PARAM;
+ 
+-			::at32(progress_bars, index).set_value(value);
++			{
++				std::lock_guard lock(progress_mutex);
++				::at32(progress_bars, index).set_value(value);
++			}
+ 
+ 			if (index == static_cast<u32>(taskbar_index) || taskbar_index == -1)
+ 				g_emu_callbacks.handle_taskbar_progress(3, static_cast<s32>(value));
+@@ -475,7 +512,10 @@ namespace rsx
+ 			if (index >= num_progress_bars)
+ 				return CELL_MSGDIALOG_ERROR_PARAM;
+ 
+-			::at32(progress_bars, index).set_value(0.f);
++			{
++				std::lock_guard lock(progress_mutex);
++				::at32(progress_bars, index).set_value(0.f);
++			}
+ 
+ 			g_emu_callbacks.handle_taskbar_progress(0, 0);
+ 
+@@ -487,7 +527,10 @@ namespace rsx
+ 			if (index >= num_progress_bars)
+ 				return CELL_MSGDIALOG_ERROR_PARAM;
+ 
+-			::at32(progress_bars, index).set_limit(static_cast<f32>(limit));
++			{
++				std::lock_guard lock(progress_mutex);
++				::at32(progress_bars, index).set_limit(static_cast<f32>(limit));
++			}
+ 
+ 			if (index == static_cast<u32>(taskbar_index))
+ 			{
+diff --git a/rpcs3/Emu/RSX/Overlays/overlay_message_dialog.h b/rpcs3/Emu/RSX/Overlays/overlay_message_dialog.h
+index 171dd80fa..310c3ee46 100644
+--- a/rpcs3/Emu/RSX/Overlays/overlay_message_dialog.h
++++ b/rpcs3/Emu/RSX/Overlays/overlay_message_dialog.h
+@@ -37,6 +37,10 @@ namespace rsx
+ 
+ 			animation_color_interpolate fade_animation;
+ 
++			bool reports_compile_progress() const;
++			std::mutex progress_mutex;
++			std::string compile_progress_title;
++			std::array<std::string, 2> compile_progress_details;
+ 			text_guard_t text_guard{};
+ 			std::array<text_guard_t, 2> bar_text_guard{};
+ 
+diff --git a/rpcs3/Emu/RSX/Overlays/overlay_progress_bar.hpp b/rpcs3/Emu/RSX/Overlays/overlay_progress_bar.hpp
+index d622796da..188645965 100644
+--- a/rpcs3/Emu/RSX/Overlays/overlay_progress_bar.hpp
++++ b/rpcs3/Emu/RSX/Overlays/overlay_progress_bar.hpp
+@@ -21,6 +21,8 @@ namespace rsx
+ 			void dec(f32 value);
+ 			void set_limit(f32 limit);
+ 			void set_value(f32 value);
++			f32 value() const { return m_value; }
++			f32 limit() const { return m_limit; }
+ 			void set_pos(s16 _x, s16 _y) override;
+ 			void set_size(u16 _w, u16 _h) override;
+ 			void translate(s16 dx, s16 dy) override;
+diff --git a/rpcs3/Emu/emu_callbacks.h b/rpcs3/Emu/emu_callbacks.h
+index 5d7ea82a9..0502252be 100644
+--- a/rpcs3/Emu/emu_callbacks.h
++++ b/rpcs3/Emu/emu_callbacks.h
+@@ -4,6 +4,7 @@
+ #include "util/shared_ptr.hpp"
+ 
+ #include <functional>
++#include <string>
+ 
+ enum class localized_string_id;
+ 
+@@ -26,6 +27,7 @@ struct emu_callbacks
+ 	std::function<void(bool enabled)> enable_disc_eject;
+ 	std::function<void(bool enabled)> enable_disc_insert;
+ 	std::function<bool(bool, std::function<void()>)> try_to_quit; // (force_quit, on_exit) Try to close RPCS3
++	std::function<bool(const std::string&, s32)> report_compile_progress;
+ 	std::function<void(s32, s32)> handle_taskbar_progress; // (type, value) type: 0 for reset, 1 for increment, 2 for set_limit, 3 for set_value
+ 	std::function<void()> init_kb_handler;
+ 	std::function<void()> init_mouse_handler;
+diff --git a/rpcs3/libretro/libretro_core.cpp b/rpcs3/libretro/libretro_core.cpp
+index 861a44116..e0dd588ac 100644
+--- a/rpcs3/libretro/libretro_core.cpp
++++ b/rpcs3/libretro/libretro_core.cpp
+@@ -2588,7 +2588,8 @@ static void vk_present_frame()
+         s_width = image.width;
+         s_height = image.height;
+         report_frame_size(s_width, s_height);
+-        video_cb(RETRO_HW_FRAME_BUFFER_VALID, s_width, s_height, 0);
++        const bool game_frame = !g_emu_callbacks.report_compile_progress || Emu.IsRunning() || Emu.IsPaused();
++        video_cb(game_frame ? RETRO_HW_FRAME_BUFFER_VALID : nullptr, s_width, s_height, 0);
+     }
+     else
+     {
+@@ -2894,6 +2895,7 @@ bool retro_load_game(const struct retro_game_info* game)
+     // installs (install_ui_icons). The software present reads the picture back
+     // before the overlays are drawn on the output, unless it records with them.
+     g_cfg.misc.use_native_interface.set(true);
++    g_cfg.misc.gdb_server.set("");
+     g_cfg.video.record_with_overlays.set(true);
+     g_cfg.misc.show_shader_compilation_hint.set(false);
+     g_cfg.misc.show_ppu_compilation_hint.set(false);
+@@ -3644,6 +3646,17 @@ static void init_emu_callbacks()
+     callbacks.enable_disc_insert = [](bool) {};
+     callbacks.on_missing_fw = []() {};
+     callbacks.handle_taskbar_progress = [](s32, s32) {};
++    constexpr unsigned frontend_compile_progress = RETRO_ENVIRONMENT_PRIVATE | 0x4150;
++    bool frontend_draws_progress = false;
++    if (environ_cb && environ_cb(frontend_compile_progress, &frontend_draws_progress) && frontend_draws_progress)
++    {
++        callbacks.report_compile_progress = [](const std::string& label, s32 percent)
++        {
++            retro_message_ext progress{label.c_str(), label.empty() ? 0u : 3000u, 1, RETRO_LOG_INFO,
++                RETRO_MESSAGE_TARGET_OSD, RETRO_MESSAGE_TYPE_PROGRESS, static_cast<int8_t>(percent)};
++            return environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE_EXT, &progress);
++        };
++    }
+ 
+     // Standalone's English texts (libretro_localized_strings.h), with the
+     // argument where standalone puts it. These were empty: the progress dialog
+diff --git a/rpcs3/libretro/libretro_input.cpp b/rpcs3/libretro/libretro_input.cpp
+index 9a62b89d4..8e65f9f92 100644
+--- a/rpcs3/libretro/libretro_input.cpp
++++ b/rpcs3/libretro/libretro_input.cpp
+@@ -9,10 +9,11 @@
+ #include "Emu/System.h"
+ #include "Emu/IdManager.h"
+ 
++#include <atomic>
+ #include <cstring>
+ 
+ static std::array<LibretroInputState, LIBRETRO_MAX_PADS> s_input_states;
+-static std::array<unsigned, LIBRETRO_MAX_PADS> s_device_types;
++static std::atomic_uint s_enabled_ports{(1u << LIBRETRO_MAX_PADS) - 1};
+ static LibretroMouseState s_mouse_state;
+ static LibretroKeyboardState s_keyboard_state;
+ static bool s_initialized = false;
+@@ -27,15 +28,10 @@ static bool s_bitmask_supported = false;
+ 
+ void libretro_input_init()
+ {
+-    for (auto& state : s_input_states)
++    for (unsigned port = 0; port < LIBRETRO_MAX_PADS; ++port)
+     {
+-        state = LibretroInputState{};
+-        state.connected = true;
+-    }
+-
+-    for (auto& type : s_device_types)
+-    {
+-        type = RETRO_DEVICE_JOYPAD;
++        s_input_states[port] = LibretroInputState{};
++        s_input_states[port].connected = libretro_input_controller_connected(port);
+     }
+ 
+     s_mouse_state = LibretroMouseState{};
+@@ -63,7 +59,7 @@ void libretro_input_poll(retro_input_state_t input_state_cb)
+     {
+         auto& state = s_input_states[port];
+ 
+-        if (s_device_types[port] == RETRO_DEVICE_NONE)
++        if (!libretro_input_controller_connected(port))
+         {
+             state.connected = false;
+             continue;
+@@ -140,11 +136,18 @@ void libretro_input_poll(retro_input_state_t input_state_cb)
+ 
+ void libretro_input_set_controller(unsigned port, unsigned device)
+ {
+-    if (port < LIBRETRO_MAX_PADS)
+-    {
+-        s_device_types[port] = device;
+-        s_input_states[port].connected = (device != RETRO_DEVICE_NONE);
+-    }
++    if (port >= LIBRETRO_MAX_PADS)
++        return;
++    if (device == RETRO_DEVICE_NONE)
++        s_enabled_ports.fetch_and(~(1u << port), std::memory_order_relaxed);
++    else
++        s_enabled_ports.fetch_or(1u << port, std::memory_order_relaxed);
++}
++
++bool libretro_input_controller_connected(unsigned port)
++{
++    return port < LIBRETRO_MAX_PADS &&
++        (s_enabled_ports.load(std::memory_order_relaxed) & (1u << port)) != 0;
+ }
+ 
+ bool libretro_input_get_button(unsigned port, unsigned button)
+diff --git a/rpcs3/libretro/libretro_input.h b/rpcs3/libretro/libretro_input.h
+index f2595fe2c..b89d480f7 100644
+--- a/rpcs3/libretro/libretro_input.h
++++ b/rpcs3/libretro/libretro_input.h
+@@ -44,6 +44,7 @@ struct LibretroKeyboardState
+ 
+ // Initialize libretro input system
+ void libretro_input_init();
++bool libretro_input_controller_connected(unsigned port);
+ 
+ // Deinitialize libretro input system
+ void libretro_input_deinit();
+diff --git a/rpcs3/libretro/libretro_pad_handler.cpp b/rpcs3/libretro/libretro_pad_handler.cpp
+index 7a5b1b58c..35177bf20 100644
+--- a/rpcs3/libretro/libretro_pad_handler.cpp
++++ b/rpcs3/libretro/libretro_pad_handler.cpp
+@@ -176,8 +176,9 @@ bool LibretroPadHandler::bindPadToDevice(std::shared_ptr<Pad> pad)
+     pad->m_sticks[2].m_offset = CELL_PAD_BTN_OFFSET_ANALOG_RIGHT_X;
+     pad->m_sticks[3].m_offset = CELL_PAD_BTN_OFFSET_ANALOG_RIGHT_Y;
+ 
+-    // Set pad as connected
+-    pad->m_port_status |= CELL_PAD_STATUS_CONNECTED;
++    device->player_id = static_cast<u8>(pad->m_player_id);
++    if (libretro_input_controller_connected(device->player_id))
++        pad->m_port_status |= CELL_PAD_STATUS_CONNECTED;
+     return true;
+ }
+ 
+@@ -193,11 +194,8 @@ std::shared_ptr<PadDevice> LibretroPadHandler::get_device(const std::string& dev
+ 
+ PadHandlerBase::connection LibretroPadHandler::update_connection(const std::shared_ptr<PadDevice>& device)
+ {
+-    if (!device)
+-        return connection::disconnected;
+-
+-    // Libretro controllers are always connected (frontend handles actual connection)
+-    return connection::connected;
++    return device && libretro_input_controller_connected(device->player_id)
++        ? connection::connected : connection::disconnected;
+ }
+ 
+ u16 LibretroPadHandler::ConvertAnalogValue(int16_t value)
+@@ -316,7 +314,7 @@ void LibretroPadHandler::process()
+             continue;
+ 
+         // Set player ID for device
+-        binding.device->player_id = static_cast<u8>(i);
++        binding.device->player_id = static_cast<u8>(binding.pad->m_player_id);
+ 
+         // Check connection
+         const auto status = update_connection(binding.device);
+@@ -330,7 +328,7 @@ void LibretroPadHandler::process()
+             continue;
+         }
+ 
+-        apply_rumble(*binding.pad, static_cast<unsigned>(i));
++        apply_rumble(*binding.pad, binding.device->player_id);
+ 
+         // Get button values from libretro input
+         auto button_values = get_button_values(binding.device);

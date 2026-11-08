@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
 import '../core/controls.dart';
+import '../core/game_library.dart';
 import '../core/gamepad/feel.dart' show HoldRepeater;
 import '../core/replay_buffer.dart';
 import '../core/screenshots.dart';
@@ -165,6 +166,8 @@ class PanelView extends StatelessWidget {
 
   final AppModel model;
 
+  static Size gameMenuSize(int rows, double scale) => Size(760 * scale, (168 + 62 * rows) * scale);
+
   @override
   Widget build(BuildContext context) {
     final scale = LayoutScale.of(context);
@@ -202,6 +205,7 @@ class PanelView extends StatelessWidget {
     final partyChat = model.overlay == Layer.party && model.together.partyChatShown;
     final heading = switch (model.overlay) {
       Layer.settings => T.text('settings'),
+      Layer.emulatorMenu => 'Emulators',
       Layer.friends => T.text('friendsTitle'),
       Layer.party => T.text('partyTitle'),
       Layer.notifications => T.text('socialNotifTitle'),
@@ -219,29 +223,33 @@ class PanelView extends StatelessWidget {
       Layer.profileTheme => T.text('profileTheme'),
       _ => category.title,
     };
+    final gameMenu = model.overlay == Layer.quickMenu || model.overlay == Layer.closeGame
+        ? gameMenuSize(category.rows.length, scale)
+        : null;
     return _Scrim(
       opacity: 0.55,
       onTapOutside: () => model.handle(Command.back),
       child: Center(
         child: SizedBox(
-          width: (compact ? 760 : (partyChat ? 1400 : 1180)) * scale,
+          width: gameMenu?.width ?? (compact ? 760 : (partyChat ? 1400 : 1180)) * scale,
           height:
+              gameMenu?.height ??
               (psMenu
-                  // The Options menu's rows say what each does: a line more each.
-                  ? 168 +
-                        switch (model.overlay) {
-                              Layer.profileMenu => 74,
-                              // Send Report says what it sends: two lines more.
-                              Layer.launcherReport => 98,
-                              // The question's line is a sentence or two.
-                              Layer.cloudQuestion => 72,
-                              _ => 62,
-                            } *
-                            category.rows.length
-                  : compact
-                  ? (tall ? 560 : 420)
-                  : 720) *
-              scale,
+                      // The Options menu's rows say what each does: a line more each.
+                      ? 168 +
+                            switch (model.overlay) {
+                                  Layer.profileMenu => 74,
+                                  // Send Report says what it sends: two lines more.
+                                  Layer.launcherReport => 98,
+                                  // The question's line is a sentence or two.
+                                  Layer.cloudQuestion => 72,
+                                  _ => 62,
+                                } *
+                                category.rows.length
+                      : compact
+                      ? (tall ? 560 : 420)
+                      : 720) *
+                  scale,
           child: Glass(
             radius: 28 * scale,
             opacity: 0.5,
@@ -359,6 +367,7 @@ class PanelView extends StatelessWidget {
                       close: !const {
                         Layer.controls,
                         Layer.advanced,
+                        Layer.emulatorMenu,
                         Layer.friendOptions,
                         Layer.quickMenu,
                       }.contains(model.overlay),
@@ -564,26 +573,64 @@ class PanelRows extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scale = LayoutScale.of(context);
-    return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: 6 * scale, vertical: 6 * scale),
+    final padding = EdgeInsets.symmetric(horizontal: 6 * scale, vertical: 6 * scale);
+    final pinnedIndex = rows.indexWhere((row) => row.pinToBottom);
+    Widget rowView(int index) => _RowView(
+      key: ValueKey('row-${rows[index].id}'),
+      model: model,
+      row: rows[index],
+      focused: index == model.panelRow && !model.panelSections && !idle,
+      onTap: () => model.activateRow(index),
+      onStep: (delta, {repeat = false}) => model.stepRow(index, delta, repeat: repeat),
+      onSet: (value) => model.setRowValue(index, value),
+      onHover: () => model.hoverRow(index),
+    );
+    final body = SingleChildScrollView(
+      padding: padding,
       child: Column(
         children: [
           for (var index = 0; index < rows.length; index++)
-            KeepVisible(
-              active: index == model.panelRow,
-              child: _RowView(
-                key: ValueKey('row-${rows[index].id}'),
-                model: model,
-                row: rows[index],
-                // While a controller is on the sections' column, no row has the focus.
-                focused: index == model.panelRow && !model.panelSections && !idle,
-                onTap: () => model.activateRow(index),
-                onStep: (delta, {repeat = false}) => model.stepRow(index, delta, repeat: repeat),
-                onSet: (value) => model.setRowValue(index, value),
-                onHover: () => model.hoverRow(index),
-              ),
-            ),
+            if (index != pinnedIndex) KeepVisible(active: index == model.panelRow, child: rowView(index)),
         ],
+      ),
+    );
+    if (pinnedIndex < 0) return body;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(child: body),
+        Padding(padding: padding, child: rowView(pinnedIndex)),
+      ],
+    );
+  }
+}
+
+class _GameCoverPreview extends StatelessWidget {
+  const _GameCoverPreview({required this.model, required this.games});
+
+  final AppModel model;
+  final List<Game> games;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = LayoutScale.of(context);
+    final size = 56 * scale;
+    return SizedBox(
+      height: size,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: games.length,
+        separatorBuilder: (_, _) => SizedBox(width: 10 * scale),
+        itemBuilder: (_, index) {
+          final game = games[index];
+          return Tooltip(
+            message: game.name,
+            child: SizedBox.square(
+              dimension: size,
+              child: GameTile(model: model, game: game, size: size, focused: false),
+            ),
+          );
+        },
       ),
     );
   }
@@ -679,6 +726,15 @@ class _RowView extends StatelessWidget {
                     onTap: () => onStep(1),
                   ),
               ],
+            ),
+          );
+        case ToggleRow(:final value, checkbox: true):
+          return Semantics(
+            checked: value,
+            child: Icon(
+              value ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+              size: 27 * scale,
+              color: value ? accent : ink.withValues(alpha: 0.65),
             ),
           );
         case ToggleRow(:final value):
@@ -854,6 +910,10 @@ class _RowView extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: AppText.display(13 * scale, color: detailColor),
                 ),
+              ],
+              if (row.previewGames.isNotEmpty) ...[
+                SizedBox(height: 12 * scale),
+                _GameCoverPreview(model: model, games: row.previewGames),
               ],
             ],
           ),

@@ -80,6 +80,7 @@ Future<int> runCli(
       final library = GameLibrary.surveyAll(arguments.sublist(1));
       for (final game in library.games) {
         final installed =
+            game.retro != null ||
             Installer.record(Installer.installedFolder(game, library.roots[game.id]!), system: host) != null;
         output.writeln(
           [game.titleId, game.name, game.executable.name, installed ? 'installed' : 'locked', game.folder].join('\t'),
@@ -94,6 +95,7 @@ Future<int> runCli(
       _glibcWarning(toolkit, host, env, output);
       final game = GameLibrary.inspect(arguments[1]);
       if (game == null) return fail('not a game folder: ${arguments[1]}');
+      if (game.retro != null) return fail('Disc games are configured and launched from the desktop library.');
       final plan = Installer.plan(game, arguments[2]);
       if (plan.copies) {
         output.writeln(
