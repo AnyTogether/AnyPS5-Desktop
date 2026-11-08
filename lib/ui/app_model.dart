@@ -79,6 +79,7 @@ import '../core/unlock_space.dart';
 import '../core/update_channel.dart';
 import '../core/unreal/unreal_controls.dart';
 import 'browser_play.dart';
+import 'clip_player.dart';
 import 'components.dart';
 import 'controllers_model.dart';
 import 'crash_model.dart';
@@ -1023,6 +1024,7 @@ class LauncherServices {
     this.preferredPorts = true,
     this.cable = true,
     this.openUrl,
+    this.clipPlayback,
     this.copyText,
     this.environment,
     this.togetherStore,
@@ -1176,6 +1178,10 @@ class LauncherServices {
 
   /// Opens a web page in the browser.
   final void Function(Uri url)? openUrl;
+
+  /// Plays clips inside the launcher (the gallery's, Captures' and those in chats); libmpv
+  /// through media_kit by default. None: a clip shows its picture, as in tests.
+  final ClipPlayback Function()? clipPlayback;
 
   /// Puts a text on the clipboard.
   final void Function(String text)? copyText;
@@ -2276,11 +2282,9 @@ class AppModel extends ChangeNotifier {
         if (!galleryViewing) move(-galleryColumns);
       case Command.down:
         if (!galleryViewing) move(galleryColumns);
+      // A clip plays over the whole screen as a picture is shown, as on the Mac.
       case Command.select:
         if (count == 0) return;
-        if (Screenshots.isClip(galleryShots[galleryIndex.clamp(0, count - 1)])) {
-          return openClip(galleryShots[galleryIndex.clamp(0, count - 1)]);
-        }
         galleryViewing = !galleryViewing;
         sounds.play(galleryViewing ? Cue.select : Cue.back);
         _changed();
@@ -2309,24 +2313,28 @@ class AppModel extends ChangeNotifier {
     }
   }
 
-  /// A click on a picture in the gallery: shown big; a click on the big one goes back.
+  /// A click on a picture or clip in the gallery: shown big (a clip plays); a click on a big
+  /// picture goes back.
   void tapShot(int index) {
     if (index < 0 || index >= galleryShots.length) return;
-    if (Screenshots.isClip(galleryShots[index])) {
-      galleryIndex = index;
-      return openClip(galleryShots[index]);
-    }
     galleryIndex = index;
     galleryViewing = true;
     sounds.play(Cue.select);
     _changed();
   }
 
-  /// A clip from the gallery, in the system's video player.
+  /// A clip from the gallery, playing over the whole screen in the launcher.
   void openClip(String path) {
-    sounds.play(Cue.select);
-    services.openUrl?.call(Uri.file(path));
-    _changed();
+    final index = galleryShots.indexOf(path);
+    if (index < 0) return;
+    tapShot(index);
+  }
+
+  /// A clip the launcher's player could not open ([source] a file's path or a link): in the
+  /// system's video player instead.
+  void playClipOutside(String source) {
+    final link = Uri.tryParse(source);
+    services.openUrl?.call(link != null && link.hasScheme && link.scheme.length > 1 ? link : Uri.file(source));
   }
 
   /// Each game's trophies, read at the scan; a game without trophy packages has none.
@@ -4409,6 +4417,11 @@ class AppModel extends ChangeNotifier {
     _changed();
   }
 
+  /// The layers that ask a plain yes or no, drawn as ConfirmCard: two answers side by side.
+  static const twoChoiceLayers = {Layer.confirmQuit, Layer.closeGame};
+
+  bool get twoChoice => twoChoiceLayers.contains(overlay);
+
   /// Escape on the home screen, the games in focus and nothing over them, asks Quit AnyPS5?
   /// (Cancel first); everywhere else Escape keeps its meaning.
   bool askQuit() {
@@ -4984,12 +4997,7 @@ class AppModel extends ChangeNotifier {
             id: 'confirmQuit',
             title: T.text('quitQuestion'),
             rows: [
-              PanelRow(
-                id: 'cancel',
-                title: T.text('cancel'),
-                detail: T.text('quitStay'),
-                kind: ActionRow(closeOverlay),
-              ),
+              PanelRow(id: 'cancel', title: T.text('cancel'), kind: ActionRow(closeOverlay)),
               PanelRow(
                 id: 'quit',
                 title: T.text('quit'),
@@ -5874,8 +5882,10 @@ class AppModel extends ChangeNotifier {
       PanelRow(
         id: 'display',
         title: T.text('display'),
-        // Upstream's engine ignores the choice: the launcher presses F11 for it, and says so.
-        detail: engine.readsDisplaySettings ? null : T.text('displayUpstream'),
+        // AnyPS5-ARM's engine opens the game borderless full screen itself (SDL's desktop full
+        // screen), and the line says what that is; upstream's ignores the choice: the launcher
+        // presses F11 for it, and says so.
+        detail: engine.readsDisplaySettings ? T.text('displayBorderless') : T.text('displayUpstream'),
         // Default (Settings › Default Display), then the game's own choices.
         kind: ChoiceRow(
           [
@@ -6357,6 +6367,19 @@ class AppModel extends ChangeNotifier {
 
     final row = panelRow < rows.length ? rows[panelRow] : null;
     if (_searchCommand(command)) return;
+    // A plain yes or no (ConfirmCard): its two answers side by side, ← to the way back, → to the
+    // destructive one, from the keys and the pad alike.
+    if (twoChoice && (command == Command.left || command == Command.right)) {
+      final target = rows.indexWhere(
+        (row) => row.kind is ActionRow && (row.kind as ActionRow).destructive == (command == Command.right),
+      );
+      if (target >= 0 && target != panelRow) {
+        panelRow = target;
+        sounds.play(Cue.move);
+        _changed();
+      }
+      return;
+    }
     if (_viaPad && _padPanelCommand(command, row, categories)) return;
     if (!_viaPad) {
       // The keys and the mouse have no sections' focus and no edit mode.

@@ -75,7 +75,7 @@ class CapturesState {
   bool sending = false;
   bool loadingOlderComments = false;
 
-  /// A post's picture over the whole screen.
+  /// A post's picture or clip over the whole screen.
   MediaItem? viewing;
 
   /// Pictures behind signed links, by their address without the signature.
@@ -673,18 +673,11 @@ extension TogetherCaptures on TogetherModel {
     app.refresh();
   }
 
-  /// The picture over the whole screen; a clip opens in the system's player, as the gallery's do.
+  /// The picture or the clip over the whole screen (a clip plays in the launcher, as on the Mac).
   void viewCapture(Post post) {
-    final clip = post.clip;
-    if (clip != null) {
-      final url = Uri.tryParse(clip.url);
-      if (url != null) app.services.openUrl?.call(url);
-      app.sounds.play(Cue.select);
-      return;
-    }
-    final picture = post.shown.firstOrNull;
-    if (picture == null) return;
-    captures.viewing = picture;
+    final media = post.clip ?? post.shown.firstOrNull;
+    if (media == null) return;
+    captures.viewing = media;
     app.sounds.play(Cue.select);
     app.refresh();
   }

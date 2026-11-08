@@ -515,7 +515,7 @@ void main() {
         expect(row('engineCurrent').kind, isA<InfoRow>().having((info) => info.text, 'text', 'AnyPS5-ARM 26d785b'));
 
         model.open(Layer.gameSettings);
-        expect(row('display').detail, isNull);
+        expect(row('display').detail, T.text('displayBorderless'), reason: 'the ARM engine opens it borderless');
         model.closeOverlay();
 
         // Back to upstream: the settings offer it again, the ARM engine stays downloaded.

@@ -97,6 +97,90 @@ class ThemeStudioView extends StatelessWidget {
   }
 }
 
+/// Appearance › Themes: the list in a pane on the right, as the Studio's (and the Mac's), the
+/// launcher left in view beside it, so a theme chosen shows on the real home screen at once.
+/// The rows keep the width a name and a line need, not the whole window's.
+class ThemesView extends StatelessWidget {
+  const ThemesView({super.key, required this.model});
+
+  final AppModel model;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = LayoutScale.of(context);
+    final accent = model.accentChoice.color;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Only the pane's side darkens, so the text there reads over any picture; a click on the
+        // home screen beside it goes back.
+        GestureDetector(
+          key: const ValueKey('themes-outside'),
+          behavior: HitTestBehavior.opaque,
+          onTap: () => model.handle(Command.back),
+          child: const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [Color(0x00000000), Color(0x00000000), Color(0x8C000000)],
+                stops: [0, 0.45, 1],
+              ),
+            ),
+          ),
+        ),
+        Align(
+          alignment: AlignmentDirectional.centerEnd,
+          child: Padding(
+            padding: EdgeInsetsDirectional.fromSTEB(0, 40 * scale, 40 * scale, 40 * scale),
+            child: SizedBox(
+              key: const ValueKey('themes-pane'),
+              width: 620 * scale,
+              child: Glass(
+                radius: 28 * scale,
+                opacity: 0.55,
+                padding: EdgeInsets.fromLTRB(36 * scale, 30 * scale, 36 * scale, 28 * scale),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            T.upper(T.text('appearance')),
+                            style: AppText.display(
+                              12 * scale,
+                              weight: FontWeight.w700,
+                              color: accent,
+                            ).copyWith(letterSpacing: 1.6 * scale),
+                          ),
+                        ),
+                        BackPill(onTap: () => model.handle(Command.back)),
+                      ],
+                    ),
+                    SizedBox(height: 6 * scale),
+                    Text(T.text('themes'), style: AppText.display(52 * scale, weight: FontWeight.w600, height: 1.02)),
+                    SizedBox(height: 6 * scale),
+                    Text(
+                      T.text('themesDetail'),
+                      style: AppText.display(15 * scale, color: Colors.white.withValues(alpha: 0.66)),
+                    ),
+                    SizedBox(height: 22 * scale),
+                    Expanded(
+                      child: PanelRows(model: model, rows: model.themeRows()),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// The theme's deep, middle and bright tones and its accent as paint chips: the colour on top,
 /// its code under it in figures of one width, the chip changing as the knobs turn.
 class _Chips extends StatelessWidget {

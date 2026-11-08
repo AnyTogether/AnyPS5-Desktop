@@ -12,6 +12,7 @@ import 'package:anyps5_desktop/ui/launcher.dart';
 import 'package:anyps5_desktop/ui/leaderboard_view.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:anyps5_desktop/ui/together_model.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -338,6 +339,63 @@ void main() {
       expect(together.screens.feedReaction, Reaction.fire.index, reason: 'the item\'s own reaction');
       model.handle(Command.back);
       expect(model.overlay, Layer.friends);
+    });
+
+    test('a game in a profile\'s recent activity: select opens its hub, back returns to the profile', () {
+      fixture = makeFixture();
+      model = fixture.model;
+      signedIn();
+      final items = feed();
+      final together = model.together;
+      model.open(Layer.profile);
+      together.profile = ProfilePage(
+        profile: const TogetherProfile(userId: 'u-ana', handle: 'ana', displayName: 'Ana', friendship: 'friends'),
+        library: const SectionShown([]),
+        trophies: const SectionShown([]),
+        activity: SectionShown([items[1], items[3]]),
+      );
+      final first = together.profileGamesFrom;
+      // A milestone has no game: select stays on the profile.
+      together.profileIndex = first + 1;
+      model.handle(Command.select);
+      expect(model.overlay, Layer.profile);
+      together.profileIndex = first;
+      model.handle(Command.select);
+      expect(model.overlay, Layer.gameHub);
+      expect(together.findState.hubTitle, 'PPSA02002');
+      expect(together.findState.hubName, 'Neon Alley');
+      model.handle(Command.back);
+      expect(model.overlay, Layer.profile);
+      expect(together.profile?.profile.handle, 'ana');
+    });
+
+    testWidgets('a game\'s name in the feed opens its hub when clicked', (tester) async {
+      fixture = makeFixture();
+      model = fixture.model;
+      signedIn();
+      model.together.hub.social.feed.load(feed(), null);
+      model.open(Layer.feed);
+      await pumpLauncher(tester, model);
+      final line = tester.widget<RichText>(
+        find.descendant(
+          of: find.byKey(const ValueKey('activity-04')),
+          matching: find.byWidgetPredicate(
+            (widget) => widget is RichText && widget.text.toPlainText().contains('Neon Alley'),
+          ),
+        ),
+      );
+      TapGestureRecognizer? tap;
+      line.text.visitChildren((span) {
+        if (span is TextSpan && span.text == 'Neon Alley') tap = span.recognizer as TapGestureRecognizer?;
+        return tap == null;
+      });
+      expect(tap, isNotNull, reason: 'the game\'s name is its own span, with a click');
+      tap!.onTap!();
+      expect(model.overlay, Layer.gameHub);
+      expect(model.together.findState.hubTitle, 'PPSA02002');
+      // Back is the feed it came from.
+      model.handle(Command.back);
+      expect(model.overlay, Layer.feed);
     });
 
     test('the friends panel offers the feed and the leaderboard; a game\'s settings its board and how it runs', () {
