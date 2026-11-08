@@ -16,6 +16,7 @@ import '../core/capture/video_encoders.dart';
 import '../core/audio/audio_out.dart';
 import '../core/audio/interface_sounds.dart';
 import '../core/audio/theme_music.dart';
+import '../core/app_update.dart';
 import '../core/audio/tones.dart';
 import '../core/controllers/pad_info.dart';
 import '../core/controllers/troubleshooter.dart';
@@ -2613,6 +2614,27 @@ class AppModel extends ChangeNotifier {
   /// backups), read when its settings open rather than on every frame.
   final Map<String, ({bool resolution, List<String> backups})> _gameFacts = {};
 
+  /// The resolution [game] is unlocked with: the one chosen in its Game Settings, or one step
+  /// below it while a Battery & Heat profile asks for a lower resolution (the title's own when
+  /// none is chosen). On Windows and Linux the relinker writes it, so it lasts until the next
+  /// unlock.
+  String? _unlockResolution(Game game, Toolkit kit) {
+    final own = currentSettings(game).resolution;
+    if (!powerWatch.adjustment.lowerResolution) return own;
+    final patch = kit.patchFile(game.titleId);
+    if (patch == null) return own;
+    final String text;
+    try {
+      text = File(patch).readAsStringSync();
+    } on FileSystemException {
+      return own;
+    }
+    if (!ResolutionPatch.supports(text)) return own;
+    final current = own ?? ResolutionPatch.defaultOf(text);
+    if (current == null) return own;
+    return ResolutionPatch.lower(current, ResolutionPatch.choices) ?? own;
+  }
+
   /// Whether the title's patch file lets Game Settings choose its resolution.
   bool supportsResolution(Game game) => _factsOf(game).resolution;
 
@@ -3070,7 +3092,7 @@ class AppModel extends ChangeNotifier {
           folder,
           knownSize: sizes[game.id],
           toolkit: kit,
-          resolution: currentSettings(game).resolution,
+          resolution: _unlockResolution(game, kit),
         );
       } on FileSystemException {
         plan = null; // The install says what is wrong.
@@ -3187,7 +3209,7 @@ class AppModel extends ChangeNotifier {
       game: game,
       toolkit: kit,
       root: folder,
-      resolution: currentSettings(game).resolution,
+      resolution: _unlockResolution(game, kit),
       freeSpace: freeSpace,
       onProgress: (step, fraction) {
         progress[id] = (step, fraction);
@@ -3317,7 +3339,7 @@ class AppModel extends ChangeNotifier {
               folder,
               knownSize: sizes[game.id],
               toolkit: kit,
-              resolution: currentSettings(game).resolution,
+              resolution: _unlockResolution(game, kit),
             );
             return plan.space?.shortage(free: freeSpace(folder), folder: folder);
           } on FileSystemException {
@@ -5351,10 +5373,25 @@ class AppModel extends ChangeNotifier {
               title: T.text('phoneAddress'),
               kind: InfoRow('${services.computerName ?? Platform.localHostname} · $port'),
             ),
+          // The phones that are paired, which of them are connected now, as on the Mac.
+          if (remote case final RemoteServer server)
+            PanelRow(
+              id: 'phones',
+              title: T.text('phones'),
+              kind: InfoRow(
+                server.devices.all.isEmpty
+                    ? T.text('phonesNone')
+                    : server.connectedDeviceIds.isEmpty
+                    ? ''
+                    : T.format('phonesConnectedCount', [server.connectedDeviceIds.toSet().length]),
+              ),
+            ),
           for (final device in remote?.devices.all ?? const <PairedDevice>[])
             PanelRow(
               id: 'device-${device.id}',
-              title: device.name,
+              title: remote?.connectedDeviceIds.contains(device.id) ?? false
+                  ? '${device.name} · ${T.text('phoneOnline')}'
+                  : device.name,
               detail: T.text('phoneRemove'),
               kind: ActionRow(() {
                 remote?.devices.remove(device.id);
@@ -5510,6 +5547,19 @@ class AppModel extends ChangeNotifier {
           ),
           ...updates.aboutRows(),
           updates.channelRow(),
+          PanelRow(id: 'author', title: T.text('madeBy'), kind: const InfoRow('Utku Halis')),
+          PanelRow(
+            id: 'github',
+            title: 'GitHub',
+            detail: 'github.com/${LauncherUpdates.repository}',
+            kind: ActionRow(() => services.openUrl?.call(Uri.https('github.com', LauncherUpdates.repository))),
+          ),
+          PanelRow(
+            id: 'upstream',
+            title: T.text('builtOn'),
+            detail: 'github.com/boykopovar/AnyPS5',
+            kind: ActionRow(() => services.openUrl?.call(Uri.https('github.com', 'boykopovar/AnyPS5'))),
+          ),
         ],
       ),
     ];

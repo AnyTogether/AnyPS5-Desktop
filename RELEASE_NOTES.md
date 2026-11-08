@@ -136,6 +136,14 @@ release when it is made.
   second press, and a bar shows how much saves and media take.
 - **Restore saves… restores the backup you choose**, as on the Mac. The latest backup can still
   be restored in one press.
+- **Battery & heat can lower the resolution**, the row the Mac already had: a game with a
+  resolution option is installed one step lower while the profile holds. On Windows and Linux the
+  resolution is written when a game is installed, so it takes effect at the next install.
+- **About has What's new, Made by, GitHub and the upstream project**, as on the Mac. What's new
+  shows while an update is on offer and opens that release's page.
+- **Settings › Fonts lists Latin Italic**, the row the Mac has, beside Latin.
+- **Settings › Phones says which paired phone is connected now**: the count at the top and
+  Connected beside the phone's name, as on the Mac.
 
 ## 0.1.20
 
