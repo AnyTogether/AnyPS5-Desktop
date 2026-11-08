@@ -9,13 +9,19 @@ extension EmbeddedEmulators on AppModel {
   ManagedRetro? get _managedRetro {
     final host = EmbeddedCoreHost.current;
     if (host == null || (host == EmbeddedCoreHost.windowsX64) != (system == HostSystem.windows)) return null;
-    return ManagedRetro(p.join(p.dirname(paths.toolkits), 'Emulators'), host);
+    return ManagedRetro(
+      p.join(p.dirname(paths.toolkits), 'Emulators'),
+      host,
+      ps3CoreDigests: (services.environment ?? Platform.environment)['ANYPS5_PS3_CORE_DIGESTS'],
+    );
   }
 
   bool _embeddedReady(RetroPlatform platform) {
     final managed = _managedRetro;
-    if (platform == RetroPlatform.ps3 || managed == null) return false;
-    return managed.isInstalled(platform) && managed.hasBios(platform);
+    if (managed == null || !managed.isInstalled(platform)) return false;
+    return platform == RetroPlatform.ps3
+        ? managed.hasPs3Firmware || managed.hasPs3FirmwarePackage
+        : managed.hasBios(platform);
   }
 
   List<PanelRow> _embeddedSetupRows() {
@@ -25,6 +31,7 @@ extension EmbeddedEmulators on AppModel {
       for (final (platform, label, core) in [
         (RetroPlatform.ps1, 'PS1', 'SwanStation'),
         (RetroPlatform.ps2, 'PS2', 'ParaLLEl PS2'),
+        if (managed.host.supports(RetroPlatform.ps3)) (RetroPlatform.ps3, 'PS3', 'RPCS3'),
       ]) ...[
         PanelRow(
           id: 'retro-${platform.name}-embedded-core',
@@ -32,7 +39,18 @@ extension EmbeddedEmulators on AppModel {
           detail: managed.isInstalled(platform) ? managed.libraryPath(platform) : T.text('retroEmbeddedInstallDetail'),
           kind: ActionRow(() => unawaited(_pickEmbeddedFile(managed, platform, label, bios: false))),
         ),
-        if (managed.isInstalled(platform))
+        if (managed.isInstalled(platform) && platform == RetroPlatform.ps3)
+          PanelRow(
+            id: 'retro-ps3-embedded-firmware',
+            title: T.text('retroPs3Firmware'),
+            detail: managed.hasPs3Firmware
+                ? T.text('retroPs3FirmwareInstalled')
+                : (managed.hasPs3FirmwarePackage ? managed.ps3FirmwarePackage : T.text('retroPs3FirmwareDetail')),
+            kind: managed.hasPs3Firmware
+                ? const InfoRow('')
+                : ActionRow(() => unawaited(_pickEmbeddedFile(managed, platform, label, bios: true))),
+          )
+        else if (managed.isInstalled(platform))
           PanelRow(
             id: 'retro-${platform.name}-embedded-bios',
             title: T.format('retroEmbeddedBios', [label]),
@@ -40,6 +58,12 @@ extension EmbeddedEmulators on AppModel {
             kind: ActionRow(() => unawaited(_pickEmbeddedFile(managed, platform, label, bios: true))),
           ),
       ],
+      if (!managed.host.supports(RetroPlatform.ps3))
+        PanelRow(
+          id: 'retro-ps3-embedded-unavailable',
+          title: T.text('retroEmbeddedWindowsOnly'),
+          kind: const InfoRow(''),
+        ),
     ];
   }
 
@@ -52,11 +76,19 @@ extension EmbeddedEmulators on AppModel {
     if (_embeddedSetupBusy || running != null || starting != null) return;
     _embeddedSetupBusy = true;
     try {
+      final firmware = bios && platform == RetroPlatform.ps3;
       final path = await services.pickFile?.call(
-        bios ? T.format('retroSelectBios', [label]) : T.text('retroSelectCoreZip'),
-        bios ? const ['bin', 'rom', 'rom0'] : const ['zip'],
+        firmware
+            ? T.text('retroPs3FirmwareSelect')
+            : (bios ? T.format('retroSelectBios', [label]) : T.text('retroSelectCoreZip')),
+        firmware ? const ['pup'] : (bios ? const ['bin', 'rom', 'rom0'] : const ['zip']),
       );
       if (path == null || _disposed) return;
+      if (firmware) {
+        await managed.importPs3Firmware(path);
+        if (!_disposed) show(T.text('retroPs3FirmwareSelected'));
+        return;
+      }
       if (bios) {
         await managed.importBios(platform, path);
       } else {
@@ -65,7 +97,13 @@ extension EmbeddedEmulators on AppModel {
       if (!_disposed) show(T.text(bios ? 'retroBiosImported' : 'retroEmbeddedInstalled'));
     } on Object catch (error) {
       debugPrint('Embedded emulator setup failed: $error');
-      if (!_disposed) show(T.text(bios ? 'retroBiosImportFailed' : 'retroCorePackageInvalid'));
+      final key = switch ((bios, platform, error)) {
+        (true, RetroPlatform.ps3, FormatException()) => 'retroPs3FirmwareInvalid',
+        (true, RetroPlatform.ps3, _) => 'retroPs3FirmwareCopyFailed',
+        (true, _, _) => 'retroBiosImportFailed',
+        _ => 'retroCorePackageInvalid',
+      };
+      if (!_disposed) show(T.text(key));
     } finally {
       _embeddedSetupBusy = false;
       if (!_disposed) _changed();
@@ -81,7 +119,11 @@ extension EmbeddedEmulators on AppModel {
       savePreferences();
     }
 
-    final scale = disc.platform == RetroPlatform.ps1 ? 'swanstation_GPU_ResolutionScale' : 'pcsx2_upscale_multiplier';
+    final scale = switch (disc.platform) {
+      RetroPlatform.ps1 => 'swanstation_GPU_ResolutionScale',
+      RetroPlatform.ps2 => 'pcsx2_upscale_multiplier',
+      RetroPlatform.ps3 => 'rpcs3_resolution_scale',
+    };
     return EmbeddedRetroGame.start(
       managed,
       disc,
@@ -96,6 +138,21 @@ extension EmbeddedEmulators on AppModel {
       changed: _changed,
     );
   }
+
+  List<PanelCategory> _ps3GameSettings(Game game) => Ps3SettingsModel.categories(
+    saved: preferences.retroGraphics[game.id] ?? const {},
+    save: (key, value) {
+      final choices = preferences.retroGraphics.putIfAbsent(game.id, () => {});
+      if (value == null) {
+        choices.remove(key);
+        if (choices.isEmpty) preferences.retroGraphics.remove(game.id);
+      } else {
+        choices[key] = value;
+      }
+      savePreferences();
+    },
+    setup: _gameRows(game),
+  );
 
   List<PanelRow> _embeddedGameRows(EmbeddedRetroGame game) => [
     for (final (key, label) in const [
@@ -112,6 +169,18 @@ extension EmbeddedEmulators on AppModel {
           detail: option.restart ? T.text('retroStartupOptionsDetail') : null,
           kind: ChoiceRow(
             option.labels.length == option.values.length ? option.labels : option.values,
+            option.selected,
+            (choice) => unawaited(game.setOption(key, option.values[choice])),
+          ),
+        ),
+    for (final key in const ['rpcs3_resolution_scale', 'rpcs3_anisotropic_filter'])
+      if (game.options[key] case final option?)
+        PanelRow(
+          id: key,
+          title: Ps3SettingsModel.optionTitle(key)!,
+          detail: option.restart ? T.text('retroStartupOptionsDetail') : null,
+          kind: ChoiceRow(
+            [for (final value in option.values) Ps3SettingsModel.optionLabel(key, value) ?? value],
             option.selected,
             (choice) => unawaited(game.setOption(key, option.values[choice])),
           ),

@@ -111,21 +111,16 @@ extension StandaloneEmulators on AppModel {
     _changed();
 
     if (run is EmbeddedRetroGame) {
-      var timedOut = false;
-      final ready = await run.ready.timeout(
-        const Duration(minutes: 3),
-        onTimeout: () {
-          timedOut = true;
-          return false;
-        },
-      );
+      final bool? ready = ps3
+          ? await run.waitForPs3Startup()
+          : await run.ready.then<bool?>((ready) => ready).timeout(const Duration(minutes: 3), onTimeout: () => null);
       if (_disposed) return;
       starting = null;
-      if (timedOut && !stopping) {
+      if (ready == null && !stopping) {
         show(T.text('retroEmbeddedStartupTimedOut'));
         unawaited(stopRunningGame());
       }
-      if (ready && !stopping) {
+      if (ready == true && !stopping) {
         preferences.lastPlayed[game.id] = run.started.toIso8601String();
         savePreferences();
       } else {
@@ -149,6 +144,7 @@ extension StandaloneEmulators on AppModel {
       unawaited(services.window?.restore());
     }
     if (overlay == Layer.quickMenu || overlay == Layer.closeGame) overlay = null;
+    if (ps3 && managed != null) _loadTrophies(game);
     updates.gameEnded();
     if (!_stopped && code != 0) {
       if (run is EmbeddedRetroGame) {

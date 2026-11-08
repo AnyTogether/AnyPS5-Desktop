@@ -97,6 +97,7 @@ import 'profile_picture.dart';
 import 'save_sync_model.dart';
 import 'sharing_model.dart';
 import 'strings.dart';
+import 'ps3_settings_model.dart';
 import 'theme.dart';
 import 'theme_hub_model.dart';
 import 'together_model.dart';
@@ -1790,7 +1791,7 @@ class AppModel extends ChangeNotifier {
       return;
     }
     if (capturing != null && mapped != Command.back) return;
-    if (overlay == Layer.settings && (mapped == Command.previousGame || mapped == Command.nextGame)) {
+    if (hasSettingsSections && (mapped == Command.previousGame || mapped == Command.nextGame)) {
       return moveCategory(mapped == Command.nextGame ? 1 : -1);
     }
     _viaPad = true;
@@ -1937,7 +1938,7 @@ class AppModel extends ChangeNotifier {
         unawaited(toggleFullscreen());
       case LauncherAction.previousSection || LauncherAction.nextSection:
         final delta = action == LauncherAction.nextSection ? 1 : -1;
-        if (overlay == Layer.settings) return moveCategory(delta);
+        if (hasSettingsSections) return moveCategory(delta);
         command(delta > 0 ? Command.nextGame : Command.previousGame);
     }
   }
@@ -2745,7 +2746,10 @@ class AppModel extends ChangeNotifier {
     records.clear();
     trophies.clear();
     for (final game in games) {
-      if (game.retro != null) continue;
+      if (game.retro != null) {
+        if (game.retro?.platform == RetroPlatform.ps3) _loadTrophies(game);
+        continue;
+      }
       final installed = Installer.installedFolder(game, rootOf(game)!);
       final record = Installer.record(installed, system: system);
       if (record != null) records[game.id] = record;
@@ -2792,6 +2796,15 @@ class AppModel extends ChangeNotifier {
   }
 
   void _loadTrophies(Game game) {
+    if (game.retro?.platform == RetroPlatform.ps3) {
+      final set = Trophies.loadPs3(game, system: _managedRetro?.systemPath, languages: [T.language.code]);
+      if (set == null) {
+        trophies.remove(game.id);
+      } else {
+        trophies[game.id] = set;
+      }
+      return;
+    }
     final folder = rootOf(game);
     if (folder == null) return;
     final installed = Installer.installedFolder(game, folder);
@@ -3913,6 +3926,9 @@ class AppModel extends ChangeNotifier {
     if (next == Layer.gameSettings) _gameFacts.clear();
     if (next == Layer.log) shownLog = selectedGame == null ? '' : logText(selectedGame!);
     if (next == Layer.trophies) {
+      if (selectedGame case final game? when game.retro?.platform == RetroPlatform.ps3) {
+        _loadTrophies(game);
+      }
       trophyIndex = 0;
       revealedTrophies = {};
     }
@@ -4819,6 +4835,11 @@ class AppModel extends ChangeNotifier {
       case Layer.settings:
         return _searchedSettings(_settingsCategories());
       case Layer.gameSettings when game != null:
+        if (game.retro?.platform == RetroPlatform.ps3 &&
+            _managedRetro?.isInstalled(RetroPlatform.ps3) == true &&
+            running?.$1.id != game.id) {
+          return _ps3GameSettings(game);
+        }
         return [PanelCategory(id: 'game', title: game.name, rows: _gameRows(game))];
       case Layer.controls when game != null:
         return [PanelCategory(id: 'controls', title: game.name, rows: _controlRows(game))];
@@ -6469,7 +6490,7 @@ class AppModel extends ChangeNotifier {
             set(!value);
             sounds.play(Cue.move);
           default:
-            if (overlay == Layer.settings && categories.length > 1) {
+            if (_settingsSectionLayer && categories.length > 1) {
               final next = (panelCategory + delta).clamp(0, categories.length - 1);
               if (next != panelCategory) sounds.play(Cue.move);
               panelCategory = next;
@@ -6512,11 +6533,11 @@ class AppModel extends ChangeNotifier {
   /// A controller's command in a panel: the sections' column and edit mode (the keys and the
   /// mouse keep the old ways). True when it was handled here.
   bool _padPanelCommand(Command command, PanelRow? row, List<PanelCategory> categories) {
-    final sections = overlay == Layer.settings && categories.length > 1;
+    final sections = _settingsSectionLayer && categories.length > 1;
     if (panelSections && sections) {
       switch (command) {
         // ↑ on the first section: onto the search field.
-        case Command.up when panelCategory == 0:
+        case Command.up when panelCategory == 0 && overlay == Layer.settings:
           _toSearch();
         case Command.up || Command.down:
           moveCategory(command == Command.down ? 1 : -1);
@@ -6669,6 +6690,11 @@ class AppModel extends ChangeNotifier {
     preferences.theme = index;
     _changed();
   }
+
+  bool get _settingsSectionLayer => overlay == Layer.settings || overlay == Layer.gameSettings;
+
+  bool get hasSettingsSections =>
+      overlay == Layer.settings || (overlay == Layer.gameSettings && panelCategories().length > 1);
 
   /// The settings' category tabs move with Q and E as well.
   void moveCategory(int delta) {

@@ -336,7 +336,7 @@ class _LauncherShellState extends State<LauncherShell> {
     final model = widget.model;
     if (action == HintAction.previousGame || action == HintAction.nextGame) {
       final delta = action == HintAction.nextGame ? 1 : -1;
-      if (model.overlay == Layer.settings) return model.moveCategory(delta);
+      if (model.hasSettingsSections) return model.moveCategory(delta);
     }
     model.handle(switch (action) {
       HintAction.previousGame => Command.previousGame,
@@ -466,7 +466,8 @@ class _LauncherShellState extends State<LauncherShell> {
                                             ),
                                           ),
                                         ],
-                                        if (model.starting?.retro != null && model.overlay == null)
+                                        if (model.overlay == null &&
+                                            (model.starting?.retro != null || model.embeddedGame?.progress != null))
                                           _StartingCard(model: model),
                                         RepaintBoundary(
                                           child: AnimatedSwitcher(
@@ -599,7 +600,9 @@ class _StartingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scale = LayoutScale.of(context);
-    final game = model.starting!;
+    final game = model.starting ?? model.running!.$1;
+    final progress = model.embeddedGame?.progress;
+    final percent = progress?.percent;
     return ColoredBox(
       color: Colors.black.withValues(alpha: 0.6),
       child: Center(
@@ -620,7 +623,7 @@ class _StartingCard extends StatelessWidget {
             SizedBox(
               width: 520 * scale,
               child: Text(
-                T.text('startingText'),
+                T.text(progress == null ? 'startingText' : 'retroPs3Preparing'),
                 textAlign: TextAlign.center,
                 style: AppText.display(16 * scale, color: Colors.white.withValues(alpha: 0.65), height: 1.4),
               ),
@@ -628,8 +631,14 @@ class _StartingCard extends StatelessWidget {
             SizedBox(height: 24 * scale),
             SizedBox(
               width: 260 * scale,
-              child: IndeterminateLine(color: model.accentChoice.color),
+              child: percent == null
+                  ? IndeterminateLine(color: model.accentChoice.color)
+                  : LinearProgressIndicator(value: percent / 100, color: model.accentChoice.color),
             ),
+            if (percent != null) ...[
+              SizedBox(height: 8 * scale),
+              Text(T.percent(percent), style: AppText.display(14 * scale)),
+            ],
           ],
         ),
       ),

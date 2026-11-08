@@ -24,6 +24,9 @@ class EmbeddedRetroGame extends RunningGame {
   final void Function(String) _onResolutionSelected;
   final void Function(String, String) _onGraphicsSelected;
   final _ready = Completer<bool>();
+  final _startupClock = Stopwatch()..start();
+  Duration _lastStartupProgress = Duration.zero;
+  ({String label, int? percent})? _startupProgress;
   late final Timer _watch;
   late final Timer _input;
   bool _reading = false;
@@ -34,12 +37,31 @@ class EmbeddedRetroGame extends RunningGame {
   String error = '';
   String resolutionError = '';
   bool presented = false;
+  ({String label, int? percent})? progress;
   double aspect = 4 / 3;
   final options = <String, EmbeddedOption>{};
   final _keys = <PadButton>{};
   List<int> _lastInput = const [];
 
   Future<bool> get ready => _ready.future;
+
+  /// Return null after an inactivity timeout or the total PS3 startup limit.
+  Future<bool?> waitForPs3Startup() async {
+    const inactivityLimit = Duration(minutes: 3);
+    const totalLimit = Duration(minutes: 15);
+    while (true) {
+      final elapsed = _startupClock.elapsed;
+      final inactiveAt = _lastStartupProgress + inactivityLimit;
+      final deadline = inactiveAt < totalLimit ? inactiveAt : totalLimit;
+      if (elapsed >= deadline) return null;
+      final ready = await _ready.future
+          .then<bool?>((ready) => ready)
+          .timeout(deadline - elapsed, onTimeout: () => null);
+      if (ready != null) return ready;
+      // The core may have reported progress while the previous timeout was waiting.
+    }
+  }
+
   static Future<EmbeddedRetroGame> start(
     ManagedRetro managed,
     RetroDisc disc, {
@@ -90,6 +112,19 @@ class EmbeddedRetroGame extends RunningGame {
       if (!presented && status['presented'] == true) {
         presented = true;
         _ready.complete(true);
+        updated = true;
+      }
+      final label = status['progressLabel'];
+      final percent = status['progressPercent'];
+      final updatedProgress = label is String && label.isNotEmpty
+          ? (label: label, percent: percent is int && percent >= 0 && percent <= 100 ? percent : null)
+          : null;
+      if (progress != updatedProgress) {
+        if (!presented && updatedProgress != null && updatedProgress != _startupProgress) {
+          _startupProgress = updatedProgress;
+          _lastStartupProgress = _startupClock.elapsed;
+        }
+        progress = updatedProgress;
         updated = true;
       }
       final updatedResolutionError = status['resolutionError'] as String? ?? '';
@@ -172,6 +207,8 @@ class EmbeddedRetroGame extends RunningGame {
               'swanstation_GPU_TextureFilter',
               'pcsx2_anisotropic_filtering',
               'pcsx2_trilinear_filtering',
+              'rpcs3_resolution_scale',
+              'rpcs3_anisotropic_filter',
             }.contains(key))) {
       _onGraphicsSelected(key, value);
     }
