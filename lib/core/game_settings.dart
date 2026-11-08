@@ -500,6 +500,46 @@ abstract final class ResolutionPatch {
   /// Whether the patch file has the entries a resolution needs.
   static bool supports(String toml) => _entryNamed(toml, 'width') != null && _entryNamed(toml, 'height') != null;
 
+  /// The WIDTHxHEIGHT the patch file itself sets (the title's own), null when it has no such
+  /// entries or their values are not numbers.
+  static String? defaultOf(String toml) {
+    int? valueOf(String name) {
+      final range = _entryNamed(toml, name);
+      if (range == null) return null;
+      for (final line in toml.split('\n').sublist(range.$1, range.$2)) {
+        final match = RegExp(r'^\s*value\s*=\s*([^#\s]+)').firstMatch(line);
+        if (match != null) return int.tryParse(match.group(1)!);
+      }
+      return null;
+    }
+
+    final width = valueOf('width');
+    final height = valueOf('height');
+    return width == null || height == null ? null : '${width}x$height';
+  }
+
+  /// The largest of [choices] with fewer pixels than [current], null when there is none; a battery
+  /// or heat profile unlocks a game one step lower, as on the Mac (PowerResolution).
+  static String? lower(String current, List<String> choices) {
+    int? pixels(String text) {
+      final size = parse(text);
+      return size == null ? null : size.$1 * size.$2;
+    }
+
+    final limit = pixels(current);
+    if (limit == null) return null;
+    String? best;
+    var most = 0;
+    for (final choice in choices) {
+      final count = pixels(choice);
+      if (count != null && count < limit && count > most) {
+        best = choice;
+        most = count;
+      }
+    }
+    return best;
+  }
+
   /// The patch file with the width and height entries' `value` set to [resolution]; the file as
   /// it is when it has no such entries or the text is not a resolution.
   static String apply(String toml, String resolution) {

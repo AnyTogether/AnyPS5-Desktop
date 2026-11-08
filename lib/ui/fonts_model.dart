@@ -287,6 +287,7 @@ class FontsModel {
     final folder = userFolder;
     return [
       PanelRow(id: 'fontLatin', title: T.text('fontsLatin'), kind: InfoRow(_describe(FontScript.latin))),
+      PanelRow(id: 'fontItalic', title: T.text('fontsItalic'), kind: InfoRow(_describe(FontScript.latinItalic))),
       PanelRow(id: 'fontTypewriter', title: T.text('fontsTypewriter'), kind: InfoRow(_describe(FontScript.typewriter))),
       PanelRow(id: 'fontThai', title: T.text('fontsThai'), kind: InfoRow(_describe(FontScript.thai))),
       PanelRow(id: 'fontArabic', title: T.text('fontsArabic'), kind: InfoRow(_describe(FontScript.arabic))),
