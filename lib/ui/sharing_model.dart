@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 import '../core/deep_link.dart';
 import '../core/game_library.dart';
 import '../core/game_settings.dart';
@@ -75,6 +77,10 @@ extension GameSharing on AppModel {
     if (imported.resolution case final String resolution
         when !supportsResolution(game) || !ResolutionPatch.choices.contains(resolution)) {
       imported = imported.copyWith(resolution: null);
+    }
+    // An engine of its own applies only where that engine is downloaded.
+    if (imported.engine case final String key when !engine.downloaded.any((kit) => p.basename(kit.root) == key)) {
+      imported = imported.copyWith(engine: null);
     }
     saveSettings(game, imported);
     show(
