@@ -349,8 +349,11 @@ class EngineModel {
   /// does; upstream's opens a window at 60% of the screen and goes full screen on F11).
   bool get readsDisplaySettings => isArm(app.toolkitVersion);
 
-  /// The same for [game]: the engine it was unlocked with, else the one that would unlock it.
-  bool readsDisplaySettingsOf(Game game) => isArm(app.records[game.id]?.toolkit ?? app.toolkitFor(game)?.version);
+  /// The same for [game]: its own engine when it has one, else the default's.
+  bool readsDisplaySettingsOf(Game game) {
+    if (app.currentSettings(game).engine == null) return readsDisplaySettings;
+    return isArm(app.toolkitFor(game)?.version ?? app.records[game.id]?.toolkit);
+  }
 
   /// The folders of the downloaded engines chosen for a game of their own.
   Set<String> get pinnedKeys => {for (final game in app.games) ?app.currentSettings(game).engine};

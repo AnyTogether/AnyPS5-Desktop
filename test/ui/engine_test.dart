@@ -11,6 +11,7 @@ import 'package:path/path.dart' as p;
 import '../support/fake_elf.dart';
 import '../support/fake_github.dart';
 import '../support/fake_toolkit.dart';
+import '../support/self_builder.dart';
 import '../support/ui_support.dart';
 
 /// The AnyPS5 engine downloaded by the launcher itself: onboarding, settings, updates. (The
@@ -38,6 +39,8 @@ void main() {
         makeFakeToolkit(p.join(model.paths.toolkits, version), version: 'upstream-v$version');
       }
       model.engine.refresh();
+      // A dump the fake relinker takes.
+      File(p.join(neon().folder, 'eboot.bin')).writeAsBytesSync(typicalSelf());
     });
 
     tearDown(() async {
@@ -116,9 +119,7 @@ void main() {
       await until(() => model.missingEngine(game) == null && model.engine.downloading == null);
       expect(model.preferences.toolkitFolder, before, reason: 'the default stays what it was');
       expect(model.engine.downloaded.map((kit) => p.basename(kit.root)), contains('0.1.9'));
-      model.unlock(game);
-      await until(() => !model.unlocking && model.records.containsKey(game.id));
-      expect(model.records[game.id]!.toolkit, 'upstream-v0.1.9');
+      expect(model.toolkitFor(game)?.version, 'upstream-v0.1.9', reason: 'what unlocks it now');
     });
 
     test('an engine GitHub no longer lists: said, nothing happens to the default', () async {
