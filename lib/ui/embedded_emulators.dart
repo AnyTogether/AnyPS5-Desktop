@@ -72,8 +72,55 @@ extension EmbeddedEmulators on AppModel {
     }
   }
 
-  Future<EmbeddedRetroGame> _startEmbeddedRetro(Game game, RetroDisc disc, ManagedRetro managed) async {
+  String _retroDiscKey(RetroDisc disc, String path) => p.relative(path, from: p.dirname(disc.path));
+
+  void _cancelRetroDiscPicker() {
+    final selection = _retroDiscLaunch?.selection;
+    _retroDiscLaunch = null;
+    if (selection != null && !selection.isCompleted) selection.complete(null);
+  }
+
+  Future<String?> _pickRetroLaunchDisc(Game game, RetroDisc disc, List<String> paths) {
+    final selection = Completer<String?>();
+    _retroDiscLaunch = (game: game, paths: paths, selection: selection);
+    open(Layer.retroStartDisc);
+    final last = preferences.retroLastDisc[game.id];
+    final index = paths.indexWhere((path) => _retroDiscKey(disc, path) == last);
+    if (index > 0) {
+      panelRow = index;
+      _changed();
+    }
+    return selection.future;
+  }
+
+  List<PanelRow> _retroLaunchDiscRows() {
+    final launch = _retroDiscLaunch;
+    final disc = launch?.game.retro;
+    if (launch == null || disc == null) return const [];
+    final last = preferences.retroLastDisc[launch.game.id];
+    return [
+      for (final (index, path) in launch.paths.indexed)
+        PanelRow(
+          id: 'retro-start-disc-$index',
+          title: T.format('retroDiscNumber', [index + 1]),
+          detail: _retroDiscKey(disc, path) == last ? T.text('retroLastDiscPlayed') : null,
+          kind: ActionRow(() {
+            if (_retroDiscLaunch != launch || overlay != Layer.retroStartDisc) return;
+            launch.selection.complete(path);
+            closeOverlay();
+          }),
+        ),
+    ];
+  }
+
+  Future<EmbeddedRetroGame> _startEmbeddedRetro(
+    Game game,
+    RetroDisc disc,
+    ManagedRetro managed, {
+    required ({int index, String path})? initialDisc,
+  }) async {
     if (!await managed.verifiesInstalled(disc.platform)) throw StateError('Installed core SHA-256 mismatch');
+    final profilePreferences = preferences;
     final settings = preferences.retroGraphics[game.id] ?? const <String, String>{};
     void save(String key, String value) {
       final choices = preferences.retroGraphics.putIfAbsent(game.id, () => {});
@@ -87,6 +134,16 @@ extension EmbeddedEmulators on AppModel {
       disc,
       internalResolution: settings[scale],
       graphics: settings,
+      initialDisc: initialDisc,
+      onDiscPlayed: initialDisc == null
+          ? null
+          : (path) {
+              if (_disposed || !identical(preferences, profilePreferences)) return;
+              final key = _retroDiscKey(disc, path);
+              if (preferences.retroLastDisc[game.id] == key) return;
+              preferences.retroLastDisc[game.id] = key;
+              savePreferences();
+            },
       onResolutionSelected: (value) => save(scale, value),
       onGraphicsSelected: save,
       readPad: () {

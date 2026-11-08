@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:anyps5_desktop/core/controllers/pad_info.dart';
 import 'package:anyps5_desktop/core/game_library.dart';
 import 'package:anyps5_desktop/core/gamepad/pad_navigation.dart';
+import 'package:anyps5_desktop/core/host.dart';
 import 'package:anyps5_desktop/core/managed_retro.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/embedded_retro_game.dart';
@@ -108,6 +109,61 @@ void main() {
     });
   }
 
+  testWidgets('Play asks for a PS1 disc and highlights the last played disc after a playlist reorder', (tester) async {
+    final host = EmbeddedCoreHost.current;
+    if (host == null) return;
+    final fixture = makeFixture(system: Platform.isWindows ? HostSystem.windows : HostSystem.linux);
+    final model = fixture.model;
+    addTearDown(() {
+      model.dispose();
+      fixture.dispose();
+    });
+    final managed = ManagedRetro(p.join(p.dirname(model.paths.toolkits), 'Emulators'), host);
+    File(managed.libraryPath(RetroPlatform.ps1)).createSync(recursive: true);
+    final bios = File(p.join(fixture.temp.path, 'bios.bin'))..writeAsBytesSync(List.filled(512 * 1024, 0)..[0] = 1);
+    await tester.runAsync(() => managed.importBios(RetroPlatform.ps1, bios.path));
+    final folder = Directory(p.join(fixture.temp.path, 'PS1', 'Test Game'))..createSync(recursive: true);
+    final image = File(p.join(folder.path, 'disc.bin'))..writeAsBytesSync(List.filled(2352, 0));
+    for (final name in ['first.cue', 'second.cue']) {
+      File(p.join(folder.path, name))
+          .writeAsStringSync('FILE "${p.basename(image.path)}" BINARY\nTRACK 01 MODE2/2352\n');
+    }
+    final playlist = File(p.join(folder.path, 'game.m3u'))..writeAsStringSync('first.cue\nsecond.cue\n');
+    model.preferences.gamesFolders.add(p.dirname(folder.path));
+    model.rescan();
+    final game = model.games.singleWhere((game) => game.retro?.path == playlist.path);
+    final firstPlay = model.play(game);
+    expect(model.overlay, Layer.retroStartDisc);
+    expect(model.panelCategories().single.rows.map((row) => row.detail), [null, null]);
+    expect(model.starting, isNull);
+    model.handle(Command.back);
+    expect(model.overlay, isNull);
+    expect(model.running, isNull);
+    await firstPlay;
+
+    model.preferences.retroLastDisc[game.id] = 'second.cue';
+    expect(Preferences.fromJson(model.preferences.toJson()).retroLastDisc[game.id], 'second.cue');
+    final secondPlay = model.play(game);
+    expect(model.panelRow, 1);
+    expect(model.panelCategories().single.rows[1].detail, T.text('retroLastDiscPlayed'));
+    model.handle(Command.back);
+    await secondPlay;
+
+    playlist.writeAsStringSync('second.cue\nfirst.cue\n');
+    await tester.runAsync(() async {
+      final thirdPlay = model.play(game);
+      expect(model.panelRow, 0);
+      expect(model.panelCategories().single.rows[0].detail, T.text('retroLastDiscPlayed'));
+      expect(model.starting, isNull);
+      model.handle(Command.select);
+      expect(model.overlay, isNull);
+      await thirdPlay;
+    });
+    expect(model.toast, T.text('retroEmbeddedStartFailed'));
+    expect(model.preferences.retroLastDisc[game.id], 'second.cue');
+    await tester.pump(const Duration(seconds: 5));
+  });
+
   testWidgets('Quick Menu changes discs in place and Back keeps the game paused', (tester) async {
     final fixture = makeFixture();
     final model = fixture.model;
@@ -120,12 +176,16 @@ void main() {
     var failed = false;
     var reject = false;
     var ended = false;
-    int? inserted = 0;
+    int? inserted = 1;
+    final played = <String>[];
+    var playedPath = 'second.cue';
     messenger.setMockMethodCallHandler(channel, (call) async {
       calls.add(call);
       switch (call.method) {
         case 'start':
           expect(call.arguments, containsPair('disc', disc.path));
+          expect(call.arguments, containsPair('initialDiscIndex', 1));
+          expect(call.arguments, containsPair('initialDiscPath', 'second.cue'));
           return 20;
         case 'status':
           return {
@@ -134,6 +194,7 @@ void main() {
             'discs': {
               'labels': ['First disc', '', 'Third disc'],
               'inserted': inserted,
+              'playedDiscPath': playedPath,
               'busy': busy,
               'failed': failed,
             },
@@ -165,15 +226,18 @@ void main() {
       onGraphicsSelected: (_, _) {},
       readPad: () => PadState.idle,
       changed: model.refresh,
+      initialDisc: (index: 1, path: 'second.cue'),
+      onDiscPlayed: played.add,
     );
     model.running = (model.games.first, session);
     await tester.pump(const Duration(milliseconds: 130));
     expect(await session.ready, isTrue);
-    expect(session.discs?.inserted, 0);
+    expect(session.discs?.inserted, 1);
+    expect(played, ['second.cue']);
 
     model.open(Layer.quickMenu);
     final discMenu = model.panelCategories().single.rows.singleWhere((row) => row.id == 'retro-disc-menu');
-    expect(discMenu.detail, 'First disc');
+    expect(discMenu.detail, T.format('retroDiscNumber', [2]));
     model.panelRow = model.panelCategories().single.rows.indexWhere((row) => row.id == 'retro-disc-menu');
     model.handle(Command.select);
     expect(model.overlay, Layer.retroDiscs);
@@ -183,13 +247,14 @@ void main() {
     model.handle(Command.select);
     expect(calls.where((call) => call.method == 'changeDisc'), hasLength(1));
     await tester.pump(const Duration(milliseconds: 130));
-    expect(calls.lastWhere((call) => call.method == 'changeDisc').arguments, 1);
+    expect(calls.lastWhere((call) => call.method == 'changeDisc').arguments, 0);
     expect(session.discs?.busy, isTrue);
     expect(model.panelCategories().single.rows.where((row) => row.focusable), isEmpty);
 
     busy = false;
     failed = true;
     inserted = null;
+    playedPath = '';
     await tester.pump(const Duration(milliseconds: 130));
     expect(session.discs?.inserted, isNull);
     expect(model.panelCategories().single.rows.last.title, T.text('retroDiscChangeFailed'));
@@ -198,9 +263,10 @@ void main() {
     expect(calls.where((call) => call.method == 'changeDisc'), hasLength(2));
     busy = false;
     failed = false;
-    inserted = 1;
+    inserted = 0;
     await tester.pump(const Duration(milliseconds: 130));
-    expect(model.panelCategories().single.rows[1].detail, T.text('retroDiscInserted'));
+    expect(model.panelCategories().single.rows[0].detail, T.text('retroDiscInserted'));
+    expect(played, ['second.cue']);
 
     model.handle(Command.back);
     expect(model.overlay, Layer.quickMenu);
@@ -217,11 +283,14 @@ void main() {
     await tester.pump();
     expect(model.overlay, isNull);
     expect(model.running?.$2, same(session));
+    expect(played, ['second.cue']);
     expect(calls.where((call) => call.method == 'pause').map((call) => call.arguments), [true, false]);
     expect(calls.where((call) => call.method == 'start'), hasLength(1));
+    playedPath = 'first.cue';
     await session.close();
     await tester.pump(const Duration(milliseconds: 130));
     expect(await session.exitCode, 0);
+    expect(played, ['second.cue', 'first.cue']);
     await tester.pump(const Duration(seconds: 5));
   });
 

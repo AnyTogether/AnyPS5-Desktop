@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <string>
 #include <thread>
 
 #if defined(_WIN32)
@@ -49,6 +50,7 @@ bool multidisc = false;
 bool legacy_disk_control = false;
 bool ejected = false;
 unsigned image = 0;
+std::string initial_path;
 
 void CheckDiskThread() {
   if (std::this_thread::get_id() != worker) wrong_disk_thread = true;
@@ -82,10 +84,23 @@ bool GetLabel(unsigned index, char* label, std::size_t size) {
   std::memcpy(label, labels[index], 7);
   return true;
 }
+bool SetInitialImage(unsigned index, const char* path) {
+  CheckDiskThread();
+  if (run_count != 0 || index >= 3) return false;
+  image = index;
+  initial_path = path;
+  return true;
+}
+bool GetImagePath(unsigned index, char* path, std::size_t size) {
+  CheckDiskThread();
+  if (!multidisc || index != image || initial_path.size() >= size) return false;
+  std::memcpy(path, initial_path.c_str(), initial_path.size() + 1);
+  return true;
+}
 void RegisterDiskControl() {
   unsigned version = 0;
   DiskControl callbacks{
-      SetEject, GetEject, GetIndex, SetIndex, Count, Replace, Add, nullptr, nullptr, GetLabel};
+      SetEject, GetEject, GetIndex, SetIndex, Count, Replace, Add, SetInitialImage, GetImagePath, GetLabel};
   if (!legacy_disk_control && environment(57, &version) && version >= 1)
     environment(58, &callbacks);
   else
@@ -110,6 +125,7 @@ extern "C" TEST_EXPORT void retro_init() {
   worker = std::this_thread::get_id();
   wrong_disk_thread = false;
   image = 0;
+  initial_path.clear();
   ejected = false;
   run_count = 0;
   if (!legacy_disk_control) RegisterDiskControl();

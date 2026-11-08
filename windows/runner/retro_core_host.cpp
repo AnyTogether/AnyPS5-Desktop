@@ -306,6 +306,7 @@ Map EncodeStatus(const SessionStatus& status) {
     result.emplace(Value("discs"), Value(Map{
         {Value("labels"), Value(List(discs->labels.begin(), discs->labels.end()))},
         {Value("inserted"), discs->inserted ? Value(static_cast<int32_t>(*discs->inserted)) : Value()},
+        {Value("playedDiscPath"), Value(discs->played ? discs->inserted_path : std::string{})},
         {Value("busy"), Value(discs->busy)},
         {Value("failed"), Value(discs->failed)},
     }));
@@ -393,6 +394,15 @@ void RetroCoreHost::Handle(const flutter::MethodCall<Value>& call,
       return;
     }
     try {
+      std::optional<InitialDisc> initial_disc;
+      const auto initial_index = fields->find(Value("initialDiscIndex"));
+      const auto* initial_path = StringField(*fields, "initialDiscPath");
+      if (initial_index != fields->end() || fields->count(Value("initialDiscPath"))) {
+        const auto* index = initial_index == fields->end() ? nullptr : std::get_if<int32_t>(&initial_index->second);
+        if (!index || *index < 0 || *index >= 128 || !initial_path || initial_path->empty())
+          throw std::runtime_error("Invalid initial disc");
+        initial_disc = InitialDisc{static_cast<unsigned>(*index), *initial_path};
+      }
       std::map<std::string, std::string> graphics;
       const auto values = fields->find(Value("graphics"));
       if (values != fields->end()) {
@@ -405,7 +415,7 @@ void RetroCoreHost::Handle(const flutter::MethodCall<Value>& call,
         }
       }
       session_ = std::make_shared<RetroCoreSession>(textures_, SessionConfig{*core, *disc, *system, *saves,
-          resolution ? *resolution : "", std::move(graphics)});
+          resolution ? *resolution : "", std::move(graphics), std::move(initial_disc)});
       if (!session_->Start()) throw std::runtime_error("Could not register the game surface");
       result->Success(Value(session_->texture_id()));
     } catch (const std::exception& failure) {

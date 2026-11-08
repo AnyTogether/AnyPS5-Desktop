@@ -79,6 +79,21 @@ filename. When converting an existing single-disc library entry to a
 playlist, use the same stem as the original disc to keep using its
 existing embedded memory card.
 
+For an embedded PS1 playlist with multiple discs, **Play** opens **Select
+disc**. Pick the disc your in-game save is on, then load the save from the
+game's own menu. All discs use the same playlist memory card. AnyPS5 marks
+and highlights **Last played** once a disc has booted or play has resumed
+after a successful swap. The marker is stored per game and profile using
+the disc's path within the playlist folder, so reordering the playlist
+keeps it on the same disc. A first launch has no marker. Back cancels
+without booting, and single-disc games start directly.
+
+The [library playlist reader](../lib/core/game_library.dart) supplies the
+disc order. The [Windows host](../windows/runner/retro_core_host.cpp) and
+[Linux host](../linux/runner/retro_core_host_linux.cc) pass the selected disc
+to the shared session, which sets it before loading the playlist and
+verifies the core opened that disc before displaying a frame.
+
 ## Native host
 
 The [shared session worker](../native/retro/retro_session.cpp) owns core
@@ -161,3 +176,13 @@ and confirmed both full file hashes stayed identical after swapping
 and closing. Both runs used temporary BIOS and save storage. A story
 prompt that requests a different disc and a physical controller still
 need interactive verification.
+
+The [launch picker tests](../test/ui/embedded_ps12_session_test.dart)
+cover cancellation, last-played focus, a reordered playlist and a
+rejected startup. The [native tests](../native/retro/test/retro_native_test.cpp)
+cover booting with Disc 2 already inserted. The focused Flutter run
+passed 52 tests, including [profile switching](../test/ui/profiles_test.dart).
+The native suite passed on Windows and Linux. Headless runs booted both
+Metal Gear Solid and Final Fantasy VII on Disc 2. Both confirmed that
+a paused swap counted as played only
+after resuming, and both used a single temporary playlist memory card.

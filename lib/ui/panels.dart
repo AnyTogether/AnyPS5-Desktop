@@ -180,6 +180,7 @@ class PanelView extends StatelessWidget {
       Layer.gameFiles,
       Layer.quickMenu,
       Layer.retroDiscs,
+      Layer.retroStartDisc,
       Layer.homeMenu,
       Layer.launcherReport,
       Layer.profileMenu,

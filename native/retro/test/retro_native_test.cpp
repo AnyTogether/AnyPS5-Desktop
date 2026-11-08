@@ -127,6 +127,23 @@ void CheckSession(const std::filesystem::path& path) {
   session.Join();
   Check(session.ended() && lifecycle() == 4 && session.Status().error.empty(), "Expected unload and deinit");
 }
+void CheckInitialDisc(const std::filesystem::path& path) {
+  const retro::SessionConfig config{
+      path.u8string(), "test.m3u", "", "", "", {}, retro::InitialDisc{1, path.u8string()}};
+  retro::Session session(config, std::make_unique<TestVideo>(), std::make_unique<TestAudio>(), [] {});
+  session.Start();
+  WaitFor([&] {
+    const auto status = session.Status();
+    if (status.ended) throw std::runtime_error(status.error);
+    return status.ready;
+  }, "Disc 2 did not boot");
+  const auto discs = session.Status().discs;
+  Check(discs && discs->inserted == 1, "The requested disc was not inserted at boot");
+  session.Stop();
+  session.Join();
+  Check(session.Status().error.empty(), "Selected-disc session did not stop cleanly");
+}
+
 void CheckDiscSwap(const std::filesystem::path& path, bool legacy = false) {
   const retro::DynamicLibrary library(path);
   const auto lifecycle = library.Get<unsigned (*)()>("test_lifecycle_count");
@@ -192,6 +209,7 @@ int main(int argc, char** argv) {
     CheckSession(std::filesystem::u8path(argv[1]));
     const auto path = std::filesystem::u8path(argv[1]);
     const retro::DynamicLibrary library(path);
+    CheckInitialDisc(path);
     CheckDiscSwap(path);
     library.Get<void (*)()>("test_use_legacy_disk_control")();
     CheckDiscSwap(path, true);

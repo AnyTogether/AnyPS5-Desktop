@@ -2160,6 +2160,8 @@
   "retroEmbeddedStartFailed": "Gömülü oyun başlatılamadı. Ayarlar bölümünde çekirdeği, BIOS dosyasını ve diski kontrol et.",
   "retroAnisotropicFiltering": "Eşyönsüz filtreleme",
   "retroChangeDisc": "Diski değiştir",
+  "retroSelectDisc": "Disk seç",
+  "retroLastDiscPlayed": "Son oynanan",
   "retroDiscNumber": "Disk %@",
   "retroDiscInserted": "Takılı",
   "retroDiscChanging": "Disk değiştiriliyor…",

@@ -165,6 +165,8 @@ class Session::Impl {
     }
     status.telemetry = TuningTelemetry();
     status.discs = discs_;
+    if (status.discs)
+      status.discs->played = status.discs->inserted && status.telemetry.steps > disc_inserted_at_step_;
     return status;
   }
 
@@ -420,6 +422,13 @@ class Session::Impl {
     }
   }
 
+  std::string DiscPath(unsigned index) const {
+    std::array<char, 16384> path{};
+    if (!disk_callbacks_.get_image_path ||
+        !disk_callbacks_.get_image_path(index, path.data(), path.size())) return {};
+    return {path.begin(), std::find(path.begin(), path.end(), '\0')};
+  }
+
   void RefreshDiscs(bool failed = false) {
     const auto& disk = disk_callbacks_.basic;
     std::optional<DiscStatus> updated;
@@ -437,13 +446,20 @@ class Session::Impl {
           }
         }
         const auto index = disk.get_image_index();
-        if (!disk.get_eject_state() && index < count) updated->inserted = index;
+        if (!disk.get_eject_state() && index < count) {
+          updated->inserted = index;
+          updated->inserted_path = DiscPath(index);
+        }
         updated->failed = failed;
       }
     }
     std::lock_guard<std::mutex> lock(settings_mutex_);
     // Preserve a request queued while the core was refreshing its state.
     if (updated) updated->busy = pending_disc_.has_value();
+    if (updated && (!discs_ || updated->inserted != discs_->inserted ||
+                    updated->inserted_path != discs_->inserted_path)) {
+      disc_inserted_at_step_ = steps_;
+    }
     discs_ = std::move(updated);
   }
 
@@ -648,7 +664,23 @@ class Session::Impl {
         disk_callbacks_ = initial_disk_callbacks;
         init();
         initialized = true;
+        const auto& initial_disc = config_.initial_disc;
+        if (initial_disc &&
+            (!disk_callbacks_.set_initial_image ||
+             !disk_callbacks_.set_initial_image(initial_disc->index, initial_disc->path.c_str()))) {
+          throw std::runtime_error("The core cannot boot the selected disc.");
+        }
         loaded = load(&game);
+        if (loaded && initial_disc) {
+          const auto& disk = disk_callbacks_.basic;
+          std::error_code error;
+          if (!disk.get_image_index || disk.get_image_index() != initial_disc->index ||
+              !disk.get_eject_state || disk.get_eject_state() ||
+              !std::filesystem::equivalent(std::filesystem::u8path(DiscPath(initial_disc->index)),
+                                           std::filesystem::u8path(initial_disc->path), error)) {
+            throw std::runtime_error("The core did not boot the selected disc.");
+          }
+        }
         if (loaded && hardware_callbacks_.reset) {
           AvInfo av{};
           av_info(&av);
@@ -770,6 +802,7 @@ class Session::Impl {
   std::array<int16_t, 4> axes_{};
   std::map<std::string, Option> options_;
   std::optional<DiscStatus> discs_;
+  int64_t disc_inserted_at_step_ = 0;
   std::optional<unsigned> pending_disc_;
   bool options_changed_ = false;
   bool graphics_queued_ = false;

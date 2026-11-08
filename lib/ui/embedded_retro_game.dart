@@ -42,6 +42,7 @@ class EmbeddedRetroGame extends RunningGame {
   EmbeddedDiscs? _discs;
   EmbeddedDiscs? get discs => _discs;
   _DiscRequest? _discRequest;
+  String? _lastPlayedDisc;
   bool get changingDisc => _discRequest != null || _discs?.busy == true;
   double aspect = 4 / 3;
   final options = <String, EmbeddedOption>{};
@@ -58,6 +59,8 @@ class EmbeddedRetroGame extends RunningGame {
     required void Function(String, String) onGraphicsSelected,
     required PadState Function() readPad,
     required void Function() changed,
+    ({int index, String path})? initialDisc,
+    void Function(String)? onDiscPlayed,
   }) async {
     final core = managed.libraryPath(disc.platform);
     if (!File(core).existsSync()) throw FileSystemException(T.text('retroEmbeddedCoreMissing'), core);
@@ -65,6 +68,8 @@ class EmbeddedRetroGame extends RunningGame {
     final id = await _channel.invokeMethod<int>('start', {
       'core': core,
       'disc': disc.path,
+      if (initialDisc != null) 'initialDiscIndex': initialDisc.index,
+      if (initialDisc != null) 'initialDiscPath': initialDisc.path,
       'system': managed.systemPath,
       'saves': saveRoot.path,
       'internalResolution': ?internalResolution,
@@ -72,20 +77,32 @@ class EmbeddedRetroGame extends RunningGame {
     });
     if (id == null || id < 0) throw StateError(T.text('retroEmbeddedSurfaceFailed'));
     final session = EmbeddedRetroGame._(id, Completer<int>(), onResolutionSelected, onGraphicsSelected);
-    session._watch = Timer.periodic(const Duration(milliseconds: 125), (_) => unawaited(session._poll(changed)));
+    session._watch = Timer.periodic(
+      const Duration(milliseconds: 125),
+      (_) => unawaited(session._poll(changed, onDiscPlayed)),
+    );
     session._input = Timer.periodic(const Duration(milliseconds: 16), (_) {
       if (session._acceptsInput && !session._closing) session._sendInput(readPad());
     });
     return session;
   }
 
-  Future<void> _poll(void Function() changed) async {
+  Future<void> _poll(void Function() changed, void Function(String)? onDiscPlayed) async {
     if (_reading) return;
     _reading = true;
     // A poll already in flight may describe the tray before the request.
     final acknowledgeDiscRequest = _discRequest == _DiscRequest.queued;
     try {
       final status = await _channel.invokeMapMethod<String, Object?>('status');
+      final discStatus = status?['discs'];
+      final played = discStatus is Map ? discStatus['playedDiscPath'] : null;
+      if ((presented || status?['presented'] == true) &&
+          played is String &&
+          played.isNotEmpty &&
+          played != _lastPlayedDisc) {
+        _lastPlayedDisc = played;
+        onDiscPlayed?.call(played);
+      }
       if (status == null || status['ended'] == true) {
         final nativeError = status?['error'] as String?;
         if (nativeError != null && nativeError.isNotEmpty) error = nativeError;
@@ -113,7 +130,7 @@ class EmbeddedRetroGame extends RunningGame {
         aspect = updatedAspect;
         updated = true;
       }
-      final newDiscs = _readDiscs(status['discs']);
+      final newDiscs = _readDiscs(discStatus);
       if (!listEquals(_discs?.labels, newDiscs?.labels) ||
           _discs?.inserted != newDiscs?.inserted ||
           _discs?.busy != newDiscs?.busy ||

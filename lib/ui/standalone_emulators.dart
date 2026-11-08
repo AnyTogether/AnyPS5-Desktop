@@ -47,22 +47,10 @@ extension StandaloneEmulators on AppModel {
   );
 
   Future<void> _playRetro(Game game, RetroDisc disc) async {
-    if (_embeddedSetupBusy || starting != null || running != null) return;
-    final allowed = together.family.beforePlay(game);
-    if (!(allowed is bool ? allowed : await allowed) ||
-        starting != null ||
-        running != null ||
-        _embeddedSetupBusy ||
-        _disposed) {
-      return;
-    }
-
+    if (_disposed || _embeddedSetupBusy || starting != null || running != null || _retroDiscLaunch != null) return;
+    final launchPreferences = preferences;
     final managed = _embeddedReady(disc.platform) ? _managedRetro : null;
     final program = standaloneEmulator(disc.platform);
-    if (program == null && managed == null) {
-      await chooseStandaloneEmulator(disc.platform);
-      return;
-    }
     final ps3 = disc.platform == RetroPlatform.ps3;
     final boot = ps3 ? p.join(game.folder, 'PS3_GAME', 'USRDIR', 'EBOOT.BIN') : disc.path;
     if (!File(disc.path).existsSync() || (ps3 && !File(boot).existsSync())) {
@@ -70,13 +58,52 @@ extension StandaloneEmulators on AppModel {
       return;
     }
 
+    ({int index, String path})? initialDisc;
+    if (managed != null && disc.platform == RetroPlatform.ps1 && p.extension(boot).toLowerCase() == '.m3u') {
+      try {
+        final playlist = GameLibrary.ps1PlaylistDiscs(boot);
+        if (playlist.isEmpty) {
+          show(T.text('retroDiscMoved'));
+          return;
+        }
+        if (playlist.length > 1) {
+          final chosen = await _pickRetroLaunchDisc(game, disc, playlist);
+          if (chosen == null || _disposed || !identical(preferences, launchPreferences)) return;
+          final index = GameLibrary.ps1PlaylistDiscs(boot).indexOf(chosen);
+          if (index < 0) {
+            show(T.text('retroDiscMoved'));
+            return;
+          }
+          initialDisc = (index: index, path: chosen);
+        }
+      } on FileSystemException {
+        show(T.text('retroDiscMoved'));
+        return;
+      }
+    }
+
+    final allowed = together.family.beforePlay(game);
+    if (!(allowed is bool ? allowed : await allowed) ||
+        starting != null ||
+        running != null ||
+        _retroDiscLaunch != null ||
+        _embeddedSetupBusy ||
+        _disposed ||
+        !identical(preferences, launchPreferences)) {
+      return;
+    }
+
+    if (program == null && managed == null) {
+      await chooseStandaloneEmulator(disc.platform);
+      return;
+    }
     sounds.play(Cue.select);
     starting = game;
     _changed();
     final RunningGame run;
     try {
       run = managed != null
-          ? await _startEmbeddedRetro(game, disc, managed)
+          ? await _startEmbeddedRetro(game, disc, managed, initialDisc: initialDisc)
           : await startRetroGame(
               installed: p.dirname(program!),
               program: program,

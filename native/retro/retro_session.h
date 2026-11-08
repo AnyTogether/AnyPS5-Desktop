@@ -20,9 +20,15 @@ Console ConsoleForCore(const std::string& path);
 
 using Options = std::map<std::string, std::string>;
 
+struct InitialDisc {
+  unsigned index;
+  std::string path;
+};
+
 struct SessionConfig {
   std::string core, disc, system, saves, initial_resolution;
   Options initial_graphics;
+  std::optional<InitialDisc> initial_disc = std::nullopt;
 };
 
 struct OptionStatus {
@@ -41,6 +47,8 @@ struct Telemetry {
 struct DiscStatus {
   std::vector<std::string> labels;
   std::optional<unsigned> inserted;
+  std::string inserted_path;
+  bool played = false;
   bool busy = false, failed = false;
 };
 

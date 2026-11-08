@@ -2160,6 +2160,8 @@
   "retroEmbeddedStartFailed": "Could not start the embedded game. Check the core, BIOS and disc in Settings.",
   "retroAnisotropicFiltering": "Anisotropic filtering",
   "retroChangeDisc": "Change disc",
+  "retroSelectDisc": "Select disc",
+  "retroLastDiscPlayed": "Last played",
   "retroDiscNumber": "Disc %@",
   "retroDiscInserted": "Inserted",
   "retroDiscChanging": "Changing disc…",
