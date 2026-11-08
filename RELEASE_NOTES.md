@@ -12,6 +12,11 @@ release when it is made.
 - **A game's options lead to its hub**, as on the Mac.
 - **Family notifications say what they're about**, as on the Mac: who asks for more time or a
   game, what a parent answered, and family alerts and invites.
+- **Update from Git sets up the build folder itself**, as on the Mac. An engine folder that is a
+  git checkout without a build folder no longer stops at "no build folder yet". With Git, CMake,
+  Ninja and a C++ compiler (g++) on PATH, the launcher runs the CMake setup the build guide
+  shows, with its progress, then pulls and builds. When a tool is missing it names it and opens
+  the right guide: upstream AnyPS5's build guide for an upstream checkout, AnyPS5-ARM's for its own.
 - **A new install gets the AnyPS5-ARM engine.** On a first start the welcome downloads
   AnyPS5-ARM's engine, which reads the phone controller and opens games full screen or at the
   window size you chose. If you already use upstream's engine, nothing changes on its own.

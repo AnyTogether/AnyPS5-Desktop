@@ -79,13 +79,31 @@ class FakeCommands extends CommandRunner {
 
 /// A git checkout of the engine's source with a configured build/ whose relinker and libraries
 /// are the fake toolkit's, in the CMake build tree's layout. [built] false leaves the build
-/// folder configured but empty; [configured] false leaves no build folder at all.
-String makeFakeCheckout(String folder, {bool configured = true, bool built = true, String? compiler}) {
+/// folder configured but empty; [configured] false leaves no build folder at all. Upstream's tree
+/// unless [arm] (AnyPS5-ARM's, which has tools/package_arm_toolkit.py).
+String makeFakeCheckout(
+  String folder, {
+  bool configured = true,
+  bool built = true,
+  String? compiler,
+  bool arm = false,
+}) {
   Directory(p.join(folder, 'core', 'relinker')).createSync(recursive: true);
   Directory(p.join(folder, 'core', 'libs', 'prx')).createSync(recursive: true);
   Directory(p.join(folder, '.git')).createSync(recursive: true);
   File(p.join(folder, 'CMakeLists.txt')).writeAsStringSync('project(AnyPS5)\n');
+  if (arm) {
+    Directory(p.join(folder, 'tools')).createSync(recursive: true);
+    File(p.join(folder, 'tools', 'package_arm_toolkit.py')).writeAsStringSync('# AnyPS5-ARM\n');
+  }
   if (!configured) return folder;
+  configureFakeCheckout(folder, compiler: compiler);
+  if (built) buildFakeCheckout(folder);
+  return folder;
+}
+
+/// What `cmake -S . -B build -G Ninja ...` writes: build/CMakeCache.txt.
+void configureFakeCheckout(String folder, {String? compiler}) {
   final build = p.join(folder, 'build');
   Directory(build).createSync(recursive: true);
   File(p.join(build, 'CMakeCache.txt')).writeAsStringSync(
@@ -93,8 +111,6 @@ String makeFakeCheckout(String folder, {bool configured = true, bool built = tru
     'CMAKE_CXX_COMPILER:FILEPATH=${compiler ?? '/usr/bin/g++'}\n'
     'CMAKE_HOME_DIRECTORY:INTERNAL=$folder\n',
   );
-  if (built) buildFakeCheckout(folder);
-  return folder;
 }
 
 /// What `cmake --build build --target relinker libs` writes: the relinker and the libraries.
