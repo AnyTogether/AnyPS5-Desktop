@@ -128,6 +128,17 @@ class Session::Impl {
     }
   }
 
+  bool ChangeDisc(unsigned index) {
+    std::lock_guard<std::mutex> lock(settings_mutex_);
+    if (stop_ || ended_ || !discs_ || discs_->busy ||
+        index >= discs_->labels.size() || discs_->inserted == index)
+      return false;
+    discs_->busy = true;
+    discs_->failed = false;
+    pending_disc_ = index;
+    return true;
+  }
+
   void SetInput(uint16_t buttons, const std::array<int16_t, 4>& axes) {
     std::lock_guard<std::mutex> lock(input_mutex_);
     buttons_ = buttons;
@@ -153,6 +164,7 @@ class Session::Impl {
           static_cast<int32_t>(option.pending.value_or(option.selected))});
     }
     status.telemetry = TuningTelemetry();
+    status.discs = discs_;
     return status;
   }
 
@@ -408,6 +420,62 @@ class Session::Impl {
     }
   }
 
+  void RefreshDiscs(bool failed = false) {
+    const auto& disk = disk_callbacks_.basic;
+    std::optional<DiscStatus> updated;
+    if (disk.set_eject_state && disk.get_eject_state && disk.get_image_index &&
+        disk.set_image_index && disk.get_num_images) {
+      const auto count = disk.get_num_images();
+      if (count >= 2 && count <= 128) {
+        updated.emplace();
+        updated->labels.resize(count);
+        if (disk_callbacks_.get_image_label) {
+          for (unsigned index = 0; index < count; ++index) {
+            std::array<char, 1024> label{};
+            if (disk_callbacks_.get_image_label(index, label.data(), label.size()))
+              updated->labels[index].assign(label.begin(), std::find(label.begin(), label.end(), '\0'));
+          }
+        }
+        const auto index = disk.get_image_index();
+        if (!disk.get_eject_state() && index < count) updated->inserted = index;
+        updated->failed = failed;
+      }
+    }
+    std::lock_guard<std::mutex> lock(settings_mutex_);
+    // Preserve a request queued while the core was refreshing its state.
+    if (updated) updated->busy = pending_disc_.has_value();
+    discs_ = std::move(updated);
+  }
+
+  void ApplyDiscChange() {
+    std::optional<unsigned> requested;
+    {
+      std::lock_guard<std::mutex> lock(settings_mutex_);
+      requested = std::exchange(pending_disc_, std::nullopt);
+    }
+    if (!requested) return;
+    const auto& disk = disk_callbacks_.basic;
+    if (!disk.get_eject_state || !disk.get_image_index || !disk.set_eject_state ||
+        !disk.set_image_index || !disk.get_num_images || *requested >= disk.get_num_images()) {
+      RefreshDiscs(true);
+      return;
+    }
+    const bool was_open = disk.get_eject_state();
+    const auto previous = disk.get_image_index();
+    const bool changed = (was_open || disk.set_eject_state(true)) &&
+        disk.set_image_index(*requested) && disk.set_eject_state(false) &&
+        !disk.get_eject_state() && disk.get_image_index() == *requested;
+    if (!changed && (disk.get_eject_state() != was_open || disk.get_image_index() != previous)) {
+      // Restore the previous disc only when its index is known to be selected.
+      if (disk.get_image_index() != previous &&
+          (disk.get_eject_state() || disk.set_eject_state(true)))
+        disk.set_image_index(previous);
+      if (disk.get_image_index() == previous && disk.get_eject_state() != was_open)
+        disk.set_eject_state(was_open);
+    }
+    RefreshDiscs(!changed);
+  }
+
   bool Environment(unsigned command, void* data) {
     if (command == kShutdown) {
       stop_ = true;
@@ -415,6 +483,16 @@ class Session::Impl {
     }
     if (!data) return false;
     switch (command) {
+      case kDiskControlVersion:
+        *static_cast<unsigned*>(data) = 1;
+        return true;
+      case kSetDiskControl:
+        disk_callbacks_ = {};
+        disk_callbacks_.basic = *static_cast<const DiskControlCallbacks*>(data);
+        return true;
+      case kSetDiskControlExt:
+        disk_callbacks_ = *static_cast<const DiskControlExtCallbacks*>(data);
+        return true;
       case kSetHardware: {
         auto& callbacks = *static_cast<HardwareCallbacks*>(data);
         if (!hardware_available_ || !video_->Bind(callbacks)) return false;
@@ -532,6 +610,7 @@ class Session::Impl {
       const auto av_info = core.Get<void (*)(AvInfo*)>("retro_get_system_av_info");
       core.Get<void (*)(bool (*)(unsigned, void*))>("retro_set_environment")(
           [](unsigned command, void* data) { return active_.load()->Environment(command, data); });
+      const auto initial_disk_callbacks = disk_callbacks_;
       core.Get<void (*)(void (*)(const void*, unsigned, unsigned, size_t))>("retro_set_video_refresh")(
           [](const void* data, unsigned width, unsigned height, size_t pitch) {
             active_.load()->Publish(data, width, height, pitch);
@@ -566,6 +645,7 @@ class Session::Impl {
         loaded = initialized = false;
         video_->Clear();
         hardware_callbacks_ = {};
+        disk_callbacks_ = initial_disk_callbacks;
         init();
         initialized = true;
         loaded = load(&game);
@@ -575,6 +655,7 @@ class Session::Impl {
           video_->GeometryChanged(av.geometry);
           video_->Reset(hardware_callbacks_);
         }
+        if (loaded) RefreshDiscs();
         return loaded;
       };
       const bool ps2 = console_ == Console::kPs2;
@@ -612,6 +693,7 @@ class Session::Impl {
       auto next = Clock::now();
       auto hardware_deadline = next + std::chrono::seconds(8);
       while (!stop_) {
+        ApplyDiscChange();
         if (ps1 || ps2)
           ApplyCheckpointGraphics(core, reopen, step, ps1, card, card_size, card_path);
         if (hardware_callbacks_.reset && !frame_ready_ && Clock::now() > hardware_deadline) {
@@ -666,6 +748,7 @@ class Session::Impl {
   std::unique_ptr<Video> video_;
   std::unique_ptr<Audio> audio_;
   HardwareCallbacks hardware_callbacks_{};
+  DiskControlExtCallbacks disk_callbacks_{};
   bool hardware_available_ = false;
   uint64_t hardware_frames_ = 0;
   std::mutex telemetry_mutex_;
@@ -686,6 +769,8 @@ class Session::Impl {
   uint16_t buttons_ = 0;
   std::array<int16_t, 4> axes_{};
   std::map<std::string, Option> options_;
+  std::optional<DiscStatus> discs_;
+  std::optional<unsigned> pending_disc_;
   bool options_changed_ = false;
   bool graphics_queued_ = false;
   bool graphics_applying_ = false;
@@ -705,6 +790,7 @@ bool Session::ended() const { return impl_->ended(); }
 void Session::Stop() { impl_->Stop(); }
 void Session::Join() { impl_->Join(); }
 void Session::Pause(bool pause) { impl_->Pause(pause); }
+bool Session::ChangeDisc(unsigned index) { return impl_->ChangeDisc(index); }
 void Session::SetInput(uint16_t buttons, const std::array<int16_t, 4>& axes) { impl_->SetInput(buttons, axes); }
 bool Session::SetOption(const std::string& key, const std::string& value) { return impl_->SetOption(key, value); }
 bool Session::SetTuningOptions(const Options& expected, const Options& values) {

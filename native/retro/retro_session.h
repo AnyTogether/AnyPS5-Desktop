@@ -38,6 +38,12 @@ struct Telemetry {
   double target_fps, audio_rate;
 };
 
+struct DiscStatus {
+  std::vector<std::string> labels;
+  std::optional<unsigned> inserted;
+  bool busy = false, failed = false;
+};
+
 struct SessionStatus {
   bool ready = false, presented = false, ended = false, hardware = false, graphics_pending = false;
   int32_t frame_width = 0, frame_height = 0;
@@ -45,6 +51,7 @@ struct SessionStatus {
   std::string error, resolution_error;
   std::map<std::string, OptionStatus> options;
   Telemetry telemetry{};
+  std::optional<DiscStatus> discs;
 };
 
 // The worker owns all video operations. The frontend may receive frame notifications
@@ -88,6 +95,7 @@ class Session {
   void Stop();
   void Join();
   void Pause(bool pause);
+  bool ChangeDisc(unsigned index);
   void SetInput(uint16_t buttons, const std::array<int16_t, 4>& axes);
   bool SetOption(const std::string& key, const std::string& value);
   bool SetTuningOptions(const Options& expected, const Options& values);

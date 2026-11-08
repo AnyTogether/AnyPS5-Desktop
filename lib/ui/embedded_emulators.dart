@@ -97,6 +97,49 @@ extension EmbeddedEmulators on AppModel {
     );
   }
 
+  String _embeddedDiscLabel(EmbeddedDiscs discs, int index) {
+    final label = discs.labels[index].trim();
+    return label.isEmpty ? T.format('retroDiscNumber', [index + 1]) : label;
+  }
+
+  List<PanelRow> _embeddedDiscRows() {
+    final game = embeddedGame;
+    final discs = game?.discs;
+    if (game == null || discs == null) return const [];
+    final busy = game.changingDisc;
+    return [
+      for (var index = 0; index < discs.labels.length; index++)
+        PanelRow(
+          id: 'retro-disc-$index',
+          title: _embeddedDiscLabel(discs, index),
+          detail: index == discs.inserted ? T.text('retroDiscInserted') : null,
+          kind: busy || index == discs.inserted
+              ? const InfoRow('')
+              : ActionRow(() => unawaited(_changeEmbeddedDisc(game, index))),
+        ),
+      if (busy || discs.failed || discs.inserted == null)
+        PanelRow(
+          id: 'retro-disc-status',
+          title: T.text(
+            busy
+                ? 'retroDiscChanging'
+                : discs.failed
+                ? 'retroDiscChangeFailed'
+                : 'retroDiscEmpty',
+          ),
+          detail: !busy && discs.inserted == null && discs.failed ? T.text('retroDiscEmpty') : null,
+          kind: const InfoRow(''),
+        ),
+    ];
+  }
+
+  Future<void> _changeEmbeddedDisc(EmbeddedRetroGame game, int index) async {
+    if (game.changingDisc) return;
+    final request = game.changeDisc(index);
+    _changed();
+    if (!await request && !_disposed && embeddedGame == game) show(T.text('retroDiscChangeFailed'));
+  }
+
   List<PanelRow> _embeddedGameRows(EmbeddedRetroGame game) => [
     for (final (key, label) in const [
       ('swanstation_GPU_ResolutionScale', 'retroInternalResolution'),

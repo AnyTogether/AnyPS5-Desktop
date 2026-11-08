@@ -107,6 +107,15 @@ FlValue* EncodeStatus(const SessionStatus& status) {
   fl_value_set_string_take(result, "progressLabel", fl_value_new_null());
   fl_value_set_string_take(result, "progressPercent", fl_value_new_null());
 
+  if (const auto& discs = status.discs) {
+    auto* item = fl_value_new_map();
+    fl_value_set_string_take(item, "labels", Strings(discs->labels));
+    fl_value_set_string_take(item, "inserted", discs->inserted ? fl_value_new_int(*discs->inserted) : fl_value_new_null());
+    fl_value_set_string_take(item, "busy", fl_value_new_bool(discs->busy));
+    fl_value_set_string_take(item, "failed", fl_value_new_bool(discs->failed));
+    fl_value_set_string_take(result, "discs", item);
+  }
+
   auto* options = fl_value_new_map();
   for (const auto& [key, option] : status.options) {
     auto* item = fl_value_new_map();
@@ -213,6 +222,10 @@ class RetroCoreHostLinux::Impl {
     } else if (method == "pause") {
       if (args && fl_value_get_type(args) == FL_VALUE_TYPE_BOOL) session_->Pause(fl_value_get_bool(args));
       Success(call);
+    } else if (method == "changeDisc") {
+      const auto index = args && fl_value_get_type(args) == FL_VALUE_TYPE_INT ? fl_value_get_int(args) : -1;
+      Success(call, fl_value_new_bool(index >= 0 && index <= INT32_MAX &&
+                                     session_->ChangeDisc(static_cast<unsigned>(index))));
     } else if (method == "input") {
       SetInput(*session_, args);
       Success(call);

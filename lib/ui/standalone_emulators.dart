@@ -148,7 +148,7 @@ extension StandaloneEmulators on AppModel {
       hiddenForGame = false;
       unawaited(services.window?.restore());
     }
-    if (overlay == Layer.quickMenu || overlay == Layer.closeGame) overlay = null;
+    if (overlay == Layer.quickMenu || overlay == Layer.closeGame || overlay == Layer.retroDiscs) overlay = null;
     updates.gameEnded();
     if (!_stopped && code != 0) {
       if (run is EmbeddedRetroGame) {

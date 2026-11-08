@@ -54,6 +54,31 @@ library names, input, focus loss, release and persistence after accepted
 graphics changes. They do not exercise actual rendering or emulator
 compatibility.
 
+## Changing PS1 discs
+
+Use one M3U playlist with the discs in order. When the embedded core
+reports multiple discs, press PS or Escape and choose **Change disc**.
+Select the disc the game requests, confirm the inserted label, and
+return to the game. Back returns to Quick Menu and keeps the game
+paused. PS resumes the running game from either menu.
+
+The [Quick Menu rows](../lib/ui/app_model.dart) and
+[disc picker](../lib/ui/embedded_emulators.dart) read the inserted disc
+from the core and use the core's disc labels when available. The
+[channel session](../lib/ui/embedded_retro_game.dart) queues a selection
+and reads completion from the next status update. A failed insert shows
+an error and leaves the picker available for another attempt. If the
+previous disc also cannot be reinserted, the picker shows the tray as
+open.
+
+The [session worker](../native/retro/retro_session.cpp) performs the
+Libretro eject, select and insert callbacks before its pause wait, so
+the game stays paused throughout the swap. The playlist stays loaded
+in the same session. Its filename stem determines the memory-card
+filename. When converting an existing single-disc library entry to a
+playlist, use the same stem as the original disc to keep using its
+existing embedded memory card.
+
 ## Native host
 
 The [shared session worker](../native/retro/retro_session.cpp) owns core
@@ -88,7 +113,11 @@ shared worker from [the native build](../native/retro/CMakeLists.txt).
 Run the native checks in an isolated build directory. The
 [fixture core](../native/retro/test/fake_core.cpp) exercises the callback
 contract without a game. The [test driver](../native/retro/test/retro_native_test.cpp)
-checks the loader, frame conversion and session behavior.
+checks the loader, frame conversion, session behavior and disc swaps
+through both the extended and legacy Libretro disk interfaces. It
+checks worker-thread ownership, a paused swap without calls to
+`retro_run`, recovery from a failed insertion, and retry after a failed
+recovery.
 [The CMake test target](../native/retro/test/CMakeLists.txt) builds the fixture and runs the driver.
 
 ```sh
@@ -113,6 +142,22 @@ The Windows runner and host translation units compiled with MSVC 19.29,
 and Windows CTest passed. All four Windows and Linux packages passed the installer ZIP and library
 checks in a new directory. The 59-test Flutter suite covered the session,
 standalone launch, library and navigation. Translation validation passed
-with matching English and Turkish keys. A multi-disc playlist still
-boots its first disc. The embedded Quick Menu disc selector is separate
-work.
+with matching English and Turkish keys.
+
+The Change Disc follow-up passed the native tests and compiled the
+updated channel adapter on Windows with MSVC 19.29 and on Linux with
+GCC 11.4. The focused Flutter run passed all 16 tests, including Quick
+Menu navigation, failed insertion, retry and Resume. Dart analysis and
+English and Turkish translation validation passed.
+
+A separate Windows headless run used the pinned SwanStation 1.0.0
+631f0fb DLL in software mode at 1x. Metal Gear Solid changed discs
+1 to 2 and back to 1. Final Fantasy VII changed discs 1 to 2 to 3 and
+back to 1. Each swap reported the requested disc while the frame counter
+stayed fixed, and each game resumed on its existing session. Each run
+created exactly one 128 KiB memory card named after the original
+playlist. A second run seeded known bytes into those scratch cards
+and confirmed both full file hashes stayed identical after swapping
+and closing. Both runs used temporary BIOS and save storage. A story
+prompt that requests a different disc and a physical controller still
+need interactive verification.

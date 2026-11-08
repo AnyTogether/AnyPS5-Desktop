@@ -277,7 +277,7 @@ Map EncodeStatus(const SessionStatus& status) {
     }));
   }
   const auto& telemetry = status.telemetry;
-  return {
+  Map result{
       {Value("ready"), Value(status.ready)},
       {Value("presented"), Value(status.presented)},
       {Value("ended"), Value(status.ended)},
@@ -302,6 +302,15 @@ Map EncodeStatus(const SessionStatus& status) {
           {Value("audioRate"), Value(telemetry.audio_rate)},
       })},
   };
+  if (const auto& discs = status.discs) {
+    result.emplace(Value("discs"), Value(Map{
+        {Value("labels"), Value(List(discs->labels.begin(), discs->labels.end()))},
+        {Value("inserted"), discs->inserted ? Value(static_cast<int32_t>(*discs->inserted)) : Value()},
+        {Value("busy"), Value(discs->busy)},
+        {Value("failed"), Value(discs->failed)},
+    }));
+  }
+  return result;
 }
 }  // namespace
 
@@ -421,6 +430,9 @@ void RetroCoreHost::Handle(const flutter::MethodCall<Value>& call,
     const auto* pause = std::get_if<bool>(arguments);
     if (pause) session_->session().Pause(*pause);
     result->Success();
+  } else if (method == "changeDisc") {
+    const auto* index = arguments ? std::get_if<int32_t>(arguments) : nullptr;
+    result->Success(Value(index && *index >= 0 && session_->session().ChangeDisc(static_cast<unsigned>(*index))));
   } else if (method == "input") {
     const auto* input = std::get_if<List>(arguments);
     if (input && input->size() == 5) {

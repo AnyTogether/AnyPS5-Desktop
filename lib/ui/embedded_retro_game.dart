@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
@@ -13,6 +14,10 @@ import '../core/gamepad/pad_navigation.dart';
 import 'strings.dart';
 
 typedef EmbeddedOption = ({List<String> values, List<String> labels, String title, bool restart, int selected});
+
+typedef EmbeddedDiscs = ({List<String> labels, int? inserted, bool busy, bool failed});
+
+enum _DiscRequest { sending, queued }
 
 class EmbeddedRetroGame extends RunningGame {
   EmbeddedRetroGame._(this.textureId, this._finished, this._onResolutionSelected, this._onGraphicsSelected)
@@ -34,6 +39,10 @@ class EmbeddedRetroGame extends RunningGame {
   String error = '';
   String resolutionError = '';
   bool presented = false;
+  EmbeddedDiscs? _discs;
+  EmbeddedDiscs? get discs => _discs;
+  _DiscRequest? _discRequest;
+  bool get changingDisc => _discRequest != null || _discs?.busy == true;
   double aspect = 4 / 3;
   final options = <String, EmbeddedOption>{};
   final _keys = <PadButton>{};
@@ -73,6 +82,8 @@ class EmbeddedRetroGame extends RunningGame {
   Future<void> _poll(void Function() changed) async {
     if (_reading) return;
     _reading = true;
+    // A poll already in flight may describe the tray before the request.
+    final acknowledgeDiscRequest = _discRequest == _DiscRequest.queued;
     try {
       final status = await _channel.invokeMapMethod<String, Object?>('status');
       if (status == null || status['ended'] == true) {
@@ -86,7 +97,8 @@ class EmbeddedRetroGame extends RunningGame {
         return;
       }
       final updatedAspect = status['aspect'];
-      var updated = false;
+      if (acknowledgeDiscRequest) _discRequest = null;
+      var updated = acknowledgeDiscRequest;
       if (!presented && status['presented'] == true) {
         presented = true;
         _ready.complete(true);
@@ -99,6 +111,14 @@ class EmbeddedRetroGame extends RunningGame {
       }
       if (updatedAspect is double && updatedAspect != aspect) {
         aspect = updatedAspect;
+        updated = true;
+      }
+      final newDiscs = _readDiscs(status['discs']);
+      if (!listEquals(_discs?.labels, newDiscs?.labels) ||
+          _discs?.inserted != newDiscs?.inserted ||
+          _discs?.busy != newDiscs?.busy ||
+          _discs?.failed != newDiscs?.failed) {
+        _discs = newDiscs;
         updated = true;
       }
       final values = status['options'];
@@ -136,6 +156,43 @@ class EmbeddedRetroGame extends RunningGame {
       }
     } finally {
       _reading = false;
+    }
+  }
+
+  static EmbeddedDiscs? _readDiscs(Object? value) {
+    if (value is! Map || value['labels'] is! List) return null;
+    final labels = value['labels'] as List;
+    if (labels.length < 2 || labels.any((label) => label is! String)) return null;
+    final index = value['inserted'];
+    return (
+      labels: List<String>.unmodifiable(labels),
+      inserted: index is int && index >= 0 && index < labels.length ? index : null,
+      busy: value['busy'] == true,
+      failed: value['failed'] == true,
+    );
+  }
+
+  Future<bool> changeDisc(int index) async {
+    final current = discs;
+    if (_closing ||
+        current == null ||
+        changingDisc ||
+        index == current.inserted ||
+        index < 0 ||
+        index >= current.labels.length) {
+      return false;
+    }
+    _discRequest = _DiscRequest.sending;
+    var accepted = false;
+    try {
+      accepted = await _channel.invokeMethod<bool>('changeDisc', index) == true;
+      return accepted;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    } finally {
+      _discRequest = accepted ? _DiscRequest.queued : null;
     }
   }
 
