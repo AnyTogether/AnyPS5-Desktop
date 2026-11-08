@@ -156,9 +156,11 @@ void main() {
       ..messageFocus = thread.length - 1;
   }
 
+  var made = false;
   tearDown(() {
     T.language = Language.english;
-    fixture.dispose();
+    if (made) fixture.dispose();
+    made = false;
   });
 
   test('a photo sent as it is reads as its caption, or as Photo, never as "[photo]"', () {
@@ -176,6 +178,7 @@ void main() {
 
   testWidgets('a photo from the website shows as a picture in its own shape, with its caption', (tester) async {
     fixture = makeFixture();
+    made = true;
     model = fixture.model;
     conversationWithAna([
       ChatMessage.fromJson(webPhoto(1)),
@@ -195,6 +198,7 @@ void main() {
 
   testWidgets('the user\'s own message: Delete for everyone, asked first, in Turkish too', (tester) async {
     fixture = makeFixture(language: Language.byCode('tr'));
+    made = true;
     model = fixture.model;
     final mine = ChatMessage(
       id: 'm1',
