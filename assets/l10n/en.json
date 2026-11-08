@@ -2131,5 +2131,18 @@
   "sharePlayMaxViewersServerDetail": "Up to 4 get a stream from your computer. With more, viewers watch through the media server and players keep a direct link.",
   "shareCodeMakeDetail": "Anyone with the code can ask to watch. You still say yes to each one.",
   "joinCodeMade": "New code: %@",
-  "joinCodeStopped": "The code no longer works"
+  "joinCodeStopped": "The code no longer works",
+  "phoneEngineTitle": "The phone can't play games",
+  "phoneEngineWhy": "Upstream's engine reads controllers and the keyboard only",
+  "phoneEngineWhyDetail": "The phone moves the launcher, and a game ignores it. The AnyPS5-ARM engine reads the phone, and opens games full screen or at the window size you chose.",
+  "phoneEngineSwitch": "Switch to the AnyPS5-ARM engine",
+  "phoneEngineSwitchDetail": "Downloads it from AnyPS5-ARM's signed releases and uses it. The next time you play a game, Update and play unlocks it with this engine. Saves and trophies stay.",
+  "phoneEngineSwitchSize": "Downloads %@ from AnyPS5-ARM's signed releases and uses it. The next time you play a game, Update and play unlocks it with this engine. Saves and trophies stay.",
+  "phoneEngineSwitchHave": "Uses the AnyPS5-ARM engine you downloaded before. The next time you play a game, Update and play unlocks it with this engine. Saves and trophies stay.",
+  "phoneEngineLater": "Not now",
+  "phoneUpstreamSwitchDetail": "Upstream's engine reads controllers and the keyboard only. Select to switch to the AnyPS5-ARM engine, which reads the phone. Games then offer Update and play.",
+  "reportPlayGoArm": "Switch to the AnyPS5-ARM engine and play again",
+  "reportPlayGoArmDetail": "This dump has no PlayGo chunk files, and the AnyPS5-ARM engine counts it as fully installed. Downloads the engine if needed, unlocks the game again and starts it. Saves and trophies stay.",
+  "reportPlayGoInstalled": "Play again with missing chunks counted as installed",
+  "reportPlayGoInstalledDetail": "For this start only, with the engine you have now. Parts of the game the dump lacks may fail to load."
 }

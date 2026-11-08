@@ -293,7 +293,8 @@ class Preferences {
   Map<String, String> lastPlayed = {};
 
   /// Which engine the settings offer: 'upstream' (boykopovar/AnyPS5) or 'arm' (AnyPS5-ARM's,
-  /// with the phone controller, full screen and window size).
+  /// with the phone controller, full screen and window size). A first start chooses 'arm'
+  /// ([load]); choices saved without it (launchers from before there was a choice) read 'upstream'.
   String engineSource = 'upstream';
 
   /// Settings › About › Update Channel: null for Stable, 'nightly' for Nightly (UpdateChannel).
@@ -478,7 +479,11 @@ class Preferences {
   /// the system gives, as Settings lists them.
   static Preferences load(String file, {List<String>? systemLocales}) {
     if (!File(file).existsSync()) {
-      return Preferences()..language = Language.forSystem(systemLocales ?? Preferences.systemLocales()).code;
+      // A first start gets AnyPS5-ARM's engine (the phone controller, full screen, window size).
+      // A launcher that saved its choices before keeps the engine it had: never switched silently.
+      return Preferences()
+        ..language = Language.forSystem(systemLocales ?? Preferences.systemLocales()).code
+        ..engineSource = 'arm';
     }
     try {
       final json = jsonDecode(File(file).readAsStringSync());
@@ -762,6 +767,10 @@ enum Layer {
   /// Before an unlock that would copy the game's files: how much and why, the two ways to link
   /// instead (the games folder on the dump's drive, Windows' Developer Mode), copying anyway.
   copyWarning,
+
+  /// A phone or a browser pad connected while the engine in use cannot read it (upstream's): why,
+  /// and Switch to the AnyPS5-ARM Engine in one press.
+  phoneEngine,
 
   /// Settings › Controllers › Test Buttons and Sticks.
   controllerTest,
@@ -3511,8 +3520,9 @@ class AppModel extends ChangeNotifier {
 
   // Playing.
 
-  /// Plays [game]; [trace] turns detailed logging on for this start only.
-  Future<void> play(Game game, {bool trace = false}) async {
+  /// Plays [game]; [trace] turns detailed logging on for this start only, and [once] adds to the
+  /// engine's environment for this start only (the crash report's PlayGo answer).
+  Future<void> play(Game game, {bool trace = false, Map<String, String> once = const {}}) async {
     final folder = rootOf(game);
     if (folder == null || starting != null || running != null || saveSync.syncing != null) return;
     // The profile's own saves and trophies in the game's folder before anything reads them.
@@ -3584,6 +3594,7 @@ class AppModel extends ChangeNotifier {
         // Settings › Battery & Heat: the frame cap now, and the file it changes in while it runs.
         ...powerWatch.environment(),
         ...online,
+        ...once,
       };
       fonts.watch(game, logFile);
       final run = await startGame(
@@ -3596,6 +3607,7 @@ class AppModel extends ChangeNotifier {
         notes: [
           for (final line in controllers.reportLines) '[anyps5-launcher] controllers: $line',
           if (phonesConnected) '[anyps5-launcher] phones: ${_phoneReachNote(game)}',
+          for (final MapEntry(:key, :value) in once.entries) '[anyps5-launcher] this start only: $key=$value',
         ],
       );
       starting = null;
@@ -3643,6 +3655,11 @@ class AppModel extends ChangeNotifier {
       together.gameChanged();
       discord.update();
       crash.ended(game, code, stopped: _stopped);
+      // The phone could not reach the game on upstream's engine: the switch, once back over Home.
+      if (_phoneEngineAfterGame) {
+        _phoneEngineAfterGame = false;
+        askPhoneEngine(again: true);
+      }
       // The saves it made go to the other computers (or the cloud).
       unawaited(saveSync.sync(game));
       // "How did it run?", once the launcher is back over the home screen.
@@ -4223,6 +4240,7 @@ class AppModel extends ChangeNotifier {
           Layer.gameFiles ||
           Layer.updateChoice ||
           Layer.updateRequired ||
+          Layer.phoneEngine ||
           Layer.friends ||
           Layer.friendOptions ||
           Layer.party ||
@@ -4503,6 +4521,74 @@ class AppModel extends ChangeNotifier {
   /// Whether a phone or a browser pad is connected.
   bool get phonesConnected => (remote?.connectedDevices.isNotEmpty ?? false) || browserPlay.pads.isNotEmpty;
 
+  /// The engine in use cannot read the phones (upstream's release builds and nightlies).
+  bool get phoneEngineMissing => EngineModel.readsPhone(toolkitVersion) == false;
+
+  /// The switch was offered this run: a phone that comes again is not asked about again.
+  bool _phoneEngineAsked = false;
+
+  /// A game on upstream's engine ran with a phone connected: the switch is offered when it ends.
+  bool _phoneEngineAfterGame = false;
+
+  /// With a phone or a browser pad connected and upstream's engine in use: Switch to the
+  /// AnyPS5-ARM Engine over Home, once a run ([again] from the toast, any time). Never over a game
+  /// or another screen; the engine stays as it is until the press.
+  void askPhoneEngine({bool again = false}) {
+    if (!phoneEngineMissing || (_phoneEngineAsked && !again)) return;
+    if (running != null || starting != null) return;
+    if (overlay != null && overlay != Layer.phoneEngine) return;
+    _phoneEngineAsked = true;
+    // The download's size, once AnyPS5-ARM's releases answer.
+    if (!engine.armChecked) unawaited(engine.checkArm(quiet: true));
+    if (overlay != Layer.phoneEngine) open(Layer.phoneEngine);
+    _changed();
+  }
+
+  /// Switch to the AnyPS5-ARM Engine: downloads it when it is not on disk and uses it. Installed
+  /// games then offer Update and Play, which unlocks them again with it.
+  Future<void> switchToArmForPhone() async {
+    final done = await engine.switchToArm();
+    if (done && overlay == Layer.phoneEngine) closeOverlay();
+    _changed();
+  }
+
+  /// The rows of Switch to the AnyPS5-ARM Engine.
+  List<PanelRow> phoneEngineRows() {
+    final pending = engine.downloading;
+    final package = engine.armPackage;
+    final have = engine.downloaded.any((kit) => EngineModel.isArm(kit.version));
+    return [
+      PanelRow(
+        id: 'phoneEngineWhy',
+        title: T.text('phoneEngineWhy'),
+        detail: T.text('phoneEngineWhyDetail'),
+        kind: const InfoRow(''),
+      ),
+      if (pending != null)
+        PanelRow(
+          id: 'phoneEngineSwitch',
+          title: T.format('engineDownloading', [
+            EngineModel.packageName(pending),
+            ((engine.progress?.fraction ?? 0) * 100).floor(),
+          ]),
+          detail: '${engine.progressText()} · ${T.text('engineStop')}',
+          kind: ActionRow(engine.cancel),
+        )
+      else
+        PanelRow(
+          id: 'phoneEngineSwitch',
+          title: T.text('phoneEngineSwitch'),
+          detail: have
+              ? T.text('phoneEngineSwitchHave')
+              : package == null
+              ? T.text('phoneEngineSwitchDetail')
+              : T.format('phoneEngineSwitchSize', [byteText(package.size)]),
+          kind: ActionRow(() => unawaited(switchToArmForPhone())),
+        ),
+      PanelRow(id: 'phoneEngineLater', title: T.text('phoneEngineLater'), kind: ActionRow(closeOverlay)),
+    ];
+  }
+
   /// Whether [game]'s engine reads the phones, from the engine it was unlocked with (the unlock
   /// puts that engine's libraries in the game's folder): null when the launcher cannot tell.
   bool? phoneReaches(Game game) => EngineModel.readsPhone(records[game.id]?.toolkit);
@@ -4538,11 +4624,14 @@ class AppModel extends ChangeNotifier {
     });
   }
 
-  /// The toast, and over the game a desktop notice: the game's window hides the toast.
+  /// The toast, and over the game a desktop notice: the game's window hides the toast. On
+  /// upstream's engine a click on the toast (or the end of the game) offers the switch.
   void _phoneCannotReach(Game game, String text) {
     _phoneToldFor = game.id;
     _phoneAnswerTimer?.cancel();
-    show(text);
+    final upstream = phoneEngineMissing;
+    if (upstream) _phoneEngineAfterGame = true;
+    show(text, onTap: upstream ? () => askPhoneEngine(again: true) : null);
     if (launcherInFront) return;
     unawaited(() async {
       if (!await desktop.notify('AnyPS5', text)) desktopNotify('AnyPS5', text);
@@ -4788,6 +4877,8 @@ class AppModel extends ChangeNotifier {
             rows: together.friendOptionRows(),
           ),
         ];
+      case Layer.phoneEngine:
+        return [PanelCategory(id: 'phoneEngine', title: T.text('phoneEngineTitle'), rows: phoneEngineRows())];
       case Layer.updateRequired when together.account.tooOld != null:
         return [
           PanelCategory(
@@ -5198,12 +5289,17 @@ class AppModel extends ChangeNotifier {
             }),
           ),
           // Upstream's engine has no phone input: said here before a game shows it.
-          if (preferences.phoneServer && EngineModel.readsPhone(toolkitVersion) == false)
+          if (preferences.phoneServer && phoneEngineMissing)
             PanelRow(
               id: 'phoneUpstream',
               title: T.text('phoneUpstream'),
-              detail: T.text('phoneUpstreamDetail'),
-              kind: const InfoRow(''),
+              detail: engine.downloading != null
+                  ? T.format('engineDownloading', [
+                      EngineModel.packageName(engine.downloading!),
+                      ((engine.progress?.fraction ?? 0) * 100).floor(),
+                    ])
+                  : T.text('phoneUpstreamSwitchDetail'),
+              kind: ActionRow(() => unawaited(engine.switchToArm())),
             ),
           if (preferences.phoneServer) ...browserPlay.settingsRows(),
           if (remote?.port case final int port)
@@ -6667,9 +6763,11 @@ class AppModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// The toolkit step asks GitHub for the newest engine as it opens.
+  /// The toolkit step asks GitHub for the newest engine as it opens: AnyPS5-ARM's on a first
+  /// start (its phone controller, full screen and window size), upstream's for a launcher that
+  /// had it chosen before.
   void _enterToolkitStep() {
-    if (engine.latest == null && !engine.checking) unawaited(engine.check(quiet: true));
+    if (engine.offered == null) engine.lookQuietly();
   }
 
   /// The toolkit step's download card: downloads the newest engine (asked once more when
@@ -6677,9 +6775,9 @@ class AppModel extends ChangeNotifier {
   void onboardingDownload() {
     if (engine.downloading != null) return;
     final pending = engine.unverified;
-    final package = pending ?? engine.latestPackage;
+    final package = pending ?? engine.offered;
     if (package == null) {
-      unawaited(engine.check(quiet: true));
+      engine.lookQuietly();
       return;
     }
     unawaited(
@@ -6731,6 +6829,8 @@ class AppModel extends ChangeNotifier {
           if (media.phase.active) remote?.publish(const RemoteBroadcast(true));
           // A phone that comes while a game runs hears at once whether that game reads it.
           if (running case (final Game playing, _)) _checkPhoneReach(playing);
+          // Over Home: upstream's engine in use, the switch to AnyPS5-ARM's in one press.
+          askPhoneEngine();
         },
         disconnected: _changed,
         pad: _phonePads.packet,

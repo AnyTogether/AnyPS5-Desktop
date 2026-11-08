@@ -2131,5 +2131,18 @@
   "sharePlayMaxViewersServerDetail": "En fazla 4 kişi yayını doğrudan bilgisayarından alır. Daha fazlasında izleyenler medya sunucusundan izler, oyuncuların doğrudan bağlantısı kalır.",
   "shareCodeMakeDetail": "Kodu olan herkes izlemek isteyebilir. Her birine yine sen karar verirsin.",
   "joinCodeMade": "Yeni kod: %@",
-  "joinCodeStopped": "Kod artık çalışmıyor"
+  "joinCodeStopped": "Kod artık çalışmıyor",
+  "phoneEngineTitle": "Telefon oyunlarda çalışmıyor",
+  "phoneEngineWhy": "Upstream motoru yalnızca kontrolcüleri ve klavyeyi okur",
+  "phoneEngineWhyDetail": "Telefon başlatıcıda gezinir ama oyun onu duymaz. AnyPS5-ARM motoru telefonu okur ve oyunları tam ekran ya da seçtiğin pencere boyutunda açar.",
+  "phoneEngineSwitch": "AnyPS5-ARM motoruna geç",
+  "phoneEngineSwitchDetail": "AnyPS5-ARM'ın imzalı sürümlerinden indirilir ve kullanılır. Bir oyunu bir dahaki oynayışında Güncelle ve oyna, onun kilidini bu motorla açar. Kayıtların ve kupaların korunur.",
+  "phoneEngineSwitchSize": "%@ AnyPS5-ARM'ın imzalı sürümlerinden indirilir ve kullanılır. Bir oyunu bir dahaki oynayışında Güncelle ve oyna, onun kilidini bu motorla açar. Kayıtların ve kupaların korunur.",
+  "phoneEngineSwitchHave": "Daha önce indirdiğin AnyPS5-ARM motoru kullanılır. Bir oyunu bir dahaki oynayışında Güncelle ve oyna, onun kilidini bu motorla açar. Kayıtların ve kupaların korunur.",
+  "phoneEngineLater": "Şimdi değil",
+  "phoneUpstreamSwitchDetail": "Upstream motoru yalnızca kontrolcüleri ve klavyeyi okur. Telefonu okuyan AnyPS5-ARM motoruna geçmek için seç. Sonra oyunlar Güncelle ve oyna önerir.",
+  "reportPlayGoArm": "AnyPS5-ARM motoruna geç ve yeniden oyna",
+  "reportPlayGoArmDetail": "Bu dump'ta PlayGo parça dosyaları yok ve AnyPS5-ARM motoru onu tamamen kurulu sayar. Gerekirse motor indirilir, oyunun kilidi yeniden açılır ve oyun başlar. Kayıtların ve kupaların korunur.",
+  "reportPlayGoInstalled": "Eksik parçaları kurulu sayarak yeniden oyna",
+  "reportPlayGoInstalledDetail": "Yalnızca bu açılış için, şu anki motorla. Dump'ta olmayan oyun bölümleri yüklenemeyebilir."
 }
