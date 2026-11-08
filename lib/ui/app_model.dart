@@ -851,11 +851,15 @@ class PanelRow {
     this.person,
     this.level,
     this.icon,
+    this.meter,
   });
 
   final String id;
   final String title;
   final String? detail;
+
+  /// A thin bar under the words: how much of something the row's two parts take up.
+  final PanelMeter? meter;
 
   /// A face button drawn after the title.
   final PadGlyph? glyph;
@@ -939,6 +943,13 @@ class StepperRow extends RowKind {
     final steps = ((max - min) / step).ceil();
     return math.min(stride(repeats), math.max(1, steps ~/ 8));
   }
+}
+
+/// How much of a whole two parts take, each from 0 to 1 (Cloud Storage's saves and media).
+class PanelMeter {
+  const PanelMeter(this.first, this.second);
+  final double first;
+  final double second;
 }
 
 class ActionRow extends RowKind {
@@ -1049,12 +1060,14 @@ class LauncherServices {
     this.desktop,
     this.backdrop,
     this.renderTrophyCard,
+    this.renderLiveBadge,
     this.cjkFonts,
     this.fontClient,
     this.builtInFonts,
     this.saveFile,
     this.saveFileAs,
     this.pickFile,
+    this.pickFileAt,
     this.pickImage,
     this.pickPictures,
     this.systemInfo,
@@ -1119,6 +1132,9 @@ class LauncherServices {
   /// cancelled.
   final Future<String?> Function(String label, List<String> extensions)? pickFile;
 
+  /// The same, opened in [folder] when one is given (a game's backups).
+  final Future<String?> Function(String label, List<String> extensions, String? folder)? pickFileAt;
+
   /// This computer for a crash report; read from the system when not given.
   final Future<SystemInfo> Function()? systemInfo;
 
@@ -1154,6 +1170,9 @@ class LauncherServices {
 
   /// Draws the trophy card for the desktop's window; TrophyCard.render by default.
   final Future<RgbaImage> Function(Trophy trophy, double scale)? renderTrophyCard;
+
+  /// Draws the LIVE badge for the desktop's window; LiveBadge.render by default.
+  final Future<RgbaImage> Function(bool live, String time, double scale)? renderLiveBadge;
 
   /// The sound card for the interface sounds and theme songs; none (silence) when not given.
   final AudioOut Function()? audio;
@@ -3552,6 +3571,30 @@ class AppModel extends ChangeNotifier {
     if (running?.$1 == game) return show(T.text('closeGameFirst'));
     try {
       SaveBackup.restore(latest, Installer.installedFolder(game, folder), backupFolder(game), DateTime.now());
+      _gameFacts.remove(game.id);
+      _loadTrophies(game);
+      show(T.text('savesRestored'));
+    } on Object catch (error) {
+      show('${T.text('backupFailed')}: $error');
+    }
+    _changed();
+  }
+
+  /// A backup the user picks takes the saves' place (the current ones backed up first), as on
+  /// the Mac; the game must not be running.
+  Future<void> restoreChosenSaves(Game game) async {
+    if (running?.$1 == game || starting == game) return show(T.text('closeGameFirst'));
+    final folder = rootOf(game);
+    if (folder == null) return;
+    final backups = backupFolder(game);
+    final title = T.text('restoreSaves');
+    final picked = services.pickFileAt != null
+        ? await services.pickFileAt!(title, const ['zip'], Directory(backups).existsSync() ? backups : null)
+        : await services.pickFile?.call(title, const ['zip']);
+    if (picked == null) return;
+    if (running?.$1 == game || starting == game) return show(T.text('closeGameFirst'));
+    try {
+      SaveBackup.restore(picked, Installer.installedFolder(game, folder), backups, DateTime.now());
       _gameFacts.remove(game.id);
       _loadTrophies(game);
       show(T.text('savesRestored'));
@@ -6200,6 +6243,16 @@ class AppModel extends ChangeNotifier {
               kind: ActionRow(() => restoreLatestSaves(game)),
             ),
           ),
+        held(
+          'restoreChoose',
+          T.text('restoreSaves'),
+          () => PanelRow(
+            id: 'restoreChoose',
+            title: T.text('restoreSaves'),
+            detail: T.text('restoreSavesDetail'),
+            kind: ActionRow(() => unawaited(restoreChosenSaves(game))),
+          ),
+        ),
         held(
           'uninstall',
           T.text('uninstall'),

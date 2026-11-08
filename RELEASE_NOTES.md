@@ -141,6 +141,14 @@ release when it is made.
 - **Settings › Fonts lists Latin Italic**, the row the Mac has, beside Latin.
 - **Settings › Phones says which paired phone is connected now**: the count at the top and
   Connected beside the phone's name, as on the Mac.
+- **Broadcasting has a microphone**, as on the Mac: Settings › Broadcasting mixes your commentary
+  over the game's sound at the level you set, and it can be switched while you are live. Windows
+  shows a small LIVE badge over the game that viewers do not see. Linux has no badge, because
+  anything drawn over the game would be recorded too.
+- **Cloud storage lists your photos, clips and voice notes**, as on the Mac: delete one with a
+  second press, and a bar shows how much saves and media take.
+- **Restore saves… restores the backup you choose**, as on the Mac. The latest backup can still
+  be restored in one press.
 
 ## 0.1.20
 

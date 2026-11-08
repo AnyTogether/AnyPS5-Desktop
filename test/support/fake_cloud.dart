@@ -20,6 +20,9 @@ class FakeCloud {
   }
 
   final HttpServer _server;
+
+  /// The photos, clips and voice notes GET /me/storage lists (Cloud Storage's media rows).
+  final List<Map<String, dynamic>> media = [];
   Uri get base => Uri.parse('http://127.0.0.1:${_server.port}');
 
   bool enabled = true;
@@ -153,7 +156,7 @@ class FakeCloud {
           'enabled': true,
           'usage': usage,
           'saves': [for (final slot in slots) slotJson(slot)],
-          'media': [],
+          'media': media,
         },
       );
     } else if (route('GET', 'me/saves') != null) {
@@ -296,6 +299,9 @@ class FakeCloud {
         slot.versions.removeWhere((v) => v.id == id);
       }
       slots.removeWhere((slot) => slot.versions.isEmpty);
+      answer = (200, {'usage': usage});
+    } else if (route('DELETE', 'me/media/*') case [final id]) {
+      media.removeWhere((item) => item['id'] == id);
       answer = (200, {'usage': usage});
     } else if (route('DELETE', 'me/saves/slots/*') case [final id]) {
       slots.removeWhere((slot) => slot.id == id);

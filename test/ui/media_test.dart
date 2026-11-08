@@ -31,7 +31,10 @@ void main() {
   late List<StreamingProcess> processes;
 
   setUp(() async {
-    fixture = makeFixture(desktop: FakeDesktop());
+    fixture = makeFixture(
+      desktop: FakeDesktop(),
+      renderLiveBadge: (live, time, scale) async => RgbaImage(1, 1, Uint8List(4)),
+    );
     model = fixture.model;
     started = [];
     processes = [];
@@ -109,7 +112,11 @@ void main() {
     processes.single
       ..write(FlvBuilder.header())
       ..write(FlvBuilder.sequence())
-      ..write(FlvBuilder.frame([[0x65, 1, 2, 3]], key: true));
+      ..write(
+        FlvBuilder.frame([
+          [0x65, 1, 2, 3],
+        ], key: true),
+      );
     final piece = await video;
     expect(ByteData.sublistView(piece).getUint16(16, Endian.little), 1, reason: 'a key frame');
     phone.send(const StreamRequest(on: false));
@@ -130,7 +137,18 @@ void main() {
   test('Settings › Broadcasting sets up the service and the key, never showing it', () {
     model.open(Layer.settings);
     List<PanelRow> rows() => model.panelCategories().firstWhere((category) => category.id == 'broadcast').rows;
-    expect(rows().map((row) => row.id), containsAllInOrder(['broadcast-service', 'broadcast-key', 'broadcast-paste', 'broadcast-page', 'broadcast-quality', 'broadcast-link', 'broadcast-private']));
+    expect(
+      rows().map((row) => row.id),
+      containsAllInOrder([
+        'broadcast-service',
+        'broadcast-key',
+        'broadcast-paste',
+        'broadcast-page',
+        'broadcast-quality',
+        'broadcast-link',
+        'broadcast-private',
+      ]),
+    );
     final key = rows().firstWhere((row) => row.id == 'broadcast-key').kind as TextRow;
     expect(key.obscure, isTrue);
     expect(key.hint, T.text('broadcastKeyNone'));
@@ -170,6 +188,61 @@ void main() {
     model.stopGame();
     await playing;
     await phone.close();
+  }, skip: Platform.isWindows ? 'the stand-in game is a shell script' : false);
+
+  test('Settings › Broadcasting sets the microphone, its level and the LIVE badge; Linux says why it has no badge', () {
+    model.open(Layer.settings);
+    List<PanelRow> rows() => model.panelCategories().firstWhere((category) => category.id == 'broadcast').rows;
+    PanelRow row(String id) => rows().firstWhere((row) => row.id == id);
+    bool has(String id) => rows().any((row) => row.id == id);
+    final mic = row('broadcast-mic').kind as ToggleRow;
+    expect(mic.value, isFalse);
+    expect(has('broadcast-mic-level'), isFalse);
+    mic.set(true);
+    expect(model.media.settings.microphone, isTrue);
+    final level = row('broadcast-mic-level').kind as StepperRow;
+    expect(level.value, 80);
+    level.set(50);
+    expect(model.media.settings.microphoneLevel, 50);
+    expect(File(Broadcaster.settingsFile(model.paths.config)).readAsStringSync(), contains('"microphoneLevel":50'));
+    final badge = row('broadcast-badge').kind;
+    expect(badge, isA<InfoRow>());
+    expect((badge as InfoRow).text, T.text('broadcastBadgeLinux'));
+    model.media.badgeOverride = true;
+    final toggle = row('broadcast-badge').kind as ToggleRow;
+    expect(toggle.value, isTrue);
+    toggle.set(false);
+    expect(model.media.settings.liveBadge, isFalse);
+    expect((row('broadcast-badge').kind as ToggleRow).value, isFalse);
+    expect(
+      rows().map((row) => row.id),
+      isNot(contains('broadcast-live-mic')),
+      reason: 'the game rows leave it out here',
+    );
+  });
+
+  test('the badge shows over the game while live and goes away when it ends', () async {
+    final desktop = model.desktop as FakeDesktop;
+    model.media
+      ..badgeOverride = true
+      ..setKey('live_key');
+    final playing = (await play()).done;
+    model.media.toggleBroadcast();
+    await until(() => processes.isNotEmpty);
+    expect(desktop.calls, isNot(contains('badge')), reason: 'not until frames go out');
+    processes.single.write(utf8.encode('frame=30\nbitrate=3000.0kbits/s\nprogress=continue\n'));
+    await until(() => model.media.phase is BroadcastLive);
+    await until(() => desktop.calls.contains('badge'));
+    model.open(Layer.quickMenu);
+    expect(
+      model.panelCategories().single.rows.map((row) => row.id),
+      containsAllInOrder(['broadcast-state', 'broadcast-live-mic', 'broadcast-stop']),
+    );
+    model.closeOverlay();
+    model.media.toggleBroadcast();
+    await until(() => desktop.calls.contains('badge-off'));
+    model.stopGame();
+    await playing;
   }, skip: Platform.isWindows ? 'the stand-in game is a shell script' : false);
 
   test('Go Live with no key asks to set up first', () async {

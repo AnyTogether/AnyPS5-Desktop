@@ -139,6 +139,10 @@ Future<void> main(List<String> arguments) async {
       pickFile: (label, extensions) async => (await openFile(
         acceptedTypeGroups: [XTypeGroup(label: label, extensions: extensions)],
       ))?.path,
+      pickFileAt: (label, extensions, folder) async => (await openFile(
+        initialDirectory: folder,
+        acceptedTypeGroups: [XTypeGroup(label: label, extensions: extensions)],
+      ))?.path,
       engineReleases: GitHubReleases(),
       launcherReleases: LauncherUpdates.source(),
       audio: SoloudAudio.new,
