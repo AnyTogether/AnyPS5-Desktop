@@ -32,8 +32,9 @@ Japanese, Hindi, Bengali, Bhojpuri, Arabic and Urdu, one JSON file each in `asse
 and Urdu read right to left, but the screens are not mirrored yet. A new language is one more
 file there, no code: see [TRANSLATING.md](TRANSLATING.md).
 
-The [standalone emulator library](<docs/AnyPS5 Desktop - Standalone Emulator Library.md>)
-can open PS1, PS2 and PS3 games in an emulator you have already installed.
+The [AnyPS5 Desktop documentation home](<docs/AnyPS5 Desktop - Documentation Home.md>)
+covers opening PlayStation games in an installed emulator and playing
+embedded PS1 and PS2 games.
 
 ## Layout
 

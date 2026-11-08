@@ -208,7 +208,8 @@ class PadNavigator {
         if (_repeater.heldBy == event.pad) _repeater.stop();
         return;
     }
-    _direction(event.pad, state);
+    // A command callback can change who owns the pad and reset the navigator.
+    if (identical(_pads[event.pad], state)) _direction(event.pad, state);
   }
 
   void _pressed(String pad, _PadState state, PadButton button) {

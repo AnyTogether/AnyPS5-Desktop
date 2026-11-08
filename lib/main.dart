@@ -156,6 +156,7 @@ Future<void> main(List<String> arguments) async {
   health.runnerRemovesMarker = await window.removeAfterClose(health.markerPath);
   _exit = AppLifecycleListener(
     onExitRequested: () async {
+      if (!await model.prepareToQuit()) return AppExitResponse.cancel;
       closing();
       return AppExitResponse.exit;
     },

@@ -37,6 +37,7 @@ extension StandaloneEmulators on AppModel {
           detail: standaloneEmulator(platform) ?? T.text('retroChooseExecutable'),
           kind: ActionRow(() => unawaited(chooseStandaloneEmulator(platform))),
         ),
+      ..._embeddedSetupRows(),
       PanelRow(
         id: 'retro-show-folders',
         title: T.text('retroShowFolders'),
@@ -45,13 +46,20 @@ extension StandaloneEmulators on AppModel {
     ],
   );
 
-  Future<void> _playStandalone(Game game, RetroDisc disc) async {
-    if (starting != null || running != null) return;
+  Future<void> _playRetro(Game game, RetroDisc disc) async {
+    if (_embeddedSetupBusy || starting != null || running != null) return;
     final allowed = together.family.beforePlay(game);
-    if (!(allowed is bool ? allowed : await allowed) || starting != null || running != null || _disposed) return;
+    if (!(allowed is bool ? allowed : await allowed) ||
+        starting != null ||
+        running != null ||
+        _embeddedSetupBusy ||
+        _disposed) {
+      return;
+    }
 
+    final managed = _embeddedReady(disc.platform) ? _managedRetro : null;
     final program = standaloneEmulator(disc.platform);
-    if (program == null) {
+    if (program == null && managed == null) {
       await chooseStandaloneEmulator(disc.platform);
       return;
     }
@@ -67,20 +75,26 @@ extension StandaloneEmulators on AppModel {
     _changed();
     final RunningGame run;
     try {
-      run = await startRetroGame(
-        installed: p.dirname(program),
-        program: program,
-        arguments: [
-          if (ps3) '--no-gui' else ...['-nogui', '--'],
-          boot,
-        ],
-        logFile: paths.logFile(game.titleId),
-      );
+      run = managed != null
+          ? await _startEmbeddedRetro(game, disc, managed)
+          : await startRetroGame(
+              installed: p.dirname(program!),
+              program: program,
+              arguments: [
+                if (ps3) '--no-gui' else ...['-nogui', '--'],
+                boot,
+              ],
+              logFile: paths.logFile(game.titleId),
+            );
     } on Object catch (error) {
       if (_disposed) return;
       starting = null;
       _padLog?.call('Could not start ${disc.platform.emulator}: $error');
-      show(T.format('retroEmulatorStartFailed', [disc.platform.emulator]));
+      show(
+        managed == null
+            ? T.format('retroEmulatorStartFailed', [disc.platform.emulator])
+            : T.text('retroEmbeddedStartFailed'),
+      );
       _changed();
       return;
     }
@@ -89,13 +103,38 @@ extension StandaloneEmulators on AppModel {
       run.stop();
       return;
     }
-    starting = null;
+    if (run is! EmbeddedRetroGame) starting = null;
     running = (game, run);
     _stopped = false;
     stopping = false;
-    preferences.lastPlayed[game.id] = run.started.toIso8601String();
     together.family.followGame();
-    savePreferences();
+    _changed();
+
+    if (run is EmbeddedRetroGame) {
+      var timedOut = false;
+      final ready = await run.ready.timeout(
+        const Duration(minutes: 3),
+        onTimeout: () {
+          timedOut = true;
+          return false;
+        },
+      );
+      if (_disposed) return;
+      starting = null;
+      if (timedOut && !stopping) {
+        show(T.text('retroEmbeddedStartupTimedOut'));
+        unawaited(stopRunningGame());
+      }
+      if (ready && !stopping) {
+        preferences.lastPlayed[game.id] = run.started.toIso8601String();
+        savePreferences();
+      } else {
+        _changed();
+      }
+    } else {
+      preferences.lastPlayed[game.id] = run.started.toIso8601String();
+      savePreferences();
+    }
 
     final code = await run.exitCode;
     if (_disposed) return;
@@ -111,7 +150,14 @@ extension StandaloneEmulators on AppModel {
     }
     if (overlay == Layer.quickMenu || overlay == Layer.closeGame) overlay = null;
     updates.gameEnded();
-    if (!_stopped && code != 0) show(T.format('retroEmulatorExited', [disc.platform.emulator, code]));
+    if (!_stopped && code != 0) {
+      if (run is EmbeddedRetroGame) {
+        debugPrint('Embedded emulator ended: ${run.error}');
+        show(T.text('retroEmbeddedStartFailed'));
+      } else {
+        show(T.format('retroEmulatorExited', [disc.platform.emulator, code]));
+      }
+    }
     _changed();
   }
 }
