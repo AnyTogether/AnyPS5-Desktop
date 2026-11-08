@@ -7,7 +7,7 @@ release when it is made.
 
 - **Each game can have its own engine**, as on the Mac: Game Settings › Engine picks the default
   or any downloaded engine, of either source, with what unlocked the game under it. A game whose
-  chosen engine is not on this computer says so when you press Play and offers the download.
+  chosen engine is not on this computer says so before unlocking and offers the download.
 - **Delete one engine version**: a row for each downloaded version in Settings › AnyPS5 Engine,
   as on the Mac. An engine a game or the default is using stays.
 

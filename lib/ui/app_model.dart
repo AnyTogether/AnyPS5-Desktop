@@ -2909,6 +2909,8 @@ class AppModel extends ChangeNotifier {
   void saveSettings(Game game, GameSettings settings) {
     if (persist) settingsStore.save(game.slug, settings);
     _cachedSettings[game.slug] = settings;
+    // A game's own engine brings its own patch file.
+    _gameFacts.remove(game.id);
     _changed();
   }
 
