@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:path/path.dart' as p;
+
 /// A photo made ready to be sealed: decoded and drawn again as a new PNG, so nothing of the
 /// original file goes along: no location, no camera, no EXIF or XMP at all. (The server strips
 /// plain uploads itself, but it cannot open a sealed one.)
@@ -24,6 +26,12 @@ class SealedPhoto {
 
   /// Larger files are not read at all.
   static const maxSourceBytes = 50 * 1024 * 1024;
+
+  /// Picture files that can be chosen or dropped into a chat: the kinds the launcher can decode.
+  static const extensions = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'];
+
+  /// Whether [path] names one of [extensions].
+  static bool isPictureFile(String path) => extensions.contains(p.extension(path).replaceFirst('.', '').toLowerCase());
 
   /// [source] decoded and written again at most [maxSide] a side, smaller still until the PNG
   /// fits [maxBytes]; throws FormatException on bytes that are no picture.
