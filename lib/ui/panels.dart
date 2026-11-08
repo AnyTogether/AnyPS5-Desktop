@@ -174,6 +174,7 @@ class PanelView extends StatelessWidget {
       Layer.confirmUninstall,
       Layer.updateChoice,
       Layer.updateRequired,
+      Layer.phoneEngine,
       Layer.friendOptions,
       Layer.copyWarning,
       Layer.gameFiles,

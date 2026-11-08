@@ -546,6 +546,18 @@ class SessionReport {
   /// The controllers connected and the last connects and disconnects (PadLog.report).
   final List<String> controllers;
 
+  /// The engine stopped because the dump has no PlayGo chunk table to check a chunk ID against
+  /// (no sce_sys/playgo-chunk.dat, and no playgo-scenario.json or one that lists no chunks):
+  /// upstream's "playgo-chunk.dat and playgo-scenario.json are missing, so chunk ID 1 cannot be
+  /// checked", and the same for an ID outside a scenario's list. APS5_PLAYGO_UNLISTED_CHUNKS
+  /// answers it, and AnyPS5-ARM's engine takes a dump without any playgo file as installed.
+  bool get playGoChunksUnknown => !stoppedByUser && playGoChunksUnknownIn(session);
+
+  static final _playGoUnknown = RegExp(r'scePlayGo: [^\n]*playgo-chunk\.dat[^\n]*cannot be checked');
+
+  /// Whether [log] says so (any title: the rule is the engine's message).
+  static bool playGoChunksUnknownIn(String log) => _playGoUnknown.hasMatch(log);
+
   /// The last lines of the game's online observation log, when online play wrote one during this
   /// start (what the game asked of the platform's online libraries just before it stopped).
   final List<String> onlineLines;

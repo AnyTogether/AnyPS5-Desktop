@@ -290,6 +290,20 @@ void main() {
       await pumpLauncher(tester, model);
       await expectLater(shell, matchesGoldenFile('goldens/pairing.png'));
     });
+
+    testWidgets('a phone with upstream\'s engine in use: the switch to AnyPS5-ARM\'s, in Turkish', (tester) async {
+      fixture = makeFixture(language: Language.byCode('tr'));
+      final model = fixture.model;
+      model.preferences.toolkitFolder = makeFakeToolkit(
+        p.join(fixture.temp.path, 'upstream'),
+        version: 'upstream-v0.1.4',
+      );
+      model.askPhoneEngine();
+      expect(model.overlay, Layer.phoneEngine);
+      await pumpLauncher(tester, model);
+      expect(find.text('AnyPS5-ARM motoruna geç'), findsOneWidget);
+      await expectLater(shell, matchesGoldenFile('goldens/phone_engine_tr.png'));
+    });
   });
 
   group('a failed unlock', () {

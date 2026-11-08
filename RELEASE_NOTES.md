@@ -5,6 +5,17 @@ release when it is made.
 
 ## Next release
 
+- **A new install gets the AnyPS5-ARM engine.** On a first start the welcome downloads
+  AnyPS5-ARM's engine, which reads the phone controller and opens games full screen or at the
+  window size you chose. If you already use upstream's engine, nothing changes on its own.
+- **Switch to the AnyPS5-ARM engine in one press when your phone can't reach a game.** With
+  upstream's engine in use, connecting a phone or a browser pad, or ending a game that ran with
+  one, offers the switch. It downloads the engine and uses it, and Update and play unlocks each
+  game with it. Settings › Phones offers the same.
+- **A dump without PlayGo chunk files no longer ends at a dead end.** When a game stops because
+  sce_sys/playgo-chunk.dat and playgo-scenario.json are missing, the crash report offers to
+  switch to the AnyPS5-ARM engine and play again, or to play once more with the missing chunks
+  counted as installed (that start only).
 - **Share play for more than four viewers**, as on the Mac. With AnyTogether's media server
   (up to 16 viewers now), the Viewers row goes up to what the server takes. Past four, the
   game's picture and sound go once to the media server and everyone watches from there, while
