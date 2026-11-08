@@ -225,6 +225,61 @@ extension TogetherCaptures on TogetherModel {
     }
   }
 
+  /// Picture files of the user's own (picked or dropped) into [conversation], one after the
+  /// other, as on the Mac. Each is drawn again from its pixels first, sealed or not, so no
+  /// location or camera data goes along.
+  Future<void> sendPictures(List<String> files, Conversation conversation) async {
+    if (files.isEmpty || !_mediaAllowed() || captures.working) return;
+    captures.working = true;
+    app.show(T.text('cloudSending'));
+    final limits = storage?.media ?? const MediaLimits();
+    try {
+      for (final file in files) {
+        await hub.messages.sendMedia(
+          conversation.id,
+          kind: 'image',
+          plain: () async {
+            final photo = await _ownPicture(file, limits.image);
+            return (await mediaFiles.upload('image', photo.bytes, photo.type)).id;
+          },
+          sealed: () async {
+            final e2ee = hub.messages.e2ee;
+            if (e2ee == null) throw const E2eeUnavailable();
+            final photo = await _ownPicture(file, SealedPhoto.maxBytes);
+            return e2ee.uploadSealed(
+              file: photo.bytes,
+              kind: 'image',
+              type: photo.type,
+              width: photo.width,
+              height: photo.height,
+            );
+          },
+        );
+        app.sounds.play(Cue.select);
+        app.show(T.format('cloudSentTo', [conversation.name(user?.id)]));
+      }
+    } on FormatException catch (error) {
+      app.show(T.text(error.message == 'too big' ? 'cloudMediaTooBig' : 'cloudBadMedia'));
+    } on E2eeUnavailable {
+      app.show(T.format('e2eeNoDevice', [conversation.name(user?.id)]));
+    } on FileSystemException {
+      app.show(T.text('cloudBadMedia'));
+    } on Object catch (error) {
+      app.show(cloudMessage(error));
+    } finally {
+      captures.working = false;
+      app.refresh();
+    }
+  }
+
+  /// A picture file of the user's own made ready to go: drawn again from its pixels (as a PNG,
+  /// smaller until it fits [limit]), so nothing of the file but the picture goes along.
+  Future<SealedPhoto> _ownPicture(String file, int limit) async {
+    final source = File(file);
+    if (source.lengthSync() > SealedPhoto.maxSourceBytes) throw const FormatException('too big');
+    return SealedPhoto.clean(source.readAsBytesSync(), limit: limit);
+  }
+
   /// A screenshot or clip pinned to the end of the user's profile gallery.
   Future<void> shareShotToGallery(String file) async {
     if (!_mediaAllowed() || captures.working) return;
@@ -337,7 +392,7 @@ extension TogetherCaptures on TogetherModel {
         case 'quota_exceeded':
           return T.text('cloudQuotaFull');
         case 'payload_too_large':
-          return T.text('cloudTooBig');
+          return T.text('cloudMediaTooBig');
         case 'bad_media' || 'bad_image':
           return T.text('cloudBadMedia');
         case 'storage_disabled':
