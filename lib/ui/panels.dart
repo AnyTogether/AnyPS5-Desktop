@@ -343,6 +343,18 @@ class PanelView extends StatelessWidget {
                           ),
                         ),
                       ),
+                    ] else if (model.overlay == Layer.findPlayers && model.together.onlineNowText != null) ...[
+                      // How many are online now, by the heading, as on the Mac and the website.
+                      SizedBox(width: 22 * scale),
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(bottom: 9 * scale),
+                          child: Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: OnlineNowLine(text: model.together.onlineNowText!),
+                          ),
+                        ),
+                      ),
                     ] else if (!psMenu)
                       const Spacer(),
                     SizedBox(width: 14 * scale),
@@ -1902,6 +1914,59 @@ class PersonAvatar extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// "12 players online now" by Find players' heading: the online colour's dot and the count, with
+/// who is left out (invisible accounts) as its tooltip. A number only, never who.
+class OnlineNowLine extends StatelessWidget {
+  const OnlineNowLine({super.key, required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = LayoutScale.of(context);
+    final hint = T.text('discoverOnlineNowHint');
+    return Tooltip(
+      message: hint,
+      child: Semantics(
+        label: '$text. $hint',
+        excludeSemantics: true,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 9 * scale,
+              height: 9 * scale,
+              decoration: BoxDecoration(
+                color: PersonAvatar.statusColor(PersonStatus.online),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: PersonAvatar.statusColor(PersonStatus.online).withValues(alpha: 0.55),
+                    blurRadius: 10 * scale,
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 10 * scale),
+            Flexible(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.display(
+                  17 * scale,
+                  weight: FontWeight.w500,
+                  color: Colors.white.withValues(alpha: 0.62),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
