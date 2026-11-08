@@ -10,6 +10,10 @@ release when it is made.
   line's tooltip says so.
 - **A game's name in recent activity opens its hub**, as the website links it to the game's
   page. Click the name in the feed or on a profile, or select an item on a profile.
+- **The browser pad goes full screen when you turn the phone**, as on the Mac. Turned to
+  landscape, the next touch on the pad takes it full screen and holds it in landscape, where the
+  browser allows it (Android, iPad). Before, it tried once on the first press, which browsers
+  refuse, so full screen was only in the menu. On an iPhone, add the page to the Home Screen.
 - **Share play for more than four viewers**, as on the Mac. With AnyTogether's media server
   (up to 16 viewers now), the Viewers row goes up to what the server takes. Past four, the
   game's picture and sound go once to the media server and everyone watches from there, while
