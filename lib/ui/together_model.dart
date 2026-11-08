@@ -211,6 +211,9 @@ class TogetherModel {
   /// Family limits: the kept status, play time, age ratings, asking a parent.
   late final FamilyGate family = FamilyGate(this);
 
+  /// Files are being dragged over the open conversation: it says what letting go does.
+  bool chatDropping = false;
+
   /// The voice notes in chats.
   late final VoiceNotes voiceNotes = VoiceNotes(
     create: app.services.voicePlayback,

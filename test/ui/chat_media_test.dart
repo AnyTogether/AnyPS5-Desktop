@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:anyps5_desktop/core/together/e2ee_client.dart';
 import 'package:anyps5_desktop/core/together/messages.dart';

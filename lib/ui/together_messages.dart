@@ -984,9 +984,6 @@ extension TogetherMessages on TogetherModel {
     unawaited(sendPictures(pictures, conversation));
   }
 
-  /// Files are being dragged over the open conversation: it says what letting go does.
-  bool chatDropping = false;
-
   void setChatDropping(bool dropping) {
     if (chatDropping == dropping) return;
     chatDropping = dropping;

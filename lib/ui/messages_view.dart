@@ -364,7 +364,7 @@ class _Thread extends StatelessWidget {
                 child: typing.isEmpty
                     ? null
                     : Text(
-                        together.typingText(conversation, typing) ?? '',
+                        together.typingText(conversation!, typing) ?? '',
                         style: AppText.display(13 * scale, color: Colors.white.withValues(alpha: 0.6)),
                       ),
               ),
