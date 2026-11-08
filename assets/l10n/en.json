@@ -2116,7 +2116,7 @@
   "shareCodeMakeDetail": "Anyone with the code can ask to watch. You still say yes to each one.",
   "joinCodeMade": "New code: %@",
   "joinCodeStopped": "The code no longer works",
-  "phoneEngineTitle": "Your phone can't reach games yet",
+  "phoneEngineTitle": "The phone can't play games",
   "phoneEngineWhy": "Upstream's engine reads controllers and the keyboard only",
   "phoneEngineWhyDetail": "The phone moves the launcher, and a game ignores it. The AnyPS5-ARM engine reads the phone, and opens games full screen or at the window size you chose.",
   "phoneEngineSwitch": "Switch to the AnyPS5-ARM engine",

@@ -2116,7 +2116,7 @@
   "shareCodeMakeDetail": "Kodu olan herkes izlemek isteyebilir. Her birine yine sen karar verirsin.",
   "joinCodeMade": "Yeni kod: %@",
   "joinCodeStopped": "Kod artık çalışmıyor",
-  "phoneEngineTitle": "Telefonun henüz oyunlara ulaşamıyor",
+  "phoneEngineTitle": "Telefon oyunlarda çalışmıyor",
   "phoneEngineWhy": "Upstream motoru yalnızca kontrolcüleri ve klavyeyi okur",
   "phoneEngineWhyDetail": "Telefon başlatıcıda gezinir ama oyun onu duymaz. AnyPS5-ARM motoru telefonu okur ve oyunları tam ekran ya da seçtiğin pencere boyutunda açar.",
   "phoneEngineSwitch": "AnyPS5-ARM motoruna geç",
