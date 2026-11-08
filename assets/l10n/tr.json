@@ -1656,7 +1656,7 @@
   "broadcastQuality": "Kalite",
   "broadcastQualityDetail": "Kare düşerse daha düşüğünü seç. Yükleme hızın bunun yaklaşık 1,5 katı olmalı.",
   "broadcastMicrophone": "Mikrofon",
-  "broadcastMicrophoneDetail": "Anlatımın oyunun sesinin üstüne karışır",
+  "broadcastMicrophoneDetail": "Anlatımın oyunun sesinin üstüne karışır.",
   "broadcastMicrophoneLevel": "Mikrofon seviyesi",
   "broadcastNoMicrophone": "Mikrofon kullanılamadı. Yayın mikrofonsuz sürüyor.",
   "broadcastBadge": "CANLI rozeti",

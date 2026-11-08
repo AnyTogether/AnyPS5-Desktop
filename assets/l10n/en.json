@@ -1656,7 +1656,7 @@
   "broadcastQuality": "Quality",
   "broadcastQualityDetail": "Pick a lower one if frames drop. Your upload speed should be about 1.5 times this.",
   "broadcastMicrophone": "Microphone",
-  "broadcastMicrophoneDetail": "Your commentary mixed over the game's sound",
+  "broadcastMicrophoneDetail": "Your commentary mixed over the game's sound.",
   "broadcastMicrophoneLevel": "Microphone level",
   "broadcastNoMicrophone": "The microphone could not be used. The broadcast goes on without it.",
   "broadcastBadge": "LIVE badge",
