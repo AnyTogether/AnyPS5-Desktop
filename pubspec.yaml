@@ -11,6 +11,7 @@ dependencies:
   code_assets: ^2.1.0
   crypto: ^3.0.6
   cryptography: ^2.9.0
+  desktop_drop: ^0.8.0
   ffi: ^2.2.0
   file_selector: ^1.1.0
   flutter:

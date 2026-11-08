@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 
 import '../core/together/e2ee.dart' show DeviceKind, safetyGroups;
@@ -16,6 +18,7 @@ import 'panels.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'together_model.dart';
+import 'voice_note_player.dart';
 
 part 'party_chat_view.dart';
 
@@ -263,169 +266,185 @@ class _Thread extends StatelessWidget {
     final note = showing ? together.composerNote : null;
     final menu = together.messageMenu;
     final lock = showing ? messages.lockOf(conversation.id) : null;
-    return Stack(
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppText.display(26 * scale, weight: FontWeight.w400),
-                  ),
-                ),
-                // △: the conversation's options, or the message's the keys are on.
-                if (conversation != null)
-                  Hint(keys: 'O', glyph: PadGlyph.triangle, label: T.text('hintOptions'), action: HintAction.options),
-              ],
-            ),
-            if (lock != null) ...[
-              SizedBox(height: 6 * scale),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: _LockLine(lock: lock, accent: accent, onTap: together.openLockSheet),
-              ),
-            ],
-            if (lock?.notice != null) ...[
-              SizedBox(height: 12 * scale),
-              _DevicesNotice(
-                text: lock!.notice == DevicesChange.mine
-                    ? T.text('e2eeMyDevicesChanged')
-                    : T.format('e2eeDevicesChanged', [together.partnerName]),
-                accent: accent,
-                onCompare: together.openLockSheet,
-                onDismiss: together.dismissLockNotice,
-              ),
-            ],
-            SizedBox(height: 14 * scale),
-            Expanded(
-              child: thread.isEmpty
-                  ? Center(
-                      child: Text(
-                        messages.loadingThread ? T.text('profileLoading') : T.text('messagesEmptyThread'),
-                        style: AppText.display(16 * scale, color: Colors.white.withValues(alpha: 0.5)),
-                      ),
-                    )
-                  : ListView(
-                      reverse: true,
-                      // Room for the focus ring of a message at the edge.
-                      padding: EdgeInsets.symmetric(horizontal: 6 * scale, vertical: 6 * scale),
-                      children: [
-                        for (final message in thread.reversed)
-                          KeepVisible(
-                            active: focused?.id == message.id,
-                            child: _Bubble(
-                              model: model,
-                              message: message,
-                              mine: message.authorId == me,
-                              me: me,
-                              author: conversation?.group == true
-                                  ? together.authorName(conversation, message.authorId)
-                                  : null,
-                              accent: accent,
-                              focused: focused?.id == message.id && menu == null,
-                              quote: together.quoteOf(message),
-                              receipt: receiptOn?.id == message.id && conversation != null
-                                  ? together.receiptText(conversation, message)
-                                  : null,
-                              onTap: () {
-                                if (message.failed) {
-                                  unawaited(messages.retry(message));
-                                } else {
-                                  together.openMessageMenu(message);
-                                }
-                              },
-                              onReaction: (name) => unawaited(together.toggleReaction(message, name)),
-                            ),
-                          ),
-                      ],
-                    ),
-            ),
-            SizedBox(
-              height: 26 * scale,
-              child: typing.isEmpty
-                  ? null
-                  : Text(
-                      T.format('messagesTyping', [together.authorName(conversation, typing.first)]),
-                      style: AppText.display(13 * scale, color: Colors.white.withValues(alpha: 0.6)),
-                    ),
-            ),
-            if (note != null)
-              _ComposerNote(title: note.$1, text: note.$2, accent: accent, onCancel: together.cancelComposerNote),
-            if (lock?.state == EncryptionState.noDevice)
-              _NoDeviceNote(text: T.format('e2eeNoDevice', [together.partnerName]))
-            else
+    return DropTarget(
+      // As on the Mac: files dropped on the open conversation are sent.
+      enable: showing && together.family.mediaAllowed,
+      onDragEntered: (_) => together.setChatDropping(true),
+      onDragExited: (_) => together.setChatDropping(false),
+      onDragDone: (details) {
+        together.setChatDropping(false);
+        together.dropPictures([for (final file in details.files) file.path]);
+      },
+      child: Stack(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               Row(
                 children: [
-                  for (var index = 0; index < TogetherMessages.quickReplies.length; index++) ...[
-                    _Chip(
-                      label: TogetherMessages.quickReplies[index],
-                      focused: inThread && focused == null && together.messageFocus == index,
-                      onTap: () => together.sendMessage(TogetherMessages.quickReplies[index]),
-                    ),
-                    SizedBox(width: 10 * scale),
-                  ],
                   Expanded(
-                    child: FocusRing(
-                      focused:
-                          inThread &&
-                          focused == null &&
-                          together.messageFocus == TogetherMessages.composer &&
-                          model.editingRow == null,
-                      radius: 12 * scale,
-                      child: RowTextField(
-                        model: model,
-                        row: together.draftField,
-                        kind: together.draftField.kind as TextRow,
-                        focused: false,
-                      ),
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.display(26 * scale, weight: FontWeight.w400),
                     ),
                   ),
+                  // △: the conversation's options, or the message's the keys are on.
+                  if (conversation != null)
+                    Hint(keys: 'O', glyph: PadGlyph.triangle, label: T.text('hintOptions'), action: HintAction.options),
                 ],
               ),
-          ],
-        ),
-        if (together.lockSheet && lock != null)
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: together.closeLockSheet,
-              child: ColoredBox(
-                color: Colors.black.withValues(alpha: 0.35),
-                child: Center(
-                  child: GestureDetector(
-                    onTap: () {},
-                    child: _LockSheet(model: model, lock: lock),
+              if (lock != null) ...[
+                SizedBox(height: 6 * scale),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: _LockLine(lock: lock, accent: accent, onTap: together.openLockSheet),
+                ),
+              ],
+              if (lock?.notice != null) ...[
+                SizedBox(height: 12 * scale),
+                _DevicesNotice(
+                  text: lock!.notice == DevicesChange.mine
+                      ? T.text('e2eeMyDevicesChanged')
+                      : T.format('e2eeDevicesChanged', [together.partnerName]),
+                  accent: accent,
+                  onCompare: together.openLockSheet,
+                  onDismiss: together.dismissLockNotice,
+                ),
+              ],
+              SizedBox(height: 14 * scale),
+              Expanded(
+                child: thread.isEmpty
+                    ? Center(
+                        child: Text(
+                          messages.loadingThread ? T.text('profileLoading') : T.text('messagesEmptyThread'),
+                          style: AppText.display(16 * scale, color: Colors.white.withValues(alpha: 0.5)),
+                        ),
+                      )
+                    : ListView(
+                        reverse: true,
+                        // Room for the focus ring of a message at the edge.
+                        padding: EdgeInsets.symmetric(horizontal: 6 * scale, vertical: 6 * scale),
+                        children: [
+                          for (final message in thread.reversed)
+                            KeepVisible(
+                              // By message: a new one doesn't take over another's playing note.
+                              key: ValueKey(message.id),
+                              active: focused?.id == message.id,
+                              child: _Bubble(
+                                model: model,
+                                message: message,
+                                mine: message.authorId == me,
+                                me: me,
+                                author: conversation?.group == true
+                                    ? together.authorName(conversation, message.authorId)
+                                    : null,
+                                accent: accent,
+                                focused: focused?.id == message.id && menu == null,
+                                quote: together.quoteOf(message),
+                                receipt: receiptOn?.id == message.id && conversation != null
+                                    ? together.receiptText(conversation, message)
+                                    : null,
+                                onTap: () {
+                                  if (message.failed) {
+                                    unawaited(messages.retry(message));
+                                  } else {
+                                    together.openMessageMenu(message);
+                                  }
+                                },
+                                onReaction: (name) => unawaited(together.toggleReaction(message, name)),
+                              ),
+                            ),
+                        ],
+                      ),
+              ),
+              SizedBox(
+                height: 26 * scale,
+                child: typing.isEmpty
+                    ? null
+                    : Text(
+                        together.typingText(conversation!, typing) ?? '',
+                        style: AppText.display(13 * scale, color: Colors.white.withValues(alpha: 0.6)),
+                      ),
+              ),
+              if (note != null)
+                _ComposerNote(title: note.$1, text: note.$2, accent: accent, onCancel: together.cancelComposerNote),
+              if (lock?.state == EncryptionState.noDevice)
+                _NoDeviceNote(text: T.format('e2eeNoDevice', [together.partnerName]))
+              else
+                Row(
+                  children: [
+                    for (var index = 0; index < TogetherMessages.quickReplies.length; index++) ...[
+                      _Chip(
+                        label: TogetherMessages.quickReplies[index],
+                        focused: inThread && focused == null && together.messageFocus == index,
+                        onTap: () => together.sendMessage(TogetherMessages.quickReplies[index]),
+                      ),
+                      SizedBox(width: 10 * scale),
+                    ],
+                    Expanded(
+                      child: FocusRing(
+                        focused:
+                            inThread &&
+                            focused == null &&
+                            together.messageFocus == TogetherMessages.composer &&
+                            model.editingRow == null,
+                        radius: 12 * scale,
+                        child: RowTextField(
+                          model: model,
+                          row: together.draftField,
+                          kind: together.draftField.kind as TextRow,
+                          focused: false,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          if (together.lockSheet && lock != null)
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: together.closeLockSheet,
+                child: ColoredBox(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: () {},
+                      child: _LockSheet(model: model, lock: lock),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        if (together.chatViewing case final viewing?)
-          Positioned.fill(
-            child: _ChatViewer(model: model, media: viewing),
-          ),
-        if (menu != null)
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: together.closeMessageMenu,
-              child: ColoredBox(
-                color: Colors.black.withValues(alpha: 0.35),
-                child: Center(
-                  child: GestureDetector(
-                    onTap: () {},
-                    child: _MenuCard(model: model, menu: menu),
+          if (together.chatViewing case final viewing?)
+            Positioned.fill(
+              child: _ChatViewer(model: model, media: viewing),
+            ),
+          if (menu != null)
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: together.closeMessageMenu,
+                child: ColoredBox(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: () {},
+                      child: _MenuCard(model: model, menu: menu),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-      ],
+          if (together.chatDropping)
+            Positioned.fill(
+              child: IgnorePointer(child: _DropOverlay(accent: accent)),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -1636,7 +1655,8 @@ IconData deviceKindIcon(DeviceKind kind) => switch (kind) {
 };
 
 /// A photo or clip sent as it is (from the gallery's Share, here or on the Mac): its picture or
-/// the clip's poster with a play mark; clicked, shown over the whole screen (a clip plays).
+/// the clip's poster with a play mark; clicked, shown over the whole screen (a clip plays). A
+/// voice note plays in its bubble.
 class _PlainMediaView extends StatelessWidget {
   const _PlainMediaView({required this.model, required this.media, required this.ink});
 
@@ -1652,6 +1672,15 @@ class _PlainMediaView extends StatelessWidget {
       return Text(
         T.text('messagesDeleted'),
         style: AppText.display(14 * scale, weight: FontWeight.w600, color: ink),
+      );
+    }
+    if (media.kind == 'voice') {
+      return _VoiceNoteView(
+        model: model,
+        id: media.id,
+        durationMs: media.durationMs,
+        ink: ink,
+        onTap: () => model.together.viewChatMedia(media),
       );
     }
     final still = media.kind == 'image' ? link : media.poster;
@@ -1692,8 +1721,7 @@ class _PlainMediaView extends StatelessWidget {
 }
 
 /// A sealed attachment in a bubble: a photo opened in memory, a clip's poster with a play mark,
-/// a voice note's length; clicked, a photo or clip over the whole screen (a clip plays), a voice
-/// note in the system's player.
+/// a voice note to play; clicked, a photo or clip over the whole screen (a clip plays).
 class _SealedAttachmentView extends StatelessWidget {
   const _SealedAttachmentView({required this.model, required this.message, required this.ink});
 
@@ -1709,24 +1737,19 @@ class _SealedAttachmentView extends StatelessWidget {
     void open() => unawaited(together.openAttachment(message));
     final seconds = ((attachment.durationMs ?? 0) / 1000).round();
     final length = '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
-    if (attachment.kind == 'voice' || message.media?.gone == true) {
-      return Pressable(
-        onTap: message.media?.gone == true ? null : open,
-        builder: (context, hovering) => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.graphic_eq_rounded,
-              size: 20 * scale,
-              color: ink.withValues(alpha: hovering ? 1 : 0.8),
-            ),
-            SizedBox(width: 8 * scale),
-            Text(
-              attachment.kind == 'voice' ? '${T.text('messagesVoice')} · $length' : T.text('messagesDeleted'),
-              style: AppText.display(14 * scale, weight: FontWeight.w600, color: ink),
-            ),
-          ],
-        ),
+    if (message.media?.gone == true) {
+      return Text(
+        T.text('messagesDeleted'),
+        style: AppText.display(14 * scale, weight: FontWeight.w600, color: ink),
+      );
+    }
+    if (attachment.kind == 'voice') {
+      return _VoiceNoteView(
+        model: model,
+        id: attachment.mediaId,
+        durationMs: attachment.durationMs,
+        ink: ink,
+        onTap: open,
       );
     }
     final width = (attachment.width ?? 16).toDouble();
@@ -1783,6 +1806,175 @@ class _SealedAttachmentView extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Files dragged over the open conversation: a dashed frame in the accent and what letting go
+/// does, as on the Mac.
+class _DropOverlay extends StatelessWidget {
+  const _DropOverlay({required this.accent});
+
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = LayoutScale.of(context);
+    return CustomPaint(
+      painter: _DashedFrame(color: accent, radius: 24 * scale, width: 3 * scale, dash: 10 * scale, gap: 8 * scale),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(24 * scale),
+        ),
+        child: Center(
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 22 * scale, vertical: 12 * scale),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.add_photo_alternate_rounded, size: 22 * scale, color: Colors.white),
+                SizedBox(width: 10 * scale),
+                Text(T.text('messagesSendPhoto'), style: AppText.display(20 * scale, weight: FontWeight.w600)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashedFrame extends CustomPainter {
+  const _DashedFrame({
+    required this.color,
+    required this.radius,
+    required this.width,
+    required this.dash,
+    required this.gap,
+  });
+
+  final Color color;
+  final double radius;
+  final double width;
+  final double dash;
+  final double gap;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = (Offset.zero & size).deflate(width / 2);
+    final path = Path()..addRRect(RRect.fromRectAndRadius(rect, Radius.circular(radius)));
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = width;
+    for (final metric in path.computeMetrics()) {
+      for (var at = 0.0; at < metric.length; at += dash + gap) {
+        canvas.drawPath(metric.extractPath(at, math.min(at + dash, metric.length)), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedFrame old) =>
+      old.color != color || old.radius != radius || old.width != width || old.dash != dash || old.gap != gap;
+}
+
+/// A voice note in a bubble, as on the Mac: a round play or pause, bars standing for the sound
+/// filled as it plays, and its length (or how far it has got). It plays one at a time; leaving
+/// the screen stops it.
+class _VoiceNoteView extends StatefulWidget {
+  const _VoiceNoteView({
+    required this.model,
+    required this.id,
+    required this.durationMs,
+    required this.ink,
+    required this.onTap,
+  });
+
+  final AppModel model;
+  final String id;
+  final int? durationMs;
+  final Color ink;
+  final VoidCallback onTap;
+
+  @override
+  State<_VoiceNoteView> createState() => _VoiceNoteViewState();
+}
+
+class _VoiceNoteViewState extends State<_VoiceNoteView> {
+  @override
+  void didUpdateWidget(_VoiceNoteView old) {
+    super.didUpdateWidget(old);
+    if (old.id != widget.id) old.model.together.stopVoiceNote(old.id);
+  }
+
+  @override
+  void dispose() {
+    widget.model.together.stopVoiceNote(widget.id);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = LayoutScale.of(context);
+    final seed = widget.id.runes.fold(0, (sum, rune) => sum + rune) % 7;
+    final seconds = (widget.durationMs ?? 0) / 1000;
+    return ValueListenableBuilder<VoiceNoteState>(
+      valueListenable: widget.model.together.voiceNotes.state,
+      builder: (context, state, _) {
+        final mine = state.id == widget.id;
+        final playing = mine && state.playing;
+        final progress = mine ? state.progress : 0.0;
+        final shown = Duration(seconds: (playing ? seconds * progress : seconds).round());
+        return Semantics(
+          button: true,
+          label: T.text('messagesVoice'),
+          child: Pressable(
+            onTap: widget.onTap,
+            builder: (context, hovering) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36 * scale,
+                  height: 36 * scale,
+                  decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                  child: Icon(
+                    playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    size: 22 * scale,
+                    color: Colors.black,
+                  ),
+                ),
+                SizedBox(width: 12 * scale),
+                for (var bar = 0; bar < 24; bar++) ...[
+                  if (bar > 0) SizedBox(width: 3 * scale),
+                  Container(
+                    width: 3 * scale,
+                    height: (6 + 16 * math.sin(bar * 1.7 + seed).abs()) * scale,
+                    decoration: BoxDecoration(
+                      color: widget.ink.withValues(alpha: bar / 24 < progress ? 1 : 0.38),
+                      borderRadius: BorderRadius.circular(2 * scale),
+                    ),
+                  ),
+                ],
+                SizedBox(width: 12 * scale),
+                Text(
+                  ClipState.clock(shown),
+                  style: AppText.display(
+                    13 * scale,
+                    weight: FontWeight.w600,
+                    color: widget.ink.withValues(alpha: 0.85),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

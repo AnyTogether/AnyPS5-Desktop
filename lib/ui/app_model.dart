@@ -81,6 +81,7 @@ import '../core/update_channel.dart';
 import '../core/unreal/unreal_controls.dart';
 import 'browser_play.dart';
 import 'clip_player.dart';
+import 'voice_note_player.dart';
 import 'components.dart';
 import 'controllers_model.dart';
 import 'crash_model.dart';
@@ -1026,6 +1027,7 @@ class LauncherServices {
     this.cable = true,
     this.openUrl,
     this.clipPlayback,
+    this.voicePlayback,
     this.copyText,
     this.environment,
     this.togetherStore,
@@ -1054,6 +1056,7 @@ class LauncherServices {
     this.saveFileAs,
     this.pickFile,
     this.pickImage,
+    this.pickPictures,
     this.systemInfo,
     this.startDetached,
     this.quit,
@@ -1100,6 +1103,10 @@ class LauncherServices {
 
   /// Asks the user for a picture (PNG or JPEG); null when they cancelled.
   final Future<String?> Function()? pickImage;
+
+  /// Asks the user for picture files to send in a chat (SealedPhoto.extensions, several at once);
+  /// null when they cancelled.
+  final Future<List<String>?> Function()? pickPictures;
 
   /// Asks the user where to save a file, [suggestedName] first; null when they cancelled.
   final Future<String?> Function(String suggestedName)? saveFile;
@@ -1183,6 +1190,10 @@ class LauncherServices {
   /// Plays clips inside the launcher (the gallery's, Captures' and those in chats); libmpv
   /// through media_kit by default. None: a clip shows its picture, as in tests.
   final ClipPlayback Function()? clipPlayback;
+
+  /// Plays voice notes inside the launcher; libmpv in the app, a fake in tests. Null: they go to
+  /// the system's player.
+  final VoicePlayback Function()? voicePlayback;
 
   /// Puts a text on the clipboard.
   final void Function(String text)? copyText;
