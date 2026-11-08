@@ -16,6 +16,10 @@ release when it is made.
   sce_sys/playgo-chunk.dat and playgo-scenario.json are missing, the crash report offers to
   switch to the AnyPS5-ARM engine and play again, or to play once more with the missing chunks
   counted as installed (that start only).
+- **The browser pad goes full screen when you turn the phone**, as on the Mac. Turned to
+  landscape, the next touch on the pad takes it full screen and holds it in landscape, where the
+  browser allows it (Android, iPad). Before, it tried once on the first press, which browsers
+  refuse, so full screen was only in the menu. On an iPhone, add the page to the Home Screen.
 - **Share play for more than four viewers**, as on the Mac. With AnyTogether's media server
   (up to 16 viewers now), the Viewers row goes up to what the server takes. Past four, the
   game's picture and sound go once to the media server and everyone watches from there, while
