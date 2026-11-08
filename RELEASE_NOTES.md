@@ -5,6 +5,13 @@ release when it is made.
 
 ## Next release
 
+- **Photos sent from the website show in chats**, with their caption and in their own shape.
+  A photo sent as it is (not end-to-end encrypted) used to show only as "[photo]".
+- **Delete for everyone** is what the message menu calls removing your own message now (it was
+  Unsend, "Geri al" in Turkish). It still asks first.
+- **Devices in the encryption sheet go by their kind** ("Windows PC", "iPhone") and the day they
+  were added, never by the computer's own name. This launcher now registers itself as "AnyPS5 on
+  Windows" or "AnyPS5 on Linux".
 - **Share play for more than four viewers**, as on the Mac. With AnyTogether's media server
   (up to 16 viewers now), the Viewers row goes up to what the server takes. Past four, the
   game's picture and sound go once to the media server and everyone watches from there, while

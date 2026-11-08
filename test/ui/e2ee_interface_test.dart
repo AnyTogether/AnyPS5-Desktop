@@ -23,7 +23,8 @@ void main() {
   const me = Person(id: 'u-me', handle: 'utku', displayName: 'Utku Halis');
   const sealed = SealedMessage(device: 'd', eph: 'e', nonce: 'n', body: 'b', sig: 's', keys: {});
 
-  PublicDevice device(String id, String name) => PublicDevice(id: id, signKey: '', boxKey: '', sig: '', name: name);
+  PublicDevice device(String id, String name) =>
+      PublicDevice(id: id, signKey: '', boxKey: '', sig: '', name: name, createdAt: DateTime(2026, 11, 3, 12));
 
   ConversationLock lock(EncryptionState state, {DevicesChange? notice, bool compared = false}) => ConversationLock(
     state: state,
@@ -113,7 +114,14 @@ void main() {
     expect(find.text('44483'), findsOneWidget);
     expect(find.text('18510'), findsOneWidget);
     expect(find.text('We compared them'), findsOneWidget);
-    expect(find.text('Ana’s MacBook Air'), findsOneWidget);
+    // Each device as its kind and the day it was added: never the computer's own name.
+    expect(find.text('Ana’s MacBook Air'), findsNothing);
+    expect(find.text('DESKTOP-7Q2'), findsNothing);
+    expect(find.text('Utku’s iPhone'), findsNothing);
+    expect(find.text('Mac'), findsOneWidget);
+    expect(find.text('Windows PC'), findsOneWidget);
+    expect(find.text('iPhone'), findsOneWidget);
+    expect(find.text('Added 2026-11-03'), findsNWidgets(3));
     expect(find.text('A new device cannot read messages sent before it was added.'), findsOneWidget);
     await expectLater(find.byType(LauncherShell), matchesGoldenFile('goldens/together_messages_e2ee_sheet.png'));
 
@@ -137,6 +145,8 @@ void main() {
     expect(find.text('Uçtan uca şifreli'), findsWidgets);
     expect(find.text('Güvenlik numarası'), findsOneWidget);
     expect(find.text('Karşılaştırıldı'), findsOneWidget);
+    expect(find.text('Windows bilgisayar'), findsOneWidget);
+    expect(find.text('Eklenme: 2026-11-03'), findsNWidgets(3));
     await expectLater(find.byType(LauncherShell), matchesGoldenFile('goldens/together_messages_e2ee_sheet_tr.png'));
   });
 

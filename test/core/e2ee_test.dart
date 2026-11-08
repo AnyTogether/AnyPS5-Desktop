@@ -407,4 +407,45 @@ void main() {
       expect(() => fromBase64(bad, bad == 'AAAA' ? 4 : null), throwsA(isA<E2eeError>()), reason: '$bad');
     }
   });
+
+  test('a device goes by its kind, read from its name as AnyTogether reads it', () {
+    final cases = {
+      'AnyPS5 on Windows': DeviceKind.windows,
+      'AnyPS5 on Linux': DeviceKind.linux,
+      'AnyPS5 on Mac': DeviceKind.mac,
+      'Chrome on Windows': DeviceKind.browser,
+      'Safari on iOS': DeviceKind.browser,
+      // Older launchers' names: the computer's own.
+      'Utku’s MacBook Pro · AnyPS5': DeviceKind.mac,
+      'DESKTOP-7F3K2LQ': DeviceKind.windows,
+      'LAPTOP-Q1W2E3': DeviceKind.windows,
+      'Slick’s iPhone': DeviceKind.iphone,
+      'Pixel 8': DeviceKind.android,
+      'steamdeck': DeviceKind.linux,
+      'gokalp-rig': DeviceKind.device,
+      'Machine': DeviceKind.device,
+      // The names the server gives other people's devices keep their kind.
+      'Windows PC': DeviceKind.windows,
+      'Linux PC': DeviceKind.linux,
+      'Mac': DeviceKind.mac,
+      'iPad': DeviceKind.ipad,
+      'Android phone': DeviceKind.android,
+      'Web browser': DeviceKind.browser,
+      'Device': DeviceKind.device,
+    };
+    for (final MapEntry(key: name, value: kind) in cases.entries) {
+      expect(deviceKindOf(name), kind, reason: name);
+    }
+    final listed = PublicDevice.fromJson({
+      'id': 'a',
+      'signKey': 's',
+      'boxKey': 'b',
+      'sig': 'g',
+      'name': 'DESKTOP-7F3K2LQ',
+      'createdAt': '2026-11-03T10:00:00.000Z',
+      'removedAt': null,
+    })!;
+    expect(listed.kind, DeviceKind.windows);
+    expect(listed.createdAt, DateTime.utc(2026, 11, 3, 10));
+  });
 }
