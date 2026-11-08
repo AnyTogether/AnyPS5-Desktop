@@ -5,15 +5,6 @@ release when it is made.
 
 ## Next release
 
-- **Battery & heat can lower the resolution**, the row the Mac already had: a game with a
-  resolution option is installed one step lower while the profile holds. On Windows and Linux the
-  resolution is written when a game is installed, so it takes effect at the next install.
-- **About has What's new, Made by, GitHub and the upstream project**, as on the Mac. What's new
-  shows while an update is on offer and opens that release's page.
-- **Settings › Fonts lists Latin Italic**, the row the Mac has, beside Latin.
-- **Settings › Phones says which paired phone is connected now**: the count at the top and
-  Connected beside the phone's name, as on the Mac.
-
 - **Update from Git sets up the build folder itself**, as on the Mac. An engine folder that is a
   git checkout without a build folder no longer stops at "no build folder yet". With Git, CMake,
   Ninja and a C++ compiler (g++) on PATH, the launcher runs the CMake setup the build guide
@@ -129,6 +120,14 @@ release when it is made.
 - **Deafen in party voice**, as on the Mac: hear nobody, with your microphone off, and the others
   see you deafened. Turning it off puts your microphone back as it was, and turning the
   microphone on hears everyone again.
+- **Battery & heat can lower the resolution**, the row the Mac already had: a game with a
+  resolution option is installed one step lower while the profile holds. On Windows and Linux the
+  resolution is written when a game is installed, so it takes effect at the next install.
+- **About has What's new, Made by, GitHub and the upstream project**, as on the Mac. What's new
+  shows while an update is on offer and opens that release's page.
+- **Settings › Fonts lists Latin Italic**, the row the Mac has, beside Latin.
+- **Settings › Phones says which paired phone is connected now**: the count at the top and
+  Connected beside the phone's name, as on the Mac.
 
 ## 0.1.20
 
