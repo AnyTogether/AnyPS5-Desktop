@@ -143,7 +143,8 @@ class BroadcastSettings {
 }
 
 /// The microphone as ffmpeg's input: PulseAudio's default source on Linux, on Windows the first
-/// DirectShow microphone ffmpeg lists; null where none is found.
+/// DirectShow device ffmpeg lists with "mic" in its name (else the first); null where none is
+/// found.
 abstract final class BroadcastMicrophone {
   static Future<List<String>?> input({
     required HostSystem system,
@@ -159,7 +160,9 @@ abstract final class BroadcastMicrophone {
     } on Object {
       return null;
     }
-    final name = audioDevices('${listing.stdout}\n${listing.stderr}').firstOrNull;
+    final names = audioDevices('${listing.stdout}\n${listing.stderr}');
+    // A microphone before anything else Windows records (Stereo Mix).
+    final name = names.where((name) => name.toLowerCase().contains('mic')).firstOrNull ?? names.firstOrNull;
     return name == null ? null : ['-thread_queue_size', '1024', '-f', 'dshow', '-i', 'audio=$name'];
   }
 

@@ -93,7 +93,7 @@ void main() {
     test('Windows asks ffmpeg for the first microphone and has none when it lists none', () async {
       var listed = 'x';
       Future<ProcessResult> run(String executable, List<String> arguments) async => ProcessResult(1, 1, '', listed);
-      listed = '[dshow] "Mic A" (audio)\n';
+      listed = '[dshow] "Stereo Mix" (audio)\n[dshow] "Mic A" (audio)\n';
       expect(await BroadcastMicrophone.input(system: HostSystem.windows, ffmpeg: 'ffmpeg', run: run), [
         '-thread_queue_size',
         '1024',

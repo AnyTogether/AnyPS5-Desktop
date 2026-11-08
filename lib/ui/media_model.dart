@@ -258,9 +258,26 @@ class MediaModel {
 
   String? _badgeState;
   bool _badgeBusy = false;
+  bool _badgeAgain = false;
 
+  /// Keeps the badge's window as the broadcast now is, one drawing at a time.
   Future<void> _updateBadge() async {
-    if (_badgeBusy) return;
+    if (_badgeBusy) {
+      _badgeAgain = true;
+      return;
+    }
+    _badgeBusy = true;
+    try {
+      do {
+        _badgeAgain = false;
+        await _drawBadge();
+      } while (_badgeAgain);
+    } finally {
+      _badgeBusy = false;
+    }
+  }
+
+  Future<void> _drawBadge() async {
     final running = _broadcaster?.pid;
     if (!_badgeShown || running == null) {
       if (_badgeState != null) {
@@ -273,17 +290,11 @@ class MediaModel {
     final time = clock(_broadcaster?.stats.duration ?? Duration.zero);
     final state = '$live $time';
     if (state == _badgeState) return;
-    _badgeBusy = true;
-    try {
-      final render = app.services.renderLiveBadge ?? LiveBadge.render;
-      final image = await render(live, time, app.desktop.cardScale(running));
-      if (_badgeShown) {
-        _badgeState = state;
-        await app.desktop.showBadge(image, pid: running);
-      }
-    } finally {
-      _badgeBusy = false;
-    }
+    final render = app.services.renderLiveBadge ?? LiveBadge.render;
+    final image = await render(live, time, app.desktop.cardScale(running));
+    if (!_badgeShown) return _drawBadge();
+    _badgeState = state;
+    await app.desktop.showBadge(image, pid: running);
   }
 
   static String failureText(String reason) => reason == Broadcaster.noEncoder ? T.text('broadcastNoEncoder') : reason;
