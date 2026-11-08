@@ -40,7 +40,8 @@ void main() {
       }
       model.engine.refresh();
       // A dump the fake relinker takes.
-      File(p.join(neon().folder, 'eboot.bin')).writeAsBytesSync(typicalSelf());
+      final game = model.games.firstWhere((game) => game.titleId == 'PPSA02002');
+      File(p.join(game.folder, 'eboot.bin')).writeAsBytesSync(typicalSelf());
     });
 
     tearDown(() async {
