@@ -2282,6 +2282,5 @@
   "retroPs3SCHChina": "SCH (China)",
   "retroPs3CrossWestern": "Cross (Western)",
   "retroPs3CircleJapanese": "Circle (Japanese)",
-  "retroPs3Preparing": "Preparing PS3 game data…",
-  "retroEmbeddedWindowsOnly": "Embedded PS3 play requires Windows x64."
+  "retroPs3Preparing": "Preparing PS3 game data…"
 }

@@ -1,6 +1,7 @@
 #include "retro_core_host_linux.h"
 
 #include "retro_linux_platform.h"
+#include "retro_vulkan_video.h"
 
 #include <algorithm>
 #include <array>
@@ -104,8 +105,12 @@ FlValue* EncodeStatus(const SessionStatus& status) {
   fl_value_set_string_take(result, "frameHeight", fl_value_new_int(status.frame_height));
   fl_value_set_string_take(result, "resolutionError", fl_value_new_string(status.resolution_error.c_str()));
   fl_value_set_string_take(result, "graphicsPending", fl_value_new_bool(status.graphics_pending));
-  fl_value_set_string_take(result, "progressLabel", fl_value_new_null());
-  fl_value_set_string_take(result, "progressPercent", fl_value_new_null());
+  fl_value_set_string_take(result, "progressLabel",
+                           status.progress_label ? fl_value_new_string(status.progress_label->c_str())
+                                                 : fl_value_new_null());
+  fl_value_set_string_take(result, "progressPercent",
+                           status.progress_percent ? fl_value_new_int(*status.progress_percent)
+                                                   : fl_value_new_null());
 
   auto* options = fl_value_new_map();
   for (const auto& [key, option] : status.options) {
@@ -263,7 +268,8 @@ class RetroCoreHostLinux::Impl {
       fl_method_call_respond_error(call, "argument", "The core, disc and storage paths are required", nullptr, nullptr);
       return;
     }
-    if (ConsoleForCore(core) != Console::kPs1 && ConsoleForCore(core) != Console::kPs2) {
+    const auto console = ConsoleForCore(core);
+    if (console == Console::kUnknown) {
       fl_method_call_respond_error(call, "unsupportedCore", "This emulator core is unavailable on Linux", nullptr, nullptr);
       return;
     }
@@ -276,7 +282,7 @@ class RetroCoreHostLinux::Impl {
       session_ = std::make_unique<Session>(
           SessionConfig{core, disc, system, saves, resolution ? resolution : "",
                         ReadOptions(ReadField(args, "graphics")).value_or(Options{})},
-          CreateLinuxVideo(), CreateLinuxAudio(),
+          console == Console::kPs3 ? CreateVulkanVideo() : CreateLinuxVideo(), CreateLinuxAudio(),
           [this] { ScheduleFrame(); });
       {
         std::lock_guard<std::mutex> lock(texture_->state->mutex);

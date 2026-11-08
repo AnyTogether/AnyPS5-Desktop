@@ -1,19 +1,133 @@
 #include "retro_vulkan_video.h"
 
+#include <vulkan/vulkan_core.h>
+
 #include <algorithm>
 #include <cstring>
+#include <mutex>
 #include <stdexcept>
 #include <utility>
 
+#if defined(_WIN32)
+#include <windows.h>
+#else
+#include <dlfcn.h>
+#endif
+
+namespace anyps5::retro {
+namespace {
+
+constexpr int kVulkan = 6;
+
+struct RetroVulkanContext {
+  VkPhysicalDevice gpu;
+  VkDevice device;
+  VkQueue queue;
+  uint32_t queue_family;
+  VkQueue present_queue;
+  uint32_t present_queue_family;
+};
+
+struct RetroVulkanNegotiation {
+  int type;
+  unsigned version;
+  const VkApplicationInfo* (*application_info)();
+  bool (*create_device)(RetroVulkanContext*, VkInstance, VkPhysicalDevice, VkSurfaceKHR,
+                        PFN_vkGetInstanceProcAddr, const char**, unsigned, const char**,
+                        unsigned, const VkPhysicalDeviceFeatures*);
+  void (*destroy_device)();
+};
+
+struct RetroVulkanImage {
+  VkImageView view;
+  VkImageLayout layout;
+  VkImageViewCreateInfo info;
+};
+
+struct RetroVulkanInterface {
+  int type;
+  unsigned version;
+  void* handle;
+  VkInstance instance;
+  VkPhysicalDevice gpu;
+  VkDevice device;
+  PFN_vkGetDeviceProcAddr device_proc;
+  PFN_vkGetInstanceProcAddr instance_proc;
+  VkQueue queue;
+  unsigned queue_family;
+  void (*set_image)(void*, const RetroVulkanImage*, uint32_t, const VkSemaphore*, uint32_t);
+  uint32_t (*sync_index)(void*);
+  uint32_t (*sync_mask)(void*);
+  void (*set_command_buffers)(void*, uint32_t, const VkCommandBuffer*);
+  void (*wait_sync)(void*);
+  void (*lock_queue)(void*);
+  void (*unlock_queue)(void*);
+  void (*set_signal)(void*, VkSemaphore);
+};
+
+class RetroVulkanVideo {
+ public:
+  ~RetroVulkanVideo();
+  bool Load();
+  bool SetNegotiation(const RetroVulkanNegotiation& negotiation);
+  bool Open();
+  void Close();
+  bool negotiated() const { return negotiated_; }
+  bool unsupported_sync() const { return unsupported_sync_; }
+  const RetroVulkanInterface& render_interface() const { return interface_; }
+  bool Read(uint8_t* pixels, unsigned width, unsigned height);
+
+ private:
+  bool PrepareBuffer(VkDeviceSize bytes);
+  void ClearBuffer();
+  bool CopyImage(const RetroVulkanImage& image, unsigned width, unsigned height);
+
+  template <typename T>
+  T InstanceProc(const char* name) const {
+    return reinterpret_cast<T>(interface_.instance_proc(interface_.instance, name));
+  }
+
+  template <typename T>
+  T DeviceProc(const char* name) const {
+    return reinterpret_cast<T>(interface_.device_proc(interface_.device, name));
+  }
+
+  void* loader_ = nullptr;
+  RetroVulkanNegotiation negotiation_{};
+  RetroVulkanInterface interface_{};
+  bool negotiated_ = false;
+  bool unsupported_sync_ = false;
+  VkCommandPool pool_ = VK_NULL_HANDLE;
+  VkCommandBuffer command_ = VK_NULL_HANDLE;
+  VkFence fence_ = VK_NULL_HANDLE;
+  VkBuffer buffer_ = VK_NULL_HANDLE;
+  VkDeviceMemory memory_ = VK_NULL_HANDLE;
+  VkDeviceSize capacity_ = 0;
+  const uint8_t* mapped_ = nullptr;
+  RetroVulkanImage image_{};
+  std::mutex queue_mutex_;
+};
+
 RetroVulkanVideo::~RetroVulkanVideo() {
   Close();
-  if (loader_) FreeLibrary(loader_);
+  if (!loader_) return;
+#if defined(_WIN32)
+  FreeLibrary(static_cast<HMODULE>(loader_));
+#else
+  dlclose(loader_);
+#endif
 }
 
 bool RetroVulkanVideo::Load() {
-  loader_ = LoadLibraryExW(L"vulkan-1.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+#if defined(_WIN32)
+  if (!loader_) loader_ = LoadLibraryExW(L"vulkan-1.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
   if (!loader_) return false;
-  const auto address = GetProcAddress(loader_, "vkGetInstanceProcAddr");
+  const auto address = GetProcAddress(static_cast<HMODULE>(loader_), "vkGetInstanceProcAddr");
+#else
+  if (!loader_) loader_ = dlopen("libvulkan.so.1", RTLD_NOW | RTLD_LOCAL);
+  if (!loader_) return false;
+  const auto address = dlsym(loader_, "vkGetInstanceProcAddr");
+#endif
   if (!address) return false;
   static_assert(sizeof(address) == sizeof(interface_.instance_proc));
   std::memcpy(&interface_.instance_proc, &address, sizeof(address));
@@ -244,9 +358,6 @@ bool RetroVulkanVideo::Read(uint8_t* pixels, unsigned width, unsigned height) {
   }
   return true;
 }
-
-namespace anyps5::retro {
-namespace {
 
 class VulkanVideo final : public Video {
  public:

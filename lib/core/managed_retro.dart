@@ -18,10 +18,7 @@ enum EmbeddedCoreHost {
     _ => null,
   };
 
-  bool supports(RetroPlatform platform) => platform != RetroPlatform.ps3 || this == windowsX64;
-
   String libraryName(RetroPlatform platform) {
-    if (!supports(platform)) throw ArgumentError.value(platform);
     final name = switch (platform) {
       RetroPlatform.ps1 => 'swanstation_libretro',
       RetroPlatform.ps2 => 'pcsx2_libretro',
@@ -37,12 +34,18 @@ class ManagedRetro {
   final String root;
   final EmbeddedCoreHost host;
   final String? ps3CoreDigests;
-  static const _patchedPs3Archive = '7bc267dc0a9cffdd21087340ab643c52ed91136606e6d33ae05c477adc7db3a4';
-  static const _patchedPs3Library = '7ac7504de83acfa2d977345f8c9b48e92f5e71c576abbf026406e667fe7a1370';
+  static const _windowsPs3Digests = (
+    '7bc267dc0a9cffdd21087340ab643c52ed91136606e6d33ae05c477adc7db3a4',
+    '7ac7504de83acfa2d977345f8c9b48e92f5e71c576abbf026406e667fe7a1370',
+  );
+  static const _linuxPs3Digests = (
+    '1417330424b7d0693f3e1547e639f88060dfe5ad69e91ba2c07a3b3465d1588f',
+    '1a9e839e304114e2618c7b2f4abfe0a819fb347b6a8e8cbe4f66b95c6f7043d2',
+  );
 
   String libraryPath(RetroPlatform platform) => p.join(root, host.libraryName(platform));
 
-  bool isInstalled(RetroPlatform platform) => host.supports(platform) && File(libraryPath(platform)).existsSync();
+  bool isInstalled(RetroPlatform platform) => File(libraryPath(platform)).existsSync();
 
   (String, String) _digests(RetroPlatform platform) => switch ((host, platform)) {
     // SwanStation 1.0.0 631f0fb and ParaLLEl PS2 v2.0.0-da5b07e.
@@ -62,15 +65,16 @@ class ManagedRetro {
       'ec087ee7f6452e9f74b4abf4b51243281366ca57b8b43e82b0c223eac5cc4fa8',
       'd7c98fb581f86f3d36b810ebed896bbe46f090f49d2b7d2bfe2eaceee87f1eb0',
     ),
-    (EmbeddedCoreHost.windowsX64, RetroPlatform.ps3) => _ps3Digests(),
-    (_, RetroPlatform.ps3) => throw ArgumentError.value(platform),
+    (_, RetroPlatform.ps3) => _ps3Digests(),
   };
 
   (String, String) _ps3Digests() {
     final configured = ps3CoreDigests;
-    if (configured == null) return (_patchedPs3Archive, _patchedPs3Library);
+    if (configured == null) return host == EmbeddedCoreHost.windowsX64 ? _windowsPs3Digests : _linuxPs3Digests;
     if (!RegExp(r'^[a-fA-F0-9]{64}:[a-fA-F0-9]{64}$').hasMatch(configured) || configured.length != 129) {
-      throw const FormatException('Set PS3 core digests to the package and DLL SHA-256 values separated by a colon.');
+      throw const FormatException(
+        'Set PS3 core digests to the package and library SHA-256 values separated by a colon.',
+      );
     }
     return (configured.substring(0, 64).toLowerCase(), configured.substring(65).toLowerCase());
   }

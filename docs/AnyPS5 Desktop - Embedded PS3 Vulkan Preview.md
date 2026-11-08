@@ -1,11 +1,11 @@
 # AnyPS5 Desktop embedded PS3 Vulkan preview
 
 This review slice builds on [the embedded PS1 and PS2 host](<AnyPS5 Desktop - Embedded PS1 and PS2.md>).
-On Windows x64, a verified RPCS3 Libretro package runs an extracted PS3 disc
+On Windows and Linux x64, a verified RPCS3 Libretro package runs an extracted PS3 disc
 in the launcher's existing window. The standalone RPCS3 option remains
 available in Settings. This preview does not use PS3 firmware download services.
 
-## Build the review package
+## Build the Windows review package
 
 Use a disposable [MSYS2](https://www.msys2.org/) installation. The pinned
 [upstream CLANG64 recipe](https://github.com/WizzardSK/rpcs3-libretro/blob/74b3fa37beb294418230b1f039bab4de97f18479/.ci/build-windows-clang-libretro.sh)
@@ -29,19 +29,52 @@ between builds. The builder records MSYS2 package versions and writes
 The [checkout attributes](../.gitattributes) preserve LF line endings for
 the builder and patch.
 
+## Build the Linux review package
+
+Use an amd64 OCI runner and the pinned Ubuntu 22.04 image used by the RPCS3
+Libretro build. From the launcher checkout:
+
+```sh
+out="$(mktemp -d)"
+docker run --rm --platform linux/amd64 --user "$(id -u):$(id -g)" \
+  -e HOME=/tmp -v "$PWD:/src:ro" -v "$out:/out" \
+  rpcs3/rpcs3-ci-jammy@sha256:e5f21d10b6e897d578537776877690c75879d0bf0bd4e2745c06588d580d53ff \
+  bash /src/tool/build-rpcs3-preview.sh /out/ps3-linux
+```
+
+The Linux builder verifies the pinned FFmpeg archive from the upstream
+Linux recipe. It checks the SO's exported Libretro entry points, dynamic
+dependencies and glibc version before packaging. The output under
+`$out/ps3-linux/packages` includes `rpcs3_libretro.so.zip` and its ZIP/SO digests.
+On Ubuntu 22.04, the core needs `libvulkan1`, a Vulkan ICD such as
+`mesa-vulkan-drivers`, `libegl1`, `libopengl0`, `libasound2`, `zlib1g`
+and `libgcc-s1`. Install the regular launcher build dependencies for the GTK
+and audio runner.
+
 ## Test from a fresh profile
 
 Build the Windows launcher with `flutter build windows --release`. The
 runner fetches a pinned, hash-verified Vulkan-Headers snapshot during
 CMake configuration and uses the Vulkan loader from the graphics driver
 at runtime. In a fresh PowerShell session, set these process-local
-variables before starting that build.
+variables before starting that build. On Linux use `flutter build linux --release`
+and a fresh set of XDG paths.
 
 ```powershell
 $env:APPDATA = 'C:\anyps5-ps3-clean\Roaming'
 $env:LOCALAPPDATA = 'C:\anyps5-ps3-clean\Local'
 $env:ANYPS5_PS3_CORE_DIGESTS = (Get-Content 'C:\anyps5-ps3-review\packages\ps3-core-digests.txt' -Raw).Trim()
 & .\build\windows\x64\runner\Release\anyps5_desktop.exe
+```
+
+On Linux:
+
+```sh
+profile="$(mktemp -d)"
+export XDG_CONFIG_HOME="$profile/config" XDG_DATA_HOME="$profile/data"
+export XDG_CACHE_HOME="$profile/cache" XDG_STATE_HOME="$profile/state"
+export ANYPS5_PS3_CORE_DIGESTS="$(cat "$out/ps3-linux/packages/ps3-core-digests.txt")"
+./build/linux/x64/release/bundle/anyps5_desktop
 ```
 
 1. Finish regular launcher onboarding. For a PS3-only check, skip the PS5
@@ -63,10 +96,10 @@ $env:ANYPS5_PS3_CORE_DIGESTS = (Get-Content 'C:\anyps5-ps3-review\packages\ps3-c
    Trophies or end play.
 
 The [package and firmware manager](../lib/core/managed_retro.dart) validates
-the ZIP and DLL separately and rechecks the installed DLL at launch.
-The digest override applies only to RPCS3 and must come from the reviewer's
-own build. The historical preview hash is still pinned for an exact copy
-of that build. The [launcher setup](../lib/ui/embedded_emulators.dart)
+the ZIP and library separately and rechecks the installed library at launch.
+The default digests identify the exact Windows and Linux preview packages.
+For your own build, use the ZIP and library SHA-256 pair emitted by the
+builder. The digest override applies only to RPCS3. The [launcher setup](../lib/ui/embedded_emulators.dart)
 uses the existing embedded session contract and the [PS3 option
 catalogue](../lib/ui/ps3_settings_model.dart). The [trophy
 reader](../lib/core/ps3_trophies.dart) reads the disc's trophy configuration
@@ -76,12 +109,14 @@ The [session contract tests](../test/ui/embedded_ps3_session_test.dart) cover
 local PUP staging, compile progress, section navigation, live setting
 persistence and release.
 
-The [Windows Vulkan adapter](../windows/runner/retro_vulkan_video.cpp)
-and [factory](../windows/runner/retro_vulkan_video.h) negotiate the device
-and copy completed frames for the Flutter texture. The same
-[worker](../native/retro/retro_session.cpp) still handles loading, input,
-audio and teardown for all three consoles. Windows PS1 and PS2 still use
-the D3D11 path, and Linux PS1 and PS2 use EGL/OpenGL.
+The [shared Vulkan adapter](../native/retro/retro_vulkan_video.cpp)
+and [factory](../native/retro/retro_vulkan_video.h) negotiate the device and
+copy completed frames for the Flutter texture. The [native build](../native/retro/CMakeLists.txt)
+pins the Vulkan headers. The [Linux GTK adapter](../linux/runner/retro_core_host_linux.cc)
+selects Vulkan for PS3 and forwards the worker's progress. Windows PS1 and
+PS2 use D3D11, and Linux PS1 and PS2 use EGL/OpenGL. The same
+[worker](../native/retro/retro_session.cpp) handles loading, input, audio and
+teardown for all three consoles.
 
 ## Stock core comparison
 
@@ -95,9 +130,8 @@ the patched core. A public package choice belongs to the maintainers.
 
 ## Platform and release gates
 
-- Windows x64 is the scope of this preview. Embedded PS3 on Linux still
-  needs a verified compatible core and Vulkan adapter qualification.
-  Linux standalone RPCS3 remains available.
+- The embedded preview covers Windows and Linux x64. Linux standalone RPCS3
+  remains available.
 - The native macOS launcher is Swift and needs its companion port and
   testing under the maintainer's direction.
 - A public one-click core install still needs maintainer approval for
@@ -134,3 +168,34 @@ Repeating that test on the unchanged PS1/PS2 base produced the same
 difference and byte-identical actual and diff images. Hosted macOS
 goldens still need their own run. Scoped Dart analysis and the English
 and Turkish translation checks passed.
+
+### Linux headless qualification
+
+The pinned Linux SO loaded as Libretro API 1 on Ubuntu 22.04. The ELF
+requires glibc 2.35 or earlier and has no GLIBCXX version requirement
+or X11/Wayland dependency. The builder links a private C++ runtime with
+its archive symbols hidden. The host process kept the system libstdc++.
+
+The Linux Dart installer verified the exact ZIP and SO and staged a
+byte-identical local PUP in a clean scratch profile. The launcher pin
+matched the installed SO. The shared worker installed firmware, emitted
+86 distinct compile percentages and cold-booted LittleBigPlanet GOTY
+into its game intro. The first game frame arrived at about 212 seconds.
+After 190 frames at 1280 × 720, the test paused and confirmed emulation
+steps stopped. It set the live scale to 150% while paused and resumed the
+same session. Output reached 1920 × 1080 in 1.27 seconds while stereo PCM
+continued with nonzero samples. The session shut down without an error.
+Two additional warm sessions in the same host process both rendered,
+paused, switched live resolution and stopped cleanly.
+
+The run used Mesa lavapipe and in-memory frame and audio sinks with no
+desktop display. A stock Linux core control reached Vulkan startup frames
+with a replacement libstdc++ in its scratch environment. That control
+only qualified the loader and readback. The patched package used the
+regular Ubuntu 22.04 system runtime.
+
+The Linux GTK channel adapter compiled against Flutter Linux engine and
+GTK headers. Native CTest passed on Windows and Linux, and the Windows
+focused Flutter run passed 16 tests, including the Linux ZIP/SO install
+and corruption checks. Full GTK window presentation and hosted runner
+builds remain separate checks.

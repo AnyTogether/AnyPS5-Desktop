@@ -31,7 +31,7 @@ extension EmbeddedEmulators on AppModel {
       for (final (platform, label, core) in [
         (RetroPlatform.ps1, 'PS1', 'SwanStation'),
         (RetroPlatform.ps2, 'PS2', 'ParaLLEl PS2'),
-        if (managed.host.supports(RetroPlatform.ps3)) (RetroPlatform.ps3, 'PS3', 'RPCS3'),
+        (RetroPlatform.ps3, 'PS3', 'RPCS3'),
       ]) ...[
         PanelRow(
           id: 'retro-${platform.name}-embedded-core',
@@ -58,12 +58,6 @@ extension EmbeddedEmulators on AppModel {
             kind: ActionRow(() => unawaited(_pickEmbeddedFile(managed, platform, label, bios: true))),
           ),
       ],
-      if (!managed.host.supports(RetroPlatform.ps3))
-        PanelRow(
-          id: 'retro-ps3-embedded-unavailable',
-          title: T.text('retroEmbeddedWindowsOnly'),
-          kind: const InfoRow(''),
-        ),
     ];
   }
 

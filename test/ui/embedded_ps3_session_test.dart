@@ -6,8 +6,10 @@ import 'package:anyps5_desktop/core/gamepad/pad_navigation.dart';
 import 'package:anyps5_desktop/core/gamepad/shortcuts.dart';
 import 'package:anyps5_desktop/core/host.dart';
 import 'package:anyps5_desktop/core/managed_retro.dart';
+import 'package:anyps5_desktop/core/toolkit_download.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/embedded_retro_game.dart';
+import 'package:archive/archive.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -18,13 +20,17 @@ import 'desktop_features_test.dart' show FakePads;
 void main() {
   test('PS3 settings categories work with the controller and section shortcuts', () {
     final pads = FakePads();
-    final fixture = makeFixture(system: HostSystem.windows, pads: () => pads);
+    final host = EmbeddedCoreHost.current!;
+    final fixture = makeFixture(
+      system: host == EmbeddedCoreHost.windowsX64 ? HostSystem.windows : HostSystem.linux,
+      pads: () => pads,
+    );
     final model = fixture.model..startPads();
     addTearDown(() {
       model.dispose();
       fixture.dispose();
     });
-    final core = ManagedRetro(p.join(p.dirname(model.paths.toolkits), 'Emulators'), EmbeddedCoreHost.windowsX64);
+    final core = ManagedRetro(p.join(p.dirname(model.paths.toolkits), 'Emulators'), host);
     File(core.libraryPath(RetroPlatform.ps3)).createSync(recursive: true);
     model
       ..games = [
@@ -53,7 +59,7 @@ void main() {
     expect(model.panelSections, isFalse);
     model.runKeyShortcut(LauncherAction.nextSection);
     expect(model.panelCategory, 2);
-  }, skip: EmbeddedCoreHost.current != EmbeddedCoreHost.windowsX64);
+  }, skip: EmbeddedCoreHost.current == null);
 
   test('PS3 stages a local PUP without replacing it after a rejected import', () async {
     final root = Directory.systemTemp.createTempSync('anyps5-ps3-firmware-');
@@ -76,7 +82,32 @@ void main() {
     final invalid = File(p.join(root.path, 'truncated.pup'))..writeAsBytesSync(header.sublist(0, 48));
     await expectLater(managed.importPs3Firmware(invalid.path), throwsFormatException);
     expect(File(managed.ps3FirmwarePackage).readAsBytesSync(), header);
-    expect(EmbeddedCoreHost.linuxX64.supports(RetroPlatform.ps3), isFalse);
+    expect(EmbeddedCoreHost.linuxX64.libraryName(RetroPlatform.ps3), 'rpcs3_libretro.so');
+  });
+
+  test('Linux installs the pinned SO from a verified ZIP and rejects tampering', () async {
+    final root = Directory.systemTemp.createTempSync('anyps5-ps3-linux-');
+    addTearDown(() => root.deleteSync(recursive: true));
+    const platform = RetroPlatform.ps3;
+    const name = 'rpcs3_libretro.so';
+    final library = File(p.join(root.path, name))..writeAsBytesSync([0x7f, 0x45, 0x4c, 0x46]);
+    final archive = Archive()..addFile(ArchiveFile.bytes(name, library.readAsBytesSync()));
+    final package = File(p.join(root.path, 'core.zip'))..writeAsBytesSync(ZipEncoder().encode(archive));
+    final archiveDigest = await AssetDownload.sha256Of(package.path);
+    final libraryDigest = await AssetDownload.sha256Of(library.path);
+    final managed = ManagedRetro(
+      p.join(root.path, 'managed'),
+      EmbeddedCoreHost.linuxX64,
+      ps3CoreDigests: '$archiveDigest:$libraryDigest',
+    );
+
+    await managed.install(platform, package.path);
+    expect(await managed.verifiesInstalled(platform), isTrue);
+    package.writeAsBytesSync([1, 2, 3]);
+    await expectLater(managed.install(platform, package.path), throwsFormatException);
+    expect(await managed.verifiesInstalled(platform), isTrue);
+    File(managed.libraryPath(platform)).writeAsBytesSync([1, 2, 3]);
+    expect(await managed.verifiesInstalled(platform), isFalse);
   });
 
   testWidgets('RPCS3 forwards real progress values and remembers an accepted live setting', (tester) async {
