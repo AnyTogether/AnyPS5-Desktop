@@ -2,11 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+
 import 'package:path/path.dart' as p;
 
 import '../desktop/desktop.dart';
 import '../host.dart';
-import '../replay_buffer.dart' show ProcessStarter;
+import '../replay_buffer.dart' show ProcessRunner, ProcessStarter;
 import 'game_sound.dart';
 import 'video_encoders.dart';
 
@@ -65,13 +66,23 @@ class BroadcastSettings {
     this.service = BroadcastService.twitch,
     this.customUrl = '',
     this.quality = BroadcastQuality.hd720p60,
+    this.microphone = false,
+    this.microphoneLevel = 80,
+    this.liveBadge = true,
     this.viewerLink = '',
   });
 
   factory BroadcastSettings.fromJson(Map<String, dynamic> json) => BroadcastSettings(
-    service: BroadcastService.values.where((service) => service.name == json['service']).firstOrNull ?? BroadcastService.twitch,
+    service:
+        BroadcastService.values.where((service) => service.name == json['service']).firstOrNull ??
+        BroadcastService.twitch,
     customUrl: json['customURL'] is String ? json['customURL'] as String : '',
-    quality: BroadcastQuality.values.where((quality) => quality.name == json['quality']).firstOrNull ?? BroadcastQuality.hd720p60,
+    quality:
+        BroadcastQuality.values.where((quality) => quality.name == json['quality']).firstOrNull ??
+        BroadcastQuality.hd720p60,
+    microphone: json['microphone'] == true,
+    microphoneLevel: json['microphoneLevel'] is num ? (json['microphoneLevel'] as num).toInt().clamp(10, 100) : 80,
+    liveBadge: json['liveBadge'] is bool ? json['liveBadge'] as bool : true,
     viewerLink: json['viewerLink'] is String ? json['viewerLink'] as String : '',
   );
 
@@ -80,6 +91,13 @@ class BroadcastSettings {
   /// The custom server, rtmp:// or rtmps://, with or without the key at its end.
   String customUrl;
   BroadcastQuality quality;
+
+  /// The microphone mixed into the game's sound, at [microphoneLevel] percent.
+  bool microphone;
+  int microphoneLevel;
+
+  /// A small LIVE badge over the game while it is broadcast (not in the broadcast itself).
+  bool liveBadge;
 
   /// The page viewers watch on (twitch.tv/name), shown and copied while live.
   String viewerLink;
@@ -99,6 +117,9 @@ class BroadcastSettings {
     'service': service.name,
     'customURL': customUrl,
     'quality': quality.name,
+    'microphone': microphone,
+    'microphoneLevel': microphoneLevel,
+    'liveBadge': liveBadge,
     'viewerLink': viewerLink,
   };
 
@@ -121,6 +142,53 @@ class BroadcastSettings {
   }
 }
 
+/// The microphone as ffmpeg's input: PulseAudio's default source on Linux, on Windows the first
+/// DirectShow microphone ffmpeg lists; null where none is found.
+abstract final class BroadcastMicrophone {
+  static Future<List<String>?> input({
+    required HostSystem system,
+    required String ffmpeg,
+    required ProcessRunner run,
+  }) async {
+    if (system == HostSystem.linux) {
+      return const ['-thread_queue_size', '1024', '-f', 'pulse', '-ar', '48000', '-ac', '2', '-i', 'default'];
+    }
+    final ProcessResult listing;
+    try {
+      listing = await run(ffmpeg, const ['-hide_banner', '-list_devices', 'true', '-f', 'dshow', '-i', 'dummy']);
+    } on Object {
+      return null;
+    }
+    final name = audioDevices('${listing.stdout}\n${listing.stderr}').firstOrNull;
+    return name == null ? null : ['-thread_queue_size', '1024', '-f', 'dshow', '-i', 'audio=$name'];
+  }
+
+  /// The audio devices in `ffmpeg -list_devices true -f dshow`'s listing, either way it prints
+  /// them: under "DirectShow audio devices" (older builds) or each line ending in "(audio)".
+  static List<String> audioDevices(String listing) {
+    final names = <String>[];
+    var underAudioHeading = false;
+    for (final line in listing.split('\n')) {
+      if (line.contains('DirectShow video devices')) underAudioHeading = false;
+      if (line.contains('DirectShow audio devices')) {
+        underAudioHeading = true;
+        continue;
+      }
+      if (line.contains('Alternative name')) continue;
+      final name = RegExp('"([^"]+)"').firstMatch(line)?.group(1);
+      if (name == null) continue;
+      if (line.trimRight().endsWith('(audio)') || underAudioHeading) names.add(name);
+    }
+    return names;
+  }
+
+  /// ffmpeg's audio filter: the game's sound with the microphone at [level] percent over it.
+  static String filter(int level) =>
+      '[1:a]aresample=async=1[game];'
+      '[2:a]aresample=48000:async=1,aformat=channel_layouts=stereo,volume=${(level / 100).toStringAsFixed(2)}[mic];'
+      '[game][mic]amix=inputs=2:duration=first:dropout_transition=0,volume=2[mixed]';
+}
+
 /// Why a broadcast cannot start with what was set up.
 enum EndpointProblem { notRtmp, noHost, noApplication, noKey }
 
@@ -128,7 +196,13 @@ enum EndpointProblem { notRtmp, noHost, noApplication, noKey }
 /// (the macOS launcher's RTMPEndpoint): host, port (1935, or 443 over TLS), the application
 /// (live2, app, or app/instance with any query).
 class RtmpEndpoint {
-  const RtmpEndpoint({required this.tls, required this.host, required this.port, required this.app, required this.streamKey});
+  const RtmpEndpoint({
+    required this.tls,
+    required this.host,
+    required this.port,
+    required this.app,
+    required this.streamKey,
+  });
 
   final bool tls;
   final String host;
@@ -285,9 +359,19 @@ class Broadcaster {
     required this.changed,
     this.environment = const {},
     ProcessStarter? start,
-    this.retryDelays = const [Duration(seconds: 2), Duration(seconds: 5), Duration(seconds: 10), Duration(seconds: 20), Duration(seconds: 30)],
+    ProcessRunner? run,
+    this.microphoneLevel,
+    this.noMicrophone,
+    this.retryDelays = const [
+      Duration(seconds: 2),
+      Duration(seconds: 5),
+      Duration(seconds: 10),
+      Duration(seconds: 20),
+      Duration(seconds: 30),
+    ],
     this.log,
-  }) : _start = start ?? ((executable, arguments) => Process.start(executable, arguments));
+  }) : _start = start ?? ((executable, arguments) => Process.start(executable, arguments)),
+       _runTool = run ?? ((executable, arguments) => Process.run(executable, arguments));
 
   final String ffmpeg;
   final HostSystem system;
@@ -301,6 +385,14 @@ class Broadcaster {
   final List<Duration> retryDelays;
   final ProcessStarter _start;
   final void Function(String line)? log;
+  final ProcessRunner _runTool;
+
+  /// The microphone's level now in percent, 0 when it is off; null keeps the broadcast silent of
+  /// it.
+  final int Function()? microphoneLevel;
+
+  /// The microphone asked for could not be used: the broadcast goes on without it.
+  final void Function()? noMicrophone;
 
   /// The failure when ffmpeg has no H.264 encoder that works on this computer.
   static const noEncoder = 'no-encoder';
@@ -322,8 +414,63 @@ class Broadcaster {
   final _live = Stopwatch();
   ScreenArea? _area;
 
+  /// ffmpeg's input arguments for the microphone, once found this broadcast.
+  List<String>? _microphone;
+
+  /// The microphone would not open this broadcast: no more tries until it is switched again.
+  bool _microphoneFailed = false;
+
+  /// ffmpeg is being restarted on purpose, for the microphone: not a dropped connection.
+  bool _restarting = false;
+
+  Timer? _microphoneRestart;
+
+  bool get _microphoneOn => (microphoneLevel?.call() ?? 0) > 0;
+
+  /// The microphone being used this run: its input arguments and level, when it is on and found.
+  ({List<String> input, int level})? get _liveMicrophone {
+    final input = _microphone;
+    return input == null || !_microphoneOn || _microphoneFailed ? null : (input: input, level: microphoneLevel!.call());
+  }
+
+  /// Finds the microphone for ffmpeg when it is wanted and not known yet; says when there is none.
+  Future<void> _findMicrophone() async {
+    if (!_microphoneOn || _microphone != null || _microphoneFailed) return;
+    _microphone = await BroadcastMicrophone.input(system: system, ffmpeg: ffmpeg, run: _runTool);
+    if (_microphone == null && !_microphoneFailed) {
+      _microphoneFailed = true;
+      noMicrophone?.call();
+    }
+  }
+
+  /// The microphone setting changed during the broadcast: ffmpeg starts again with it (a level
+  /// change waits for a pause in the presses).
+  void microphoneChanged() {
+    if (!phase.active) return;
+    if (_microphoneOn) _microphoneFailed = false;
+    final wanted = _microphoneOn;
+    final current = _liveMicrophone;
+    _microphoneRestart?.cancel();
+    if (wanted == (current != null) && !wanted) return;
+    _microphoneRestart = Timer(const Duration(milliseconds: 900), () => unawaited(_restartWithMicrophone()));
+  }
+
+  Future<void> _restartWithMicrophone() async {
+    await _findMicrophone();
+    final process = _process;
+    if (!phase.active || process == null) return;
+    _restarting = true;
+    process.kill();
+  }
+
   /// ffmpeg's arguments to publish the game in [area] to [endpoint].
-  List<String> arguments(VideoEncoder encoder, ScreenArea? area, RtmpEndpoint endpoint, BroadcastQuality quality) {
+  List<String> arguments(
+    VideoEncoder encoder,
+    ScreenArea? area,
+    RtmpEndpoint endpoint,
+    BroadcastQuality quality, {
+    ({List<String> input, int level})? microphone,
+  }) {
     final width = quality.width;
     final height = quality.height;
     return [
@@ -343,17 +490,18 @@ class Broadcaster {
       '2',
       '-i',
       'pipe:0',
+      ...?microphone?.input,
+      if (microphone != null) ...['-filter_complex', BroadcastMicrophone.filter(microphone.level)],
       '-map',
       '0:v',
       '-map',
-      '1:a',
+      if (microphone == null) '1:a' else '[mixed]',
       // One size whatever shape the window has: letterboxed, so the stream never changes size.
       '-vf',
       'scale=$width:$height:force_original_aspect_ratio=decrease:flags=bicubic,'
           'pad=$width:$height:(ow-iw)/2:(oh-ih)/2,fps=${quality.frameRate},${encoder.filterTail}',
       ...encoder.arguments(use: EncodeUse.broadcast, bitRate: quality.bitRate, keyEvery: quality.frameRate * 2),
-      '-af',
-      'aresample=async=1',
+      if (microphone == null) ...['-af', 'aresample=async=1'],
       '-c:a',
       'aac',
       '-b:a',
@@ -375,6 +523,8 @@ class Broadcaster {
     _endpoint = endpoint;
     _quality = quality;
     _attempt = 0;
+    _microphone = null;
+    _microphoneFailed = false;
     _set(const BroadcastStarting());
     final encoder = await encoders.encoder;
     if (!phase.active) return;
@@ -386,6 +536,8 @@ class Broadcaster {
     final sound = soundOf(pid);
     _sound = sound;
     await sound.start((samples) => _steady?.add(samples));
+    await _findMicrophone();
+    if (!phase.active) return;
     // Runs until ffmpeg ends; the phase says how it goes.
     unawaited(_run());
   }
@@ -397,9 +549,10 @@ class Broadcaster {
     if (encoder == null || endpoint == null || pid == null || !phase.active) return;
     final area = areaOf(pid);
     _area = area;
+    final microphone = _liveMicrophone;
     final Process process;
     try {
-      process = await _start(ffmpeg, arguments(encoder, area, endpoint, _quality));
+      process = await _start(ffmpeg, arguments(encoder, area, endpoint, _quality, microphone: microphone));
     } on Object catch (error) {
       return _fail('$error');
     }
@@ -444,8 +597,20 @@ class Broadcaster {
     _tick?.cancel();
     _steady = null;
     if (!phase.active) return;
+    // Started again on purpose: the microphone was switched or moved.
+    if (_restarting) {
+      _restarting = false;
+      return _run();
+    }
     final reason = _reason(errors.toString(), code);
     log?.call('broadcast: ffmpeg ended ($code): ${_scrub(errors.toString().trim())}');
+    // ffmpeg could not open the microphone: the broadcast goes on without it.
+    if (microphone != null && !_wentLive) {
+      log?.call('broadcast: going on without the microphone');
+      _microphoneFailed = true;
+      noMicrophone?.call();
+      return _run();
+    }
     if (phase is BroadcastStarting && _attempt == 0 && !_wentLive) return _fail(reason);
     if (_attempt >= retryDelays.length) return _fail(reason);
     final delay = retryDelays[_attempt++];
@@ -499,6 +664,8 @@ class Broadcaster {
   }
 
   void _cleanUp() {
+    _microphoneRestart?.cancel();
+    _microphoneRestart = null;
     _retry?.cancel();
     _retry = null;
     _tick?.cancel();

@@ -113,6 +113,9 @@ final class _Win32 {
     );
     defWindowProc = user.lookup<Void>('DefWindowProcW');
     getDpiForWindow = _optional(() => user.lookupFunction<Uint32 Function(_H), int Function(int)>('GetDpiForWindow'));
+    setWindowDisplayAffinity = _optional(
+      () => user.lookupFunction<Int32 Function(_H, Uint32), int Function(int, int)>('SetWindowDisplayAffinity'),
+    );
     createCompatibleDC = gdi.lookupFunction<_H Function(_H), int Function(int)>('CreateCompatibleDC');
     deleteDC = gdi.lookupFunction<Int32 Function(_H), int Function(int)>('DeleteDC');
     createDIBSection = gdi
@@ -178,6 +181,7 @@ final class _Win32 {
   late final int Function(Pointer<Uint8>) dispatchMessage;
   late final Pointer<Void> defWindowProc;
   late final int Function(int)? getDpiForWindow;
+  late final int Function(int, int)? setWindowDisplayAffinity;
   late final int Function(int) createCompatibleDC;
   late final int Function(int) deleteDC;
   late final int Function(int, Pointer<Uint8>, int, Pointer<Pointer<Uint8>>, int, int) createDIBSection;
@@ -661,11 +665,94 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
     }
   }
 
+  int _badge = 0;
+
+  @override
+  Future<bool> showBadge(RgbaImage? badge, {int? pid}) async {
+    if (badge == null) {
+      if (_badge != 0) _w.destroyWindow(_badge);
+      _badge = 0;
+      return true;
+    }
+    final game = pid == null ? 0 : windowOf(pid);
+    final anchor = game != 0 ? game : _w.getForegroundWindow();
+    final screens = _screenOf(anchor);
+    if (screens == null) return false;
+    final (_, screen) = screens;
+    final scale = cardScale(pid);
+    var fresh = false;
+    if (_badge == 0) {
+      final window = _makeCardWindow(badge.width, badge.height);
+      if (window == 0) return false;
+      // Viewers must not see it. Windows before 10 version 2004 refuse the flag: no badge there,
+      // since the broadcast's screen grab would record it.
+      final affinity = _w.setWindowDisplayAffinity;
+      if (affinity == null || affinity(window, 0x11 /* WDA_EXCLUDEFROMCAPTURE */) == 0) {
+        _w.destroyWindow(window);
+        return false;
+      }
+      _badge = window;
+      fresh = true;
+    }
+    final screenDc = _w.getDC(0);
+    final memory = _w.createCompatibleDC(screenDc);
+    final bitsOut = calloc<Pointer<Uint8>>();
+    final header = calloc<Uint8>(44);
+    final ints = header.cast<Int32>();
+    ints[0] = 40;
+    ints[1] = badge.width;
+    ints[2] = -badge.height;
+    (header + 12).cast<Uint16>().value = 1;
+    (header + 14).cast<Uint16>().value = 32;
+    final bitmap = _w.createDIBSection(memory, header, 0, bitsOut, 0, 0);
+    final previous = bitmap == 0 ? 0 : _w.selectObject(memory, bitmap);
+    final point = calloc<Int32>(2)
+      ..[0] = screen[0] + (18 * scale).round()
+      ..[1] = screen[1] + (14 * scale).round();
+    final size = calloc<Int32>(2)
+      ..[0] = badge.width
+      ..[1] = badge.height;
+    final source = calloc<Int32>(2);
+    final blend = calloc<Uint8>(4)
+      ..[0] = 0
+      ..[1] = 0
+      ..[2] = 255
+      ..[3] = 1; // AC_SRC_ALPHA
+    final message = calloc<Uint8>(48);
+    try {
+      if (bitmap == 0) return false;
+      bitsOut.value.asTypedList(badge.pixels.length).setAll(0, badge.premultipliedBgra());
+      _w.updateLayeredWindow(_badge, screenDc, point, size, memory, source, 0, blend, 2 /* ULW_ALPHA */);
+      if (fresh) {
+        _w.showWindow(_badge, 4 /* SW_SHOWNOACTIVATE */);
+        _w.setWindowPos(_badge, _topmost, 0, 0, 0, 0, _noMove | _noSize | _noActivate | _showWindow);
+      }
+      for (var guard = 0; guard < 32 && _w.peekMessage(message, _badge, 0, 0, 1 /* PM_REMOVE */) != 0; guard++) {
+        _w.translateMessage(message);
+        _w.dispatchMessage(message);
+      }
+      return true;
+    } finally {
+      if (bitmap != 0) {
+        _w.selectObject(memory, previous);
+        _w.deleteObject(bitmap);
+      }
+      _w.deleteDC(memory);
+      _w.releaseDC(0, screenDc);
+      for (final pointer in [bitsOut, header, point, size, source, blend, message]) {
+        calloc.free(pointer);
+      }
+    }
+  }
+
   @override
   Future<bool> notify(String title, String body, {String? icon}) async => false;
 
   @override
-  void dispose() {}
+  void dispose() {
+    if (_badge != 0) _w.destroyWindow(_badge);
+    _badge = 0;
+  }
 }
 
 /// A game window's outer size for [percent] of the screen's work area: the picture (16:9) as large

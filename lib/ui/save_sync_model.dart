@@ -400,7 +400,22 @@ class SaveSyncModel {
       return [PanelRow(id: 'cloud-off', title: T.text('cloudStorageOff'), kind: const InfoRow(''))];
     }
     final rows = <PanelRow>[
-      if (usageText case final String used) PanelRow(id: 'cloud-usage', title: used, kind: const InfoRow('')),
+      if (usageText case final String used)
+        PanelRow(
+          id: 'cloud-usage',
+          title: used,
+          detail: read.usage == null
+              ? null
+              : T.format('cloudStorageUsageLine', [
+                  size(read.usage!.saves),
+                  size(read.usage!.media),
+                  size(read.usage!.free),
+                ]),
+          meter: read.usage == null || read.usage!.limit <= 0
+              ? null
+              : PanelMeter(read.usage!.saves / read.usage!.limit, read.usage!.media / read.usage!.limit),
+          kind: const InfoRow(''),
+        ),
       PanelRow(id: 'cloud-saves', title: T.text('cloudStorageSaves'), kind: const InfoRow('')),
       if (read.saves.isEmpty)
         PanelRow(id: 'cloud-nosaves', title: T.text('cloudStorageNoSaves'), kind: const InfoRow('')),
@@ -479,7 +494,58 @@ class SaveSyncModel {
         ),
       );
     }
+    rows.add(PanelRow(id: 'cloud-media', title: T.text('cloudStorageMediaTitle'), kind: const InfoRow('')));
+    if (read.media.isEmpty) {
+      rows.add(PanelRow(id: 'cloud-nomedia', title: T.text('cloudStorageNoMedia'), kind: const InfoRow('')));
+    }
+    for (final media in read.media) {
+      final armedHere = armed == 'media-${media.id}';
+      rows.add(
+        PanelRow(
+          id: 'media-${media.id}',
+          title: T.text(switch (media.kind) {
+            'clip' => 'clip',
+            'voice' => 'cloudVoiceNote',
+            _ => 'cloudPhoto',
+          }),
+          detail: armedHere
+              ? T.text('cloudStoragePressAgain')
+              : [
+                  if (media.createdAt != null) _day(media.createdAt!),
+                  size(media.size),
+                  if (media.gallery != null) T.text('cloudStoragePinned'),
+                ].join(' · '),
+          kind: ActionRow(() {
+            if (armedHere) {
+              unawaited(deleteMedia(media));
+            } else {
+              armed = 'media-${media.id}';
+              app.refresh();
+            }
+          }, destructive: armedHere),
+        ),
+      );
+    }
     return rows;
+  }
+
+  /// "2026-11-08 20:14", the moment as the save versions show theirs.
+  String _day(DateTime date) {
+    final local = date.toLocal();
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${local.year}-${two(local.month)}-${two(local.day)} ${two(local.hour)}:${two(local.minute)}';
+  }
+
+  /// Deletes one photo, clip or voice note; its place in storage comes back.
+  Future<void> deleteMedia(StoredMedia media) async {
+    try {
+      await storage.deleteMedia(media.id);
+      armed = null;
+      app.show(T.text('cloudStorageDeleted'));
+      await load();
+    } on Object catch (error) {
+      app.show(_message(error));
+    }
   }
 
   /// An older version becomes the newest again and comes down to this computer when it has the

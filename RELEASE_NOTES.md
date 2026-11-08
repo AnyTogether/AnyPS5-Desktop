@@ -5,6 +5,15 @@ release when it is made.
 
 ## Next release
 
+- **Broadcasting has a microphone**, as on the Mac: Settings › Broadcasting mixes your commentary
+  over the game's sound at the level you set, and it can be switched while you are live. Windows
+  shows a small LIVE badge over the game that viewers do not see. Linux has no badge, because
+  anything drawn over the game would be recorded too.
+- **Cloud storage lists your photos, clips and voice notes**, as on the Mac: delete one with a
+  second press, and a bar shows how much saves and media take.
+- **Restore saves… restores the backup you choose**, as on the Mac. The latest backup can still
+  be restored in one press.
+
 - **A new install gets the AnyPS5-ARM engine.** On a first start the welcome downloads
   AnyPS5-ARM's engine, which reads the phone controller and opens games full screen or at the
   window size you chose. If you already use upstream's engine, nothing changes on its own.

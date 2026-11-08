@@ -5,6 +5,7 @@ import 'package:anyps5_desktop/core/host.dart';
 import 'package:anyps5_desktop/core/installer.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
+import 'package:anyps5_desktop/core/save_backup.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
@@ -123,6 +124,37 @@ void main() {
     (restore.kind as ActionRow).run();
     expect(File(p.join(installed, '_sd', 'save.dat')).readAsStringSync(), 'one');
     expect(model.toast, T.text('savesRestored'));
+  });
+
+  test('Restore saves… takes the backup the user picks, with the current saves backed up first', () async {
+    String? picked;
+    final own = makeFixture(pickFile: (label, extensions) async => picked);
+    addTearDown(own.dispose);
+    addTearDown(own.model.dispose);
+    final launcher = own.model;
+    final orbit = launcher.games.firstWhere((game) => game.titleId == 'PPSA01001');
+    final installed = Installer.installedFolder(orbit, launcher.root!);
+    File(p.join(installed, '_sd', 'save.dat'))
+      ..createSync(recursive: true)
+      ..writeAsStringSync('one');
+    launcher.select(launcher.games.indexOf(orbit));
+    launcher.open(Layer.gameSettings);
+    (launcher.panelCategories().single.rows.firstWhere((row) => row.id == 'backup').kind as ActionRow).run();
+    final backups = SaveBackup.backups(launcher.backupFolder(orbit));
+    expect(backups, hasLength(1));
+    final older = backups.single;
+    File(p.join(installed, '_sd', 'save.dat')).writeAsStringSync('two');
+    // Nothing picked: nothing happens.
+    PanelRow restore() => launcher.panelCategories().single.rows.firstWhere((row) => row.id == 'restoreChoose');
+    (restore().kind as ActionRow).run();
+    await Future<void>.delayed(Duration.zero);
+    expect(File(p.join(installed, '_sd', 'save.dat')).readAsStringSync(), 'two');
+    expect(restore().title, T.text('restoreSaves'));
+    picked = older;
+    await launcher.restoreChosenSaves(orbit);
+    expect(File(p.join(installed, '_sd', 'save.dat')).readAsStringSync(), 'one');
+    expect(launcher.toast, T.text('savesRestored'));
+    expect(SaveBackup.backups(launcher.backupFolder(orbit)), hasLength(2), reason: 'the current saves were kept first');
   });
 
   test('a dump copied into the games folder shows up on its own', () async {
