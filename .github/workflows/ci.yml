@@ -25,7 +25,7 @@ env:
   FLUTTER_VERSION: 3.47.1
   # libpulse-dev: flutter_webrtc's Linux loopback capture (share play's Opus track) builds only
   # with it; the bundle then needs libpulse0, which PulseAudio and PipeWire systems have.
-  LINUX_PACKAGES: clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libsdl2-2.0-0 libpulse-dev file
+  LINUX_PACKAGES: clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libsdl2-2.0-0 libpulse-dev libegl-dev libepoxy-dev file
   # libmpv-dev: the in-app clip player (media_kit_video links libmpv); patchelf: the bundle carries
   # that libmpv and what it needs in lib/ (packaging/linux/bundle-libmpv.sh).
   CLIP_PLAYER_PACKAGES: libmpv-dev patchelf

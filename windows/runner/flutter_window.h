@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 
+#include "retro_core_host.h"
 #include "win32_window.h"
 
 // A window that does nothing but host a Flutter view.
@@ -39,6 +40,7 @@ class FlutterWindow : public Win32Window {
 
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
+  std::unique_ptr<RetroCoreHost> retro_core_;
 
   // "anyps5/window": the launcher asks for full screen and back (F11, its setting).
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> window_channel_;

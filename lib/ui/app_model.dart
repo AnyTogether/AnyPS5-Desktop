@@ -4435,7 +4435,7 @@ class AppModel extends ChangeNotifier {
     final index = games.indexOf(game);
     if (index >= 0) selected = index;
     open(Layer.quickMenu);
-    if (!front && run is! EmbeddedRetroGame) await raiseLauncher();
+    if (!front) await raiseLauncher();
   }
 
   /// Whether the game under the quick menu was sent its Options (paused, as far as the launcher

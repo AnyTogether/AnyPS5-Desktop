@@ -8,13 +8,13 @@ and Vulkan bridge have their own review scope.
 
 ## Review setup
 
-1. Add a game from the existing library. The launcher uses the same cover,
-   wallpaper and playlist formats as the standalone library.
-2. Under **Settings → Emulators**, choose the embedded core for the console
+1. Under **Settings → Emulators**, choose the embedded core for the console
    and select its verified ZIP for your operating system.
-3. Select your local console BIOS. Play uses the embedded core when its
-   library and BIOS are present. Existing standalone paths remain available
-   for consoles without embedded setup.
+2. Select your local console BIOS.
+3. Add your games through **Settings → Game Library** if needed. The library
+   accepts the same cover, wallpaper and playlist formats as the standalone
+   slice. Play uses the embedded core when its library and BIOS are present.
+   Existing standalone paths remain available for consoles without embedded setup.
 4. Press PS or Escape to open Quick Menu. Resume returns to the same
    native session. Game settings lists the graphics controls reported by
    the active core. Supported resolution and filtering changes are
@@ -53,3 +53,66 @@ use a mocked native channel to verify the contract, including the exact
 library names, input, focus loss, release and persistence after accepted
 graphics changes. They do not exercise actual rendering or emulator
 compatibility.
+
+## Native host
+
+The [shared session worker](../native/retro/retro_session.cpp) owns core
+callbacks, option transitions, input, memory-card writes and pacing.
+Its [adapter contract](../native/retro/retro_session.h) keeps renderer,
+audio and frame delivery outside the session. The
+[Libretro declarations](../native/retro/libretro_abi.h) describe the C
+callback types used by the worker. The
+[dynamic loader](../native/retro/retro_library.cpp) and
+[its interface](../native/retro/retro_library.h) scope the DLL or SO
+handle to the session. The [software frame converter](../native/retro/retro_frame.cpp)
+and [frame representation](../native/retro/retro_frame.h) give both
+platforms immutable RGBA frames.
+
+The [Linux adapter](../linux/runner/retro_core_host_linux.cc) and
+[registration interface](../linux/runner/retro_core_host_linux.h)
+connect the session to the GTK Flutter texture registrar. The
+[EGL renderer](../linux/runner/retro_linux_video.cc) keeps a private
+desktop OpenGL context on the worker. The
+[PulseAudio sink](../linux/runner/retro_linux_audio.cc) uses a bounded
+audio queue. Their [platform factories](../linux/runner/retro_linux_platform.h)
+keep the device-specific objects out of the shared worker.
+[Linux runner startup](../linux/runner/my_application.cc) registers
+the channel for its view. Its [CMake target](../linux/runner/CMakeLists.txt)
+links EGL, epoxy and PulseAudio. The [Windows adapter](../windows/runner/retro_core_host.cpp)
+uses D3D11 and waveOut. The [Windows channel interface](../windows/runner/retro_core_host.h)
+is owned by the [runner window](../windows/runner/flutter_window.cpp)
+through its [window member](../windows/runner/flutter_window.h).
+The [Windows CMake target](../windows/runner/CMakeLists.txt) links the
+shared worker from [the native build](../native/retro/CMakeLists.txt).
+
+Run the native checks in an isolated build directory. The
+[fixture core](../native/retro/test/fake_core.cpp) exercises the callback
+contract without a game. The [test driver](../native/retro/test/retro_native_test.cpp)
+checks the loader, frame conversion and session behavior.
+[The CMake test target](../native/retro/test/CMakeLists.txt) builds the fixture and runs the driver.
+
+```sh
+cmake -S native/retro/test -B /tmp/anyps5-retro-test
+cmake --build /tmp/anyps5-retro-test --parallel 3
+ctest --test-dir /tmp/anyps5-retro-test --output-on-failure
+```
+
+## Verification
+
+On Ubuntu 22.04 in WSL, the four Linux runner source files compiled with
+GCC 11.4 against Flutter, GTK, EGL and PulseAudio headers. The native
+tests passed. A headless test used the same session and EGL renderer with
+the exact pinned libraries. Crash Team Racing rendered 760 frames at
+1024 × 432. Gran Turismo 4 rendered 854 at 1280 × 896. Both produced
+non-silent PCM and exited cleanly. These runs used Mesa llvmpipe with no
+display and captured audio samples in memory. They cover the worker's
+real game paths. The full Flutter desktop bundle, display and audio
+output still need hosted or desktop qualification.
+
+The Windows runner and host translation units compiled with MSVC 19.29,
+and Windows CTest passed. All four Windows and Linux packages passed the installer ZIP and library
+checks in a new directory. The 59-test Flutter suite covered the session,
+standalone launch, library and navigation. Translation validation passed
+with matching English and Turkish keys. A multi-disc playlist still
+boots its first disc. The embedded Quick Menu disc selector is separate
+work.
