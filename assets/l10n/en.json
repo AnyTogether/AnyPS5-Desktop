@@ -2115,5 +2115,12 @@
   "sharePlayMaxViewersServerDetail": "Up to 4 get a stream from your computer. With more, viewers watch through the media server and players keep a direct link.",
   "shareCodeMakeDetail": "Anyone with the code can ask to watch. You still say yes to each one.",
   "joinCodeMade": "New code: %@",
-  "joinCodeStopped": "The code no longer works"
+  "joinCodeStopped": "The code no longer works",
+  "engineGitSetUpDetail": "No build folder yet: this sets one up with CMake first, then pulls and builds. It needs Git, CMake, Ninja and a C++ compiler (g++).",
+  "engineGitStepConfiguring": "Setting up the build folder with CMake",
+  "engineGitNoNinja": "Ninja isn't installed, or isn't on PATH",
+  "engineGitNoCompiler": "there's no C++ compiler (g++) on PATH",
+  "engineGitConfigureFailed": "CMake couldn't set up the build folder",
+  "engineGitGuideUpstream": "Open upstream AnyPS5's build guide",
+  "engineGitGuideArm": "Open AnyPS5-ARM's Windows and Linux build guide"
 }

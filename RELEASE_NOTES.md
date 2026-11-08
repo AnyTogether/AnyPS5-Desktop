@@ -5,6 +5,11 @@ release when it is made.
 
 ## Next release
 
+- **Update from Git sets up the build folder itself**, as on the Mac. An engine folder that is a
+  git checkout without a build folder no longer stops at "no build folder yet". With Git, CMake,
+  Ninja and a C++ compiler (g++) on PATH, the launcher runs the CMake setup the build guide
+  shows, with its progress, then pulls and builds. When a tool is missing it names it and opens
+  the right guide: upstream AnyPS5's build guide for an upstream checkout, AnyPS5-ARM's for its own.
 - **Share play for more than four viewers**, as on the Mac. With AnyTogether's media server
   (up to 16 viewers now), the Viewers row goes up to what the server takes. Past four, the
   game's picture and sound go once to the media server and everyone watches from there, while
