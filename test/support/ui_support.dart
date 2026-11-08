@@ -31,6 +31,7 @@ import 'package:anyps5_desktop/main.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/background.dart';
 import 'package:anyps5_desktop/ui/clip_player.dart';
+import 'package:anyps5_desktop/ui/voice_note_player.dart';
 import 'package:anyps5_desktop/ui/components.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:anyps5_desktop/ui/theme_hub_model.dart';
@@ -176,9 +177,11 @@ Fixture makeFixture({
   Future<Map<PadAction, List<String>>?> Function(String folder)? gameControls,
   Future<String?> Function(String title)? pickFolder,
   Future<String?> Function()? pickImage,
+  Future<List<String>?> Function()? pickPictures,
   CommandRunner? commands,
   DiscordPresence Function()? discord,
   ClipPlayback Function()? clipPlayback,
+  VoicePlayback Function()? voicePlayback,
 }) {
   final opened = <Uri>[];
   final copied = <String>[];
@@ -223,11 +226,13 @@ Fixture makeFixture({
       computerName: 'Desk',
       pickFolder: pickFolder ?? (_) async => root,
       pickImage: pickImage,
+      pickPictures: pickPictures,
       advertise: false,
       preferredPorts: false,
       cable: false,
       openUrl: opened.add,
       clipPlayback: clipPlayback,
+      voicePlayback: voicePlayback,
       copyText: copied.add,
       openFolder: (folder) => shown?.call(folder),
       environment: environment,

@@ -32,6 +32,8 @@ import 'ui/crash_model.dart';
 import 'ui/launcher.dart';
 import 'ui/launcher_window_channel.dart';
 import 'ui/profile_picture.dart';
+import 'ui/sealed_photo.dart';
+import 'ui/voice_note_player.dart';
 import 'ui/sharing_model.dart';
 import 'ui/strings.dart';
 import 'ui/together_model.dart' show launcherVersion;
@@ -113,10 +115,17 @@ Future<void> main(List<String> arguments) async {
       ),
       // Clips play inside the launcher (libmpv); the system's player when one cannot be opened.
       clipPlayback: MediaKitClipPlayback.new,
+      voicePlayback: MediaKitVoicePlayback.new,
       copyText: (text) => unawaited(Clipboard.setData(ClipboardData(text: text))),
       pickImage: () async => (await openFile(
         acceptedTypeGroups: const [XTypeGroup(label: 'Pictures', extensions: ProfilePicture.extensions)],
       ))?.path,
+      pickPictures: () async => [
+        for (final file in await openFiles(
+          acceptedTypeGroups: const [XTypeGroup(label: 'Pictures', extensions: SealedPhoto.extensions)],
+        ))
+          file.path,
+      ],
       saveFile: (name) async => (await getSaveLocation(
         suggestedName: name,
         acceptedTypeGroups: const [

@@ -5,6 +5,14 @@ release when it is made.
 
 ## Next release
 
+- **Send a picture in any chat**, as on the Mac: a conversation's options (△) have Send a photo, for
+  several files at once, in conversations that aren't encrypted too. Each one is drawn again here,
+  so no location or camera data goes along.
+- **Drop pictures on an open chat** to send them, as on the Mac.
+- **Voice notes play inside the launcher**, as on the Mac: play and pause in the bubble, bars and
+  the time as it goes, one at a time. One the launcher cannot open goes to the system's player,
+  as before.
+- **The typing line names everyone who is typing** in a group, as on the Mac.
 - **Update from Git sets up the build folder itself**, as on the Mac. An engine folder that is a
   git checkout without a build folder no longer stops at "no build folder yet". With Git, CMake,
   Ninja and a C++ compiler (g++) on PATH, the launcher runs the CMake setup the build guide

@@ -61,6 +61,7 @@ import 'livekit_room.dart';
 import 'online_webrtc.dart';
 import 'sealed_photo.dart';
 import 'strings.dart';
+import 'voice_note_player.dart';
 import 'voice_webrtc.dart';
 
 part 'together_messages.dart';
@@ -209,6 +210,16 @@ class TogetherModel {
 
   /// Family limits: the kept status, play time, age ratings, asking a parent.
   late final FamilyGate family = FamilyGate(this);
+
+  /// Files are being dragged over the open conversation: it says what letting go does.
+  bool chatDropping = false;
+
+  /// The voice notes in chats.
+  late final VoiceNotes voiceNotes = VoiceNotes(
+    create: app.services.voicePlayback,
+    onSystemPlayer: _voiceInSystemPlayer,
+    onFailed: (_) => app.show(T.text('messagesAttachmentFailed')),
+  );
   late final StreamSubscription<TogetherEvent> _ready;
   Timer? _flush;
 
@@ -1608,6 +1619,7 @@ class TogetherModel {
   void dispose() {
     stopRinging();
     calls.noAnswer?.cancel();
+    unawaited(voiceNotes.dispose());
     unawaited(online.stop());
     family.dispose();
     talkWatch?.stop();
