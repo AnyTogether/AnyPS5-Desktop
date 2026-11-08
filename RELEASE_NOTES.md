@@ -5,6 +5,15 @@ release when it is made.
 
 ## Next release
 
+- **Battery & heat can lower the resolution**, the row the Mac already had: a game with a
+  resolution option is installed one step lower while the profile holds. On Windows and Linux the
+  resolution is written when a game is installed, so it takes effect at the next install.
+- **About has What's new, Made by, GitHub and the upstream project**, as on the Mac. What's new
+  shows while an update is on offer and opens that release's page.
+- **Settings › Fonts lists Latin Italic**, the row the Mac has, beside Latin.
+- **Settings › Phones says which paired phone is connected now**: the count at the top and
+  Connected beside the phone's name, as on the Mac.
+
 - **Quit AnyPS5? is a small yes or no**, as on the Mac: Cancel and Quit side by side, ← and →
   between them, Esc still cancels, Quit in red. Close the game? asks the same way.
 - **Linked profiles show it on Who's playing?**: AnyTogether's mark on the tile of a profile

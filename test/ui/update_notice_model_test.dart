@@ -171,5 +171,28 @@ void main() {
       expect(rows.first.title, 'AnyPS5 Desktop $newer is ready · Restart now');
       expect(rows.first.detail, 'Restart now, or it goes in at the next launch.');
     });
+
+    test('About: What\'s new opens the release, and the same links as on the Mac', () async {
+      final model = launcher();
+      expect(model.updates.aboutRows().map((row) => row.id), isNot(contains('whatsNew')), reason: 'nothing on offer');
+      await model.updates.startupCheck();
+      final whatsNew = model.updates.aboutRows().firstWhere((row) => row.id == 'whatsNew');
+      expect(whatsNew.title, "What's new");
+      expect(whatsNew.detail, 'github.com/AnyTogether/AnyPS5-Desktop/releases/tag/v$newer');
+      (whatsNew.kind as ActionRow).run();
+      expect(fixture!.opened.last, Uri.parse('https://github.com/AnyTogether/AnyPS5-Desktop/releases/tag/v$newer'));
+
+      final about = model.panelCategories().firstWhere((category) => category.id == 'about').rows;
+      PanelRow aboutRow(String id) => about.firstWhere((row) => row.id == id);
+      expect(aboutRow('author').title, 'Made by');
+      expect((aboutRow('author').kind as InfoRow).text, 'Utku Halis');
+      expect(aboutRow('github').detail, 'github.com/AnyTogether/AnyPS5-Desktop');
+      (aboutRow('github').kind as ActionRow).run();
+      expect(fixture!.opened.last, Uri.parse('https://github.com/AnyTogether/AnyPS5-Desktop'));
+      expect(aboutRow('upstream').title, 'Built on AnyPS5');
+      expect(aboutRow('upstream').detail, 'github.com/boykopovar/AnyPS5');
+      (aboutRow('upstream').kind as ActionRow).run();
+      expect(fixture!.opened.last, Uri.parse('https://github.com/boykopovar/AnyPS5'));
+    });
   });
 }
