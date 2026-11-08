@@ -182,6 +182,7 @@ void main() {
       (whatsNew.kind as ActionRow).run();
       expect(fixture!.opened.last, Uri.parse('https://github.com/AnyTogether/AnyPS5-Desktop/releases/tag/v$newer'));
 
+      model.open(Layer.settings);
       final about = model.panelCategories().firstWhere((category) => category.id == 'about').rows;
       PanelRow aboutRow(String id) => about.firstWhere((row) => row.id == id);
       expect(aboutRow('author').title, 'Made by');

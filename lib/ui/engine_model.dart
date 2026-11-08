@@ -130,10 +130,17 @@ class EngineModel {
   /// Whether a toolkit's version.txt names an upstream nightly (`upstream-main-<commit>`).
   static bool isUpstreamNightly(String? version) => UpstreamNightlyPackage.isVersion(version);
 
-  /// Asks AnyPS5-ARM's releases for its newest engine.
-  Future<void> checkArm({bool quiet = false}) async {
+  Future<void>? _armCheck;
+
+  /// Asks AnyPS5-ARM's releases for its newest engine; a second call while one runs waits for it.
+  Future<void> checkArm({bool quiet = false}) {
+    if (armChecking) return _armCheck ?? Future.value();
+    return _armCheck = _checkArm(quiet);
+  }
+
+  Future<void> _checkArm(bool quiet) async {
     final source = _armSource;
-    if (source == null || armChecking) return;
+    if (source == null) return;
     armChecking = true;
     armError = null;
     app.refresh();
@@ -211,6 +218,47 @@ class EngineModel {
     if (arm && !armChecked) unawaited(checkArm(quiet: true));
     if (!arm && latest == null) unawaited(check(quiet: true));
   }
+
+  /// One press from the phone's notice or a crash report: AnyPS5-ARM's engine is chosen, used at
+  /// once when one is downloaded, else downloaded from AnyPS5-ARM's signed releases. True when it
+  /// is the engine in use. Installed games then offer Update and Play (unlocked again with it).
+  Future<bool> switchToArm() async {
+    if (!armSelected) {
+      app.preferences.engineSource = 'arm';
+      app.savePreferences();
+    }
+    if (isArm(app.toolkitVersion)) return true;
+    final kit = downloaded.where((kit) => isArm(kit.version)).firstOrNull;
+    if (kit != null) {
+      use(kit);
+      return true;
+    }
+    if (downloading != null) return false;
+    if (!armChecked) await checkArm(quiet: true);
+    return download();
+  }
+
+  /// The newest engine of the source chosen, for the first start's download card.
+  ToolkitPackage? get offered => armSelected ? armPackage : latestPackage;
+
+  /// Whether GitHub is being asked for the source chosen.
+  bool get looking => armSelected ? armChecking : checking;
+
+  /// Why GitHub could not be asked for the source chosen.
+  String? get lookError => armSelected ? armError : checkError;
+
+  /// Asks GitHub for the source chosen, quietly.
+  void lookQuietly() {
+    if (armSelected) {
+      if (!armChecking) unawaited(checkArm(quiet: true));
+    } else if (!checking) {
+      unawaited(check(quiet: true));
+    }
+  }
+
+  /// A package as the download card names it: v0.1.4, or AnyPS5-ARM 5ca076a87.
+  static String offeredName(ToolkitPackage package) =>
+      package is ArmToolkitPackage ? 'AnyPS5-ARM ${package.commit}' : packageName(package);
 
   List<PanelRow> _armRows(Toolkit? current) {
     final package = armPackage;

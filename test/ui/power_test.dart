@@ -155,19 +155,20 @@ value = 1080
     expect(model.powerWatch.adjustment.lowerResolution, isTrue);
     expect(model.preferences.powerProfiles?['battery'], containsPair('lowerResolution', true));
     final neon = model.games.firstWhere((game) => game.titleId == 'PPSA02002');
-    model.unlock(neon);
-    for (var tries = 0; tries < 2000 && model.unlocking; tries++) {
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+    Future<void> until(bool Function() condition) async {
+      for (var tries = 0; tries < 2000 && !condition(); tries++) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      expect(condition(), isTrue);
     }
-    expect(model.unlocking, isFalse);
+
+    model.unlock(neon);
+    await until(() => !model.unlocking && model.records.containsKey(neon.id));
     expect(model.records[neon.id]?.resolution, '1600x900', reason: 'one step under the title\'s 1920x1080');
     // The same game unlocked off the profile keeps the title's own.
     (row('batteryResolution').kind as ToggleRow).set(false);
     model.unlock(neon);
-    for (var tries = 0; tries < 2000 && model.unlocking; tries++) {
-      await Future<void>.delayed(const Duration(milliseconds: 5));
-    }
-    expect(model.records[neon.id]?.resolution, isNull);
+    await until(() => !model.unlocking && model.records[neon.id]?.resolution == null);
   });
 
   test('where the heat cannot be read, only the battery profile is offered, and that is said', () {
