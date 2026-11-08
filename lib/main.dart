@@ -27,6 +27,7 @@ import 'core/release_signing.dart';
 import 'core/steam/steam_launch.dart';
 import 'core/toolkit_download.dart';
 import 'ui/app_model.dart';
+import 'ui/clip_player.dart';
 import 'ui/crash_model.dart';
 import 'ui/launcher.dart';
 import 'ui/launcher_window_channel.dart';
@@ -110,6 +111,8 @@ Future<void> main(List<String> arguments) async {
             ? Process.run('rundll32', ['url.dll,FileProtocolHandler', url.toString()])
             : Process.run('xdg-open', [url.toString()]),
       ),
+      // Clips play inside the launcher (libmpv); the system's player when one cannot be opened.
+      clipPlayback: MediaKitClipPlayback.new,
       copyText: (text) => unawaited(Clipboard.setData(ClipboardData(text: text))),
       pickImage: () async => (await openFile(
         acceptedTypeGroups: const [XTypeGroup(label: 'Pictures', extensions: ProfilePicture.extensions)],

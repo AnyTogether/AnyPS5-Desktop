@@ -745,7 +745,9 @@ void main() {
       expect(json.replaySeconds, 60);
     });
 
-    testWidgets('a clip shows in the gallery and opens in the system player', (tester) async {
+    testWidgets('a clip shows in the gallery and opens in the launcher\'s viewer, not the system player', (
+      tester,
+    ) async {
       final game = model.selectedGame!;
       final clip = Screenshots.clipPath(model.paths.pictures, game, DateTime(2026, 10, 26, 12));
       File(clip)
@@ -754,9 +756,11 @@ void main() {
       model.open(Layer.gallery);
       expect(model.galleryShots, contains(clip));
       model.galleryIndex = model.galleryShots.indexOf(clip);
+      final opened = fixture.opened.length;
       model.handle(Command.select);
-      expect(fixture.opened.last, Uri.file(clip));
-      expect(model.galleryViewing, isFalse);
+      expect(model.galleryViewing, isTrue);
+      expect(fixture.opened, hasLength(opened));
+      // No player in this launcher: the viewer shows the clip's picture.
       await pumpLauncher(tester, model);
       expect(find.byKey(const ValueKey('clip-badge')), findsWidgets);
     });
