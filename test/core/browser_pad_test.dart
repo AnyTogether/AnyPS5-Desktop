@@ -261,4 +261,16 @@ void main() {
       expect(page, mac.readAsStringSync(), reason: 'run tool/sync_browser_pad.sh');
     }
   });
+
+  test('turned to landscape, the page goes full screen with the next finished touch', () {
+    final page = File('assets/browser_pad/index.html').readAsStringSync();
+    // A browser takes full screen from pointerup on a touch screen, never from pointerdown.
+    expect(page, contains('stage.addEventListener("pointerup", fullscreenOnTouch)'));
+    final down = page.substring(page.indexOf('function down(event)'), page.indexOf('function move(event)'));
+    expect(down, isNot(contains('ullscreen')), reason: 'pointerdown gives no user activation on a touch screen');
+    // Wanted again each time the phone turns to landscape, and again after a refusal.
+    expect(page, contains('matchMedia("(orientation: landscape)")'));
+    expect(page, contains('goFullscreen().catch(() => { fullscreenWanted = true; })'));
+    expect(page, isNot(contains('Android/i.test')), reason: 'any browser that has the Fullscreen API');
+  });
 }
