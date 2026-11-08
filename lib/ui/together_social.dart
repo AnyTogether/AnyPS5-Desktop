@@ -282,6 +282,16 @@ extension TogetherSocial on TogetherModel {
     };
   }
 
+  /// The game's name as [activityText] writes it, to find it there; null without a game.
+  String? activityGameName(Activity item) => item.game == null ? null : _socialGameName(item.game!);
+
+  /// An activity item's game: its hub, as the website links a game's name to its page.
+  void openActivityGame(Activity item) {
+    final game = item.game;
+    if (game == null) return;
+    openGameHub(game.titleId, _socialGameName(game));
+  }
+
   /// A game as this library names it, else as the server does.
   String _socialGameName(SocialGame game) =>
       app.games.where((known) => known.titleId == game.titleId).firstOrNull?.nameFor([T.language.code]) ??

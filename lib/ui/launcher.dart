@@ -18,6 +18,7 @@ import 'captures_view.dart';
 import 'challenge_view.dart';
 import 'compare_view.dart';
 import 'components.dart';
+import 'confirm_card.dart';
 import 'controller_test_view.dart';
 import 'crash_report_view.dart';
 import 'drag_pan.dart';
@@ -471,6 +472,7 @@ class _LauncherShellState extends State<LauncherShell> {
                                                 Layer.profilePicker => ProfilePickerView(model: model),
                                                 Layer.addProfile => AddProfileView(model: model),
                                                 Layer.themeStudio => ThemeStudioView(model: model),
+                                                Layer.themes => ThemesView(model: model),
                                                 Layer.messages => WithBackPill(
                                                   onBack: () => model.handle(Command.back),
                                                   titleLine: (side: 80, top: 60),
@@ -497,6 +499,8 @@ class _LauncherShellState extends State<LauncherShell> {
                                                   onBack: () => model.handle(Command.back),
                                                   child: LeaderboardView(model: model),
                                                 ),
+                                                // A plain yes or no: Quit AnyPS5?, Close the game?
+                                                Layer.confirmQuit || Layer.closeGame => ConfirmCard(model: model),
                                                 Layer.challenge => WithBackPill(
                                                   onBack: () => model.handle(Command.back),
                                                   child: ChallengeDetailView(model: model),

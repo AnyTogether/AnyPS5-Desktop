@@ -383,7 +383,7 @@ void main() {
       model.handle(launcher.Command.select);
       model.handle(launcher.Command.right);
       await tester.pumpAndSettle();
-      expect(find.text('Unsend'), findsOneWidget);
+      expect(find.text('Delete for everyone'), findsOneWidget);
       expect(find.text('Love'), findsOneWidget);
       await expectLater(find.byType(LauncherShell), matchesGoldenFile('goldens/together_messages_menu.png'));
     });

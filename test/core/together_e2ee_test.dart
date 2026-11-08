@@ -107,6 +107,15 @@ void main() {
       expect(await e2ee.start(), isTrue);
       expect(e2ee.device!.deviceId, kept.deviceId);
       expect(server.callsTo('me/e2ee/device', method: 'PUT'), hasLength(1));
+
+      // Registered by an older launcher under the computer's own name: registered again under
+      // this one's, the same keys.
+      e2eeServer.session!['name'] = 'DESKTOP-7Q2';
+      e2ee.clear();
+      expect(await e2ee.start(), isTrue);
+      expect(server.callsTo('me/e2ee/device', method: 'PUT'), hasLength(2));
+      expect(e2eeServer.session!['name'], 'Desk');
+      expect(e2eeServer.session!['id'], kept.deviceId);
     });
 
     test('another account on the same profile gets keys of its own', () async {

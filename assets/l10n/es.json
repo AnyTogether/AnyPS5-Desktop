@@ -885,7 +885,6 @@
   "launcherReportLaterDetail": "No volver a preguntar por este caso.",
   "launcherReportCopied": "El informe era demasiado largo para el enlace, así que se copió completo al portapapeles. Pégalo en el informe.",
   "quitQuestion": "¿Salir de AnyPS5?",
-  "quitStay": "Seguir en la pantalla de inicio",
   "captures": "Capturas",
   "replayBuffer": "Búfer de repetición",
   "replayBufferDetail": "Mientras juegas, los últimos minutos se guardan en una carpeta temporal; no se guardan de forma permanente hasta que pulses Share. Usa aproximadamente un núcleo de CPU (720p, 30 fps).",

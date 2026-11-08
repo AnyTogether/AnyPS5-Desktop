@@ -10,6 +10,34 @@ release when it is made.
   Ninja and a C++ compiler (g++) on PATH, the launcher runs the CMake setup the build guide
   shows, with its progress, then pulls and builds. When a tool is missing it names it and opens
   the right guide: upstream AnyPS5's build guide for an upstream checkout, AnyPS5-ARM's for its own.
+- **Quit AnyPS5? is a small yes or no**, as on the Mac: Cancel and Quit side by side, ← and →
+  between them, Esc still cancels, Quit in red. Close the game? asks the same way.
+- **Linked profiles show it on Who's playing?**: AnyTogether's mark on the tile of a profile
+  linked to an account, with its @handle, and Local under one that stays on this PC.
+- **Appearance › Themes opens beside the home screen**, like the Theme Studio, so a theme you
+  pick shows behind the list at once. A row that takes the focus no longer reads dark on dark
+  while its highlight fades in.
+- **A game's window or full screen is easier to find**: the row in the game's options (… / △)
+  is now called Window or full screen, and says that full screen is borderless with the
+  AnyPS5-ARM engine. Settings › Default display still sets it for every game.
+- **Clearer words in Turkish for friends**: Arkadaşlardan çıkar, and what your handle is for.
+- **Clips play inside the launcher**, as on the Mac. A clip in a game's gallery, a clip post in
+  Captures and a clip in a chat play over the whole screen, from the start and over again, with
+  their sound. In the gallery ← and → move to the next picture or clip, and ✕ or ○ close it. The
+  pointer brings a bar to pause and move through the clip. A clip the launcher cannot open goes to
+  the system's video player, as before. Photos in chats open over the whole screen too.
+- **Photos sent from the website show in chats**, with their caption and in their own shape.
+  A photo sent as it is (not end-to-end encrypted) used to show only as "[photo]".
+- **Delete for everyone** is what the message menu calls removing your own message now (it was
+  Unsend, "Geri al" in Turkish). It still asks first.
+- **Devices in the encryption sheet go by their kind** ("Windows PC", "iPhone") and the day they
+  were added, never by the computer's own name. This launcher now registers itself as "AnyPS5 on
+  Windows" or "AnyPS5 on Linux".
+- **How many are online now** by Find players' heading, as on the Mac and the website. It is a
+  number only. Accounts that are invisible or hide their status are not counted, and the
+  line's tooltip says so.
+- **A game's name in recent activity opens its hub**, as the website links it to the game's
+  page. Click the name in the feed or on a profile, or select an item on a profile.
 - **The browser pad goes full screen when you turn the phone**, as on the Mac. Turned to
   landscape, the next touch on the pad takes it full screen and holds it in landscape, where the
   browser allows it (Android, iPad). Before, it tried once on the first press, which browsers

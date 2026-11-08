@@ -226,6 +226,11 @@ extension TogetherMessages on TogetherModel {
   }
 
   void messagesCommand(Command command) {
+    // A picture or clip over the whole screen: ✕, ○ and △ close it, as on the Mac.
+    if (chatViewing != null) {
+      if (command == Command.back || command == Command.select || command == Command.options) closeChatViewer();
+      return;
+    }
     if (lockSheet) return _lockSheetCommand(command);
     if (messageMenu != null) return _menuCommand(command);
     final targets = messageTargets;
@@ -688,7 +693,7 @@ extension TogetherMessages on TogetherModel {
       ? T.text('messagesDeleted')
       : target.encrypted && target.seal != SealState.opened
       ? shownText(target)
-      : (target.words ?? '');
+      : (target.words ?? previewText(target));
 
   /// The message of the user's that gets the receipt line: their newest one in the thread.
   ChatMessage? receiptFor(Conversation conversation) {
@@ -909,6 +914,9 @@ extension TogetherMessages on TogetherModel {
       SealState.beforeDevice => T.text('e2eeBeforeDevice'),
       SealState.undecryptable => T.text('e2eeUndecryptable'),
       SealState.opening => '…',
+      // A photo or clip sent as it is: its caption under the picture, not the "[photo]" the
+      // server writes for older clients.
+      _ when message.media != null && !message.encrypted && message.kind != 'text' => message.caption ?? '',
       _ => message.text ?? '',
     };
   }
@@ -923,8 +931,12 @@ extension TogetherMessages on TogetherModel {
         _ => T.text('messagesPhoto'),
       };
     }
-    // A photo or clip sent as it is: what it is, when no words came with it.
-    if ((message.text ?? '').isEmpty && message.media != null) {
+    // A photo or clip sent as it is: its caption, or what it is when no words came with it (the
+    // server's text for it is a "[photo]" stand-in).
+    if (message.media != null && !message.encrypted && message.kind != 'text' && (message.caption ?? '').isNotEmpty) {
+      return message.caption!;
+    }
+    if (message.media != null && ((message.text ?? '').isEmpty || (!message.encrypted && message.kind != 'text'))) {
       return switch (message.media!.kind) {
         'clip' => T.text('messagesClip'),
         'voice' => T.text('messagesVoice'),
@@ -968,11 +980,43 @@ extension TogetherMessages on TogetherModel {
     return loading;
   }
 
-  /// A sealed attachment opened from a temporary file only this user can read, in the
-  /// system's viewer or player.
+  /// A photo or clip sent as it is, over the whole screen (a clip plays in the launcher, as on
+  /// the Mac).
+  void viewChatMedia(MediaLink media) {
+    final link = media.url;
+    if (media.gone || link == null) return;
+    if (media.kind == 'clip') {
+      chatViewing = ViewedMedia.clip(link, poster: media.poster, aspect: media.aspect);
+    } else if (media.kind == 'image') {
+      chatViewing = ViewedMedia.picture(link: link);
+    } else {
+      final url = Uri.tryParse(link);
+      if (url != null) app.services.openUrl?.call(url);
+      app.sounds.play(Cue.select);
+      return;
+    }
+    app.sounds.play(Cue.select);
+    app.refresh();
+  }
+
+  void closeChatViewer() {
+    chatViewing = null;
+    app.sounds.play(Cue.back);
+    app.refresh();
+  }
+
+  /// A sealed attachment: a photo over the whole screen from memory; a clip from a temporary
+  /// file only this user can read, playing in the launcher; a voice note in the system's
+  /// player.
   Future<void> openAttachment(ChatMessage message) async {
     final attachment = message.attachment;
     if (attachment == null) return;
+    final aspect = mediaAspect(attachment.width, attachment.height);
+    if (attachment.kind == 'image') {
+      chatViewing = ViewedMedia.picture(bytes: sealedFile(message), aspect: aspect);
+      app.refresh();
+      return;
+    }
     try {
       final bytes = await sealedFile(message);
       final folder = Directory(p.join(Directory.systemTemp.path, 'anyps5-attachments'))..createSync(recursive: true);
@@ -999,6 +1043,15 @@ extension TogetherMessages on TogetherModel {
       };
       final path = p.join(folder.path, '${uuidv7()}.$extension');
       writePrivately(path, bytes);
+      if (attachment.kind == 'clip') {
+        chatViewing = ViewedMedia.clip(
+          path,
+          posterBytes: attachment.poster == null ? null : sealedFile(message, poster: true),
+          aspect: aspect,
+        );
+        app.refresh();
+        return;
+      }
       app.services.openUrl?.call(Uri.file(path));
     } on Object {
       app.show(T.text('messagesAttachmentFailed'));

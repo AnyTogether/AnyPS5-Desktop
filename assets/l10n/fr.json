@@ -886,7 +886,6 @@
   "launcherReportLaterDetail": "Ne plus demander pour ce cas.",
   "launcherReportCopied": "Le rapport était trop long pour le lien ; il a donc été entièrement copié dans le presse-papiers. Collez-le dans le ticket.",
   "quitQuestion": "Quitter AnyPS5 ?",
-  "quitStay": "Rester sur l’écran d’accueil",
   "captures": "Captures",
   "replayBuffer": "Mémoire tampon de replay",
   "replayBufferDetail": "Pendant que vous jouez, les dernières minutes sont conservées dans un dossier temporaire et ne sont enregistrées que si vous appuyez sur Share. Utilise environ un cœur de processeur (720p, 30 fps).",

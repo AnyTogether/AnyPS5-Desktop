@@ -206,6 +206,26 @@ class DeviceSecrets {
   }
 }
 
+/// What kind of device a device key is on, read from the name its app registered (docs/e2ee.md
+/// in AnyTogether). Lists show this, never the name: older launchers registered the computer's
+/// own name, which often holds a person's name.
+enum DeviceKind { windows, mac, linux, iphone, ipad, android, browser, device }
+
+/// The same reading as deviceKindOf in AnyTogether's packages/e2ee, so the server's names for
+/// other people's devices ("Windows PC", "iPhone") keep their kind.
+DeviceKind deviceKindOf(String name) {
+  final n = name.toLowerCase();
+  bool has(String pattern) => RegExp(pattern).hasMatch(n);
+  if (has(r'chrome|firefox|safari|\bedge\b|opera|browser')) return DeviceKind.browser;
+  if (has(r'iphone|\bios\b')) return DeviceKind.iphone;
+  if (has(r'ipad')) return DeviceKind.ipad;
+  if (has(r'android|pixel|galaxy|samsung|oneplus|xiaomi|redmi|huawei')) return DeviceKind.android;
+  if (has(r'\bmac\b|macbook|imac|mac ?mini|mac ?studio|mac ?pro|macos')) return DeviceKind.mac;
+  if (has(r'linux|ubuntu|fedora|debian|\barch\b|steam ?deck|steamos')) return DeviceKind.linux;
+  if (has(r'windows|\bpc\b|^desktop-|^laptop-')) return DeviceKind.windows;
+  return DeviceKind.device;
+}
+
 /// A device as the server lists it: public keys and the device's signature over them.
 class PublicDevice {
   const PublicDevice({
@@ -215,6 +235,7 @@ class PublicDevice {
     required this.sig,
     this.name = '',
     this.removed = false,
+    this.createdAt,
   });
 
   /// From an E2eeDeviceView; null when a field is missing or not a text.
@@ -232,6 +253,7 @@ class PublicDevice {
       sig: sig,
       name: json['name'] is String ? json['name'] as String : '',
       removed: json['removedAt'] != null,
+      createdAt: json['createdAt'] is String ? DateTime.tryParse(json['createdAt'] as String) : null,
     );
   }
 
@@ -241,6 +263,11 @@ class PublicDevice {
   final String sig;
   final String name;
   final bool removed;
+
+  /// When it was added; null from a list without it.
+  final DateTime? createdAt;
+
+  DeviceKind get kind => deviceKindOf(name);
 
   /// What PUT /me/e2ee/device takes.
   Map<String, String> toRegister(String name) => {'signKey': signKey, 'boxKey': boxKey, 'sig': sig, 'name': name};

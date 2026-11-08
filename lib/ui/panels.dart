@@ -10,6 +10,7 @@ import '../core/replay_buffer.dart';
 import '../core/screenshots.dart';
 import '../core/trophies.dart';
 import 'app_model.dart';
+import 'clip_player.dart';
 import 'components.dart';
 import 'glass.dart';
 import 'level_badge.dart';
@@ -178,9 +179,7 @@ class PanelView extends StatelessWidget {
       Layer.copyWarning,
       Layer.gameFiles,
       Layer.quickMenu,
-      Layer.closeGame,
       Layer.homeMenu,
-      Layer.confirmQuit,
       Layer.launcherReport,
       Layer.profileMenu,
       Layer.signIn,
@@ -189,17 +188,14 @@ class PanelView extends StatelessWidget {
     // PS's menus: a heading that may be long (the game's name), and only as tall as their rows.
     final psMenu = const {
       Layer.quickMenu,
-      Layer.closeGame,
       Layer.homeMenu,
-      Layer.confirmQuit,
       Layer.launcherReport,
       Layer.profileMenu,
       Layer.cloudQuestion,
     }.contains(model.overlay);
-    // The quick menu and Close Game? are about the game playing: its icon by the heading.
-    final gameIcon = model.overlay == Layer.quickMenu || model.overlay == Layer.closeGame
-        ? model.running?.$1.icon
-        : null;
+    // The quick menu is about the game playing: its icon by the heading (Close Game? is a
+    // ConfirmCard, with the icon too).
+    final gameIcon = model.overlay == Layer.quickMenu ? model.running?.$1.icon : null;
     // The copy warning explains itself before its four choices.
     final tall = model.overlay == Layer.copyWarning;
     // The party with its chat beside the rows: wider.
@@ -342,6 +338,18 @@ class PanelView extends StatelessWidget {
                           ),
                         ),
                       ),
+                    ] else if (model.overlay == Layer.findPlayers && model.together.onlineNowText != null) ...[
+                      // How many are online now, by the heading, as on the Mac and the website.
+                      SizedBox(width: 22 * scale),
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(bottom: 9 * scale),
+                          child: Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: OnlineNowLine(text: model.together.onlineNowText!),
+                          ),
+                        ),
+                      ),
                     ] else if (!psMenu)
                       const Spacer(),
                     SizedBox(width: 14 * scale),
@@ -353,7 +361,6 @@ class PanelView extends StatelessWidget {
                         Layer.advanced,
                         Layer.friendOptions,
                         Layer.quickMenu,
-                        Layer.closeGame,
                       }.contains(model.overlay),
                     ),
                   ],
@@ -613,10 +620,15 @@ class _RowView extends StatelessWidget {
     final destructive = kind is ActionRow && kind.destructive;
     final glass = LookScope.isGlass(context);
     final ink = LookScope.focusedInk(context);
-    final titleColor = focused ? ink : (destructive ? Palette.danger : Colors.white);
-    final detailColor = focused
-        ? ink.withValues(alpha: glass ? 0.68 : 0.6)
-        : Colors.white.withValues(alpha: glass ? 0.72 : 0.55);
+    final idleTitle = destructive ? Palette.danger : Colors.white;
+    final idleDetail = Colors.white.withValues(alpha: glass ? 0.72 : 0.55);
+    final focusedDetail = ink.withValues(alpha: glass ? 0.68 : 0.6);
+    // The words follow the focus fill as it comes and goes, frame by frame (set below, where the
+    // fill is drawn): dark words wait for the light fill. Switched at once while the fill still
+    // faded in, a row read dark on dark whenever the fill's animation stood still (the launcher
+    // resting behind another window while the pointer passed over the rows).
+    var titleColor = focused ? ink : idleTitle;
+    var detailColor = focused ? focusedDetail : idleDetail;
     final accent = model.accentChoice.color;
     // With a controller the ‹ › and − + (mouse targets) show only in edit mode (✕ on the row),
     // where ← and → change the value.
@@ -855,10 +867,18 @@ class _RowView extends StatelessWidget {
       onTap: row.focusable ? onTap : null,
       onHover: row.focusable ? onHover : null,
       pressScale: 0.99,
-      builder: (context, hovering) => glass
-          // Glass: rows are thin panes inside the panel's ice (no blur of their own); the
-          // focused one is the bright chip. Wide rows do not grow: the chip and its glow say it.
-          ? Padding(
+      builder: (context, hovering) => TweenAnimationBuilder<double>(
+        // The same pace as the Glass chip's own (IceSurface): the words and the fill move as one.
+        tween: Tween(end: focused ? 1 : 0),
+        duration: Motion.focus,
+        curve: Motion.settle,
+        builder: (context, t, _) {
+          titleColor = Color.lerp(idleTitle, ink, t)!;
+          detailColor = Color.lerp(idleDetail, focusedDetail, t)!;
+          if (glass) {
+            // Glass: rows are thin panes inside the panel's ice (no blur of their own); the
+            // focused one is the bright chip. Wide rows do not grow: the chip and its glow say it.
+            return Padding(
               padding: EdgeInsets.only(bottom: 6 * scale),
               child: IceSurface(
                 radius: 14 * scale,
@@ -872,26 +892,26 @@ class _RowView extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 14 * scale),
                 child: content(),
               ),
-            )
-          : AnimatedContainer(
-              duration: Motion.focus,
-              curve: Motion.settle,
-              margin: EdgeInsets.only(bottom: 6 * scale),
-              padding: EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 14 * scale),
-              decoration: BoxDecoration(
-                color: focused
-                    ? Colors.white
-                    : Colors.white.withValues(alpha: row.focusable ? (hovering ? 0.12 : 0.06) : 0),
-                borderRadius: BorderRadius.circular(14 * scale),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.white.withValues(alpha: focused ? 0.22 : 0),
-                    blurRadius: 16 * scale,
-                  ),
-                ],
-              ),
-              child: content(),
+            );
+          }
+          final idleFill = Colors.white.withValues(alpha: row.focusable ? (hovering ? 0.12 : 0.06) : 0);
+          return Container(
+            margin: EdgeInsets.only(bottom: 6 * scale),
+            padding: EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 14 * scale),
+            decoration: BoxDecoration(
+              color: Color.lerp(idleFill, Colors.white, t),
+              borderRadius: BorderRadius.circular(14 * scale),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.22 * t),
+                  blurRadius: 16 * scale,
+                ),
+              ],
             ),
+            child: content(),
+          );
+        },
+      ),
     );
   }
 }
@@ -1906,6 +1926,59 @@ class PersonAvatar extends StatelessWidget {
   }
 }
 
+/// "12 players online now" by Find players' heading: the online colour's dot and the count, with
+/// who is left out (invisible accounts) as its tooltip. A number only, never who.
+class OnlineNowLine extends StatelessWidget {
+  const OnlineNowLine({super.key, required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = LayoutScale.of(context);
+    final hint = T.text('discoverOnlineNowHint');
+    return Tooltip(
+      message: hint,
+      child: Semantics(
+        label: '$text. $hint',
+        excludeSemantics: true,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 9 * scale,
+              height: 9 * scale,
+              decoration: BoxDecoration(
+                color: PersonAvatar.statusColor(PersonStatus.online),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: PersonAvatar.statusColor(PersonStatus.online).withValues(alpha: 0.55),
+                    blurRadius: 10 * scale,
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 10 * scale),
+            Flexible(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.display(
+                  17 * scale,
+                  weight: FontWeight.w500,
+                  color: Colors.white.withValues(alpha: 0.62),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// A person's status dot in a ring: a plain dot, a crescent moon for idle, a dot with a bar
 /// across for do not disturb, as friends know them from chat apps.
 class StatusDot extends StatelessWidget {
@@ -2003,17 +2076,34 @@ class GalleryView extends StatelessWidget {
                         SizedBox(width: 32 * scale),
                       SizedBox(width: 16 * scale),
                       Expanded(
-                        child: Pressable(
-                          key: const ValueKey('shot-large'),
-                          pressScale: 1,
-                          onTap: () => model.handle(Command.back),
-                          builder: (context, _) => ClipRRect(
-                            borderRadius: BorderRadius.circular(12 * scale),
-                            child: Screenshots.isClip(shots[index])
-                                ? _ClipTile(path: shots[index], accent: model.accentChoice.color)
-                                : ArtworkImage(path: shots[index], fit: BoxFit.contain, cacheWidth: 1920),
-                          ),
-                        ),
+                        child: Screenshots.isClip(shots[index])
+                            // A clip plays from the start, over and over, as on the Mac; a click on
+                            // it does not close it (its bar is under the pointer).
+                            ? Center(
+                                child: AspectRatio(
+                                  aspectRatio: 16 / 9,
+                                  child: ClipRRect(
+                                    key: const ValueKey('shot-large'),
+                                    borderRadius: BorderRadius.circular(12 * scale),
+                                    child: ClipPlayerView(
+                                      source: shots[index],
+                                      create: model.services.clipPlayback,
+                                      onFailed: model.playClipOutside,
+                                      accent: model.accentChoice.color,
+                                      poster: _ClipTile(path: shots[index], accent: model.accentChoice.color),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Pressable(
+                                key: const ValueKey('shot-large'),
+                                pressScale: 1,
+                                onTap: () => model.handle(Command.back),
+                                builder: (context, _) => ClipRRect(
+                                  borderRadius: BorderRadius.circular(12 * scale),
+                                  child: ArtworkImage(path: shots[index], fit: BoxFit.contain, cacheWidth: 1920),
+                                ),
+                              ),
                       ),
                       SizedBox(width: 16 * scale),
                       if (arrows)
@@ -2119,7 +2209,7 @@ class GalleryView extends StatelessWidget {
 }
 
 /// A clip in the gallery: the picture of its last moment (when ffmpeg made one) under a play
-/// badge and its length's mark; ✕ or a click opens it in the system's player.
+/// badge and its length's mark; ✕ or a click plays it over the whole screen.
 class _ClipTile extends StatelessWidget {
   const _ClipTile({required this.path, required this.accent});
 

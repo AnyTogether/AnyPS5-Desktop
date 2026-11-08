@@ -124,11 +124,15 @@ class ProfilePickerView extends StatelessWidget {
                       flow.pickerIndex = index;
                       model.pickerCommand(Command.select);
                     },
-                    avatar: ProfileTile(
-                      profile: tiles[index],
-                      picture: model.profiles.pictureOf(tiles[index]),
+                    avatar: LinkedProfileTile(
+                      linked: tiles[index].mode == ProfileMode.online,
                       size: 168 * scale,
-                      focused: flow.pickerIndex == index,
+                      child: ProfileTile(
+                        profile: tiles[index],
+                        picture: model.profiles.pictureOf(tiles[index]),
+                        size: 168 * scale,
+                        focused: flow.pickerIndex == index,
+                      ),
                     ),
                     strip: LauncherProfiles.colorOf(tiles[index]),
                     name: tiles[index].name,
@@ -167,11 +171,13 @@ class ProfilePickerView extends StatelessWidget {
     );
   }
 
+  /// Under the name: the AnyTogether account a profile is linked to (its @handle, or AnyTogether
+  /// while it has none yet), or Local for one that stays on this computer.
   Widget _modeLine(LauncherProfile profile, {required bool current}) {
     final online = profile.mode == ProfileMode.online;
     final text = online
-        ? (profile.account == null ? T.text('profileOnline') : '@${profile.account!.handle}')
-        : T.text('profileOffline');
+        ? (profile.account == null ? T.text('profileOnlineTag') : '@${profile.account!.handle}')
+        : T.text('profileOfflineTag');
     return Builder(
       builder: (context) {
         final scale = LayoutScale.of(context);
@@ -179,7 +185,10 @@ class ProfilePickerView extends StatelessWidget {
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(online ? Icons.people_alt_rounded : Icons.wifi_off_rounded, size: 13 * scale, color: color),
+            if (online)
+              TogetherMark(size: 14 * scale)
+            else
+              Icon(Icons.computer_rounded, size: 13 * scale, color: color),
             SizedBox(width: 6 * scale),
             Flexible(
               child: Text(
@@ -192,6 +201,84 @@ class ProfilePickerView extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// AnyTogether's mark: its two rings, on the blue, violet and mint of the website's.
+class TogetherMark extends StatelessWidget {
+  const TogetherMark({super.key, required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(size: Size.square(size), painter: const _RingsPainter());
+}
+
+class _RingsPainter extends CustomPainter {
+  const _RingsPainter();
+
+  static const colors = [Color(0xFF4F7CFF), Color(0xFFB65CFF), Color(0xFF2FE0C4)];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // The website's 32-unit drawing: rings of radius 8.5 at x 12 and 20, a 2.5 stroke.
+    final unit = size.width / 32;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5 * unit
+      ..shader = const LinearGradient(colors: colors, stops: [0, 0.55, 1]).createShader(Offset.zero & size);
+    canvas
+      ..drawCircle(Offset(12 * unit, 16 * unit), 8.5 * unit, paint)
+      ..drawCircle(Offset(20 * unit, 16 * unit), 8.5 * unit, paint);
+  }
+
+  @override
+  bool shouldRepaint(_RingsPainter oldDelegate) => false;
+}
+
+/// A profile's tile on the picker, with AnyTogether's mark on a small dark disc at its lower
+/// right when the profile is linked to an account: which ones are online is seen at a glance.
+/// A local profile's tile stays as it is.
+class LinkedProfileTile extends StatelessWidget {
+  const LinkedProfileTile({super.key, required this.linked, required this.size, required this.child});
+
+  final bool linked;
+  final double size;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!linked) return child;
+    final scale = LayoutScale.of(context);
+    final badge = size * 0.28;
+    // On the circle's edge, down and to the right (45°).
+    final centre = size / 2 + size / 2 * 0.7071;
+    return SizedBox.square(
+      dimension: size,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          child,
+          Positioned(
+            key: const ValueKey('together-badge'),
+            left: centre - badge / 2,
+            top: centre - badge / 2,
+            child: Container(
+              width: badge,
+              height: badge,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF0C0E16),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 1.5 * scale),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 10 * scale)],
+              ),
+              alignment: Alignment.center,
+              child: TogetherMark(size: badge * 0.62),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
