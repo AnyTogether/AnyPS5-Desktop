@@ -23,6 +23,9 @@ class FindState {
   Set<String> askedFriends = {};
   Discovery? discovery;
 
+  /// How many are online now, by the heading (invisible accounts are not in it).
+  int? online;
+
   /// The hub open: its game, what came back, and whether reading it failed.
   String? hubTitle;
   String hubName = '';
@@ -57,6 +60,7 @@ class FindState {
     askedToWatch = {};
     askedFriends = {};
     discovery = null;
+    online = null;
     hubTitle = null;
     hub = null;
     draft = null;
@@ -163,6 +167,7 @@ extension TogetherFind on TogetherModel {
     final mine = quiet(discover.mine());
     final parties = quiet(discover.parties());
     final suggestions = quiet(discover.suggestions());
+    final online = quiet(discover.online());
     // Share plays only where the family lets the user watch them.
     final live = (family.rules?.sharePlay ?? true)
         ? quiet(SharePlayClient(account).public(live: true))
@@ -198,7 +203,18 @@ extension TogetherFind on TogetherModel {
     final liveRead = await live;
     if (read != findState.reads) return;
     if (liveRead != null) findState.live = liveRead;
+    final onlineRead = await online;
+    if (read != findState.reads) return;
+    if (onlineRead != null) findState.online = onlineRead;
     app.refresh();
+  }
+
+  /// "12 players online now" by Find players' heading, as on the Mac and the website; nothing
+  /// while there is no count or nobody is counted.
+  String? get onlineNowText {
+    final count = findState.online;
+    if (count == null || count < 1) return null;
+    return T.format(count == 1 ? 'discoverOnlineNowOne' : 'discoverOnlineNowMany', [T.number(count)]);
   }
 
   Future<void> loadMoreBoard() async {

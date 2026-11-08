@@ -147,6 +147,19 @@ void main() {
       await expectLater(find.byType(LauncherShell), matchesGoldenFile('goldens/find_players_mine_tr.png'));
     });
 
+    testWidgets('golden: how many are online now, by the heading (tr)', (tester) async {
+      fixture = makeFixture(language: Language.byCode('tr'));
+      model = fixture.model;
+      signedIn();
+      board();
+      model.together.findState.online = 1234;
+      model.open(Layer.findPlayers);
+      await pumpLauncher(tester, model);
+      expect(find.text('Şu an 1.234 oyuncu çevrimiçi'), findsOneWidget);
+      expect(find.byTooltip('Görünmez olanlar ve durumunu gizleyenler sayılmaz.'), findsOneWidget);
+      await expectLater(find.byType(LauncherShell), matchesGoldenFile('goldens/find_players_online_tr.png'));
+    });
+
     testWidgets('golden: the post form (en)', (tester) async {
       fixture = makeFixture();
       model = fixture.model;
@@ -227,6 +240,22 @@ void main() {
       );
     });
 
+    test('the online count says one or many, and nothing without a count or with nobody', () {
+      fixture = makeFixture();
+      model = fixture.model;
+      signedIn();
+      final together = model.together;
+      expect(together.onlineNowText, isNull);
+      together.findState.online = 0;
+      expect(together.onlineNowText, isNull);
+      together.findState.online = 1;
+      expect(together.onlineNowText, '1 player online now');
+      together.findState.online = 12;
+      expect(together.onlineNowText, '12 players online now');
+      together.findState.clear();
+      expect(together.findState.online, isNull);
+    });
+
     test('back from the post form returns to the game\'s settings it came from', () {
       fixture = makeFixture();
       model = fixture.model;
@@ -302,9 +331,13 @@ void main() {
           'mine': true,
         },
       );
+      server.answers['stats/online'] = (200, {'online': 7});
       final together = model.together;
       together.openFindPlayers();
       await until(() => together.findState.discovery != null);
+      // How many are online now comes with the lists.
+      await until(() => together.findState.online == 7);
+      expect(together.onlineNowText, '7 players online now');
       together.openLfgPost('PPSA02002', 'Neon Alley');
       expect(together.findState.draft!.languages, ['tr']);
       final send = model.panelCategories().single.rows.firstWhere((row) => row.id == 'post-send');
