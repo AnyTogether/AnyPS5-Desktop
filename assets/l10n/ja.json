@@ -886,7 +886,6 @@
   "launcherReportLaterDetail": "これについては再度質問されませんでした。",
   "launcherReportCopied": "レポートが長すぎてリンクできないため、レポート全体がクリップボードにあります。それを問題に貼り付けます。",
   "quitQuestion": "AnyPS5 をやめますか?",
-  "quitStay": "ホーム画面に留まってください",
   "captures": "キャプチャ",
   "replayBuffer": "リプレイバッファ",
   "replayBufferDetail": "プレイ中、最後の数分は一時フォルダーに保存され、[共有] を押さない限り保存されません。約 1 CPU コア (720p、30 fps) のコストがかかります。",

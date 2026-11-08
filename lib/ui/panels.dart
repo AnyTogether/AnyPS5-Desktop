@@ -179,9 +179,7 @@ class PanelView extends StatelessWidget {
       Layer.copyWarning,
       Layer.gameFiles,
       Layer.quickMenu,
-      Layer.closeGame,
       Layer.homeMenu,
-      Layer.confirmQuit,
       Layer.launcherReport,
       Layer.profileMenu,
       Layer.signIn,
@@ -190,17 +188,14 @@ class PanelView extends StatelessWidget {
     // PS's menus: a heading that may be long (the game's name), and only as tall as their rows.
     final psMenu = const {
       Layer.quickMenu,
-      Layer.closeGame,
       Layer.homeMenu,
-      Layer.confirmQuit,
       Layer.launcherReport,
       Layer.profileMenu,
       Layer.cloudQuestion,
     }.contains(model.overlay);
-    // The quick menu and Close Game? are about the game playing: its icon by the heading.
-    final gameIcon = model.overlay == Layer.quickMenu || model.overlay == Layer.closeGame
-        ? model.running?.$1.icon
-        : null;
+    // The quick menu is about the game playing: its icon by the heading (Close Game? is a
+    // ConfirmCard, with the icon too).
+    final gameIcon = model.overlay == Layer.quickMenu ? model.running?.$1.icon : null;
     // The copy warning explains itself before its four choices.
     final tall = model.overlay == Layer.copyWarning;
     // The party with its chat beside the rows: wider.
@@ -366,7 +361,6 @@ class PanelView extends StatelessWidget {
                         Layer.advanced,
                         Layer.friendOptions,
                         Layer.quickMenu,
-                        Layer.closeGame,
                       }.contains(model.overlay),
                     ),
                   ],
@@ -626,10 +620,15 @@ class _RowView extends StatelessWidget {
     final destructive = kind is ActionRow && kind.destructive;
     final glass = LookScope.isGlass(context);
     final ink = LookScope.focusedInk(context);
-    final titleColor = focused ? ink : (destructive ? Palette.danger : Colors.white);
-    final detailColor = focused
-        ? ink.withValues(alpha: glass ? 0.68 : 0.6)
-        : Colors.white.withValues(alpha: glass ? 0.72 : 0.55);
+    final idleTitle = destructive ? Palette.danger : Colors.white;
+    final idleDetail = Colors.white.withValues(alpha: glass ? 0.72 : 0.55);
+    final focusedDetail = ink.withValues(alpha: glass ? 0.68 : 0.6);
+    // The words follow the focus fill as it comes and goes, frame by frame (set below, where the
+    // fill is drawn): dark words wait for the light fill. Switched at once while the fill still
+    // faded in, a row read dark on dark whenever the fill's animation stood still (the launcher
+    // resting behind another window while the pointer passed over the rows).
+    var titleColor = focused ? ink : idleTitle;
+    var detailColor = focused ? focusedDetail : idleDetail;
     final accent = model.accentChoice.color;
     // With a controller the ‹ › and − + (mouse targets) show only in edit mode (✕ on the row),
     // where ← and → change the value.
@@ -868,10 +867,18 @@ class _RowView extends StatelessWidget {
       onTap: row.focusable ? onTap : null,
       onHover: row.focusable ? onHover : null,
       pressScale: 0.99,
-      builder: (context, hovering) => glass
-          // Glass: rows are thin panes inside the panel's ice (no blur of their own); the
-          // focused one is the bright chip. Wide rows do not grow: the chip and its glow say it.
-          ? Padding(
+      builder: (context, hovering) => TweenAnimationBuilder<double>(
+        // The same pace as the Glass chip's own (IceSurface): the words and the fill move as one.
+        tween: Tween(end: focused ? 1 : 0),
+        duration: Motion.focus,
+        curve: Motion.settle,
+        builder: (context, t, _) {
+          titleColor = Color.lerp(idleTitle, ink, t)!;
+          detailColor = Color.lerp(idleDetail, focusedDetail, t)!;
+          if (glass) {
+            // Glass: rows are thin panes inside the panel's ice (no blur of their own); the
+            // focused one is the bright chip. Wide rows do not grow: the chip and its glow say it.
+            return Padding(
               padding: EdgeInsets.only(bottom: 6 * scale),
               child: IceSurface(
                 radius: 14 * scale,
@@ -885,26 +892,26 @@ class _RowView extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 14 * scale),
                 child: content(),
               ),
-            )
-          : AnimatedContainer(
-              duration: Motion.focus,
-              curve: Motion.settle,
-              margin: EdgeInsets.only(bottom: 6 * scale),
-              padding: EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 14 * scale),
-              decoration: BoxDecoration(
-                color: focused
-                    ? Colors.white
-                    : Colors.white.withValues(alpha: row.focusable ? (hovering ? 0.12 : 0.06) : 0),
-                borderRadius: BorderRadius.circular(14 * scale),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.white.withValues(alpha: focused ? 0.22 : 0),
-                    blurRadius: 16 * scale,
-                  ),
-                ],
-              ),
-              child: content(),
+            );
+          }
+          final idleFill = Colors.white.withValues(alpha: row.focusable ? (hovering ? 0.12 : 0.06) : 0);
+          return Container(
+            margin: EdgeInsets.only(bottom: 6 * scale),
+            padding: EdgeInsets.symmetric(horizontal: 20 * scale, vertical: 14 * scale),
+            decoration: BoxDecoration(
+              color: Color.lerp(idleFill, Colors.white, t),
+              borderRadius: BorderRadius.circular(14 * scale),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.22 * t),
+                  blurRadius: 16 * scale,
+                ),
+              ],
             ),
+            child: content(),
+          );
+        },
+      ),
     );
   }
 }

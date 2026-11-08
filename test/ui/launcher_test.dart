@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:anyps5_desktop/core/controls.dart';
 import 'package:anyps5_desktop/core/engine_checkout.dart';
 import 'package:anyps5_desktop/core/file_links.dart';
+import 'package:anyps5_desktop/core/gamepad/pad_navigation.dart';
 import 'package:anyps5_desktop/core/font_download.dart';
 import 'package:anyps5_desktop/core/game_settings.dart';
 import 'package:anyps5_desktop/core/host.dart';
@@ -12,9 +13,11 @@ import 'package:anyps5_desktop/core/remote/remote_server.dart';
 import 'package:anyps5_desktop/core/system_fonts.dart';
 import 'package:anyps5_desktop/core/toolkit_download.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
+import 'package:anyps5_desktop/ui/confirm_card.dart';
 import 'package:anyps5_desktop/ui/launcher.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:anyps5_desktop/ui/theme.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -449,6 +452,42 @@ void main() {
       await press(tester, LogicalKeyboardKey.arrowDown);
       await press(tester, LogicalKeyboardKey.enter);
       expect(quits, [0]);
+    });
+
+    testWidgets('"Quit AnyPS5?" is a small yes or no: Cancel and Quit side by side, ← and → between them', (
+      tester,
+    ) async {
+      final quits = <int>[];
+      fixture = makeFixture(quit: quits.add);
+      final model = fixture.model;
+      await pumpLauncher(tester, model);
+      await press(tester, LogicalKeyboardKey.escape);
+      expect(model.overlay, Layer.confirmQuit);
+      expect(find.byType(ConfirmCard), findsOneWidget);
+      expect(find.text('Stay on the home screen'), findsNothing, reason: 'no line under Cancel');
+      final cancel = tester.getCenter(find.byKey(const ValueKey('answer-cancel')));
+      final quit = tester.getCenter(find.byKey(const ValueKey('answer-quit')));
+      expect(cancel.dy, quit.dy, reason: 'on one line');
+      expect(cancel.dx, lessThan(quit.dx), reason: 'Cancel on the left, Quit on the right');
+      await press(tester, LogicalKeyboardKey.arrowRight);
+      expect(model.panelRow, 1);
+      await press(tester, LogicalKeyboardKey.arrowRight);
+      expect(model.panelRow, 1, reason: 'the arrows stop at the last answer');
+      await press(tester, LogicalKeyboardKey.arrowLeft);
+      expect(model.panelRow, 0);
+      await press(tester, LogicalKeyboardKey.arrowRight);
+      await press(tester, LogicalKeyboardKey.escape);
+      expect(model.overlay, isNull, reason: 'Escape cancels, even on Quit');
+      expect(quits, isEmpty);
+      // The pad's ← and → too, and Cross on Quit quits.
+      await press(tester, LogicalKeyboardKey.escape);
+      model.padCommand(PadCommand.right);
+      expect(model.panelRow, 1);
+      model.padCommand(PadCommand.left);
+      expect(model.panelRow, 0);
+      await tester.tap(find.byKey(const ValueKey('answer-quit')));
+      await tester.pump();
+      expect(quits, [0], reason: 'a click on Quit quits');
     });
 
     testWidgets('with no games, Up still reaches the top bar and its Settings', (tester) async {
