@@ -5,6 +5,12 @@ release when it is made.
 
 ## Next release
 
+- **Each game can have its own engine**, as on the Mac: Game Settings › Engine picks the default
+  or any downloaded engine, of either source, with what unlocked the game under it. A game whose
+  chosen engine is not on this computer says so when you press Play and offers the download.
+- **Delete one engine version**: a row for each downloaded version in Settings › AnyPS5 Engine,
+  as on the Mac. An engine a game or the default is using stays.
+
 - **A new install gets the AnyPS5-ARM engine.** On a first start the welcome downloads
   AnyPS5-ARM's engine, which reads the phone controller and opens games full screen or at the
   window size you chose. If you already use upstream's engine, nothing changes on its own.
