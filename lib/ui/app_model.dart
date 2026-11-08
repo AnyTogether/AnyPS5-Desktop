@@ -2620,7 +2620,7 @@ class AppModel extends ChangeNotifier {
   bool supportsResolution(Game game) => _factsOf(game).resolution;
 
   ({bool resolution, List<String> backups}) _factsOf(Game game) => _gameFacts.putIfAbsent(game.id, () {
-    final patch = toolkit?.patchFile(game.titleId);
+    final patch = toolkitFor(game)?.patchFile(game.titleId);
     var resolution = false;
     try {
       resolution = patch != null && ResolutionPatch.supports(File(patch).readAsStringSync());
@@ -2901,6 +2901,11 @@ class AppModel extends ChangeNotifier {
     // An update dumped (or removed) since the unlock needs its executable relinked: unlocking
     // again applies it.
     if (record != null && record.update == game.update?.version) {
+      // A game with an engine of its own follows that one, whatever the default is.
+      if (currentSettings(game).engine != null) {
+        final own = toolkitFor(game)?.version;
+        return Installed(outdated: own != null && own != record.toolkit);
+      }
       final version = toolkitVersion;
       return Installed(outdated: (version != null && version != record.toolkit) || engine.updateAvailable);
     }
@@ -2913,9 +2918,32 @@ class AppModel extends ChangeNotifier {
 
   GameSettings settingsFor(Game game) => settingsStore.load(game.slug);
 
+  /// The engine that unlocks [game]: the one chosen for it in its Game Settings (null while that
+  /// one is not on this computer: [missingEngine]), else the default [toolkit].
+  Toolkit? toolkitFor(Game game) {
+    final pin = currentSettings(game).engine;
+    if (pin == null) return toolkit;
+    return engine.downloaded.where((kit) => p.basename(kit.root) == pin).firstOrNull;
+  }
+
+  /// The engine [game] is pinned to when that one is not on this computer, null otherwise.
+  String? missingEngine(Game game) {
+    final pin = currentSettings(game).engine;
+    return pin != null && !engine.downloaded.any((kit) => p.basename(kit.root) == pin) ? pin : null;
+  }
+
+  /// A game pinned to an engine that is not downloaded: says so, and the game's settings offer
+  /// the download (Game Settings › Engine).
+  void _tellEngineMissing(Game game, String pin) {
+    show(T.format('engineGameMissing', [EngineModel.nameOf(pin)]));
+    if (selectedGame == game && overlay == null) open(Layer.gameSettings);
+  }
+
   void saveSettings(Game game, GameSettings settings) {
     if (persist) settingsStore.save(game.slug, settings);
     _cachedSettings[game.slug] = settings;
+    // A game's own engine brings its own patch file.
+    _gameFacts.remove(game.id);
     _changed();
   }
 
@@ -3059,8 +3087,11 @@ class AppModel extends ChangeNotifier {
   void unlock(Game game, {bool copy = false}) {
     final folder = rootOf(game);
     if (folder == null) return;
-    final kit = toolkit;
-    if (kit == null) return show(T.text('noToolkit'));
+    final kit = toolkitFor(game);
+    if (kit == null) {
+      if (missingEngine(game) case final String pin) return _tellEngineMissing(game, pin);
+      return show(T.text('noToolkit'));
+    }
     // Asked for while it is being prepared: it becomes the user's own.
     if (prepare.active == game.id) return _promotePreparation(game);
     prepare.cancel(game.id);
@@ -3103,7 +3134,8 @@ class AppModel extends ChangeNotifier {
   /// Unlocks the game again and plays it; with a newer engine out, downloads that first.
   void updateAndPlay(Game game) {
     _playAfterInstall = game.id;
-    if (engine.updateAvailable) {
+    // A game with its own engine is unlocked with that one: the default's update is not its.
+    if (currentSettings(game).engine == null && engine.updateAvailable) {
       unawaited(
         engine.download().then((done) {
           if (done) {
@@ -3137,11 +3169,19 @@ class AppModel extends ChangeNotifier {
   void _startNext() {
     // While the engine is built in place the unlocks wait for it (engineJobEnded goes on).
     if (engine.git.running) return;
-    final kit = toolkit;
-    if (_installer != null || queue.isEmpty || root == null || kit == null) return;
+    if (_installer != null || queue.isEmpty || root == null) return;
+    final next = games.where((game) => game.id == queue.first).firstOrNull;
+    final kit = next == null ? toolkit : toolkitFor(next);
+    if (next != null && kit == null && missingEngine(next) == null) return; // No engine yet: it waits.
     final id = queue.removeAt(0);
-    final game = games.where((game) => game.id == id).firstOrNull;
+    final game = next;
     if (game == null) return _startNext();
+    // Its engine was deleted while it waited: said, and the next game goes on.
+    if (kit == null) {
+      if (_playAfterInstall == id) _playAfterInstall = null;
+      _tellEngineMissing(game, missingEngine(game)!);
+      return _startNext();
+    }
     final folder = rootOf(game)!;
     _installer = _runUnlock(
       game,
@@ -3319,8 +3359,8 @@ class AppModel extends ChangeNotifier {
               game,
               folder,
               knownSize: sizes[game.id],
-              toolkit: kit,
-              resolution: _unlockResolution(game, kit),
+              toolkit: toolkitFor(game) ?? kit,
+              resolution: _unlockResolution(game, toolkitFor(game) ?? kit),
             );
             return plan.space?.shortage(free: freeSpace(folder), folder: folder);
           } on FileSystemException {
@@ -3643,7 +3683,7 @@ class AppModel extends ChangeNotifier {
       final began = DateTime.now();
       // Upstream's engine does not read ANYPS5_FULLSCREEN or ANYPS5_WINDOW_SIZE: the launcher
       // sizes its window or presses its F11 once the window is open.
-      if (!engine.readsDisplaySettings) {
+      if (!engine.readsDisplaySettingsOf(game)) {
         unawaited(desktop.applyDisplay(run.pid, fullscreen: settings.fullscreen, windowSize: settings.windowSize));
       }
       // Settings › Behaviour › Hide the launcher while a game runs.
@@ -5050,10 +5090,8 @@ class AppModel extends ChangeNotifier {
                 id: 'update',
                 title: T.text('updateAndPlay'),
                 detail: switch (engine.latestPackage) {
-                  final ToolkitPackage newest when engine.updateAvailable => T.format('engineUpdateAndPlayDetail', [
-                    'v${newest.version}',
-                    byteText(newest.size),
-                  ]),
+                  final ToolkitPackage newest when engine.updateAvailable && currentSettings(game).engine == null =>
+                    T.format('engineUpdateAndPlayDetail', ['v${newest.version}', byteText(newest.size)]),
                   _ => T.text('updateAndPlayDetail'),
                 },
                 kind: ActionRow(() {
@@ -5946,7 +5984,7 @@ class AppModel extends ChangeNotifier {
         // AnyPS5-ARM's engine opens the game borderless full screen itself (SDL's desktop full
         // screen), and the line says what that is; upstream's ignores the choice: the launcher
         // presses F11 for it, and says so.
-        detail: engine.readsDisplaySettings ? T.text('displayBorderless') : T.text('displayUpstream'),
+        detail: engine.readsDisplaySettingsOf(game) ? T.text('displayBorderless') : T.text('displayUpstream'),
         // Default (Settings › Default Display), then the game's own choices.
         kind: ChoiceRow(
           [
@@ -5966,7 +6004,7 @@ class AppModel extends ChangeNotifier {
         PanelRow(
           id: 'windowSize',
           title: T.text('windowSize'),
-          detail: engine.readsDisplaySettings ? null : T.text('windowSizeUpstream'),
+          detail: engine.readsDisplaySettingsOf(game) ? null : T.text('windowSizeUpstream'),
           kind: StepperRow(
             value: display.windowSize,
             min: DisplayDefaults.minimumWindowSize,
@@ -5998,7 +6036,7 @@ class AppModel extends ChangeNotifier {
       PanelRow(
         id: 'upscaling',
         title: T.text('upscaling'),
-        detail: engine.readsDisplaySettings ? T.text('upscalingDetail') : T.text('upscalingUpstream'),
+        detail: engine.readsDisplaySettingsOf(game) ? T.text('upscalingDetail') : T.text('upscalingUpstream'),
         kind: ChoiceRow(
           [T.text('upscalingBilinear'), T.text('upscalingFsr1')],
           (settings.upscaler ?? Upscaler.bilinear).index,
@@ -6038,7 +6076,7 @@ class AppModel extends ChangeNotifier {
         id: 'frameGeneration',
         title: T.text('frameGeneration'),
         // Only AnyPS5-ARM's engine makes the frames: said for upstream's, as FSR 1 is.
-        detail: !engine.readsDisplaySettings
+        detail: !engine.readsDisplaySettingsOf(game)
             ? T.text('frameGenerationUpstream')
             // Settings › Battery & Heat holds it paused now.
             : settings.frameGeneration == true && powerWatch.adjustment.pauseFrameGeneration
@@ -6090,6 +6128,7 @@ class AppModel extends ChangeNotifier {
           (index) => change(settings.copyWith(language: index == 0 ? null : languages[index - 1].$1)),
         ),
       ),
+      ...engine.gameRows(game),
       PanelRow(
         id: 'controls',
         title: T.text('controls'),
