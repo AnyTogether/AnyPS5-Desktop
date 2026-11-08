@@ -10,6 +10,13 @@ release when it is made.
   their sound. In the gallery ← and → move to the next picture or clip, and ✕ or ○ close it. The
   pointer brings a bar to pause and move through the clip. A clip the launcher cannot open goes to
   the system's video player, as before. Photos in chats open over the whole screen too.
+- **Photos sent from the website show in chats**, with their caption and in their own shape.
+  A photo sent as it is (not end-to-end encrypted) used to show only as "[photo]".
+- **Delete for everyone** is what the message menu calls removing your own message now (it was
+  Unsend, "Geri al" in Turkish). It still asks first.
+- **Devices in the encryption sheet go by their kind** ("Windows PC", "iPhone") and the day they
+  were added, never by the computer's own name. This launcher now registers itself as "AnyPS5 on
+  Windows" or "AnyPS5 on Linux".
 - **How many are online now** by Find players' heading, as on the Mac and the website. It is a
   number only. Accounts that are invisible or hide their status are not counted, and the
   line's tooltip says so.

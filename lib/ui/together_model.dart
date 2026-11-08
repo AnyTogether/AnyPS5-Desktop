@@ -96,7 +96,7 @@ class TogetherModel {
       account: account,
       keys: () => app.e2eeKeysFor(app.sessionProfileId),
       notes: () => app.e2eeNotesFor(app.sessionProfileId),
-      deviceName: () => deviceName,
+      deviceName: () => e2eeDeviceName,
     );
     hub = TogetherHub(
       account: account,
@@ -360,6 +360,10 @@ class TogetherModel {
     final short = os.length > 48 ? os.substring(0, 48) : os;
     return 'launcher-${system.name}/$launcherVersion (${system == HostSystem.windows ? 'Windows' : 'Linux'} $short)';
   }
+
+  /// This device's name for end-to-end encryption, which friends' device lists read: what it is,
+  /// never the computer's own name (docs/e2ee.md in AnyTogether).
+  String get e2eeDeviceName => app.system == HostSystem.windows ? 'AnyPS5 on Windows' : 'AnyPS5 on Linux';
 
   /// This computer's name as the server and the phone show it.
   String get deviceName {
