@@ -96,18 +96,59 @@ Save in-game first for those trials. The menu marks startup-only settings.
 
 ## RPCS3 preview and release gates
 
-The checked-in [frontend patch](../tool/patches/rpcs3-libretro-frontend.patch)
-targets [RPCS3 Libretro revision 74b3fa37](https://github.com/WizzardSK/rpcs3-libretro/tree/74b3fa37beb294418230b1f039bab4de97f18479).
-It relays compilation progress, honors the frontend's active controller
-ports and confines local offline peer-to-peer traffic to loopback. The
-prototype used the project's
-[Windows CLANG64 recipe](https://github.com/WizzardSK/rpcs3-libretro/blob/74b3fa37beb294418230b1f039bab4de97f18479/.ci/build-windows-clang-libretro.sh).
-The launcher accepts only the verified preview package from an absolute
-ANYPS5_MANAGED_CORE_PACKAGES directory. It checks the DLL hash before using an existing PS3 install.
-A fresh clone has no such package
-and offers no stock-core fallback. The patch and recipe are review
-materials. A reproducible public package and distribution route are
-outstanding.
+The [frontend patch](../tool/patches/rpcs3-libretro-frontend.patch) relays
+compilation progress, reports active controller ports and confines offline
+peer-to-peer traffic to loopback. The [package builder](../tool/build-rpcs3-preview.sh)
+uses the [RPCS3 Libretro Windows CLANG64 recipe](https://github.com/WizzardSK/rpcs3-libretro/blob/74b3fa37beb294418230b1f039bab4de97f18479/.ci/build-windows-clang-libretro.sh).
+It pins RPCS3 Libretro, FFmpeg and Abseil by commit. RPCS3 submodules follow the
+pinned tree. MSYS2 dependencies and upstream's optional embedded game-patch
+database can change between builds. The builder records the MSYS2 versions.
+Its output is a reviewer build with its own digests.
+
+### Build a PS3 test package
+
+Use a disposable [MSYS2](https://www.msys2.org/) installation. The upstream
+recipe replaces several CLANG64 import archives with static libraries, so
+keep this install separate from your normal development toolchain. Update
+MSYS2 first, then run these commands in its **CLANG64** shell from a checkout
+of this PR. Use a short build path with space for the compiler outputs.
+
+```bash
+pacman -S --needed base-devel curl git p7zip \
+  mingw-w64-clang-x86_64-{clang,cmake,lld,ninja,llvm,nasm,pkgconf,opencv,glew,vulkan-headers,vulkan-loader}
+bash tool/build-rpcs3-preview.sh /c/anyps5-ps3-review
+```
+
+The output path must be new. The resulting `packages` directory contains
+`rpcs3_libretro.dll.zip` and `ps3-core-digests.txt`. Keep the two SHA-256 values
+from your own build. The installer verifies the ZIP before extraction and
+checks the DLL before publishing it and at subsequent launches. The default
+test package hashes still apply when no digest override is configured.
+The [checkout attributes](../.gitattributes) keep the shell script and patch
+in LF format on Windows.
+
+Build the launcher as described below, then set the reviewer environment in
+PowerShell and start the launcher from the same shell. Use a new profile path.
+
+```powershell
+$env:ANYPS5_DESKTOP_EXPERIMENT_HOME = 'C:/anyps5-ps3-clean-profile'
+$env:ANYPS5_MANAGED_CORE_PACKAGES = 'C:/anyps5-ps3-review/packages'
+$env:ANYPS5_PS3_CORE_DIGESTS = (Get-Content "$env:ANYPS5_MANAGED_CORE_PACKAGES/ps3-core-digests.txt" -Raw).Trim()
+& .\build\windows\x64\runner\Release\anyps5_desktop.exe
+```
+
+Finish normal launcher onboarding. For a PS3-only test, skip the games
+folder and PS5 engine steps and choose Offline. Open
+**Settings → Emulators → PS3 → Setup**, install the core and let the
+launcher fetch the checksum-verified official Sony firmware. Add a folder
+containing your extracted PS3 disc and finish setup. On the first launch,
+check compilation progress, the embedded viewport and PS/Guide or Escape
+opening the Quick Menu. Resume should return to the same session.
+
+For a public one-click install, the maintainers need to approve the RPCS3 fork
+and patch, where to publish the package and its corresponding source and
+notices, and how to pin and update the downloadable ZIP and DLL. The reviewer
+workflow uses a local build and explicit hashes. It needs no published binary.
 
 The [Vulkan bridge](../windows/runner/retro_vulkan_video.cpp) presents the
 RPCS3 frame to Flutter and rejects synchronization it cannot support.
@@ -136,6 +177,10 @@ reached its first warp room. Vice City and LittleBigPlanet verification
 covered the opening sequence and tutorial. These are representative
 checks, not a compatibility matrix. The upstream draft is a separate
 port and should be tested on its own commit.
+
+The [package installer tests](../test/core/managed_retro_test.dart) cover
+missing packages, invalid pins, ZIP and DLL mismatches, and retrying with
+an installed core. Use a new profile root for the manual PS3 acceptance run.
 
 Start review with Windows PS1 and PS2 library, setup and embedded
 controls. Review the PS3 host and packaging separately. Keep core-license

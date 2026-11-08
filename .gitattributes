@@ -1,0 +1,2 @@
+tool/build-rpcs3-preview.sh text eol=lf
+tool/patches/rpcs3-libretro-frontend.patch text eol=lf

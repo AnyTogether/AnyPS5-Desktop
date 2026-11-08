@@ -3890,6 +3890,7 @@ class AppModel extends ChangeNotifier {
   ManagedRetro get _managedRetro => ManagedRetro(
     p.join(p.dirname(paths.toolkits), 'Emulators'),
     packageDirectory: (services.environment ?? Platform.environment)['ANYPS5_MANAGED_CORE_PACKAGES'],
+    ps3CoreDigests: (services.environment ?? Platform.environment)['ANYPS5_PS3_CORE_DIGESTS'],
   );
   bool get managedRetroAvailable => system == HostSystem.windows && Abi.current() == Abi.windowsX64;
   String? get retroCoreOverride => (services.environment ?? Platform.environment)['ANYPS5_LIBRETRO_HOME'];

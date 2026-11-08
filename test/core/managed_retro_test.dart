@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:anyps5_desktop/core/game_library.dart';
 import 'package:anyps5_desktop/core/managed_retro.dart';
+import 'package:anyps5_desktop/core/toolkit_download.dart';
+import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
@@ -38,6 +40,38 @@ void main() {
 
     expect(managed.isInstalled(RetroPlatform.ps3), isTrue);
     await expectLater(managed.install(RetroPlatform.ps3), throwsFormatException);
+  });
+
+  test('a clean profile can install a locally built PS3 package using explicit digests', () async {
+    final root = Directory.systemTemp.createTempSync('anyps5-managed-');
+    addTearDown(() => root.deleteSync(recursive: true));
+    final name = ManagedRetro.libraryName(RetroPlatform.ps3);
+    final dll = ByteData(88)
+      ..setUint16(0, 0x5a4d, Endian.little)
+      ..setUint32(60, 64, Endian.little)
+      ..setUint32(64, 0x4550, Endian.little)
+      ..setUint16(68, 0x8664, Endian.little)
+      ..setUint16(86, 0x2000, Endian.little);
+    final bytes = dll.buffer.asUint8List();
+    final packages = Directory(p.join(root.path, 'packages'))..createSync();
+    final original = File(p.join(root.path, name))..writeAsBytesSync(bytes);
+    final archive = Archive()..addFile(ArchiveFile(name, bytes.length, bytes));
+    final zip = File(p.join(packages.path, '$name.zip'))..writeAsBytesSync(ZipEncoder().encode(archive));
+    final archiveDigest = await AssetDownload.sha256Of(zip.path);
+    final libraryDigest = await AssetDownload.sha256Of(original.path);
+    final emulatorRoot = p.join(root.path, 'emulators');
+    ManagedRetro configured(String digests) =>
+        ManagedRetro(emulatorRoot, packageDirectory: packages.path, ps3CoreDigests: digests);
+
+    await expectLater(configured('malformed').install(RetroPlatform.ps3), throwsFormatException);
+    await expectLater(configured('$libraryDigest:$libraryDigest').install(RetroPlatform.ps3), throwsFormatException);
+    await expectLater(configured('$archiveDigest:$archiveDigest').install(RetroPlatform.ps3), throwsFormatException);
+    final managed = configured('$archiveDigest:$libraryDigest'.toUpperCase());
+    expect(managed.isInstalled(RetroPlatform.ps3), isFalse);
+    await managed.install(RetroPlatform.ps3);
+    expect(await File(p.join(emulatorRoot, name)).readAsBytes(), bytes);
+    await zip.delete();
+    await managed.install(RetroPlatform.ps3);
   });
 
   test('a rejected BIOS replacement preserves the private copy', () async {

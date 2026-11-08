@@ -9,10 +9,11 @@ import 'game_library.dart';
 import 'toolkit_download.dart';
 
 class ManagedRetro {
-  ManagedRetro(this.root, {this.packageDirectory});
+  ManagedRetro(this.root, {this.packageDirectory, this.ps3CoreDigests});
 
   final String root;
   final String? packageDirectory;
+  final String? ps3CoreDigests;
   static const _patchedPs3Archive = '7bc267dc0a9cffdd21087340ab643c52ed91136606e6d33ae05c477adc7db3a4';
   static const _patchedPs3Library = '7ac7504de83acfa2d977345f8c9b48e92f5e71c576abbf026406e667fe7a1370';
 
@@ -34,7 +35,8 @@ class ManagedRetro {
     final name = libraryName(platform);
     final installed = isInstalled(platform);
     if (platform == RetroPlatform.ps3) {
-      if (installed && await AssetDownload.sha256Of(p.join(root, name)) == _patchedPs3Library) return;
+      final (archiveDigest, libraryDigest) = _ps3Digests();
+      if (installed && await AssetDownload.sha256Of(p.join(root, name)) == libraryDigest) return;
       final directory = packageDirectory;
       if (directory == null) {
         throw const FormatException('The PS3 preview requires a verified RPCS3 package.');
@@ -43,7 +45,7 @@ class ManagedRetro {
       if (!p.isAbsolute(directory) || !archive.existsSync()) {
         throw const FormatException('The configured PS3 emulator package is missing.');
       }
-      if (await AssetDownload.sha256Of(archive.path) != _patchedPs3Archive) {
+      if (await AssetDownload.sha256Of(archive.path) != archiveDigest) {
         throw const FormatException('The configured PS3 emulator package did not pass verification.');
       }
       final size = await archive.length();
@@ -51,7 +53,7 @@ class ManagedRetro {
         name,
         archive.path,
         verify: (file) async {
-          if (await AssetDownload.sha256Of(file.path) != _patchedPs3Library) {
+          if (await AssetDownload.sha256Of(file.path) != libraryDigest) {
             throw const FormatException('The installed PS3 emulator did not pass verification.');
           }
         },
@@ -90,6 +92,15 @@ class ManagedRetro {
         }
       },
     );
+  }
+
+  (String, String) _ps3Digests() {
+    final configured = ps3CoreDigests;
+    if (configured == null) return (_patchedPs3Archive, _patchedPs3Library);
+    if (!RegExp(r'^[a-fA-F0-9]{64}:[a-fA-F0-9]{64}$').hasMatch(configured) || configured.length != 129) {
+      throw const FormatException('Set PS3 core digests to the package and DLL SHA-256 values separated by a colon.');
+    }
+    return (configured.substring(0, 64).toLowerCase(), configured.substring(65).toLowerCase());
   }
 
   Future<void> _publishCore(String name, String archive, {required Future<void> Function(File) verify}) async {
