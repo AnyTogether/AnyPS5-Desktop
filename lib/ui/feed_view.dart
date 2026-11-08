@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../core/together/social.dart';
@@ -235,22 +236,7 @@ class _ActivityCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(
-                          text: name,
-                          style: AppText.display(17 * scale, weight: FontWeight.w600, color: ink),
-                        ),
-                        TextSpan(
-                          text: ' ${together.activityText(item)}',
-                          style: AppText.display(17 * scale, color: ink.withValues(alpha: 0.82)),
-                        ),
-                      ],
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  ActivityLine(model: model, item: item, name: name, size: 17 * scale, ink: ink),
                   SizedBox(height: 6 * scale),
                   Row(
                     children: [
@@ -443,6 +429,83 @@ class _ReactionPill extends StatelessWidget {
   }
 }
 
+/// Who did what, on up to two lines: the name, then what they did. The game's name in it opens the
+/// game's hub when clicked, as the website links it to the game's page, and is underlined while
+/// the pointer is on it. It looks the same as the rest of the line until then.
+class ActivityLine extends StatefulWidget {
+  const ActivityLine({
+    super.key,
+    required this.model,
+    required this.item,
+    required this.name,
+    required this.size,
+    required this.ink,
+  });
+
+  final AppModel model;
+  final Activity item;
+  final String name;
+  final double size;
+  final Color ink;
+
+  @override
+  State<ActivityLine> createState() => _ActivityLineState();
+}
+
+class _ActivityLineState extends State<ActivityLine> {
+  late final TapGestureRecognizer _open = TapGestureRecognizer()
+    ..onTap = () => widget.model.together.openActivityGame(widget.item);
+  bool _hovering = false;
+
+  @override
+  void dispose() {
+    _open.dispose();
+    super.dispose();
+  }
+
+  void _hover(bool on) {
+    if (_hovering != on) setState(() => _hovering = on);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final together = widget.model.together;
+    final text = together.activityText(widget.item);
+    final game = together.activityGameName(widget.item);
+    final at = game == null || game.isEmpty ? -1 : text.indexOf(game);
+    final plain = AppText.display(widget.size, color: widget.ink.withValues(alpha: 0.82));
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: widget.name,
+            style: AppText.display(widget.size, weight: FontWeight.w600, color: widget.ink),
+          ),
+          if (at < 0)
+            TextSpan(text: ' $text', style: plain)
+          else ...[
+            TextSpan(text: ' ${text.substring(0, at)}', style: plain),
+            TextSpan(
+              text: game,
+              style: plain.copyWith(
+                decoration: _hovering ? TextDecoration.underline : TextDecoration.none,
+                decorationColor: widget.ink.withValues(alpha: 0.45),
+              ),
+              recognizer: _open,
+              mouseCursor: SystemMouseCursors.click,
+              onEnter: (_) => _hover(true),
+              onExit: (_) => _hover(false),
+            ),
+            TextSpan(text: text.substring(at + game!.length), style: plain),
+          ],
+        ],
+      ),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+}
+
 /// One item of someone's recent activity on their profile, as the Mac's profile column has it:
 /// who and what on two lines, when, and the reactions it got as counts; reacting stays in the
 /// feed.
@@ -474,21 +537,12 @@ class ProfileActivityRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                        text: TogetherModel.shown(item.actor).name,
-                        style: AppText.display(15 * scale, weight: FontWeight.w600, color: ink),
-                      ),
-                      TextSpan(
-                        text: ' ${model.together.activityText(item)}',
-                        style: AppText.display(15 * scale, color: ink.withValues(alpha: 0.82)),
-                      ),
-                    ],
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                ActivityLine(
+                  model: model,
+                  item: item,
+                  name: TogetherModel.shown(item.actor).name,
+                  size: 15 * scale,
+                  ink: ink,
                 ),
                 SizedBox(height: 5 * scale),
                 Row(
