@@ -5,15 +5,6 @@ release when it is made.
 
 ## Next release
 
-- **Broadcasting has a microphone**, as on the Mac: Settings › Broadcasting mixes your commentary
-  over the game's sound at the level you set, and it can be switched while you are live. Windows
-  shows a small LIVE badge over the game that viewers do not see. Linux has no badge, because
-  anything drawn over the game would be recorded too.
-- **Cloud storage lists your photos, clips and voice notes**, as on the Mac: delete one with a
-  second press, and a bar shows how much saves and media take.
-- **Restore saves… restores the backup you choose**, as on the Mac. The latest backup can still
-  be restored in one press.
-
 - **Update from Git sets up the build folder itself**, as on the Mac. An engine folder that is a
   git checkout without a build folder no longer stops at "no build folder yet". With Git, CMake,
   Ninja and a C++ compiler (g++) on PATH, the launcher runs the CMake setup the build guide
@@ -129,6 +120,14 @@ release when it is made.
 - **Deafen in party voice**, as on the Mac: hear nobody, with your microphone off, and the others
   see you deafened. Turning it off puts your microphone back as it was, and turning the
   microphone on hears everyone again.
+- **Broadcasting has a microphone**, as on the Mac: Settings › Broadcasting mixes your commentary
+  over the game's sound at the level you set, and it can be switched while you are live. Windows
+  shows a small LIVE badge over the game that viewers do not see. Linux has no badge, because
+  anything drawn over the game would be recorded too.
+- **Cloud storage lists your photos, clips and voice notes**, as on the Mac: delete one with a
+  second press, and a bar shows how much saves and media take.
+- **Restore saves… restores the backup you choose**, as on the Mac. The latest backup can still
+  be restored in one press.
 
 ## 0.1.20
 
