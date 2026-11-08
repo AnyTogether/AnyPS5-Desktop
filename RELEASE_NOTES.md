@@ -16,6 +16,13 @@ release when it is made.
   is now called Window or full screen, and says that full screen is borderless with the
   AnyPS5-ARM engine. Settings › Default display still sets it for every game.
 - **Clearer words in Turkish for friends**: Arkadaşlardan çıkar, and what your handle is for.
+- **Photos sent from the website show in chats**, with their caption and in their own shape.
+  A photo sent as it is (not end-to-end encrypted) used to show only as "[photo]".
+- **Delete for everyone** is what the message menu calls removing your own message now (it was
+  Unsend, "Geri al" in Turkish). It still asks first.
+- **Devices in the encryption sheet go by their kind** ("Windows PC", "iPhone") and the day they
+  were added, never by the computer's own name. This launcher now registers itself as "AnyPS5 on
+  Windows" or "AnyPS5 on Linux".
 - **How many are online now** by Find players' heading, as on the Mac and the website. It is a
   number only. Accounts that are invisible or hide their status are not counted, and the
   line's tooltip says so.

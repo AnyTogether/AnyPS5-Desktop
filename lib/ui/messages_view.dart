@@ -3,7 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
-import '../core/together/e2ee.dart' show safetyGroups;
+import '../core/together/e2ee.dart' show DeviceKind, safetyGroups;
 import '../core/together/e2ee_client.dart';
 import '../core/together/messages.dart';
 import '../core/together/people.dart' show Friend;
@@ -741,7 +741,7 @@ class _MenuCard extends StatelessWidget {
         : message != null
         ? (message.encrypted && message.seal != SealState.opened
               ? TogetherMessages.shownText(message)
-              : (message.words ?? ''))
+              : (message.words ?? TogetherMessages.previewText(message)))
         : conversation?.name(me) ?? '';
     return ConstrainedBox(
       constraints: BoxConstraints(maxWidth: 420 * scale),
@@ -1556,19 +1556,41 @@ class _DeviceList extends StatelessWidget {
           style: AppText.display(13 * scale, weight: FontWeight.w700),
         ),
         SizedBox(height: 4 * scale),
+        // Each device as its kind and the day it was added: never the name its app registered
+        // (often the computer's own) or its ID.
         for (final device in devices.active)
           Padding(
-            padding: EdgeInsets.only(top: 3 * scale),
+            padding: EdgeInsets.only(top: 4 * scale),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.devices_rounded, size: 13 * scale, color: Colors.white.withValues(alpha: 0.5)),
-                SizedBox(width: 6 * scale),
+                Padding(
+                  padding: EdgeInsets.only(top: 1 * scale),
+                  child: Icon(
+                    deviceKindIcon(device.kind),
+                    size: 14 * scale,
+                    color: Colors.white.withValues(alpha: 0.5),
+                  ),
+                ),
+                SizedBox(width: 7 * scale),
                 Expanded(
-                  child: Text(
-                    device.name.isEmpty ? device.id.substring(0, 8) : device.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppText.display(12.5 * scale, color: Colors.white.withValues(alpha: 0.75)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        deviceKindText(device.kind),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.display(12.5 * scale, color: Colors.white.withValues(alpha: 0.8)),
+                      ),
+                      if (device.createdAt case final added?)
+                        Text(
+                          T.format('e2eeDeviceAdded', [_day(added)]),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.display(11 * scale, color: Colors.white.withValues(alpha: 0.45)),
+                        ),
+                    ],
                   ),
                 ),
               ],
@@ -1577,7 +1599,35 @@ class _DeviceList extends StatelessWidget {
       ],
     );
   }
+
+  static String _day(DateTime date) {
+    final local = date.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${local.year}-${two(local.month)}-${two(local.day)}';
+  }
 }
+
+/// What a device is, in words: "Windows PC", "iPhone", "Device".
+String deviceKindText(DeviceKind kind) => T.text(switch (kind) {
+  DeviceKind.windows => 'e2eeDeviceWindows',
+  DeviceKind.mac => 'e2eeDeviceMac',
+  DeviceKind.linux => 'e2eeDeviceLinux',
+  DeviceKind.iphone => 'e2eeDeviceIphone',
+  DeviceKind.ipad => 'e2eeDeviceIpad',
+  DeviceKind.android => 'e2eeDeviceAndroid',
+  DeviceKind.browser => 'e2eeDeviceBrowser',
+  DeviceKind.device => 'e2eeDeviceOther',
+});
+
+IconData deviceKindIcon(DeviceKind kind) => switch (kind) {
+  DeviceKind.windows => Icons.desktop_windows_rounded,
+  DeviceKind.mac => Icons.laptop_mac_rounded,
+  DeviceKind.linux => Icons.computer_rounded,
+  DeviceKind.iphone || DeviceKind.android => Icons.smartphone_rounded,
+  DeviceKind.ipad => Icons.tablet_mac_rounded,
+  DeviceKind.browser => Icons.language_rounded,
+  DeviceKind.device => Icons.devices_rounded,
+};
 
 /// A photo or clip sent as it is (from the gallery's Share, here or on the Mac): its picture or
 /// the clip's poster with a play mark; clicked, opened in the system's viewer or player.
@@ -1609,7 +1659,7 @@ class _PlainMediaView extends StatelessWidget {
         child: SizedBox(
           width: 320 * scale,
           child: AspectRatio(
-            aspectRatio: 16 / 9,
+            aspectRatio: media.aspect,
             child: Stack(
               fit: StackFit.expand,
               children: [
