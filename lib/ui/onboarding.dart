@@ -485,20 +485,20 @@ class _ToolkitStep extends StatelessWidget {
                   final focused = model.onboardingChoice == 0;
                   final color = focused ? Colors.black : Colors.white;
                   final downloading = engine.downloading;
-                  final newest = engine.latestPackage;
+                  final newest = engine.offered;
                   final String detail;
                   if (downloading != null) {
                     detail = engine.progressText();
                   } else if (engine.unverified != null) {
                     detail = T.text('engineUnverified');
                   } else if (newest != null) {
-                    detail = T.format('engineDownloadDetail', ['v${newest.version}', byteText(newest.size)]);
-                  } else if (engine.checking) {
+                    detail = T.format('engineDownloadDetail', [EngineModel.offeredName(newest), byteText(newest.size)]);
+                  } else if (engine.looking) {
                     detail = T.text('engineLooking');
-                  } else if (engine.checkError != null) {
+                  } else if (engine.lookError != null) {
                     detail = T.text('engineOffline');
                   } else {
-                    detail = T.text('engineSource');
+                    detail = T.text(engine.armSelected ? 'engineArmSource' : 'engineSource');
                   }
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

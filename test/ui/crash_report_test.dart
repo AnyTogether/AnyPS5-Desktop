@@ -13,6 +13,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
+import '../support/fake_toolkit.dart';
 import '../support/ui_support.dart';
 
 const crashScript = '''
@@ -173,6 +174,93 @@ void main() {
       model.padCommand(PadCommand.options);
       expect(model.overlay, isNull);
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
+
+    group('a dump without PlayGo chunk files', () {
+      // Upstream's words when a title asks for a chunk ID and the dump has no playgo-chunk.dat and
+      // no playgo-scenario.json (SILENT HILL: The Short Message on v0.1.4); the rule is the
+      // message, not the title.
+      const playGoCrash = '''
+if [ "\$APS5_PLAYGO_UNLISTED_CHUNKS" = installed ]; then echo 'chunks counted as installed'; exit 0; fi
+echo "terminate called after throwing an instance of 'std::runtime_error'" >&2
+echo '  what():  scePlayGo: sce_sys/playgo-chunk.dat and sce_sys/playgo-scenario.json are missing, so chunk ID 1 cannot be checked; set APS5_PLAYGO_UNLISTED_CHUNKS=installed or =absent to answer for this dump' >&2
+exit 3''';
+
+      test('the engine\'s message is read whatever the title, the scenario one too', () {
+        expect(
+          SessionReport.playGoChunksUnknownIn(
+            'what():  scePlayGo: sce_sys/playgo-chunk.dat and sce_sys/playgo-scenario.json are missing, so chunk ID 1 '
+            'cannot be checked; set APS5_PLAYGO_UNLISTED_CHUNKS=installed or =absent to answer for this dump',
+          ),
+          isTrue,
+        );
+        expect(
+          SessionReport.playGoChunksUnknownIn(
+            'scePlayGo: sce_sys/playgo-chunk.dat is missing and sce_sys/playgo-scenario.json lists no chunks, so '
+            'chunk ID 1200 outside the listed ids 0 to 999 cannot be checked; set APS5_PLAYGO_UNLISTED_CHUNKS=installed',
+          ),
+          isTrue,
+        );
+        expect(SessionReport.playGoChunksUnknownIn('scePlayGo: sce_sys/playgo-chunk.dat could not be read'), isFalse);
+        expect(SessionReport.playGoChunksUnknownIn('FATAL: unhandled exception 0xc0000005'), isFalse);
+      });
+
+      test('the report offers AnyPS5-ARM\'s engine and a start with the chunks counted as installed', () async {
+        gameScript(playGoCrash);
+        await model.play(orbit());
+        await model.crash.pending;
+        expect(model.crash.current!.report!.playGoChunksUnknown, isTrue);
+        expect(rowIds(), ['playGoArm', 'playGoInstalled', 'save', 'copy', 'issue', 'log', 'playTraced', 'close']);
+        // Back from the shared text still lands on Open an issue.
+        choose('issue');
+        model.handle(Command.back);
+        expect(rowIds()[model.panelRow], 'issue');
+      }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
+
+      test('Play again with missing chunks counted as installed: that start only', () async {
+        gameScript(playGoCrash);
+        await model.play(orbit());
+        await model.crash.pending;
+        choose('playGoInstalled');
+        expect(model.overlay, isNull);
+        await until(
+          () => model.running == null && model.starting == null && log().contains('chunks counted as installed'),
+        );
+        expect(log(), contains('[anyps5-launcher] this start only: APS5_PLAYGO_UNLISTED_CHUNKS=installed'));
+        expect(model.overlay, isNull, reason: 'it ended well: no report');
+        // The next start is as before.
+        await model.play(orbit());
+        await model.crash.pending;
+        expect(model.overlay, Layer.crashReport);
+        expect(model.crash.current!.report!.playGoChunksUnknown, isTrue);
+      }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
+
+      test('Switch to the AnyPS5-ARM engine and play again: used, then the game unlocked with it', () async {
+        makeFakeToolkit(p.join(model.engine.store.root, 'arm-5ca076a87'), version: 'arm-5ca076a87');
+        model.engine.refresh();
+        gameScript(playGoCrash);
+        await model.play(orbit());
+        await model.crash.pending;
+        choose('playGoArm');
+        await until(() => model.records[orbit().id]?.toolkit == 'arm-5ca076a87');
+        expect(model.preferences.engineSource, 'arm');
+        expect(model.toolkitVersion, 'arm-5ca076a87');
+      }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
+
+      test('a game made with AnyPS5-ARM\'s engine is offered only the start with the chunks installed', () async {
+        gameScript(playGoCrash);
+        final installed = Installer.installedFolder(orbit(), model.root!);
+        final record = File(p.join(installed, Installer.recordName));
+        record.writeAsStringSync(
+          record.readAsStringSync().replaceFirst(RegExp(r'"toolkit":"[^"]*"'), '"toolkit":"arm-5ca076a87"'),
+        );
+        model.rescan();
+        expect(model.records[orbit().id]?.toolkit, 'arm-5ca076a87');
+        await model.play(orbit());
+        await model.crash.pending;
+        expect(rowIds(), isNot(contains('playGoArm')));
+        expect(rowIds().first, 'playGoInstalled');
+      }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
+    });
 
     test('with another panel open, a toast says it instead', () async {
       gameScript('sleep 1\nexit 3');
