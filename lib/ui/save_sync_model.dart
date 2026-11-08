@@ -503,11 +503,11 @@ class SaveSyncModel {
       rows.add(
         PanelRow(
           id: 'media-${media.id}',
-          title: T.text(switch (media.kind) {
-            'clip' => 'clip',
-            'voice' => 'cloudVoiceNote',
-            _ => 'cloudPhoto',
-          }),
+          title: media.kind == 'clip'
+              ? T.text('messagesClip')
+              : media.kind == 'voice'
+              ? T.text('messagesVoice')
+              : T.text('messagesPhoto'),
           detail: armedHere
               ? T.text('cloudStoragePressAgain')
               : [
