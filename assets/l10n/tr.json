@@ -835,7 +835,7 @@
   "updateApplied": "v%@ güncellemesi uygulandı",
   "updateToApply": "v%@ güncellemesi · uygulamak için kilidi aç",
   "useDisplayDefaults": "Varsayılan görüntüyü kullan",
-  "useDisplayDefaultsDetail": "Görüntü, pencere boyutu ve dikey senkronizasyon yeniden Ayarlar › Varsayılan görüntü'yü izler.",
+  "useDisplayDefaultsDetail": "Pencere ya da tam ekran, pencere boyutu ve dikey senkronizasyon yeniden Ayarlar › Varsayılan görüntü'yü izler.",
   "presetsTitle": "Oyun ön ayarları",
   "presetsIntroTitle": "Her oyun için bir kez ayarla",
   "presetsIntro": "Oyun Ön Ayarları'nı destekleyen oyunlar bu ayarlarla başlar. Kendi ayarlarını saklayan bir oyun, onları oyunda değiştirdiğinde kendininkileri kullanır.",

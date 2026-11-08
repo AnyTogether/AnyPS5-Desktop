@@ -835,7 +835,7 @@
   "updateApplied": "Update v%@ applied",
   "updateToApply": "Update v%@ · unlock to apply",
   "useDisplayDefaults": "Use default display",
-  "useDisplayDefaultsDetail": "Display, window size and vertical sync back to Settings › Default display.",
+  "useDisplayDefaultsDetail": "Window or full screen, window size and vertical sync back to Settings › Default display.",
   "presetsTitle": "Game presets",
   "presetsIntroTitle": "Set once for every game",
   "presetsIntro": "Games that support Game Presets start with these settings. A game that keeps its own settings uses those once you change them in it.",
