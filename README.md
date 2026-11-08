@@ -74,6 +74,14 @@ Vice City's opening sequence in the embedded PS2 viewport.
 
 LittleBigPlanet GOTY reports SPU cache progress on the launcher’s own startup screen.
 
+![LittleBigPlanet's opening planet scene rendered inside AnyPS5 after compilation](docs/media/anyps5-retro-ps3-intro.jpg)
+
+After compilation, the embedded PS3 viewport renders LittleBigPlanet's opening sequence.
+
+![The AnyPS5 Quick Menu offers Resume and Graphics while LittleBigPlanet is still running](docs/media/anyps5-retro-ps3-quick-menu.jpg)
+
+AnyPS5's Quick Menu offers Resume and Graphics during the same PS3 session.
+
 ## Layout
 
 - `lib/core/` platform-independent logic in pure Dart (no Flutter), unit tested:
