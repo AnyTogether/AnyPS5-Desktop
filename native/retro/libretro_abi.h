@@ -13,6 +13,21 @@ struct GameInfo {
   std::size_t size;
   const char* meta;
 };
+struct DiskControlCallbacks {
+  bool (*set_eject_state)(bool);
+  bool (*get_eject_state)();
+  unsigned (*get_image_index)();
+  bool (*set_image_index)(unsigned);
+  unsigned (*get_num_images)();
+  bool (*replace_image_index)(unsigned, const GameInfo*);
+  bool (*add_image_index)();
+};
+struct DiskControlExtCallbacks {
+  DiskControlCallbacks basic;
+  bool (*set_initial_image)(unsigned, const char*);
+  bool (*get_image_path)(unsigned, char*, std::size_t);
+  bool (*get_image_label)(unsigned, char*, std::size_t);
+};
 struct Variable {
   const char* key;
   const char* value;
@@ -67,13 +82,14 @@ struct HardwareCallbacks {
 
 enum EnvironmentCommand {
   kCanDupe = 3, kShutdown = 7, kSystemDirectory = 9, kPixelFormat = 10,
-  kInputDescriptors = 11, kGetVariable = 15, kSetVariables = 16,
+  kInputDescriptors = 11, kSetDiskControl = 13, kGetVariable = 15, kSetVariables = 16,
   kVariableUpdate = 17, kSupportNoGame = 18, kCorePath = 19,
   kContentDirectory = 30, kSaveDirectory = 31, kSetAv = 32,
   kSetGeometry = 37, kAudioVideoEnable = 47 | 0x10000, kFastForward = 49,
   kCoreOptionsVersion = 52, kSetHardware = 14, kHardwareInterface = 41 | 0x10000,
   kHardwareNegotiation = 43 | 0x10000,
-  kPreferredHardware = 56, kSetCoreOptionsV2 = 67, kSetCoreOptionsV2Intl = 68,
+  kPreferredHardware = 56, kDiskControlVersion = 57, kSetDiskControlExt = 58,
+  kSetCoreOptionsV2 = 67, kSetCoreOptionsV2Intl = 68,
   kMessageVersion = 59, kExtendedMessage = 60,
   kFrontendCompileProgress = 0x20000 | 0x4150,
 };

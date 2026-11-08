@@ -5,6 +5,18 @@ On Windows and Linux x64, a verified RPCS3 Libretro package runs an extracted PS
 in the launcher's existing window. The standalone RPCS3 option remains
 available in Settings. This preview does not use PS3 firmware download services.
 
+For PS3-only review, [compare the PS3 branch against the PS1/PS2 branch](https://github.com/B-Howell/AnyPS5-Desktop/compare/codex/pr84-embedded-ps12...codex/pr84-embedded-ps3).
+The combined build sends PS1 playlist selection and swaps through the same
+runner channel as PS3 sessions. The PS3 core uses Vulkan and reports compilation
+progress through that channel. PS3 leaves the PS1 disk-control callbacks unused.
+
+The combined host passed 29 focused Flutter tests and the native test suite
+on Windows and Ubuntu 22.04 WSL. Headless Windows probes booted Metal Gear
+Solid and Final Fantasy VII directly on Disc 2 and retained one memory card
+per title through swaps. A separate probe of the same host booted LittleBigPlanet
+GOTY with Vulkan and stereo PCM, then changed resolution from 1280 × 720 to
+1920 × 1080 in the same session.
+
 ## Build the Windows review package
 
 Use a disposable [MSYS2](https://www.msys2.org/) installation. The pinned

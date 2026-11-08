@@ -101,6 +101,7 @@ void CheckSession(const std::filesystem::path& path) {
   session.Start();
   WaitFor([&] { return session.Status().ready; }, "Session did not produce a frame");
   Check(lifecycle() == 2, "Expected init and load");
+  Check(!session.Status().discs, "A single-disc session should not offer disc changes");
 
   retro::Session busy(config, std::make_unique<TestVideo>(), std::make_unique<TestAudio>(), [] {});
   busy.Start();
@@ -126,6 +127,78 @@ void CheckSession(const std::filesystem::path& path) {
   session.Join();
   Check(session.ended() && lifecycle() == 4 && session.Status().error.empty(), "Expected unload and deinit");
 }
+void CheckInitialDisc(const std::filesystem::path& path) {
+  const retro::SessionConfig config{
+      path.u8string(), "test.m3u", "", "", "", {}, retro::InitialDisc{1, path.u8string()}};
+  retro::Session session(config, std::make_unique<TestVideo>(), std::make_unique<TestAudio>(), [] {});
+  session.Start();
+  WaitFor([&] {
+    const auto status = session.Status();
+    if (status.ended) throw std::runtime_error(status.error);
+    return status.ready;
+  }, "Disc 2 did not boot");
+  const auto discs = session.Status().discs;
+  Check(discs && discs->inserted == 1, "The requested disc was not inserted at boot");
+  session.Stop();
+  session.Join();
+  Check(session.Status().error.empty(), "Selected-disc session did not stop cleanly");
+}
+
+void CheckDiscSwap(const std::filesystem::path& path, bool legacy = false) {
+  const retro::DynamicLibrary library(path);
+  const auto lifecycle = library.Get<unsigned (*)()>("test_lifecycle_count");
+  const auto wrong_thread = library.Get<bool (*)()>("test_wrong_disk_thread");
+  const auto run_count = library.Get<unsigned (*)()>("test_run_count");
+  const auto fail_next_recovery = library.Get<void (*)()>("test_fail_next_recovery");
+  const auto initial = lifecycle();
+  const retro::SessionConfig config{path.u8string(), "test.m3u", "", "", "", {}};
+  retro::Session session(config, std::make_unique<TestVideo>(), std::make_unique<TestAudio>(), [] {});
+  session.Start();
+  WaitFor([&] { return session.Status().ready; }, "Multi-disc session did not start");
+  const auto first = session.Status().discs;
+  const auto expected_labels = legacy ? std::vector<std::string>(3)
+                                      : std::vector<std::string>{"Disc A", "Disc B", "Disc C"};
+  Check(first && first->labels == expected_labels && first->inserted == 0,
+        "Expected three ordered discs and the first inserted");
+  Check(!session.ChangeDisc(3), "Invalid disc index was queued");
+
+  session.Pause(true);
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  const auto steps = run_count();
+  Check(session.ChangeDisc(1), "Valid disc change was not queued");
+  WaitFor([&] {
+    const auto discs = session.Status().discs;
+    return discs && !discs->busy && discs->inserted == 1;
+  }, "Disc switch did not complete while paused");
+  Check(!session.Status().discs->failed && lifecycle() == initial + 2 &&
+        run_count() == steps, "Disc switch restarted or advanced the game");
+
+  Check(session.ChangeDisc(2), "Unavailable disc must be attempted on the worker");
+  WaitFor([&] {
+    const auto discs = session.Status().discs;
+    return discs && !discs->busy && discs->failed;
+  }, "Failed disc switch was not reported");
+  Check(session.Status().discs->inserted == 1, "Failed insertion did not restore the previous disc");
+
+  fail_next_recovery();
+  Check(session.ChangeDisc(2), "Second insertion failure was not queued");
+  WaitFor([&] {
+    const auto discs = session.Status().discs;
+    return discs && !discs->busy && discs->failed;
+  }, "Failed recovery was not reported");
+  Check(!session.Status().discs->inserted, "Failed recovery incorrectly reported a disc inserted");
+
+  Check(session.ChangeDisc(0), "Retry disc switch was not queued");
+  WaitFor([&] {
+    const auto discs = session.Status().discs;
+    return discs && !discs->busy && !discs->failed && discs->inserted == 0;
+  }, "Disc switch did not recover after retry");
+  Check(run_count() == steps, "Recovery advanced the paused game");
+  Check(!wrong_thread(), "Core disk callbacks ran outside the native worker");
+  session.Stop();
+  session.Join();
+  Check(lifecycle() == initial + 4, "Multi-disc game did not close its original session");
+}
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -134,6 +207,12 @@ int main(int argc, char** argv) {
     CheckLibrary(std::filesystem::u8path(argv[1]));
     CheckFrames();
     CheckSession(std::filesystem::u8path(argv[1]));
+    const auto path = std::filesystem::u8path(argv[1]);
+    const retro::DynamicLibrary library(path);
+    CheckInitialDisc(path);
+    CheckDiscSwap(path);
+    library.Get<void (*)()>("test_use_legacy_disk_control")();
+    CheckDiscSwap(path, true);
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;

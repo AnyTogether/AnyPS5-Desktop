@@ -112,6 +112,16 @@ FlValue* EncodeStatus(const SessionStatus& status) {
                            status.progress_percent ? fl_value_new_int(*status.progress_percent)
                                                    : fl_value_new_null());
 
+  if (const auto& discs = status.discs) {
+    auto* item = fl_value_new_map();
+    fl_value_set_string_take(item, "labels", Strings(discs->labels));
+    fl_value_set_string_take(item, "inserted", discs->inserted ? fl_value_new_int(*discs->inserted) : fl_value_new_null());
+    fl_value_set_string_take(item, "playedDiscPath", fl_value_new_string(discs->played ? discs->inserted_path.c_str() : ""));
+    fl_value_set_string_take(item, "busy", fl_value_new_bool(discs->busy));
+    fl_value_set_string_take(item, "failed", fl_value_new_bool(discs->failed));
+    fl_value_set_string_take(result, "discs", item);
+  }
+
   auto* options = fl_value_new_map();
   for (const auto& [key, option] : status.options) {
     auto* item = fl_value_new_map();
@@ -218,6 +228,10 @@ class RetroCoreHostLinux::Impl {
     } else if (method == "pause") {
       if (args && fl_value_get_type(args) == FL_VALUE_TYPE_BOOL) session_->Pause(fl_value_get_bool(args));
       Success(call);
+    } else if (method == "changeDisc") {
+      const auto index = args && fl_value_get_type(args) == FL_VALUE_TYPE_INT ? fl_value_get_int(args) : -1;
+      Success(call, fl_value_new_bool(index >= 0 && index <= INT32_MAX &&
+                                     session_->ChangeDisc(static_cast<unsigned>(index))));
     } else if (method == "input") {
       SetInput(*session_, args);
       Success(call);
@@ -274,6 +288,16 @@ class RetroCoreHostLinux::Impl {
       return;
     }
     try {
+      std::optional<InitialDisc> initial_disc;
+      auto* initial_index = ReadField(args, "initialDiscIndex");
+      const auto* initial_path = StringField(args, "initialDiscPath");
+      if (initial_index || ReadField(args, "initialDiscPath")) {
+        if (!initial_index || fl_value_get_type(initial_index) != FL_VALUE_TYPE_INT || !initial_path || !*initial_path)
+          throw std::runtime_error("Invalid initial disc");
+        const auto index = fl_value_get_int(initial_index);
+        if (index < 0 || index >= 128) throw std::runtime_error("Invalid initial disc");
+        initial_disc = InitialDisc{static_cast<unsigned>(index), initial_path};
+      }
       // Keep one registration for this view. A raster callback can still hold
       // the previous frame while a session releases or the next one starts.
       if (!texture_) texture_ = static_cast<RetroTexture*>(g_object_new(retro_texture_get_type(), nullptr));
@@ -281,7 +305,7 @@ class RetroCoreHostLinux::Impl {
       if (!registered_) throw std::runtime_error("Could not register the game surface");
       session_ = std::make_unique<Session>(
           SessionConfig{core, disc, system, saves, resolution ? resolution : "",
-                        ReadOptions(ReadField(args, "graphics")).value_or(Options{})},
+                        ReadOptions(ReadField(args, "graphics")).value_or(Options{}), std::move(initial_disc)},
           console == Console::kPs3 ? CreateVulkanVideo() : CreateLinuxVideo(), CreateLinuxAudio(),
           [this] { ScheduleFrame(); });
       {

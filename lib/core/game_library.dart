@@ -282,16 +282,10 @@ abstract final class GameLibrary {
     final claimed = <String>{};
     for (final playlist in playlists) {
       try {
-        if (playlist.lengthSync() > 64 * 1024) continue;
-        final tracks = const LineSplitter()
-            .convert(_text(playlist.readAsBytesSync()))
-            .map((line) => line.trim())
-            .where((line) => line.isNotEmpty && !line.startsWith('#'))
-            .map((name) => _localDiscFile(folder, name))
-            .toList();
+        final tracks = ps1PlaylistDiscs(playlist.path);
         if (tracks.isNotEmpty && tracks.every((track) => discs[track] == RetroPlatform.ps1)) {
           discs[playlist.path] = RetroPlatform.ps1;
-          claimed.addAll(tracks.nonNulls);
+          claimed.addAll(tracks);
         }
       } on FileSystemException {
         continue;
@@ -301,6 +295,22 @@ abstract final class GameLibrary {
       for (final entry in discs.entries)
         if (!claimed.contains(entry.key)) _discoveredRetro(folder, entry.key, entry.value),
     ];
+  }
+
+  /// Paths in core order. Reject the whole playlist if a disc is missing.
+  static List<String> ps1PlaylistDiscs(String path) {
+    final file = File(path);
+    if (file.lengthSync() > 64 * 1024) return const [];
+    final folder = p.dirname(path);
+    final tracks = <String>[];
+    for (final line in const LineSplitter().convert(_text(file.readAsBytesSync()))) {
+      final name = line.trim();
+      if (name.isEmpty || name.startsWith('#')) continue;
+      final track = _localDiscFile(folder, name);
+      if (track == null || tracks.length == 128) return const [];
+      tracks.add(track);
+    }
+    return tracks;
   }
 
   static String? _localDiscFile(String folder, String name) {

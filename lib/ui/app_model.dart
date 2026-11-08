@@ -223,6 +223,11 @@ class Preferences {
       for (final entry in (json['compatAsked'] as Map<String, dynamic>? ?? const {}).entries)
         if (entry.value is String) entry.key: entry.value as String,
     }
+    ..retroLastDisc = {
+      if (json['retroLastDisc'] case final Map<dynamic, dynamic> discs)
+        for (final entry in discs.entries)
+          if (entry.key is String && entry.value is String) entry.key as String: entry.value as String,
+    }
     ..lastPlayed = {
       for (final entry in (json['lastPlayed'] as Map<String, dynamic>? ?? const {}).entries)
         entry.key: entry.value as String,
@@ -314,6 +319,7 @@ class Preferences {
   /// silent, null is 100. Games keep their own volume.
   int? launcherVolume;
   Map<String, String> lastPlayed = {};
+  Map<String, String> retroLastDisc = {};
 
   /// Which engine the settings offer: 'upstream' (boykopovar/AnyPS5) or 'arm' (AnyPS5-ARM's,
   /// with the phone controller, full screen and window size).
@@ -426,6 +432,7 @@ class Preferences {
     'gamesFolders': gamesFolders,
     if (retroEmulators.isNotEmpty) 'retroEmulators': retroEmulators,
     if (retroGraphics.isNotEmpty) 'retroGraphics': retroGraphics,
+    if (retroLastDisc.isNotEmpty) 'retroLastDisc': retroLastDisc,
     if (showRetroFolders) 'showRetroFolders': true,
     // The first one under the old name too, for an older launcher started again.
     'gamesFolder': gamesFolders.firstOrNull,
@@ -801,6 +808,8 @@ enum Layer {
 
   /// PS in a game: the game paused under Resume, Game Settings and Close Game.
   quickMenu,
+  retroDiscs,
+  retroStartDisc,
 
   /// A friend's share play watched full screen (share_play_model.dart): the controller is the
   /// game's, PS leaves.
@@ -2398,6 +2407,7 @@ class AppModel extends ChangeNotifier {
   String? _playAfterInstall;
 
   Game? starting;
+  ({Game game, List<String> paths, Completer<String?> selection})? _retroDiscLaunch;
   (Game, RunningGame)? running;
 
   /// A short message at the bottom of the screen, with a trophy level's badge before it when
@@ -3908,6 +3918,7 @@ class AppModel extends ChangeNotifier {
     sounds.play(cue);
     if (overlay != next) together.askingRow = null;
     overlay = next;
+    if (next != Layer.retroStartDisc) _cancelRetroDiscPicker();
     panelRow = 0;
     // Settings open with every section; a search is over.
     if (next == Layer.settings) {
@@ -4016,7 +4027,12 @@ class AppModel extends ChangeNotifier {
   }
 
   void closeOverlay() {
+    if (overlay == Layer.retroDiscs && embeddedGame != null) {
+      open(Layer.quickMenu, cue: Cue.back);
+      return;
+    }
     overlay = null;
+    _cancelRetroDiscPicker();
     // A crop closed some other way (PS) keeps nothing.
     pictureCrop?.image.dispose();
     pictureCrop = null;
@@ -4258,6 +4274,9 @@ class AppModel extends ChangeNotifier {
       case Layer.shareWatch:
         // Taken above; here only for the switch's sake.
         return sharePlay.watchCommand(command);
+      case Layer.retroDiscs when command == Command.back || command == Command.options:
+        closeOverlay();
+        return;
       case Layer.quickMenu || Layer.closeGame when command == Command.back || command == Command.options:
         resumeGame();
         return;
@@ -4306,6 +4325,8 @@ class AppModel extends ChangeNotifier {
           Layer.party ||
           Layer.family ||
           Layer.quickMenu ||
+          Layer.retroDiscs ||
+          Layer.retroStartDisc ||
           Layer.closeGame ||
           Layer.homeMenu ||
           Layer.confirmQuit ||
@@ -4947,6 +4968,15 @@ class AppModel extends ChangeNotifier {
                 title: T.text('gameSettings'),
                 kind: ActionRow(() => open(Layer.gameSettings)),
               ),
+              if (embeddedGame?.discs case final discs?)
+                PanelRow(
+                  id: 'retro-disc-menu',
+                  title: T.text('retroChangeDisc'),
+                  detail: discs.inserted != null
+                      ? _embeddedDiscLabel(discs, discs.inserted!)
+                      : T.text('retroDiscEmpty'),
+                  kind: ActionRow(() => open(Layer.retroDiscs)),
+                ),
               if (embeddedGame == null) ...media.gameRows(),
               if (embeddedGame == null) ...sharePlay.rows(),
               PanelRow(
@@ -4958,6 +4988,10 @@ class AppModel extends ChangeNotifier {
             ],
           ),
         ];
+      case Layer.retroStartDisc:
+        return [PanelCategory(id: 'retroStartDisc', title: T.text('retroSelectDisc'), rows: _retroLaunchDiscRows())];
+      case Layer.retroDiscs:
+        return [PanelCategory(id: 'retroDiscs', title: T.text('retroChangeDisc'), rows: _embeddedDiscRows())];
       case Layer.closeGame when running != null:
         return [
           PanelCategory(
@@ -7127,6 +7161,7 @@ class AppModel extends ChangeNotifier {
   void dispose() {
     embeddedGame?.stop();
     _disposed = true;
+    _cancelRetroDiscPicker();
     saveSync.dispose();
     powerWatch.stop();
     for (final watcher in _libraries.values) {
