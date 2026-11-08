@@ -1,15 +1,15 @@
 import 'package:anyps5_desktop/core/together/compat.dart';
+import 'package:anyps5_desktop/core/together/levels.dart' show Showcase;
+import 'package:anyps5_desktop/core/together/posts.dart' show MediaItem;
 import 'package:anyps5_desktop/core/together/profiles.dart';
 import 'package:anyps5_desktop/ui/app_model.dart' hide GameState;
 import 'package:anyps5_desktop/ui/captures_view.dart' show CaptureViewer;
 import 'package:anyps5_desktop/ui/launcher.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:anyps5_desktop/ui/together_model.dart';
-import 'package:anyps5_desktop/core/together/posts.dart' show MediaItem;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/fake_together.dart';
 import '../support/ui_support.dart';
 import 'together_levels_interface_test.dart' show library, mine, recent, signedIn;
 
@@ -82,37 +82,6 @@ void main() {
     await tester.pump();
     expect(find.byType(CaptureViewer), findsNothing);
     expect(model.overlay, Layer.profile);
-  });
-
-  test('the gallery comes from the server, private and failed included, and only where it keeps files', () async {
-    final server = await FakeTogether.start();
-    addTearDown(server.close);
-    fixture = makeFixture(together: server.base);
-    model = fixture.model;
-    model.together.email = 'utku@example.com';
-    await model.together.sendCode();
-    model.together.code = '123456';
-    await model.together.verify();
-    final files = model.together.mediaFiles;
-
-    server.answers['GET users/ana/gallery'] = (
-      200,
-      {
-        'items': [
-          {'id': 'm1', 'kind': 'image', 'url': 'https://cdn.test/m1.png'},
-        ],
-      },
-    );
-    final shown = await files.gallery('ana');
-    expect(shown, isA<SectionShown<List<MediaItem>>>());
-    expect(shown.value!.single.id, 'm1');
-
-    server.answers['GET users/ana/gallery'] = (403, {'status': 403, 'code': 'forbidden', 'title': 'Private'});
-    expect(await files.gallery('ana'), isA<SectionPrivate<List<MediaItem>>>());
-
-    server.answers['GET users/ana/gallery'] = (500, {'status': 500, 'code': 'internal', 'title': 'Broken'});
-    expect(await files.gallery('ana'), isA<SectionFailed<List<MediaItem>>>());
-    model.dispose();
   });
 
   testWidgets('golden: the community card on the home screen once there is a verdict', (tester) async {

@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:anyps5_desktop/core/capture/clip_tools.dart';
 import 'package:anyps5_desktop/core/together/cloud_saves.dart';
 import 'package:anyps5_desktop/core/together/posts.dart';
+import 'package:anyps5_desktop/core/together/profiles.dart';
 import 'package:anyps5_desktop/ui/app_model.dart' hide Command, GameState;
 import 'package:anyps5_desktop/ui/app_model.dart' as launcher show Command;
 import 'package:anyps5_desktop/ui/strings.dart';
@@ -200,6 +201,25 @@ void main() {
     model.galleryIndex = 0;
     return shot;
   }
+
+  test("someone's gallery: shown, private or failed, as the owner's setting and the server say", () async {
+    final files = model.together.mediaFiles;
+    server.answers['GET users/ana/gallery'] = (
+      200,
+      {
+        'items': [media('m1', 'image')],
+      },
+    );
+    final shown = await files.gallery('ana');
+    expect(shown, isA<SectionShown<List<MediaItem>>>());
+    expect(shown.value!.single.id, 'm1');
+
+    server.answers['GET users/ana/gallery'] = FakeTogether.problem(403, 'forbidden');
+    expect(await files.gallery('ana'), isA<SectionPrivate<List<MediaItem>>>());
+
+    server.answers['GET users/ana/gallery'] = FakeTogether.problem(500, 'internal');
+    expect(await files.gallery('ana'), isA<SectionFailed<List<MediaItem>>>());
+  });
 
   test('without a server that keeps files, △ in the gallery shows the file in its folder', () {
     final shot = openGallery();
