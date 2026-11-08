@@ -492,7 +492,9 @@ extension TogetherMessages on TogetherModel {
       final lock = hub.messages.lockOf(menu.conversationId);
       return [
         if (lock != null) 'lock',
-        if (lock?.state == EncryptionState.on && app.services.pickImage != null) 'photo',
+        // As on the Mac: any conversation with a device to send to, where the family allows it.
+        if (family.mediaAllowed && lock?.state != EncryptionState.noDevice && app.services.pickPictures != null)
+          'photo',
         'pin',
         'mute',
       ];
@@ -505,7 +507,7 @@ extension TogetherMessages on TogetherModel {
     return [
       'react',
       'reply',
-      if (message.attachment != null && message.media?.gone != true) 'open',
+      if ((message.attachment != null || message.media?.kind == 'voice') && message.media?.gone != true) 'open',
       if (Messages.canEdit(message, me, DateTime.now()) && readable) 'edit',
       if (message.authorId == me) 'unsend',
       if (message.authorId != me && readable) 'report',
@@ -600,11 +602,15 @@ extension TogetherMessages on TogetherModel {
       case 'photo':
         messageMenu = null;
         app.sounds.play(Cue.select);
-        unawaited(sendPhoto());
+        if (conversation != null) unawaited(pickPictures(conversation));
       case 'open' when message != null:
         messageMenu = null;
         app.sounds.play(Cue.select);
-        unawaited(openAttachment(message));
+        if (message.attachment != null) {
+          unawaited(openAttachment(message));
+        } else if (message.media case final media?) {
+          viewChatMedia(media);
+        }
       case 'report':
         menu
           ..reporting = true
@@ -800,6 +806,18 @@ extension TogetherMessages on TogetherModel {
   String authorName(Conversation? conversation, String? userId) =>
       conversation?.author(userId)?.displayName ?? hub.friends.byId(userId ?? '')?.person.displayName ?? '';
 
+  /// "Ayşe is typing…" for the people in [typing], everyone's name as on the Mac; null for none.
+  String? typingText(Conversation conversation, List<String> typing) {
+    final names = [
+      for (final id in typing)
+        if (authorName(conversation, id) case final name when name.isNotEmpty) name,
+    ];
+    if (names.isEmpty) return null;
+    return names.length == 1
+        ? T.format('messagesTyping', [names.single])
+        : T.format('messagesTypingMany', [names.join(', ')]);
+  }
+
   /// A message that came while its conversation is not on screen: a word at the bottom.
   void _messageArrived(Map<String, dynamic> data) {
     final author = data['authorId'];
@@ -946,20 +964,30 @@ extension TogetherMessages on TogetherModel {
     return message.text ?? '';
   }
 
-  /// A photo picked, re-encoded here (no location or camera data goes along), sealed and sent.
-  Future<void> sendPhoto() async {
-    final pick = app.services.pickImage;
+  /// A conversation's options › Send a photo: picture files chosen on this computer (several at
+  /// once, as on the Mac), each drawn again here and sent.
+  Future<void> pickPictures(Conversation conversation) async {
+    final pick = app.services.pickPictures;
     if (pick == null) return;
-    try {
-      final path = await pick();
-      if (path == null) return;
-      final file = File(path);
-      if (file.lengthSync() > SealedPhoto.maxSourceBytes) throw const FormatException('too big');
-      final photo = await SealedPhoto.clean(file.readAsBytesSync());
-      await hub.messages.sendPhoto(photo.bytes, type: photo.type, width: photo.width, height: photo.height);
-    } on Object catch (error) {
-      app.show(message(error));
-    }
+    final files = await pick();
+    if (files == null || files.isEmpty) return;
+    await sendPictures(files, conversation);
+  }
+
+  /// Files dropped on the open conversation: its pictures go, anything else is said no to, as on
+  /// the Mac.
+  void dropPictures(List<String> files) {
+    final conversation = hub.messages.byId(hub.messages.openId);
+    if (conversation == null || !family.mediaAllowed || files.isEmpty) return;
+    final pictures = files.where(SealedPhoto.isPictureFile).toList();
+    if (pictures.length < files.length) app.show(T.text('cloudBadMedia'));
+    unawaited(sendPictures(pictures, conversation));
+  }
+
+  void setChatDropping(bool dropping) {
+    if (chatDropping == dropping) return;
+    chatDropping = dropping;
+    app.refresh();
   }
 
   /// A sealed attachment's file (or poster) opened in memory, once per message.
@@ -981,7 +1009,7 @@ extension TogetherMessages on TogetherModel {
   }
 
   /// A photo or clip sent as it is, over the whole screen (a clip plays in the launcher, as on
-  /// the Mac).
+  /// the Mac); a voice note plays in its bubble.
   void viewChatMedia(MediaLink media) {
     final link = media.url;
     if (media.gone || link == null) return;
@@ -990,9 +1018,7 @@ extension TogetherMessages on TogetherModel {
     } else if (media.kind == 'image') {
       chatViewing = ViewedMedia.picture(link: link);
     } else {
-      final url = Uri.tryParse(link);
-      if (url != null) app.services.openUrl?.call(url);
-      app.sounds.play(Cue.select);
+      playVoiceNote(media.id, () async => link);
       return;
     }
     app.sounds.play(Cue.select);
@@ -1006,8 +1032,7 @@ extension TogetherMessages on TogetherModel {
   }
 
   /// A sealed attachment: a photo over the whole screen from memory; a clip from a temporary
-  /// file only this user can read, playing in the launcher; a voice note in the system's
-  /// player.
+  /// file only this user can read, playing in the launcher; a voice note in its bubble.
   Future<void> openAttachment(ChatMessage message) async {
     final attachment = message.attachment;
     if (attachment == null) return;
@@ -1017,45 +1042,68 @@ extension TogetherMessages on TogetherModel {
       app.refresh();
       return;
     }
+    if (attachment.kind == 'voice') {
+      playVoiceNote(attachment.mediaId, () => _openedFile(message));
+      return;
+    }
     try {
-      final bytes = await sealedFile(message);
-      final folder = Directory(p.join(Directory.systemTemp.path, 'anyps5-attachments'))..createSync(recursive: true);
-      Posix.chmod(folder.path, 448); // 0700
-      // What was opened an hour ago and more goes first.
-      for (final old in folder.listSync()) {
-        if (old is File && DateTime.now().difference(old.statSync().modified) > const Duration(hours: 1)) {
-          try {
-            old.deleteSync();
-          } on FileSystemException {
-            // Still open in a viewer.
-          }
-        }
-      }
-      final extension = switch (attachment.type) {
-        'image/png' => 'png',
-        'image/jpeg' => 'jpg',
-        'image/webp' => 'webp',
-        'video/mp4' => 'mp4',
-        'audio/ogg' => 'ogg',
-        'audio/webm' => 'webm',
-        'audio/mp4' || 'audio/aac' => 'm4a',
-        _ => 'bin',
-      };
-      final path = p.join(folder.path, '${uuidv7()}.$extension');
-      writePrivately(path, bytes);
-      if (attachment.kind == 'clip') {
-        chatViewing = ViewedMedia.clip(
-          path,
-          posterBytes: attachment.poster == null ? null : sealedFile(message, poster: true),
-          aspect: aspect,
-        );
-        app.refresh();
-        return;
-      }
-      app.services.openUrl?.call(Uri.file(path));
+      final path = await _openedFile(message);
+      chatViewing = ViewedMedia.clip(
+        path,
+        posterBytes: attachment.poster == null ? null : sealedFile(message, poster: true),
+        aspect: aspect,
+      );
+      app.refresh();
     } on Object {
       app.show(T.text('messagesAttachmentFailed'));
     }
+  }
+
+  /// A sealed clip or voice note, opened to a temporary file only this user can read.
+  Future<String> _openedFile(ChatMessage message) async {
+    final bytes = await sealedFile(message);
+    final folder = Directory(p.join(Directory.systemTemp.path, 'anyps5-attachments'))..createSync(recursive: true);
+    Posix.chmod(folder.path, 448); // 0700
+    // What was opened an hour ago and more goes first.
+    for (final old in folder.listSync()) {
+      if (old is File && DateTime.now().difference(old.statSync().modified) > const Duration(hours: 1)) {
+        try {
+          old.deleteSync();
+        } on FileSystemException {
+          // Still open in a viewer.
+        }
+      }
+    }
+    final extension = switch (message.attachment?.type) {
+      'image/png' => 'png',
+      'image/jpeg' => 'jpg',
+      'image/webp' => 'webp',
+      'video/mp4' => 'mp4',
+      'audio/ogg' => 'ogg',
+      'audio/webm' => 'webm',
+      'audio/mp4' || 'audio/aac' => 'm4a',
+      _ => 'bin',
+    };
+    final path = p.join(folder.path, '${uuidv7()}.$extension');
+    writePrivately(path, bytes);
+    return path;
+  }
+
+  /// Plays a voice note, or pauses the one playing: in the launcher, one at a time, as on the
+  /// Mac; in the system's player when the launcher has no player or cannot open it.
+  void playVoiceNote(String id, Future<String> Function() source) {
+    unawaited(voiceNotes.toggle(id, source));
+  }
+
+  /// A voice note's bubble left the screen: it stops, as on the Mac.
+  void stopVoiceNote(String id) => unawaited(voiceNotes.stopNote(id));
+
+  /// A voice note the launcher's player could not open: as a file or a link for the system's
+  /// player, as before.
+  void _voiceInSystemPlayer(String source) {
+    final link = Uri.tryParse(source);
+    final url = link != null && link.hasScheme ? link : Uri.file(source);
+    app.services.openUrl?.call(url);
   }
 
   Future<void> reportMessage(ChatMessage message, String reason) async {
