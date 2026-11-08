@@ -689,6 +689,7 @@ void main() {
         'party-code-link',
         'party-code-new',
         'party-code-stop',
+        'party-code-enter',
       ]);
       expect(row('party-code-new').title, 'New code');
 
@@ -770,7 +771,10 @@ void main() {
         }),
       );
       await until(() => together.hub.parties.party!.leaderId == 'u-ana');
-      expect(rowIds().where((id) => id.startsWith('party-request') || id.startsWith('party-code')), isEmpty);
+      // Joining someone else's with a code is still there, as on the Mac.
+      expect(rowIds().where((id) => id.startsWith('party-request') || id.startsWith('party-code')), [
+        'party-code-enter',
+      ]);
       expect(together.partyBadge, 0);
 
       // Asking with a code and being turned down.
