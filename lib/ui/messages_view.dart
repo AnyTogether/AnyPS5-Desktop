@@ -1930,7 +1930,7 @@ class _VoiceNoteViewState extends State<_VoiceNoteView> {
         final mine = state.id == widget.id;
         final playing = mine && state.playing;
         final progress = mine ? state.progress : 0.0;
-        final shown = Duration(milliseconds: ((playing ? seconds * progress : seconds) * 1000).round());
+        final shown = Duration(seconds: (playing ? seconds * progress : seconds).round());
         return Semantics(
           button: true,
           label: T.text('messagesVoice'),

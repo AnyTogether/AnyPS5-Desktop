@@ -252,8 +252,8 @@ void main() {
       await pumpLauncher(tester, model);
       expect(find.text('0:07'), findsNWidgets(2));
 
-      // The first bubble's clock is the second to last on the list: the newest is at the bottom.
-      await tester.tap(find.text('0:07').first);
+      // The older note, at the top of the thread; the newest is first in the list.
+      await tester.tap(find.text('0:07').last);
       await tester.pump();
       await tester.pump();
       expect(players.single.opened, ['https://cdn.test/v1.ogg']);
@@ -277,7 +277,7 @@ void main() {
       expect(model.together.voiceNotes.state.value.playing, isFalse);
 
       // The other note takes over.
-      await tester.tap(find.text('0:07').last);
+      await tester.tap(find.text('0:07').first);
       await tester.pump();
       await tester.pump();
       expect(players.single.opened, ['https://cdn.test/v1.ogg', 'https://cdn.test/v2.ogg']);
@@ -288,7 +288,7 @@ void main() {
       await tester.pump();
       expect(model.together.voiceNotes.state.value.playing, isFalse);
       expect(model.together.voiceNotes.state.value.progress, 0);
-      await tester.tap(find.text('0:07').last);
+      await tester.tap(find.text('0:07').first);
       await tester.pump();
       await tester.pump();
       expect(players.single.opened, hasLength(3));
