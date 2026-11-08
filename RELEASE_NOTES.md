@@ -5,6 +5,11 @@ release when it is made.
 
 ## Next release
 
+- **Clips play inside the launcher**, as on the Mac. A clip in a game's gallery, a clip post in
+  Captures and a clip in a chat play over the whole screen, from the start and over again, with
+  their sound. In the gallery ← and → move to the next picture or clip, and ✕ or ○ close it. The
+  pointer brings a bar to pause and move through the clip. A clip the launcher cannot open goes to
+  the system's video player, as before. Photos in chats open over the whole screen too.
 - **Photos sent from the website show in chats**, with their caption and in their own shape.
   A photo sent as it is (not end-to-end encrypted) used to show only as "[photo]".
 - **Delete for everyone** is what the message menu calls removing your own message now (it was

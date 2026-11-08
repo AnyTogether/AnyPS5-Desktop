@@ -410,6 +410,12 @@ use those once changed in the game.
   Build them on Ubuntu 22.04 so they run on glibc 2.34 and newer; GTK 3 comes from the system.
   Both bring the `application/x-anyps5theme` MIME type (`anyps5-desktop-mime.xml`), which the
   desktop entry opens.
+- The clip player (media_kit, libmpv): on Windows `libmpv-2.dll` and ANGLE come from
+  media_kit_libs_windows_video and sit beside the launcher. On Linux the build needs
+  `libmpv-dev` and `patchelf`; `packaging/linux/bundle-libmpv.sh` (run by the install step)
+  copies the build machine's libmpv and the libraries it needs that the launcher does not link
+  already into the bundle's `lib/`, with their packages' copyright files in `lib/licenses/`, so
+  the bundle, the AppImage and the .deb start on systems with another libmpv or none.
 
 ## Credits
 
@@ -439,6 +445,10 @@ GPL-2.0, as the AnyPS5-ARM launcher it is ported from (see `LICENSE`). LibAtrac9
 `native/atrac9` is MIT (`native/atrac9/LICENSE`), as is `flutter_soloud`. The Noto fonts in
 `assets/system-fonts` and the Noto Sans CJK fonts the launcher downloads are under the SIL Open
 Font License 1.1 (`assets/system-fonts/OFL.txt`; the CJK licence is saved beside them). SDL2 is
-under the zlib license (`third_party/SDL2/LICENSE.txt`, shipped as `SDL2-LICENSE.txt`). The
+under the zlib license (`third_party/SDL2/LICENSE.txt`, shipped as `SDL2-LICENSE.txt`). Clips
+play through [media_kit](https://github.com/media-kit/media-kit) (MIT) and
+[libmpv](https://mpv.io) with FFmpeg (mpv is GPL-2.0-or-later, LGPL-2.1-or-later when built
+for it); the Linux bundle carries the Ubuntu packages' copyright files for the libraries it
+copies, in `lib/licenses/`. The
 padlock on locked games (`lib/ui/padlock.dart`) is drawn after Hugeicons' `square-lock-02` from
 the Hugeicons Free set, MIT licensed.

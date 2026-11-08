@@ -936,6 +936,8 @@
   "shortcutsResetDone": "Shortcuts back to their defaults",
   "touchpad": "Touchpad",
   "clip": "Clip",
+  "clipPlay": "Play",
+  "clipPause": "Pause",
   "profilesCategory": "Profiles",
   "profileKicker": "AnyPS5",
   "profileWhoIsPlaying": "Who's playing?",

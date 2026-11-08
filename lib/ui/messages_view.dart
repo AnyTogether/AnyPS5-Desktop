@@ -8,6 +8,8 @@ import '../core/together/e2ee_client.dart';
 import '../core/together/messages.dart';
 import '../core/together/people.dart' show Friend;
 import 'app_model.dart';
+import 'captures_view.dart' show RemotePicture;
+import 'clip_player.dart';
 import 'components.dart';
 import 'glass.dart';
 import 'panels.dart';
@@ -402,6 +404,10 @@ class _Thread extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        if (together.chatViewing case final viewing?)
+          Positioned.fill(
+            child: _ChatViewer(model: model, media: viewing),
           ),
         if (menu != null)
           Positioned.fill(
@@ -1630,7 +1636,7 @@ IconData deviceKindIcon(DeviceKind kind) => switch (kind) {
 };
 
 /// A photo or clip sent as it is (from the gallery's Share, here or on the Mac): its picture or
-/// the clip's poster with a play mark; clicked, opened in the system's viewer or player.
+/// the clip's poster with a play mark; clicked, shown over the whole screen (a clip plays).
 class _PlainMediaView extends StatelessWidget {
   const _PlainMediaView({required this.model, required this.media, required this.ink});
 
@@ -1650,10 +1656,7 @@ class _PlainMediaView extends StatelessWidget {
     }
     final still = media.kind == 'image' ? link : media.poster;
     return Pressable(
-      onTap: () {
-        final url = Uri.tryParse(link);
-        if (url != null) model.services.openUrl?.call(url);
-      },
+      onTap: () => model.together.viewChatMedia(media),
       builder: (context, hovering) => ClipRRect(
         borderRadius: BorderRadius.circular(12 * scale),
         child: SizedBox(
@@ -1689,7 +1692,8 @@ class _PlainMediaView extends StatelessWidget {
 }
 
 /// A sealed attachment in a bubble: a photo opened in memory, a clip's poster with a play mark,
-/// a voice note's length; clicked, opened in the system's viewer or player.
+/// a voice note's length; clicked, a photo or clip over the whole screen (a clip plays), a voice
+/// note in the system's player.
 class _SealedAttachmentView extends StatelessWidget {
   const _SealedAttachmentView({required this.model, required this.message, required this.ink});
 
@@ -1776,6 +1780,74 @@ class _SealedAttachmentView extends StatelessWidget {
                   ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A chat's picture or clip over the whole screen (the macOS launcher's MediaViewer): a click on
+/// the picture, or around the clip, closes it; the clip plays in the launcher.
+class _ChatViewer extends StatelessWidget {
+  const _ChatViewer({required this.model, required this.media});
+
+  final AppModel model;
+  final ViewedMedia media;
+
+  Widget _picture(String? link, Future<Uint8List>? bytes) {
+    if (link != null) return RemotePicture(model: model, link: link, fit: BoxFit.contain);
+    if (bytes == null) return const SizedBox.shrink();
+    return FutureBuilder<Uint8List>(
+      future: bytes,
+      builder: (context, snapshot) => snapshot.hasData
+          ? Image.memory(snapshot.data!, fit: BoxFit.contain, gaplessPlayback: true)
+          : Center(
+              child: Icon(
+                snapshot.hasError ? Icons.broken_image_rounded : Icons.lock_rounded,
+                size: 28,
+                color: Colors.white.withValues(alpha: 0.4),
+              ),
+            ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = LayoutScale.of(context);
+    final together = model.together;
+    final clip = media.clip;
+    final hasPoster = media.poster != null || media.posterBytes != null;
+    return ColoredBox(
+      key: const ValueKey('chat-viewer'),
+      color: Colors.black.withValues(alpha: 0.94),
+      child: WithBackPill(
+        onBack: together.closeChatViewer,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: together.closeChatViewer,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(70 * scale, 80 * scale, 70 * scale, 40 * scale),
+            child: clip == null
+                ? _picture(media.link, media.bytes)
+                : Center(
+                    child: AspectRatio(
+                      aspectRatio: media.aspect,
+                      child: GestureDetector(
+                        onTap: () {},
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14 * scale),
+                          child: ClipPlayerView(
+                            source: clip,
+                            create: model.services.clipPlayback,
+                            onFailed: model.playClipOutside,
+                            accent: model.accentChoice.color,
+                            poster: hasPoster ? _picture(media.poster, media.posterBytes) : null,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
           ),
         ),
       ),

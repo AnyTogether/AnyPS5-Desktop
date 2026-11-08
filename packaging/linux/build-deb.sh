@@ -21,8 +21,9 @@ cp "$HERE/anyps5-desktop-512.png" "$PKG/usr/share/icons/hicolor/512x512/apps/any
 
 # The packages that hold the system libraries the bundle links directly (its NEEDED entries
 # that are not in the bundle), by their plain names (Ubuntu 24.04's t64 packages provide them),
-# and the newest glibc symbol version it needs.
-files=("$PKG/opt/anyps5-desktop/anyps5_desktop" "$PKG"/opt/anyps5-desktop/lib/*.so)
+# and the newest glibc symbol version it needs. lib/*.so.* are the libraries carried with the
+# clip player's libmpv (bundle-libmpv.sh) and SDL2.
+files=("$PKG/opt/anyps5-desktop/anyps5_desktop" "$PKG"/opt/anyps5-desktop/lib/*.so "$PKG"/opt/anyps5-desktop/lib/*.so.*)
 needed=$(for f in "${files[@]}"; do objdump -p "$f" | awk '/NEEDED/ {print $2}'; done | sort -u)
 packages=$(for lib in $needed; do
     [ -e "$PKG/opt/anyps5-desktop/lib/$lib" ] && continue

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../core/screenshots.dart';
 import '../core/together/posts.dart';
 import 'app_model.dart';
+import 'clip_player.dart';
 import 'components.dart';
 import 'glass.dart';
 import 'panels.dart';
@@ -635,7 +636,8 @@ class _CommentRow extends StatelessWidget {
   }
 }
 
-/// A post's picture over the whole screen.
+/// A post's picture or clip over the whole screen: a click on the picture, or around the clip,
+/// closes it; a clip plays in the launcher.
 class _Viewer extends StatelessWidget {
   const _Viewer({required this.model, required this.media});
 
@@ -645,15 +647,38 @@ class _Viewer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scale = LayoutScale.of(context);
+    final poster = media.poster ?? media.thumb;
     return ColoredBox(
       color: Colors.black.withValues(alpha: 0.94),
       child: WithBackPill(
         onBack: model.together.closeViewer,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(70 * scale, 80 * scale, 70 * scale, 40 * scale),
-          child: GestureDetector(
-            onTap: model.together.closeViewer,
-            child: RemotePicture(model: model, link: media.url, fit: BoxFit.contain),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: model.together.closeViewer,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(70 * scale, 80 * scale, 70 * scale, 40 * scale),
+            child: media.clip
+                ? Center(
+                    child: AspectRatio(
+                      aspectRatio: mediaAspect(media.width, media.height),
+                      child: GestureDetector(
+                        onTap: () {},
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14 * scale),
+                          child: ClipPlayerView(
+                            source: media.url,
+                            create: model.services.clipPlayback,
+                            onFailed: model.playClipOutside,
+                            accent: model.accentChoice.color,
+                            poster: poster == null
+                                ? null
+                                : RemotePicture(model: model, link: poster, fit: BoxFit.contain),
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                : RemotePicture(model: model, link: media.url, fit: BoxFit.contain),
           ),
         ),
       ),

@@ -30,6 +30,7 @@ import 'package:anyps5_desktop/core/unreal/unreal_controls.dart';
 import 'package:anyps5_desktop/main.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/background.dart';
+import 'package:anyps5_desktop/ui/clip_player.dart';
 import 'package:anyps5_desktop/ui/components.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:anyps5_desktop/ui/theme_hub_model.dart';
@@ -176,6 +177,7 @@ Fixture makeFixture({
   Future<String?> Function()? pickImage,
   CommandRunner? commands,
   DiscordPresence Function()? discord,
+  ClipPlayback Function()? clipPlayback,
 }) {
   final opened = <Uri>[];
   final copied = <String>[];
@@ -224,6 +226,7 @@ Fixture makeFixture({
       preferredPorts: false,
       cable: false,
       openUrl: opened.add,
+      clipPlayback: clipPlayback,
       copyText: copied.add,
       openFolder: (folder) => shown?.call(folder),
       environment: environment,
