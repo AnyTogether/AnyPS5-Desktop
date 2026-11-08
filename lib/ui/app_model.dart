@@ -7,7 +7,7 @@ import 'dart:ui' as ui show Image;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart' show Color;
-import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:flutter/services.dart' show LogicalKeyboardKey, PlatformException;
 import 'package:path/path.dart' as p;
 
 import '../core/audio/atrac9.dart';
@@ -103,6 +103,8 @@ import 'update_model.dart';
 import 'trophy_card.dart';
 
 part 'profiles_model.dart';
+part 'retro_home_folders.dart';
+part 'standalone_emulators.dart';
 part 'settings_search.dart';
 part 'themes_model.dart';
 
@@ -127,6 +129,12 @@ class Preferences {
     ..menuMusicFile = json['menuMusicFile'] as String?
     ..profileName = json['profileName'] as String? ?? ''
     ..gamesFolders = _folders(json['gamesFolders'], json['gamesFolder'])
+    ..retroEmulators = {
+      if (json['retroEmulators'] case final Map<dynamic, dynamic> entries)
+        for (final platform in RetroPlatform.values)
+          if (entries[platform.name] case final String path) platform.name: path,
+    }
+    ..showRetroFolders = json['showRetroFolders'] == true
     ..toolkitFolder = json['toolkitFolder'] as String?
     ..onboarded = json['onboarded'] as bool? ?? false
     ..gameArtwork = json['gameArtwork'] as bool? ?? true
@@ -232,6 +240,8 @@ class Preferences {
   /// The games folders in order (a library over several drives); the first holds the store, where
   /// games are unlocked. A folder whose drive is unplugged stays in the list.
   List<String> gamesFolders = [];
+  Map<String, String> retroEmulators = {};
+  bool showRetroFolders = false;
   String? toolkitFolder;
   bool onboarded = false;
   bool gameArtwork = true;
@@ -400,6 +410,8 @@ class Preferences {
     'menuMusicFile': menuMusicFile,
     'profileName': profileName,
     'gamesFolders': gamesFolders,
+    if (retroEmulators.isNotEmpty) 'retroEmulators': retroEmulators,
+    if (showRetroFolders) 'showRetroFolders': true,
     // The first one under the old name too, for an older launcher started again.
     'gamesFolder': gamesFolders.firstOrNull,
     'toolkitFolder': toolkitFolder,
@@ -572,6 +584,10 @@ class Installing extends GameState {
 class Failed extends GameState {
   const Failed(this.message);
   final String message;
+}
+
+class NeedsEmulator extends GameState {
+  const NeedsEmulator();
 }
 
 class Installed extends GameState {
@@ -1482,7 +1498,7 @@ class AppModel extends ChangeNotifier {
         musicVolume == 0 ||
         launcherVolume == 0;
     // The theme's (or the user's own) menu music when the selected game has no song.
-    music.play(quiet ? null : selectedGame, fallback: quiet ? null : menuMusic);
+    music.play(quiet ? null : homePreviewGame, fallback: quiet ? null : menuMusic);
     // With the game in front, the launcher says nothing.
     sounds.muted = running != null && !active;
   }
@@ -2176,6 +2192,7 @@ class AppModel extends ChangeNotifier {
 
   List<Game> games = [];
   int selected = 0;
+  RetroPlatform? _homeRetroFolder;
   int libraryIndex = 0;
   HomeFocus focus = HomeFocus.tiles;
   Layer? overlay;
@@ -2647,7 +2664,7 @@ class AppModel extends ChangeNotifier {
       _connected.clear();
       _scannedFolders = key;
     }
-    final survey = GameLibrary.surveyAll(folders);
+    final survey = GameLibrary.surveyAll(folders, includeRetro: true);
     folderCounts = survey.folders;
     _gameRoots = survey.roots;
     _takeScan(survey.games, quiet: _newlyConnected());
@@ -2673,7 +2690,7 @@ class AppModel extends ChangeNotifier {
   List<String> _watchedScan(String folder) {
     final folders = preferences.gamesFolders;
     if (_disposed || !folders.contains(folder)) return const [];
-    final survey = GameLibrary.surveyAll(folders);
+    final survey = GameLibrary.surveyAll(folders, includeRetro: true);
     final key = folders.join('\n');
     final counted = !mapEquals(folderCounts, survey.folders);
     folderCounts = survey.folders;
@@ -2708,6 +2725,7 @@ class AppModel extends ChangeNotifier {
     records.clear();
     trophies.clear();
     for (final game in games) {
+      if (game.retro != null) continue;
       final installed = Installer.installedFolder(game, rootOf(game)!);
       final record = Installer.record(installed, system: system);
       if (record != null) records[game.id] = record;
@@ -2834,6 +2852,9 @@ class AppModel extends ChangeNotifier {
     }
     if (starting?.id == game.id) return const Starting();
     if (together.family.ageLock(game) case final FamilyLocked lock) return lock;
+    if (game.retro case final RetroDisc disc) {
+      return standaloneEmulator(disc.platform) == null ? const NeedsEmulator() : const Installed();
+    }
     final installed = records.containsKey(game.id);
     final current = progress[game.id];
     if (current != null) {
@@ -2968,6 +2989,10 @@ class AppModel extends ChangeNotifier {
 
   void primaryAction(Game game) {
     switch (stateOf(game)) {
+      case NeedsEmulator():
+        unawaited(chooseStandaloneEmulator(game.retro!.platform));
+      case Installed() when game.retro != null:
+        unawaited(play(game));
       case Installed(:final outdated):
         void go() => outdated ? open(Layer.updateChoice) : unawaited(play(game));
         // Settings › AnyPS5 Engine › Update from Git Before Playing: the checkout's remote first.
@@ -3015,6 +3040,7 @@ class AppModel extends ChangeNotifier {
   /// Queues [game]'s unlock; when its files would be copied (the games folder cannot link to the
   /// dump) and [copy] does not say so already, asks first.
   void unlock(Game game, {bool copy = false}) {
+    if (game.retro != null) return;
     final folder = rootOf(game);
     if (folder == null) return;
     final kit = toolkit;
@@ -3502,6 +3528,7 @@ class AppModel extends ChangeNotifier {
 
   /// Plays [game]; [trace] turns detailed logging on for this start only.
   Future<void> play(Game game, {bool trace = false}) async {
+    if (game.retro case final RetroDisc disc) return _playStandalone(game, disc);
     final folder = rootOf(game);
     if (folder == null || starting != null || running != null || saveSync.syncing != null) return;
     // The profile's own saves and trophies in the game's folder before anything reads them.
@@ -3652,6 +3679,21 @@ class AppModel extends ChangeNotifier {
       _changed();
     }
   }
+
+  @visibleForTesting
+  Future<RunningGame> Function({
+    required String installed,
+    required String program,
+    required List<String> arguments,
+    required String logFile,
+  })
+  startRetroGame = ({required installed, required program, required arguments, required logFile}) => GameProcess.start(
+    installed: installed,
+    program: program,
+    arguments: arguments,
+    logFile: logFile,
+    environment: const {},
+  );
 
   /// While a game runs, a trophy it earns shows and goes to the phones.
   void _watchTrophies(Game game) {
@@ -3971,6 +4013,7 @@ class AppModel extends ChangeNotifier {
   void select(int index) {
     if (index < 0 || index >= games.length) return;
     selected = index;
+    _homeRetroFolder = preferences.showRetroFolders ? games[index].retro?.platform : null;
     focus = HomeFocus.tiles;
     measureSelected();
     _changed();
@@ -4251,15 +4294,17 @@ class AppModel extends ChangeNotifier {
     if (focus == const HomeFocus.notice(1) && updates.restartAfterGame) focus = const HomeFocus.notice(0);
     switch ((focus.area, command)) {
       case ('tiles', Command.left):
-        moveSelection(-1);
+        moveHomeSelection(-1);
       case ('tiles', Command.right):
-        moveSelection(1);
+        moveHomeSelection(1);
       case ('tiles', Command.down):
-        _moveFocus(const HomeFocus.actions(0));
+        if (!openSelectedHomeFolder()) _moveFocus(const HomeFocus.actions(0));
+      case ('tiles', Command.back):
+        closeHomeFolder();
       case ('tiles', Command.up):
-        _moveFocus(const HomeFocus.top(1));
+        if (!closeHomeFolder()) _moveFocus(const HomeFocus.top(1));
       case ('tiles', Command.select):
-        primaryAction(game!);
+        if (!openSelectedHomeFolder()) primaryAction(game!);
       case ('top', Command.left) when focus.index == 0 && updates.showsNotice:
         _moveFocus(HomeFocus.notice(updates.restartAfterGame ? 0 : 1));
       case ('top', Command.left):
@@ -4304,7 +4349,7 @@ class AppModel extends ChangeNotifier {
           open(Layer.gameSettings);
         }
       case (_, Command.options):
-        open(Layer.gameSettings);
+        if (selectedHomeFolder == null) open(Layer.gameSettings);
       default:
         break;
     }
@@ -4339,7 +4384,7 @@ class AppModel extends ChangeNotifier {
     final (game, run) = playing;
     final front = _frontForGuide;
     quickMenuPaused = false;
-    if (!front && preferences.pauseOnMenu) {
+    if (!front && preferences.pauseOnMenu && game.retro == null) {
       // An engine that takes presses: Options held on player 1's pad through the remote pad
       // bridge, whoever drives it (sent three times, 40 ms apart; the menu ~210 ms after the
       // first). Otherwise the key the game's Options is on, typed into its window.
@@ -5348,6 +5393,7 @@ class AppModel extends ChangeNotifier {
       PanelCategory(id: 'shortcuts', title: T.text('shortcuts'), rows: _shortcutRows()),
       // Fonts are rarely changed: near the end, before About.
       PanelCategory(id: 'fonts', title: T.text('fonts'), rows: fonts.settingsRows()),
+      _standaloneEmulatorSettings(),
       PanelCategory(
         id: 'about',
         title: T.text('about'),
@@ -5747,6 +5793,17 @@ class AppModel extends ChangeNotifier {
   }
 
   List<PanelRow> _gameRows(Game game) {
+    if (game.retro case final RetroDisc disc) {
+      return [
+        PanelRow(
+          id: 'retro-emulator',
+          title: disc.platform.emulator,
+          detail: standaloneEmulator(disc.platform),
+          kind: ActionRow(() => unawaited(chooseStandaloneEmulator(disc.platform))),
+        ),
+        PanelRow(id: 'log', title: T.text('openLog'), kind: ActionRow(() => open(Layer.log))),
+      ];
+    }
     final settings = currentSettings(game);
     void change(GameSettings next) => saveSettings(game, next);
     final defaults = preferences.displayDefaults;
@@ -6879,7 +6936,7 @@ class AppModel extends ChangeNotifier {
               Queued() || Installing() || WaitingForEngine() => RemoteGameState.installing,
               Starting() => RemoteGameState.starting,
               Running() || Stopping() => RemoteGameState.running,
-              Unreadable() => RemoteGameState.unavailable,
+              Unreadable() || NeedsEmulator() => RemoteGameState.unavailable,
             },
             trophies: switch (trophies[game.id]) {
               final TrophySet set => '${set.unlockedCount}/${set.trophies.length}',

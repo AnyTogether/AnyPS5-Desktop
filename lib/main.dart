@@ -128,7 +128,7 @@ Future<void> main(List<String> arguments) async {
         acceptedTypeGroups: [XTypeGroup(label: label, extensions: extensions)],
       ))?.path,
       pickFile: (label, extensions) async => (await openFile(
-        acceptedTypeGroups: [XTypeGroup(label: label, extensions: extensions)],
+        acceptedTypeGroups: extensions.isEmpty ? const [] : [XTypeGroup(label: label, extensions: extensions)],
       ))?.path,
       engineReleases: GitHubReleases(),
       launcherReleases: LauncherUpdates.source(),

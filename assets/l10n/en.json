@@ -2129,5 +2129,16 @@
   "sharePlayMaxViewersServerDetail": "Up to 4 get a stream from your computer. With more, viewers watch through the media server and players keep a direct link.",
   "shareCodeMakeDetail": "Anyone with the code can ask to watch. You still say yes to each one.",
   "joinCodeMade": "New code: %@",
-  "joinCodeStopped": "The code no longer works"
+  "joinCodeStopped": "The code no longer works",
+  "retroEmulators": "Emulators",
+  "retroGames": "%@ games",
+  "retroSelectExecutable": "Select the %@ executable",
+  "retroChooseExecutable": "Choose an installed executable",
+  "retroEmulatorPickerFailed": "Could not open the emulator file picker",
+  "retroChooseEmulator": "Choose emulator",
+  "retroEmulatorNeeded": "Emulator required",
+  "retroShowFolders": "Show as folders",
+  "retroDiscMoved": "The game file is missing. Put it back or scan the library again.",
+  "retroEmulatorStartFailed": "Could not start %@",
+  "retroEmulatorExited": "%@ closed with exit code %d"
 }

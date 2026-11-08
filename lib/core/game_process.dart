@@ -53,6 +53,7 @@ abstract final class GameProcess {
     required Map<String, String> environment,
     required String logFile,
     HostSystem? system,
+    String? program,
     List<String> arguments = const [],
     DateTime Function()? clock,
     bool traced = false,
@@ -60,7 +61,7 @@ abstract final class GameProcess {
     List<String> notes = const [],
   }) async {
     final host = system ?? HostSystem.current;
-    final executable = p.join(installed, host.executableName);
+    final executable = program ?? p.join(installed, host.executableName);
     if (!File(executable).existsSync()) {
       throw ProcessException(executable, arguments, 'the game is not installed', 2);
     }

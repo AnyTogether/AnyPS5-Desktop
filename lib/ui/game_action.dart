@@ -26,6 +26,7 @@ class GameAction {
 
   static GameAction of(GameState state) => switch (state) {
     Installed() => GameAction(T.text('play'), Icons.play_arrow_rounded),
+    NeedsEmulator() => GameAction(T.text('retroChooseEmulator'), Icons.settings_rounded),
     Locked() || Unreadable() => GameAction(T.text('unlock'), Icons.lock_open_rounded),
     Failed() => GameAction(T.text('retry'), Icons.refresh_rounded),
     Installing(preparing: true) => GameAction(T.text('playWhenReady'), Icons.play_arrow_rounded),
