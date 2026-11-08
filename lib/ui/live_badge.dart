@@ -29,7 +29,7 @@ abstract final class LiveBadge {
     canvas.drawRRect(track, Paint()..color = Colors.black.withValues(alpha: 0.55));
     final pill = RRect.fromRectAndRadius(Rect.fromLTWH(0, 0, pillWidth, _height), const Radius.circular(_height / 2));
     canvas.drawRRect(pill, Paint()..color = live ? const Color(0xFFEB2933) : const Color(0xFFF29926));
-    canvas.drawCircle(Offset(pad + dot / 2, _height / 2), dot / 2, Paint()..color = Colors.white);
+    canvas.drawCircle(const Offset(pad + dot / 2, _height / 2), dot / 2, Paint()..color = Colors.white);
     label.paint(canvas, Offset(pad + dot + dotGap, (_height - label.height) / 2));
     clock.paint(canvas, Offset(pillWidth + 9, (_height - clock.height) / 2));
     label.dispose();

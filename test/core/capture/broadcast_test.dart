@@ -162,7 +162,7 @@ void main() {
     final endpoint = RtmpEndpoint.parse('rtmps://a.rtmps.youtube.com/live2', 'key-1');
 
     test('the microphone is mixed over the game at its level, and goes on without it when it will not open', () async {
-      var level = 80;
+      const level = 80;
       final told = <String>[];
       late Broadcaster made;
       made = Broadcaster(
