@@ -73,13 +73,16 @@ void main() {
     expect(model.phoneEngineMissing, isTrue);
   }
 
+  /// The key the launcher gave the phone, for it to come back without pairing again.
+  String? phoneKey;
+
   Future<FakePhone> pairedPhone() async {
     final phone = await FakePhone.connect(model.remote!.port!);
     phone.hello('phone-1', 'Pixel');
     await phone.next<Pairing>();
     await until(() => model.pairing != null);
     model.handle(launcher.Command.select);
-    await phone.next<Welcome>();
+    phoneKey = (await phone.next<Welcome>()).key;
     await until(() => model.remote!.connectedDevices.isNotEmpty);
     return phone;
   }
@@ -167,7 +170,7 @@ void main() {
       await phone.close();
       await until(() => model.remote!.connectedDevices.isEmpty);
       final again = await FakePhone.connect(model.remote!.port!);
-      again.hello('phone-1', 'Pixel');
+      again.hello('phone-1', 'Pixel', key: phoneKey);
       await again.next<Welcome>();
       await until(() => model.remote!.connectedDevices.isNotEmpty);
       await Future<void>.delayed(const Duration(milliseconds: 100));
