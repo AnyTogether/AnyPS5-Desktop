@@ -2129,5 +2129,18 @@
   "sharePlayMaxViewersServerDetail": "Jusqu’à 4 reçoivent un flux depuis votre ordinateur. Au-delà, les spectateurs regardent via le serveur multimédia et les joueurs gardent une liaison directe.",
   "shareCodeMakeDetail": "Toute personne ayant le code peut demander à regarder. Vous acceptez chaque personne.",
   "joinCodeMade": "Nouveau code : %@",
-  "joinCodeStopped": "Le code ne fonctionne plus"
+  "joinCodeStopped": "Le code ne fonctionne plus",
+  "phoneEngineTitle": "Le téléphone ne peut pas lancer de jeux",
+  "phoneEngineWhy": "Le moteur d’origine ne lit que les manettes et le clavier",
+  "phoneEngineWhyDetail": "Le téléphone pilote le lanceur, mais un jeu l’ignore. Le moteur AnyPS5-ARM lit le téléphone et ouvre les jeux en plein écran ou à la taille de fenêtre que vous avez choisie.",
+  "phoneEngineSwitch": "Passer au moteur AnyPS5-ARM",
+  "phoneEngineSwitchDetail": "Le télécharge depuis les versions signées d’AnyPS5-ARM et l’utilise. La prochaine fois que vous lancerez un jeu, Mettre à jour et jouer le déverrouillera avec ce moteur. Les sauvegardes et les trophées sont conservés.",
+  "phoneEngineSwitchSize": "Télécharge %@ depuis les versions signées d’AnyPS5-ARM et l’utilise. La prochaine fois que vous lancerez un jeu, Mettre à jour et jouer le déverrouillera avec ce moteur. Les sauvegardes et les trophées sont conservés.",
+  "phoneEngineSwitchHave": "Utilise le moteur AnyPS5-ARM que vous avez téléchargé auparavant. La prochaine fois que vous lancerez un jeu, Mettre à jour et jouer le déverrouillera avec ce moteur. Les sauvegardes et les trophées sont conservés.",
+  "phoneEngineLater": "Pas maintenant",
+  "phoneUpstreamSwitchDetail": "Le moteur d’origine ne lit que les manettes et le clavier. Sélectionnez cette option pour passer au moteur AnyPS5-ARM, qui lit le téléphone. Les jeux proposeront alors Mettre à jour et jouer.",
+  "reportPlayGoArm": "Passer au moteur AnyPS5-ARM et rejouer",
+  "reportPlayGoArmDetail": "Ce dump n’a pas de fichiers de segments PlayGo, et le moteur AnyPS5-ARM le considère comme entièrement installé. Télécharge le moteur si nécessaire, déverrouille de nouveau le jeu et le lance. Les sauvegardes et les trophées sont conservés.",
+  "reportPlayGoInstalled": "Rejouer en comptant les segments manquants comme installés",
+  "reportPlayGoInstalledDetail": "Pour ce lancement uniquement, avec le moteur que vous avez actuellement. Les parties du jeu absentes du dump peuvent ne pas se charger."
 }

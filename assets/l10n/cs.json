@@ -2129,5 +2129,18 @@
   "sharePlayMaxViewersServerDetail": "Až 4 diváci dostávají stream z vašeho počítače. Při větším počtu sledují přes mediální server a hráči si ponechají přímé spojení.",
   "shareCodeMakeDetail": "Kdokoli s kódem může požádat o sledování. Každému stále musíte dát souhlas.",
   "joinCodeMade": "Nový kód: %@",
-  "joinCodeStopped": "Kód už nefunguje"
+  "joinCodeStopped": "Kód už nefunguje",
+  "phoneEngineTitle": "Telefon neumí hrát hry",
+  "phoneEngineWhy": "Engine původního projektu čte pouze ovladače a klávesnici",
+  "phoneEngineWhyDetail": "Telefon ovládá launcher, ale hra ho ignoruje. Engine AnyPS5-ARM telefon čte a otevírá hry na celou obrazovku nebo ve zvolené velikosti okna.",
+  "phoneEngineSwitch": "Přepnout na engine AnyPS5-ARM",
+  "phoneEngineSwitchDetail": "Stáhne jej z podepsaných vydání AnyPS5-ARM a použije ho. Při příštím spuštění hry ji Aktualizovat a hrát odemkne s tímto enginem. Uložené pozice a trofeje zůstanou.",
+  "phoneEngineSwitchSize": "Stáhne %@ z podepsaných vydání AnyPS5-ARM a použije jej. Při příštím spuštění hry ji Aktualizovat a hrát odemkne s tímto enginem. Uložené pozice a trofeje zůstanou.",
+  "phoneEngineSwitchHave": "Použije engine AnyPS5-ARM, který jste již stáhli. Při příštím spuštění hry ji Aktualizovat a hrát odemkne s tímto enginem. Uložené pozice a trofeje zůstanou.",
+  "phoneEngineLater": "Teď ne",
+  "phoneUpstreamSwitchDetail": "Engine původního projektu čte pouze ovladače a klávesnici. Vyberte pro přepnutí na engine AnyPS5-ARM, který čte telefon. Hry pak nabídnou Aktualizovat a hrát.",
+  "reportPlayGoArm": "Přepnout na engine AnyPS5-ARM a hrát znovu",
+  "reportPlayGoArmDetail": "Tento dump neobsahuje soubory částí PlayGo a engine AnyPS5-ARM ho bere jako plně nainstalovaný. V případě potřeby stáhne engine, znovu odemkne hru a spustí ji. Uložené pozice a trofeje zůstanou.",
+  "reportPlayGoInstalled": "Hrát znovu s chybějícími částmi považovanými za nainstalované",
+  "reportPlayGoInstalledDetail": "Pouze pro toto spuštění, s enginem, který právě máte. Části hry, které v dumpu chybí, se nemusí načíst."
 }

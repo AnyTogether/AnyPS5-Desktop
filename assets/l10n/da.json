@@ -2129,5 +2129,18 @@
   "sharePlayMaxViewersServerDetail": "Op til 4 får en stream fra din computer. Ved flere ser seerne med via medieserveren, og spillere beholder en direkte forbindelse.",
   "shareCodeMakeDetail": "Alle med koden kan bede om at se med. Du siger stadig ja til hver enkelt.",
   "joinCodeMade": "Ny kode: %@",
-  "joinCodeStopped": "Koden virker ikke længere"
+  "joinCodeStopped": "Koden virker ikke længere",
+  "phoneEngineTitle": "Telefonen kan ikke spille spil",
+  "phoneEngineWhy": "Upstreams engine læser kun controllere og tastaturet",
+  "phoneEngineWhyDetail": "Telefonen styrer launcheren, men et spil ignorerer den. AnyPS5-ARM-enginen læser telefonen og åbner spil i fuld skærm eller i den vinduesstørrelse, du valgte.",
+  "phoneEngineSwitch": "Skift til AnyPS5-ARM-enginen",
+  "phoneEngineSwitchDetail": "Henter den fra AnyPS5-ARMs signerede udgivelser og bruger den. Næste gang du spiller et spil, låser Opdater og spil det op med denne engine. Gemte data og trofæer bevares.",
+  "phoneEngineSwitchSize": "Henter %@ fra AnyPS5-ARMs signerede udgivelser og bruger den. Næste gang du spiller et spil, låser Opdater og spil det op med denne engine. Gemte data og trofæer bevares.",
+  "phoneEngineSwitchHave": "Bruger den AnyPS5-ARM-engine, du hentede tidligere. Næste gang du spiller et spil, låser Opdater og spil det op med denne engine. Gemte data og trofæer bevares.",
+  "phoneEngineLater": "Ikke nu",
+  "phoneUpstreamSwitchDetail": "Upstreams engine læser kun controllere og tastaturet. Vælg for at skifte til AnyPS5-ARM-enginen, som læser telefonen. Spil tilbyder så Opdater og spil.",
+  "reportPlayGoArm": "Skift til AnyPS5-ARM-enginen og spil igen",
+  "reportPlayGoArmDetail": "Dette dump har ingen PlayGo-chunkfiler, og AnyPS5-ARM-enginen regner det som fuldt installeret. Henter enginen om nødvendigt, låser spillet op igen og starter det. Gemte data og trofæer bevares.",
+  "reportPlayGoInstalled": "Spil igen med manglende chunks regnet som installeret",
+  "reportPlayGoInstalledDetail": "Kun for denne start, med den engine du har nu. Dele af spillet, som dumpet mangler, kan fejle ved indlæsning."
 }

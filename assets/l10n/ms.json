@@ -2129,5 +2129,18 @@
   "sharePlayMaxViewersServerDetail": "Sehingga 4 orang mendapat strim daripada komputer anda. Jika lebih, penonton menonton melalui pelayan media dan pemain mengekalkan pautan terus.",
   "shareCodeMakeDetail": "Sesiapa yang mempunyai kod boleh meminta untuk menonton. Anda masih berkata ya kepada setiap orang.",
   "joinCodeMade": "Kod baharu: %@",
-  "joinCodeStopped": "Kod tidak lagi berfungsi"
+  "joinCodeStopped": "Kod tidak lagi berfungsi",
+  "phoneEngineTitle": "Telefon tidak boleh memainkan permainan",
+  "phoneEngineWhy": "Enjin upstream hanya membaca pengawal dan papan kekunci",
+  "phoneEngineWhyDetail": "Telefon menggerakkan pelancar, dan permainan mengabaikannya. Enjin AnyPS5-ARM membaca telefon, dan membuka permainan skrin penuh atau pada saiz tetingkap yang anda pilih.",
+  "phoneEngineSwitch": "Tukar kepada enjin AnyPS5-ARM",
+  "phoneEngineSwitchDetail": "Memuat turunnya daripada keluaran bertandatangan AnyPS5-ARM dan menggunakannya. Kali seterusnya anda bermain permainan, Kemas Kini dan Main membukanya dengan enjin ini. Data simpanan dan trofi kekal.",
+  "phoneEngineSwitchSize": "Memuat turun %@ daripada keluaran bertandatangan AnyPS5-ARM dan menggunakannya. Kali seterusnya anda bermain permainan, Kemas Kini dan Main membukanya dengan enjin ini. Data simpanan dan trofi kekal.",
+  "phoneEngineSwitchHave": "Menggunakan enjin AnyPS5-ARM yang telah anda muat turun sebelum ini. Kali seterusnya anda bermain permainan, Kemas Kini dan Main membukanya dengan enjin ini. Data simpanan dan trofi kekal.",
+  "phoneEngineLater": "Bukan sekarang",
+  "phoneUpstreamSwitchDetail": "Enjin upstream hanya membaca pengawal dan papan kekunci. Pilih untuk bertukar kepada enjin AnyPS5-ARM, yang membaca telefon. Permainan kemudian menawarkan Kemas Kini dan Main.",
+  "reportPlayGoArm": "Tukar kepada enjin AnyPS5-ARM dan main semula",
+  "reportPlayGoArmDetail": "Dump ini tiada fail cebisan PlayGo, dan enjin AnyPS5-ARM menganggapnya dipasang sepenuhnya. Memuat turun enjin jika perlu, membuka permainan semula dan memulakannya. Data simpanan dan trofi kekal.",
+  "reportPlayGoInstalled": "Main semula dengan cebisan yang hilang dianggap dipasang",
+  "reportPlayGoInstalledDetail": "Untuk permulaan ini sahaja, dengan enjin yang anda ada sekarang. Bahagian permainan yang tiada dalam dump mungkin gagal dimuatkan."
 }

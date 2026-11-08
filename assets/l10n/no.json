@@ -2129,5 +2129,18 @@
   "sharePlayMaxViewersServerDetail": "Opptil 4 får en strøm fra datamaskinen din. Med flere ser seerne via medieserveren, og spillerne beholder en direkte forbindelse.",
   "shareCodeMakeDetail": "Alle med koden kan be om å se på. Du sier fortsatt ja til hver enkelt.",
   "joinCodeMade": "Ny kode: %@",
-  "joinCodeStopped": "Koden fungerer ikke lenger"
+  "joinCodeStopped": "Koden fungerer ikke lenger",
+  "phoneEngineTitle": "Telefonen kan ikke spille spill",
+  "phoneEngineWhy": "Upstreams motor leser bare kontrollere og tastaturet",
+  "phoneEngineWhyDetail": "Telefonen styrer launcheren, men et spill ignorerer den. AnyPS5-ARM-motoren leser telefonen og åpner spill i fullskjerm eller i vindusstørrelsen du valgte.",
+  "phoneEngineSwitch": "Bytt til AnyPS5-ARM-motoren",
+  "phoneEngineSwitchDetail": "Laster den ned fra AnyPS5-ARMs signerte utgivelser og bruker den. Neste gang du spiller et spill, låser Oppdater og spill det opp med denne motoren. Lagringsfiler og trofeer beholdes.",
+  "phoneEngineSwitchSize": "Laster ned %@ fra AnyPS5-ARMs signerte utgivelser og bruker den. Neste gang du spiller et spill, låser Oppdater og spill det opp med denne motoren. Lagringsfiler og trofeer beholdes.",
+  "phoneEngineSwitchHave": "Bruker AnyPS5-ARM-motoren du lastet ned tidligere. Neste gang du spiller et spill, låser Oppdater og spill det opp med denne motoren. Lagringsfiler og trofeer beholdes.",
+  "phoneEngineLater": "Ikke nå",
+  "phoneUpstreamSwitchDetail": "Upstreams motor leser bare kontrollere og tastaturet. Velg for å bytte til AnyPS5-ARM-motoren, som leser telefonen. Spill tilbyr da Oppdater og spill.",
+  "reportPlayGoArm": "Bytt til AnyPS5-ARM-motoren og spill igjen",
+  "reportPlayGoArmDetail": "Denne dumpen har ingen PlayGo-chunkfiler, og AnyPS5-ARM-motoren regner den som fullt installert. Laster ned motoren om nødvendig, låser opp spillet på nytt og starter det. Lagringsfiler og trofeer beholdes.",
+  "reportPlayGoInstalled": "Spill igjen med manglende chunker regnet som installert",
+  "reportPlayGoInstalledDetail": "Bare for denne starten, med motoren du har nå. Deler av spillet som dumpen mangler, kan feile under innlasting."
 }

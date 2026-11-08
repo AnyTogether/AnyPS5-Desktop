@@ -2129,5 +2129,18 @@
   "sharePlayMaxViewersServerDetail": "最多 4 人可从你的电脑获得一路流。超过后观看者通过媒体服务器观看，玩家保持直连。",
   "shareCodeMakeDetail": "拥有代码的人都可以请求观看。每个请求仍需你同意。",
   "joinCodeMade": "新代码：%@",
-  "joinCodeStopped": "该代码已失效"
+  "joinCodeStopped": "该代码已失效",
+  "phoneEngineTitle": "手机无法玩游戏",
+  "phoneEngineWhy": "上游引擎只读取手柄和键盘",
+  "phoneEngineWhyDetail": "手机可以操作启动器，但游戏会忽略它。AnyPS5-ARM 引擎可以读取手机，并以全屏或你选择的窗口大小打开游戏。",
+  "phoneEngineSwitch": "切换到 AnyPS5-ARM 引擎",
+  "phoneEngineSwitchDetail": "从 AnyPS5-ARM 的已签名发行版下载并使用。下次玩游戏时，“更新并游玩”会用此引擎解锁游戏。存档和奖杯会保留。",
+  "phoneEngineSwitchSize": "从 AnyPS5-ARM 的已签名发行版下载 %@ 并使用。下次玩游戏时，“更新并游玩”会用此引擎解锁游戏。存档和奖杯会保留。",
+  "phoneEngineSwitchHave": "使用你之前下载的 AnyPS5-ARM 引擎。下次玩游戏时，“更新并游玩”会用此引擎解锁游戏。存档和奖杯会保留。",
+  "phoneEngineLater": "以后再说",
+  "phoneUpstreamSwitchDetail": "上游引擎只读取手柄和键盘。选择以切换到可读取手机的 AnyPS5-ARM 引擎。之后游戏会提供“更新并游玩”。",
+  "reportPlayGoArm": "切换到 AnyPS5-ARM 引擎并重新游玩",
+  "reportPlayGoArmDetail": "此转储没有 PlayGo 分块文件，而 AnyPS5-ARM 引擎会将其视为已完全安装。如有需要会下载引擎，重新解锁游戏并启动。存档和奖杯会保留。",
+  "reportPlayGoInstalled": "将缺失的分块视为已安装并重新游玩",
+  "reportPlayGoInstalledDetail": "仅本次启动使用，使用你当前的引擎。转储中缺少的游戏部分可能无法加载。"
 }

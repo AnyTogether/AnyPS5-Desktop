@@ -2129,5 +2129,18 @@
   "sharePlayMaxViewersServerDetail": "Hingga 4 penonton mendapat stream dari komputer Anda. Jika lebih, penonton menonton lewat server media dan pemain tetap tersambung langsung.",
   "shareCodeMakeDetail": "Siapa pun yang punya kode dapat meminta untuk menonton. Anda tetap menyetujui satu per satu.",
   "joinCodeMade": "Kode baru: %@",
-  "joinCodeStopped": "Kode tidak berfungsi lagi"
+  "joinCodeStopped": "Kode tidak berfungsi lagi",
+  "phoneEngineTitle": "Ponsel tidak dapat memainkan game",
+  "phoneEngineWhy": "Mesin upstream hanya membaca pengontrol dan keyboard",
+  "phoneEngineWhyDetail": "Ponsel menggerakkan peluncur, dan game mengabaikannya. Mesin AnyPS5-ARM membaca ponsel, dan membuka game layar penuh atau sebesar jendela yang Anda pilih.",
+  "phoneEngineSwitch": "Beralih ke mesin AnyPS5-ARM",
+  "phoneEngineSwitchDetail": "Mengunduhnya dari rilis bertanda tangan AnyPS5-ARM dan menggunakannya. Saat Anda memainkan game berikutnya, Perbarui dan Mainkan membukanya dengan mesin ini. Simpanan dan piala tetap ada.",
+  "phoneEngineSwitchSize": "Mengunduh %@ dari rilis bertanda tangan AnyPS5-ARM dan menggunakannya. Saat Anda memainkan game berikutnya, Perbarui dan Mainkan membukanya dengan mesin ini. Simpanan dan piala tetap ada.",
+  "phoneEngineSwitchHave": "Menggunakan mesin AnyPS5-ARM yang sudah Anda unduh sebelumnya. Saat Anda memainkan game berikutnya, Perbarui dan Mainkan membukanya dengan mesin ini. Simpanan dan piala tetap ada.",
+  "phoneEngineLater": "Nanti saja",
+  "phoneUpstreamSwitchDetail": "Mesin upstream hanya membaca pengontrol dan keyboard. Pilih untuk beralih ke mesin AnyPS5-ARM, yang membaca ponsel. Game kemudian menawarkan Perbarui dan Mainkan.",
+  "reportPlayGoArm": "Beralih ke mesin AnyPS5-ARM dan mainkan lagi",
+  "reportPlayGoArmDetail": "Dump ini tidak punya file chunk PlayGo, dan mesin AnyPS5-ARM menganggapnya terinstal penuh. Mengunduh mesin jika perlu, membuka game lagi, lalu memulainya. Simpanan dan piala tetap ada.",
+  "reportPlayGoInstalled": "Mainkan lagi dengan chunk yang hilang dianggap terinstal",
+  "reportPlayGoInstalledDetail": "Hanya untuk permulaan ini, dengan mesin yang Anda pakai sekarang. Bagian game yang tidak ada di dump mungkin gagal dimuat."
 }

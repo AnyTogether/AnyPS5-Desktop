@@ -2129,5 +2129,18 @@
   "sharePlayMaxViewersServerDetail": "Até 4 recebem uma transmissão do seu computador. Com mais, os espectadores assistem pelo servidor de mídia e os jogadores mantêm uma conexão direta.",
   "shareCodeMakeDetail": "Quem tiver o código pode pedir para assistir. Você ainda aprova cada pedido.",
   "joinCodeMade": "Novo código: %@",
-  "joinCodeStopped": "O código não funciona mais"
+  "joinCodeStopped": "O código não funciona mais",
+  "phoneEngineTitle": "O celular não consegue jogar",
+  "phoneEngineWhy": "O mecanismo original lê apenas controles e o teclado",
+  "phoneEngineWhyDetail": "O celular controla o inicializador, e um jogo o ignora. O mecanismo AnyPS5-ARM lê o celular e abre os jogos em tela cheia ou no tamanho de janela que você escolheu.",
+  "phoneEngineSwitch": "Mudar para o mecanismo AnyPS5-ARM",
+  "phoneEngineSwitchDetail": "Baixa-o das versões assinadas do AnyPS5-ARM e o usa. Na próxima vez que você jogar, Atualizar e jogar desbloqueia o jogo com este mecanismo. Os dados salvos e os troféus são mantidos.",
+  "phoneEngineSwitchSize": "Baixa %@ das versões assinadas do AnyPS5-ARM e o usa. Na próxima vez que você jogar, Atualizar e jogar desbloqueia o jogo com este mecanismo. Os dados salvos e os troféus são mantidos.",
+  "phoneEngineSwitchHave": "Usa o mecanismo AnyPS5-ARM que você baixou antes. Na próxima vez que você jogar, Atualizar e jogar desbloqueia o jogo com este mecanismo. Os dados salvos e os troféus são mantidos.",
+  "phoneEngineLater": "Agora não",
+  "phoneUpstreamSwitchDetail": "O mecanismo original lê apenas controles e o teclado. Selecione para mudar para o mecanismo AnyPS5-ARM, que lê o celular. Os jogos passam então a oferecer Atualizar e jogar.",
+  "reportPlayGoArm": "Mudar para o mecanismo AnyPS5-ARM e jogar de novo",
+  "reportPlayGoArmDetail": "Este dump não tem arquivos de chunk do PlayGo, e o mecanismo AnyPS5-ARM o considera totalmente instalado. Baixa o mecanismo se necessário, desbloqueia o jogo de novo e o inicia. Os dados salvos e os troféus são mantidos.",
+  "reportPlayGoInstalled": "Jogar de novo contando os chunks ausentes como instalados",
+  "reportPlayGoInstalledDetail": "Somente para esta inicialização, com o mecanismo que você tem agora. Partes do jogo que faltam no dump podem não carregar."
 }

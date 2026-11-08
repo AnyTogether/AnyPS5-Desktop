@@ -2129,5 +2129,18 @@
   "sharePlayMaxViewersServerDetail": "Până la 4 primesc un flux de la calculatorul tău. Dacă sunt mai mulți, spectatorii urmăresc prin serverul media, iar jucătorii păstrează o legătură directă.",
   "shareCodeMakeDetail": "Oricine are codul poate cere să urmărească. Tu spui în continuare da pentru fiecare.",
   "joinCodeMade": "Cod nou: %@",
-  "joinCodeStopped": "Codul nu mai funcționează"
+  "joinCodeStopped": "Codul nu mai funcționează",
+  "phoneEngineTitle": "Telefonul nu poate rula jocuri",
+  "phoneEngineWhy": "Motorul upstream citește doar controllere și tastatura",
+  "phoneEngineWhyDetail": "Telefonul mută selecția în launcher, dar un joc îl ignoră. Motorul AnyPS5-ARM citește telefonul și deschide jocurile pe tot ecranul sau la dimensiunea de fereastră aleasă de tine.",
+  "phoneEngineSwitch": "Comută la motorul AnyPS5-ARM",
+  "phoneEngineSwitchDetail": "Îl descarcă din versiunile semnate AnyPS5-ARM și îl folosește. Data viitoare când joci un joc, Actualizează și joacă îl deblochează cu acest motor. Salvările și trofeele rămân.",
+  "phoneEngineSwitchSize": "Descarcă %@ din versiunile semnate AnyPS5-ARM și îl folosește. Data viitoare când joci un joc, Actualizează și joacă îl deblochează cu acest motor. Salvările și trofeele rămân.",
+  "phoneEngineSwitchHave": "Folosește motorul AnyPS5-ARM descărcat anterior. Data viitoare când joci un joc, Actualizează și joacă îl deblochează cu acest motor. Salvările și trofeele rămân.",
+  "phoneEngineLater": "Nu acum",
+  "phoneUpstreamSwitchDetail": "Motorul upstream citește doar controllere și tastatura. Selectează pentru a comuta la motorul AnyPS5-ARM, care citește telefonul. Jocurile vor oferi apoi Actualizează și joacă.",
+  "reportPlayGoArm": "Comută la motorul AnyPS5-ARM și joacă din nou",
+  "reportPlayGoArmDetail": "Acest dump nu are fișiere chunk PlayGo, iar motorul AnyPS5-ARM îl consideră complet instalat. Descarcă motorul dacă este nevoie, deblochează din nou jocul și îl pornește. Salvările și trofeele rămân.",
+  "reportPlayGoInstalled": "Joacă din nou cu chunk-urile lipsă considerate instalate",
+  "reportPlayGoInstalledDetail": "Doar pentru această pornire, cu motorul pe care îl ai acum. Părțile jocului care lipsesc din dump ar putea să nu se încarce."
 }

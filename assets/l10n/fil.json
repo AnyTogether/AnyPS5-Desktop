@@ -2129,5 +2129,18 @@
   "sharePlayMaxViewersServerDetail": "Hanggang 4 ang nakakakuha ng stream mula sa iyong computer. Kapag mas marami, nanonood ang mga manonood sa pamamagitan ng media server at pinapanatili ng mga manlalaro ang direktang link.",
   "shareCodeMakeDetail": "Maaaring humiling na manood ang sinumang may code. Ikaw pa rin ang magsasabi ng oo sa bawat isa.",
   "joinCodeMade": "Bagong code: %@",
-  "joinCodeStopped": "Hindi na gumagana ang code"
+  "joinCodeStopped": "Hindi na gumagana ang code",
+  "phoneEngineTitle": "Hindi makapaglaro ng mga laro ang telepono",
+  "phoneEngineWhy": "Controller at keyboard lang ang binabasa ng upstream na engine",
+  "phoneEngineWhyDetail": "Ang telepono ang nagagalaw sa launcher, at binabalewala ito ng laro. Binabasa ng AnyPS5-ARM engine ang telepono, at binubuksan nito ang mga laro nang full screen o sa laki ng window na pinili mo.",
+  "phoneEngineSwitch": "Lumipat sa AnyPS5-ARM engine",
+  "phoneEngineSwitchDetail": "Dina-download ito mula sa mga signed release ng AnyPS5-ARM at ginagamit. Sa susunod na maglaro ka, ia-unlock ng I-update at Laruin ang laro gamit ang engine na ito. Mananatili ang mga save at tropeo.",
+  "phoneEngineSwitchSize": "Dina-download ang %@ mula sa mga signed release ng AnyPS5-ARM at ginagamit. Sa susunod na maglaro ka, ia-unlock ng I-update at Laruin ang laro gamit ang engine na ito. Mananatili ang mga save at tropeo.",
+  "phoneEngineSwitchHave": "Ginagamit ang AnyPS5-ARM engine na na-download mo na dati. Sa susunod na maglaro ka, ia-unlock ng I-update at Laruin ang laro gamit ang engine na ito. Mananatili ang mga save at tropeo.",
+  "phoneEngineLater": "Hindi ngayon",
+  "phoneUpstreamSwitchDetail": "Controller at keyboard lang ang binabasa ng upstream na engine. Piliin para lumipat sa AnyPS5-ARM engine, na bumabasa sa telepono. Mag-aalok na ang mga laro ng I-update at Laruin.",
+  "reportPlayGoArm": "Lumipat sa AnyPS5-ARM engine at maglaro ulit",
+  "reportPlayGoArmDetail": "Walang mga PlayGo chunk file ang dump na ito, at itinuturing ito ng AnyPS5-ARM engine bilang ganap na naka-install. Magda-download ng engine kung kailangan, ia-unlock muli ang laro, at sisimulan ito. Mananatili ang mga save at tropeo.",
+  "reportPlayGoInstalled": "Maglaro ulit na ituturing na naka-install ang mga nawawalang chunk",
+  "reportPlayGoInstalledDetail": "Para sa pagsisimulang ito lang, gamit ang engine na mayroon ka ngayon. Maaaring hindi mag-load ang mga bahagi ng laro na wala sa dump."
 }

@@ -2129,5 +2129,18 @@
   "sharePlayMaxViewersServerDetail": "최대 4명까지 컴퓨터에서 스트림을 받습니다. 그보다 많으면 시청자는 미디어 서버를 통해 시청하고 플레이어는 직접 연결을 유지합니다.",
   "shareCodeMakeDetail": "코드를 가진 누구나 시청을 요청할 수 있습니다. 각 요청은 직접 수락해야 합니다.",
   "joinCodeMade": "새 코드: %@",
-  "joinCodeStopped": "코드가 더 이상 작동하지 않습니다"
+  "joinCodeStopped": "코드가 더 이상 작동하지 않습니다",
+  "phoneEngineTitle": "휴대폰으로는 게임을 플레이할 수 없습니다",
+  "phoneEngineWhy": "업스트림 엔진은 컨트롤러와 키보드만 인식합니다",
+  "phoneEngineWhyDetail": "휴대폰으로 런처는 조작할 수 있지만 게임은 입력을 무시합니다. AnyPS5-ARM 엔진은 휴대폰 입력을 인식하며 게임을 전체 화면 또는 선택한 창 크기로 엽니다.",
+  "phoneEngineSwitch": "AnyPS5-ARM 엔진으로 전환",
+  "phoneEngineSwitchDetail": "AnyPS5-ARM의 서명된 릴리스에서 다운로드하여 사용합니다. 다음에 게임을 플레이할 때 업데이트 후 플레이가 이 엔진으로 게임을 잠금 해제합니다. 세이브와 트로피는 유지됩니다.",
+  "phoneEngineSwitchSize": "AnyPS5-ARM의 서명된 릴리스에서 %@을(를) 다운로드하여 사용합니다. 다음에 게임을 플레이할 때 업데이트 후 플레이가 이 엔진으로 게임을 잠금 해제합니다. 세이브와 트로피는 유지됩니다.",
+  "phoneEngineSwitchHave": "이전에 다운로드한 AnyPS5-ARM 엔진을 사용합니다. 다음에 게임을 플레이할 때 업데이트 후 플레이가 이 엔진으로 게임을 잠금 해제합니다. 세이브와 트로피는 유지됩니다.",
+  "phoneEngineLater": "나중에",
+  "phoneUpstreamSwitchDetail": "업스트림 엔진은 컨트롤러와 키보드만 인식합니다. 선택하면 휴대폰을 인식하는 AnyPS5-ARM 엔진으로 전환합니다. 이후 게임에서 업데이트 후 플레이를 사용할 수 있습니다.",
+  "reportPlayGoArm": "AnyPS5-ARM 엔진으로 전환하고 다시 플레이",
+  "reportPlayGoArmDetail": "이 덤프에는 PlayGo 청크 파일이 없으며 AnyPS5-ARM 엔진은 이를 완전히 설치된 것으로 처리합니다. 필요하면 엔진을 다운로드하고 게임을 다시 잠금 해제하여 시작합니다. 세이브와 트로피는 유지됩니다.",
+  "reportPlayGoInstalled": "누락된 청크를 설치된 것으로 처리하고 다시 플레이",
+  "reportPlayGoInstalledDetail": "이번 실행에만 현재 엔진으로 적용됩니다. 덤프에 없는 게임 부분은 불러오지 못할 수 있습니다."
 }

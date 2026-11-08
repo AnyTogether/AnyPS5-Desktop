@@ -2129,5 +2129,18 @@
   "sharePlayMaxViewersServerDetail": "Upp till 4 får en ström från din dator. Med fler tittar åskådarna via mediaservern och spelarna behåller en direkt länk.",
   "shareCodeMakeDetail": "Alla med koden kan be att få titta. Du säger fortfarande ja till varje person.",
   "joinCodeMade": "Ny kod: %@",
-  "joinCodeStopped": "Koden fungerar inte längre"
+  "joinCodeStopped": "Koden fungerar inte längre",
+  "phoneEngineTitle": "Telefonen kan inte spela spel",
+  "phoneEngineWhy": "Upstreams motor läser bara handkontroller och tangentbordet",
+  "phoneEngineWhyDetail": "Telefonen styr launchern, men ett spel ignorerar den. AnyPS5-ARM-motorn läser telefonen och öppnar spel i helskärm eller i den fönsterstorlek du valde.",
+  "phoneEngineSwitch": "Byt till AnyPS5-ARM-motorn",
+  "phoneEngineSwitchDetail": "Hämtar den från AnyPS5-ARM:s signerade utgåvor och använder den. Nästa gång du spelar ett spel låser Uppdatera och spela upp det med den här motorn. Sparfiler och troféer behålls.",
+  "phoneEngineSwitchSize": "Hämtar %@ från AnyPS5-ARM:s signerade utgåvor och använder den. Nästa gång du spelar ett spel låser Uppdatera och spela upp det med den här motorn. Sparfiler och troféer behålls.",
+  "phoneEngineSwitchHave": "Använder den AnyPS5-ARM-motor du hämtade tidigare. Nästa gång du spelar ett spel låser Uppdatera och spela upp det med den här motorn. Sparfiler och troféer behålls.",
+  "phoneEngineLater": "Inte nu",
+  "phoneUpstreamSwitchDetail": "Upstreams motor läser bara handkontroller och tangentbordet. Välj för att byta till AnyPS5-ARM-motorn, som läser telefonen. Spel erbjuder då Uppdatera och spela.",
+  "reportPlayGoArm": "Byt till AnyPS5-ARM-motorn och spela igen",
+  "reportPlayGoArmDetail": "Den här dumpen saknar PlayGo-chunkfiler, och AnyPS5-ARM-motorn räknar den som fullständigt installerad. Hämtar motorn vid behov, låser upp spelet igen och startar det. Sparfiler och troféer behålls.",
+  "reportPlayGoInstalled": "Spela igen med saknade chunkar räknade som installerade",
+  "reportPlayGoInstalledDetail": "Bara för den här starten, med motorn du har nu. Delar av spelet som dumpen saknar kan misslyckas att laddas."
 }

@@ -2129,5 +2129,18 @@
   "sharePlayMaxViewersServerDetail": "Legfeljebb 4 néző kap streamet közvetlenül a számítógépedről. Ennél többnél a nézők a médiaszerveren keresztül néznek, a játékosok pedig közvetlen kapcsolatot tartanak.",
   "shareCodeMakeDetail": "Bárki, akinek megvan a kód, nézést kérhet. Mindegyikre te mondasz igent.",
   "joinCodeMade": "Új kód: %@",
-  "joinCodeStopped": "A kód már nem működik"
+  "joinCodeStopped": "A kód már nem működik",
+  "phoneEngineTitle": "A telefon nem tud játékokat játszani",
+  "phoneEngineWhy": "Az upstream motor csak kontrollereket és billentyűzetet olvas",
+  "phoneEngineWhyDetail": "A telefon mozgatja az indítót, a játék viszont figyelmen kívül hagyja. Az AnyPS5-ARM motor olvassa a telefont, és a játékokat teljes képernyőn vagy a választott ablakmérettel nyitja meg.",
+  "phoneEngineSwitch": "Váltás az AnyPS5-ARM motorra",
+  "phoneEngineSwitchDetail": "Letölti az AnyPS5-ARM aláírt kiadásaiból, és használja. Legközelebb, amikor játszol egy játékkal, a Frissítés és játék ezzel a motorral oldja fel. A mentések és a trófeák megmaradnak.",
+  "phoneEngineSwitchSize": "Letölti a(z) %@ verziót az AnyPS5-ARM aláírt kiadásaiból, és használja. Legközelebb, amikor játszol egy játékkal, a Frissítés és játék ezzel a motorral oldja fel. A mentések és a trófeák megmaradnak.",
+  "phoneEngineSwitchHave": "A korábban letöltött AnyPS5-ARM motort használja. Legközelebb, amikor játszol egy játékkal, a Frissítés és játék ezzel a motorral oldja fel. A mentések és a trófeák megmaradnak.",
+  "phoneEngineLater": "Most nem",
+  "phoneUpstreamSwitchDetail": "Az upstream motor csak kontrollereket és billentyűzetet olvas. Válaszd ki az AnyPS5-ARM motorra váltáshoz, amely a telefont is olvassa. A játékok ezután a Frissítés és játék lehetőséget kínálják.",
+  "reportPlayGoArm": "Váltás az AnyPS5-ARM motorra és újrajátszás",
+  "reportPlayGoArmDetail": "Ebben a dumpban nincsenek PlayGo chunk fájlok, és az AnyPS5-ARM motor teljesen telepítettnek számolja. Szükség esetén letölti a motort, újra feloldja a játékot, és elindítja. A mentések és a trófeák megmaradnak.",
+  "reportPlayGoInstalled": "Újrajátszás a hiányzó chunkok telepítettnek számításával",
+  "reportPlayGoInstalledDetail": "Csak erre az indításra, a jelenlegi motorral. A játék azon részei, amelyek hiányoznak a dumpból, esetleg nem töltődnek be."
 }

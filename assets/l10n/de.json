@@ -2129,5 +2129,18 @@
   "sharePlayMaxViewersServerDetail": "Bis zu 4 erhalten einen Stream von deinem Computer. Bei mehr schauen Zuschauer über den Medienserver zu, und Spieler behalten eine direkte Verbindung.",
   "shareCodeMakeDetail": "Wer den Code hat, kann anfragen zuzuschauen. Du bestätigst weiterhin jede Anfrage.",
   "joinCodeMade": "Neuer Code: %@",
-  "joinCodeStopped": "Der Code funktioniert nicht mehr"
+  "joinCodeStopped": "Der Code funktioniert nicht mehr",
+  "phoneEngineTitle": "Das Smartphone kann keine Spiele spielen",
+  "phoneEngineWhy": "Die Upstream-Engine liest nur Controller und Tastatur",
+  "phoneEngineWhyDetail": "Das Smartphone steuert den Launcher, ein Spiel ignoriert es. Die AnyPS5-ARM-Engine liest das Smartphone und öffnet Spiele im Vollbild oder in der von dir gewählten Fenstergröße.",
+  "phoneEngineSwitch": "Zur AnyPS5-ARM-Engine wechseln",
+  "phoneEngineSwitchDetail": "Lädt sie aus den signierten Releases von AnyPS5-ARM herunter und verwendet sie. Beim nächsten Spielstart schaltet Aktualisieren und spielen das Spiel mit dieser Engine frei. Spielstände und Trophäen bleiben erhalten.",
+  "phoneEngineSwitchSize": "Lädt %@ aus den signierten Releases von AnyPS5-ARM herunter und verwendet es. Beim nächsten Spielstart schaltet Aktualisieren und spielen das Spiel mit dieser Engine frei. Spielstände und Trophäen bleiben erhalten.",
+  "phoneEngineSwitchHave": "Verwendet die AnyPS5-ARM-Engine, die du zuvor heruntergeladen hast. Beim nächsten Spielstart schaltet Aktualisieren und spielen das Spiel mit dieser Engine frei. Spielstände und Trophäen bleiben erhalten.",
+  "phoneEngineLater": "Jetzt nicht",
+  "phoneUpstreamSwitchDetail": "Die Upstream-Engine liest nur Controller und Tastatur. Wähle dies, um zur AnyPS5-ARM-Engine zu wechseln, die das Smartphone liest. Spiele bieten dann Aktualisieren und spielen an.",
+  "reportPlayGoArm": "Zur AnyPS5-ARM-Engine wechseln und erneut spielen",
+  "reportPlayGoArmDetail": "Diesem Dump fehlen PlayGo-Chunk-Dateien, und die AnyPS5-ARM-Engine zählt ihn als vollständig installiert. Lädt bei Bedarf die Engine herunter, schaltet das Spiel erneut frei und startet es. Spielstände und Trophäen bleiben erhalten.",
+  "reportPlayGoInstalled": "Erneut spielen, fehlende Chunks als installiert gezählt",
+  "reportPlayGoInstalledDetail": "Nur für diesen Start, mit der Engine, die du jetzt hast. Teile des Spiels, die dem Dump fehlen, können eventuell nicht geladen werden."
 }

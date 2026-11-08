@@ -2129,5 +2129,18 @@
   "sharePlayMaxViewersServerDetail": "最多 4 位可從你的電腦取得串流，超過時觀看者會透過媒體伺服器觀看，玩家則保持直接連線。",
   "shareCodeMakeDetail": "任何持有代碼的人都可以要求觀看。每位仍須經你同意。",
   "joinCodeMade": "新代碼：%@",
-  "joinCodeStopped": "該代碼已失效"
+  "joinCodeStopped": "該代碼已失效",
+  "phoneEngineTitle": "手機無法玩遊戲",
+  "phoneEngineWhy": "上游引擎只讀取控制器和鍵盤",
+  "phoneEngineWhyDetail": "手機可以操作啟動器，但遊戲會忽略它。AnyPS5-ARM 引擎可以讀取手機，並以全螢幕或您選擇的視窗大小開啟遊戲。",
+  "phoneEngineSwitch": "切換到 AnyPS5-ARM 引擎",
+  "phoneEngineSwitchDetail": "從 AnyPS5-ARM 的已簽署版本下載並使用。下次玩遊戲時，「更新並遊玩」會用此引擎解鎖遊戲。存檔和獎盃會保留。",
+  "phoneEngineSwitchSize": "從 AnyPS5-ARM 的已簽署版本下載 %@ 並使用。下次玩遊戲時，「更新並遊玩」會用此引擎解鎖遊戲。存檔和獎盃會保留。",
+  "phoneEngineSwitchHave": "使用您之前下載的 AnyPS5-ARM 引擎。下次玩遊戲時，「更新並遊玩」會用此引擎解鎖遊戲。存檔和獎盃會保留。",
+  "phoneEngineLater": "以後再說",
+  "phoneUpstreamSwitchDetail": "上游引擎只讀取控制器和鍵盤。選取以切換到可讀取手機的 AnyPS5-ARM 引擎。之後遊戲會提供「更新並遊玩」。",
+  "reportPlayGoArm": "切換到 AnyPS5-ARM 引擎並重新遊玩",
+  "reportPlayGoArmDetail": "此傾印沒有 PlayGo 分塊檔案，而 AnyPS5-ARM 引擎會將其視為已完全安裝。如有需要會下載引擎，重新解鎖遊戲並啟動。存檔和獎盃會保留。",
+  "reportPlayGoInstalled": "將缺少的分塊視為已安裝並重新遊玩",
+  "reportPlayGoInstalledDetail": "僅此次啟動使用，使用您目前的引擎。傾印中缺少的遊戲部分可能無法載入。"
 }

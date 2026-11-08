@@ -2129,5 +2129,18 @@
   "sharePlayMaxViewersServerDetail": "Hasta 4 reciben una transmisión desde tu equipo. Con más, los espectadores miran a través del servidor multimedia y los jugadores mantienen un enlace directo.",
   "shareCodeMakeDetail": "Cualquiera con el código puede pedir mirar. Tú sigues aprobando cada solicitud.",
   "joinCodeMade": "Código nuevo: %@",
-  "joinCodeStopped": "El código ya no funciona"
+  "joinCodeStopped": "El código ya no funciona",
+  "phoneEngineTitle": "El teléfono no puede jugar a los juegos",
+  "phoneEngineWhy": "El motor original solo lee mandos y teclado",
+  "phoneEngineWhyDetail": "El teléfono controla el lanzador, pero un juego lo ignora. El motor AnyPS5-ARM lee el teléfono y abre los juegos a pantalla completa o con el tamaño de ventana que elijas.",
+  "phoneEngineSwitch": "Cambiar al motor AnyPS5-ARM",
+  "phoneEngineSwitchDetail": "Lo descarga de las versiones firmadas de AnyPS5-ARM y lo usa. La próxima vez que juegues, Actualizar y jugar desbloqueará el juego con este motor. Los datos guardados y los trofeos se conservan.",
+  "phoneEngineSwitchSize": "Descarga %@ de las versiones firmadas de AnyPS5-ARM y lo usa. La próxima vez que juegues, Actualizar y jugar desbloqueará el juego con este motor. Los datos guardados y los trofeos se conservan.",
+  "phoneEngineSwitchHave": "Usa el motor AnyPS5-ARM que descargaste antes. La próxima vez que juegues, Actualizar y jugar desbloqueará el juego con este motor. Los datos guardados y los trofeos se conservan.",
+  "phoneEngineLater": "Ahora no",
+  "phoneUpstreamSwitchDetail": "El motor original solo lee mandos y teclado. Selecciona esta opción para cambiar al motor AnyPS5-ARM, que lee el teléfono. Los juegos ofrecerán entonces Actualizar y jugar.",
+  "reportPlayGoArm": "Cambiar al motor AnyPS5-ARM y jugar de nuevo",
+  "reportPlayGoArmDetail": "Este volcado no tiene archivos de fragmentos PlayGo, y el motor AnyPS5-ARM lo cuenta como totalmente instalado. Descarga el motor si hace falta, vuelve a desbloquear el juego y lo inicia. Los datos guardados y los trofeos se conservan.",
+  "reportPlayGoInstalled": "Jugar de nuevo contando los fragmentos que faltan como instalados",
+  "reportPlayGoInstalledDetail": "Solo para este inicio, con el motor que tienes ahora. Las partes del juego que faltan en el volcado pueden no cargarse."
 }

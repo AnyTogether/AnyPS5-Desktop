@@ -2129,5 +2129,18 @@
   "sharePlayMaxViewersServerDetail": "እስከ 4 ሰዎች ከኮምፒውተርዎ ስርጭት ያገኛሉ። ከዚያ በላይ ሲሆኑ ተመልካቾች በሚዲያ አገልጋዩ በኩል ይመለከታሉ ተጫዋቾች ደግሞ ቀጥታ ግንኙነታቸውን ይይዛሉ።",
   "shareCodeMakeDetail": "ኮዱ ያለው ማንም ለመመልከት መጠየቅ ይችላል። ለእያንዳንዱ አሁንም እርስዎ ይፈቅዳሉ።",
   "joinCodeMade": "አዲስ ኮድ፦ %@",
-  "joinCodeStopped": "ኮዱ ከአሁን በኋላ አይሰራም"
+  "joinCodeStopped": "ኮዱ ከአሁን በኋላ አይሰራም",
+  "phoneEngineTitle": "ስልኩ ጨዋታዎችን መጫወት አይችልም",
+  "phoneEngineWhy": "የመጀመሪያው ኤንጂን መቆጣጠሪያዎችን እና ኪቦርድን ብቻ ያነባል",
+  "phoneEngineWhyDetail": "ስልኩ launcherን ይቆጣጠራል፣ ጨዋታ ግን ችላ ይለዋል። የAnyPS5-ARM ኤንጂን ስልኩን ያነባል፣ እና ጨዋታዎችን በሙሉ ስክሪን ወይም በመረጡት የመስኮት መጠን ይከፍታል።",
+  "phoneEngineSwitch": "ወደ AnyPS5-ARM ኤንጂን ቀይር",
+  "phoneEngineSwitchDetail": "ከAnyPS5-ARM ፊርማ ካላቸው ልቀቶች ያወርደዋል እና ይጠቀማል። ቀጣይ ጊዜ ጨዋታ ሲጫወቱ፣ አዘምን እና ተጫወት ጨዋታውን በዚህ ኤንጂን ይከፍታል። የተቀመጡ ጨዋታዎች (Saves) እና ዋንጫዎች ይቆያሉ።",
+  "phoneEngineSwitchSize": "%@ን ከAnyPS5-ARM ፊርማ ካላቸው ልቀቶች ያወርደዋል እና ይጠቀማል። ቀጣይ ጊዜ ጨዋታ ሲጫወቱ፣ አዘምን እና ተጫወት ጨዋታውን በዚህ ኤንጂን ይከፍታል። የተቀመጡ ጨዋታዎች (Saves) እና ዋንጫዎች ይቆያሉ።",
+  "phoneEngineSwitchHave": "ከዚህ በፊት ያወረዱትን የAnyPS5-ARM ኤንጂን ይጠቀማል። ቀጣይ ጊዜ ጨዋታ ሲጫወቱ፣ አዘምን እና ተጫወት ጨዋታውን በዚህ ኤንጂን ይከፍታል። የተቀመጡ ጨዋታዎች (Saves) እና ዋንጫዎች ይቆያሉ።",
+  "phoneEngineLater": "አሁን አይደለም",
+  "phoneUpstreamSwitchDetail": "የመጀመሪያው ኤንጂን መቆጣጠሪያዎችን እና ኪቦርድን ብቻ ያነባል። ስልኩን ወደሚያነበው የAnyPS5-ARM ኤንጂን ለመቀየር ይምረጡ። ከዚያ ጨዋታዎች አዘምን እና ተጫወት ያቀርባሉ።",
+  "reportPlayGoArm": "ወደ AnyPS5-ARM ኤንጂን ቀይረህ እንደገና ተጫወት",
+  "reportPlayGoArmDetail": "ይህ ዳምፕ የPlayGo ቸንክ ፋይሎች የሉትም፣ እና የAnyPS5-ARM ኤንጂን ሙሉ በሙሉ እንደተጫነ ይቆጥረዋል። ኤንጂኑን ካስፈለገ ያወርዳል፣ ጨዋታውን እንደገና ይከፍታል እና ያስጀምረዋል። የተቀመጡ ጨዋታዎች (Saves) እና ዋንጫዎች ይቆያሉ።",
+  "reportPlayGoInstalled": "የጎደሉ ቸንኮች እንደተጫኑ ተቆጥረው እንደገና ተጫወት",
+  "reportPlayGoInstalledDetail": "ለዚህ ጅምር ብቻ፣ አሁን ባለዎት ኤንጂን። ዳምፕው የጎደላቸው የጨዋታው ክፍሎች መጫን ላይሳካላቸው ይችላል።"
 }
