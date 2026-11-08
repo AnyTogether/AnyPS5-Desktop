@@ -10,6 +10,17 @@ release when it is made.
   Ninja and a C++ compiler (g++) on PATH, the launcher runs the CMake setup the build guide
   shows, with its progress, then pulls and builds. When a tool is missing it names it and opens
   the right guide: upstream AnyPS5's build guide for an upstream checkout, AnyPS5-ARM's for its own.
+- **A new install gets the AnyPS5-ARM engine.** On a first start the welcome downloads
+  AnyPS5-ARM's engine, which reads the phone controller and opens games full screen or at the
+  window size you chose. If you already use upstream's engine, nothing changes on its own.
+- **Switch to the AnyPS5-ARM engine in one press when your phone can't reach a game.** With
+  upstream's engine in use, connecting a phone or a browser pad, or ending a game that ran with
+  one, offers the switch. It downloads the engine and uses it, and Update and play unlocks each
+  game with it. Settings › Phones offers the same.
+- **A dump without PlayGo chunk files no longer ends at a dead end.** When a game stops because
+  sce_sys/playgo-chunk.dat and playgo-scenario.json are missing, the crash report offers to
+  switch to the AnyPS5-ARM engine and play again, or to play once more with the missing chunks
+  counted as installed (that start only).
 - **Quit AnyPS5? is a small yes or no**, as on the Mac: Cancel and Quit side by side, ← and →
   between them, Esc still cancels, Quit in red. Close the game? asks the same way.
 - **Linked profiles show it on Who's playing?**: AnyTogether's mark on the tile of a profile
