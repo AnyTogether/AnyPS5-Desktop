@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 import '../support/fake_process.dart';
+import '../support/self_builder.dart';
 import '../support/ui_support.dart';
 
 /// Settings › Battery & heat: the readings, the profiles, what a game starts with and hears while
@@ -155,6 +156,7 @@ value = 1080
     expect(model.powerWatch.adjustment.lowerResolution, isTrue);
     expect(model.preferences.powerProfiles?['battery'], containsPair('lowerResolution', true));
     final neon = model.games.firstWhere((game) => game.titleId == 'PPSA02002');
+    File(p.join(neon.folder, 'eboot.bin')).writeAsBytesSync(typicalSelf());
     Future<void> until(bool Function() condition) async {
       for (var tries = 0; tries < 2000 && !condition(); tries++) {
         await Future<void>.delayed(const Duration(milliseconds: 5));
