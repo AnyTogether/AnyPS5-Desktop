@@ -42,10 +42,11 @@ void main() {
         expect(T.text(key), isNot(contains('Finder')), reason: '$key in ${language.code}');
       }
     }
-    // Only the two texts of the macOS launcher's tables this one never shows name it.
+    // Only the two texts of the macOS launcher's tables this one never shows name it, and a
+    // friend's device in the encryption sheet, which can be a Mac.
     for (final code in ['en', 'tr']) {
       for (final MapEntry(:key, :value) in languageFile(code).entries) {
-        if (key == 'rosettaMissing' || key == 'clipsDetail') continue;
+        if (key == 'rosettaMissing' || key == 'clipsDetail' || key == 'e2eeDeviceMac') continue;
         expect(value, isNot(contains('Mac')), reason: '$key in $code');
         expect(value, isNot(contains('⌥')), reason: '$key in $code');
       }

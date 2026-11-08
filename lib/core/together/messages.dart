@@ -100,6 +100,8 @@ class MediaLink {
     this.poster,
     this.sealed = false,
     this.gone = false,
+    this.width,
+    this.height,
   });
 
   static MediaLink? fromJson(Object? json) {
@@ -111,7 +113,16 @@ class MediaLink {
       poster: json['poster'] as String?,
       sealed: json['sealed'] == true,
       gone: json['removed'] == true || json['blocked'] == true,
+      width: (json['width'] as num?)?.toInt(),
+      height: (json['height'] as num?)?.toInt(),
     );
+  }
+
+  /// Its picture's shape, kept between a tall 1:2 and a wide 2.4:1; 16:9 when the server did not say.
+  double get aspect {
+    final w = width, h = height;
+    if (w == null || h == null || w <= 0 || h <= 0) return 16 / 9;
+    return (w / h).clamp(0.5, 2.4);
   }
 
   final String id;
@@ -120,6 +131,8 @@ class MediaLink {
   final String? poster;
   final bool sealed;
   final bool gone;
+  final int? width;
+  final int? height;
 }
 
 /// One message in a conversation; a deleted (unsent or removed) one keeps its place with no text
@@ -271,8 +284,9 @@ class ChatMessage {
   bool reacted(String name, String? userId) =>
       reactions.any((reaction) => reaction.name == name && reaction.userIds.contains(userId));
 
-  /// What can be edited and quoted: the text, or a piece of media's caption.
-  String? get words => kind == 'text' ? text : (caption ?? text);
+  /// What can be edited and quoted: the text, or a piece of media's caption (null without one,
+  /// never the server's "[photo]" stand-in).
+  String? get words => kind == 'text' ? text : caption;
 
   ChatMessage copyWith({
     String? text,

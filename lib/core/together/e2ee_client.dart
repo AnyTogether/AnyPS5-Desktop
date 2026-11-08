@@ -139,9 +139,11 @@ class EndToEnd with Notifier {
       if (problem.status != 404) rethrow;
     }
     if (_user != user) return false;
-    if (current == null || current['id'] != mine.id || current['boxKey'] != mine.boxKey) {
+    // Registered again when the name changed too: older launchers sent the computer's own name.
+    final name = deviceName();
+    if (current == null || current['id'] != mine.id || current['boxKey'] != mine.boxKey || current['name'] != name) {
       try {
-        await account.call('PUT', 'me/e2ee/device', mine.toRegister(deviceName()));
+        await account.call('PUT', 'me/e2ee/device', mine.toRegister(name));
       } on TogetherProblem catch (problem) {
         if (problem.status == 404 || problem.status == 405 || problem.status == 501) {
           if (_user == user) {
