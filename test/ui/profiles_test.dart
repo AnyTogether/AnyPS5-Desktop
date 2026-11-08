@@ -534,6 +534,33 @@ void main() {
       await expectLater(shell, matchesGoldenFile('goldens/profiles_picker.png'));
     });
 
+    testWidgets('Quit AnyPS5?: a small yes or no, the answers side by side, in Turkish', (tester) async {
+      fixture = makeFixture(language: Language.byCode('tr'));
+      final model = fixture.model;
+      model.open(Layer.confirmQuit);
+      model.handle(Command.right);
+      await pumpLauncher(tester, model);
+      await expectLater(shell, matchesGoldenFile('goldens/quit_confirm_tr.png'));
+    });
+
+    testWidgets("who's playing: a linked profile wears AnyTogether's mark, a local one says Local", (tester) async {
+      fixture = makeFixture();
+      final model = fixture.model;
+      model.profiles
+        ..add(
+          name: 'Mira',
+          mode: ProfileMode.online,
+          account: const ProfileAccount(userId: 'u7', handle: 'mira.k'),
+        )
+        ..add(name: 'Deniz', mode: ProfileMode.offline);
+      model.openProfilePicker(atLaunch: true);
+      await pumpLauncher(tester, model);
+      expect(find.byType(LinkedProfileTile), findsNWidgets(3));
+      expect(find.byKey(const ValueKey('together-badge')), findsOneWidget, reason: 'only Mira is linked');
+      expect(find.text('@mira.k'), findsOneWidget);
+      expect(find.text(T.text('profileOfflineTag')), findsNWidgets(2), reason: 'the first profile and Deniz are local');
+    });
+
     testWidgets('the first start: offline or online, in Turkish', (tester) async {
       fixture = makeFixture(onboarded: false, language: Language.byCode('tr'));
       final model = fixture.model;

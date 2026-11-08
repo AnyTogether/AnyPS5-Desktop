@@ -886,7 +886,6 @@
   "launcherReportLaterDetail": "Für diesen Fall nicht erneut fragen.",
   "launcherReportCopied": "Der Bericht war zu lang für den Link und wurde daher vollständig in die Zwischenablage kopiert. Füge ihn in das Issue ein.",
   "quitQuestion": "AnyPS5 beenden?",
-  "quitStay": "Auf der Startseite bleiben",
   "captures": "Aufnahmen",
   "replayBuffer": "Replay-Puffer",
   "replayBufferDetail": "Während du spielst, werden die letzten Minuten in einem temporären Ordner gehalten und erst durch Drücken von Share dauerhaft gespeichert. Benötigt etwa einen CPU-Kern (720p, 30 fps).",

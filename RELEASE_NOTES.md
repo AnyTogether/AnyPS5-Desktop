@@ -5,6 +5,18 @@ release when it is made.
 
 ## Next release
 
+- **Quit AnyPS5? is a small yes or no**, as on the Mac: Cancel and Quit side by side, ← and →
+  between them, Esc still cancels, Quit in red. Close the game? asks the same way.
+- **Linked profiles show it on Who's playing?**: AnyTogether's mark on the tile of a profile
+  linked to an account, with its @handle, and Local under one that stays on this PC.
+- **Appearance › Themes opens beside the home screen**, like the Theme Studio, so a theme you
+  pick shows behind the list at once. A row that takes the focus no longer reads dark on dark
+  while its highlight fades in.
+- **A game's window or full screen is easier to find**: the row in the game's options (… / △)
+  is now called Window or full screen, and says that full screen is borderless with the
+  AnyPS5-ARM engine. Settings › Default display still sets it for every game.
+- **Clearer words in Turkish for friends**: Arkadaşlardan çıkar, and what your handle is for.
+
 - **Share play for more than four viewers**, as on the Mac. With AnyTogether's media server
   (up to 16 viewers now), the Viewers row goes up to what the server takes. Past four, the
   game's picture and sound go once to the media server and everyone watches from there, while

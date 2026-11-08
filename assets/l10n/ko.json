@@ -871,7 +871,6 @@
   "launcherReportLaterDetail": "이 항목에 대해 다시 묻지 않음.",
   "launcherReportCopied": "보고서 내용이 너무 길어 링크에 담을 수 없으므로, 전체 내용을 클립보드에 복사했습니다. 이슈(issue)에 붙여넣어 주세요.",
   "quitQuestion": "AnyPS5를 종료하시겠습니까?",
-  "quitStay": "홈 화면 유지",
   "captures": "캡처",
   "replayBuffer": "리플레이 버퍼",
   "replayLength": "최근 기록 유지",

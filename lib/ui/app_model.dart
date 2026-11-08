@@ -4391,6 +4391,11 @@ class AppModel extends ChangeNotifier {
     _changed();
   }
 
+  /// The layers that ask a plain yes or no, drawn as ConfirmCard: two answers side by side.
+  static const twoChoiceLayers = {Layer.confirmQuit, Layer.closeGame};
+
+  bool get twoChoice => twoChoiceLayers.contains(overlay);
+
   /// Escape on the home screen, the games in focus and nothing over them, asks Quit AnyPS5?
   /// (Cancel first); everywhere else Escape keeps its meaning.
   bool askQuit() {
@@ -4893,12 +4898,7 @@ class AppModel extends ChangeNotifier {
             id: 'confirmQuit',
             title: T.text('quitQuestion'),
             rows: [
-              PanelRow(
-                id: 'cancel',
-                title: T.text('cancel'),
-                detail: T.text('quitStay'),
-                kind: ActionRow(closeOverlay),
-              ),
+              PanelRow(id: 'cancel', title: T.text('cancel'), kind: ActionRow(closeOverlay)),
               PanelRow(
                 id: 'quit',
                 title: T.text('quit'),
@@ -5778,8 +5778,10 @@ class AppModel extends ChangeNotifier {
       PanelRow(
         id: 'display',
         title: T.text('display'),
-        // Upstream's engine ignores the choice: the launcher presses F11 for it, and says so.
-        detail: engine.readsDisplaySettings ? null : T.text('displayUpstream'),
+        // AnyPS5-ARM's engine opens the game borderless full screen itself (SDL's desktop full
+        // screen), and the line says what that is; upstream's ignores the choice: the launcher
+        // presses F11 for it, and says so.
+        detail: engine.readsDisplaySettings ? T.text('displayBorderless') : T.text('displayUpstream'),
         // Default (Settings › Default Display), then the game's own choices.
         kind: ChoiceRow(
           [
@@ -6261,6 +6263,19 @@ class AppModel extends ChangeNotifier {
 
     final row = panelRow < rows.length ? rows[panelRow] : null;
     if (_searchCommand(command)) return;
+    // A plain yes or no (ConfirmCard): its two answers side by side, ← to the way back, → to the
+    // destructive one, from the keys and the pad alike.
+    if (twoChoice && (command == Command.left || command == Command.right)) {
+      final target = rows.indexWhere(
+        (row) => row.kind is ActionRow && (row.kind as ActionRow).destructive == (command == Command.right),
+      );
+      if (target >= 0 && target != panelRow) {
+        panelRow = target;
+        sounds.play(Cue.move);
+        _changed();
+      }
+      return;
+    }
     if (_viaPad && _padPanelCommand(command, row, categories)) return;
     if (!_viaPad) {
       // The keys and the mouse have no sections' focus and no edit mode.
