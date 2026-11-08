@@ -9,8 +9,10 @@ import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:anyps5_desktop/ui/theme.dart';
 import 'package:anyps5_desktop/ui/launcher.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 
 import '../support/fake_process.dart';
+import '../support/self_builder.dart';
 import '../support/ui_support.dart';
 
 /// Settings › Battery & heat: the readings, the profiles, what a game starts with and hears while
@@ -125,6 +127,50 @@ void main() {
     (row('batteryOn').kind as ToggleRow).set(true);
     (row('batteryCap').kind as ChoiceRow).set(2);
     expect(model.preferences.powerProfiles, isNull);
+  });
+
+  test('Lower resolution: saved with the Mac\'s key, a game unlocked while it holds is one step lower', () async {
+    Directory(p.join(fixture.toolkit, 'patches')).createSync(recursive: true);
+    File(p.join(fixture.toolkit, 'patches', 'PPSA02002.toml')).writeAsStringSync('''
+format = 1
+
+[[patch]]
+name = "width"
+va = 0x1234
+type = "u32"
+expected = 1920
+value = 1920
+
+[[patch]]
+name = "height"
+va = 0x1240
+type = "u32"
+expected = 1080
+value = 1080
+''');
+    model.powerWatch.take(onBattery);
+    final toggle = row('batteryResolution');
+    expect(toggle.title, T.text('powerLowerResolution'));
+    expect((toggle.kind as ToggleRow).value, isFalse);
+    (toggle.kind as ToggleRow).set(true);
+    expect(model.powerWatch.adjustment.lowerResolution, isTrue);
+    expect(model.preferences.powerProfiles?['battery'], containsPair('lowerResolution', true));
+    final neon = model.games.firstWhere((game) => game.titleId == 'PPSA02002');
+    File(p.join(neon.folder, 'eboot.bin')).writeAsBytesSync(typicalSelf());
+    Future<void> until(bool Function() condition) async {
+      for (var tries = 0; tries < 2000 && !condition(); tries++) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      expect(condition(), isTrue);
+    }
+
+    model.unlock(neon);
+    await until(() => !model.unlocking && model.records.containsKey(neon.id));
+    expect(model.records[neon.id]?.resolution, '1600x900', reason: 'one step under the title\'s 1920x1080');
+    // The same game unlocked off the profile keeps the title's own.
+    (row('batteryResolution').kind as ToggleRow).set(false);
+    model.unlock(neon);
+    await until(() => !model.unlocking && model.records[neon.id]?.resolution == null);
   });
 
   test('where the heat cannot be read, only the battery profile is offered, and that is said', () {

@@ -260,7 +260,7 @@ void main() {
       model.open(Layer.settings);
       model.selectCategory(model.panelCategories().indexWhere((category) => category.id == 'fonts'));
       await pumpLauncher(tester, model);
-      expect(find.text('Noto Sans · Built in'), findsOneWidget);
+      expect(find.text('Noto Sans · Built in'), findsNWidgets(2), reason: 'Latin and Latin Italic');
       expect(find.text('Download Japanese, Chinese and Korean now'), findsOneWidget);
       await expectLater(shell, matchesGoldenFile('goldens/settings_fonts.png'));
     });

@@ -502,6 +502,21 @@ value       = "0100"
       expect(ResolutionPatch.apply(toml, 'nonsense'), toml);
     });
 
+    test('the title\'s own resolution, and one step lower', () {
+      expect(ResolutionPatch.defaultOf(toml), '1920x1080');
+      expect(ResolutionPatch.defaultOf('format = 1\n'), isNull);
+      const choices = ResolutionPatch.choices;
+      expect(ResolutionPatch.lower('2560x1440', choices), '1920x1080');
+      expect(ResolutionPatch.lower('1920x1080', choices), '1600x900');
+      expect(ResolutionPatch.lower('1280x720', choices), isNull, reason: 'already the lowest');
+      expect(
+        ResolutionPatch.lower('1920x1080', ['1280x720', '3840x2160', '1600x900']),
+        '1600x900',
+        reason: 'by pixels',
+      );
+      expect(ResolutionPatch.lower('nonsense', choices), isNull);
+    });
+
     test('the installer hands the title patch file to the relinker, with the chosen resolution', () async {
       final temp = temporaryFolder('patch');
       addTearDown(() => temp.deleteSync(recursive: true));
