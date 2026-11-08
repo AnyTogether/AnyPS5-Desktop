@@ -5,6 +5,14 @@ release when it is made.
 
 ## Next release
 
+- **Join with a code works for watching a share play too**, as on the Mac: Party › Join with a
+  code looks a code up as you type it (a party's or a share play's), even while you're in a party,
+  and asks to join or to watch. A yes shows up as an invite.
+- **A share play guest can help player 1** instead of playing their own, as on the Mac: Assist
+  Player 1 in the share play's quick menu rows.
+- **A friend's trophy level and the party's lead now say so**, as on the Mac: a word when a friend
+  levels up (not while you're in a game), when you lead the party, and when you hand it over or
+  remove someone.
 - **A new install gets the AnyPS5-ARM engine.** On a first start the welcome downloads
   AnyPS5-ARM's engine, which reads the phone controller and opens games full screen or at the
   window size you chose. If you already use upstream's engine, nothing changes on its own.

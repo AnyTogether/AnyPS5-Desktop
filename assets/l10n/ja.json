@@ -594,6 +594,7 @@
   "padAssistOff": "オフ",
   "padAssistControllers": "その他のコントローラー",
   "padAssistOn": "%@ がプレイヤー 1 を助けます",
+  "assistShare": "アシストプレイヤー 1",
   "gyroSection": "ジャイロ照準",
   "gyro": "ジャイロで狙う",
   "gyroDetail": "コントローラーまたは携帯電話を回して右スティックを動かします。",

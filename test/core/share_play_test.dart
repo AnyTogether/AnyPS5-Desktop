@@ -240,6 +240,11 @@ void main() {
     expect(bridge, 3);
     expect(sent[13], 3, reason: 'the pad the host gave');
     expect(router.receive(padPacket(), 'b'), isFalse);
+    // Assist: the packet says it helps player 1 instead of its pad.
+    router.assist.add('a');
+    expect(router.receive(padPacket(), 'a'), isTrue);
+    expect(bridges.sent.last.$2[13], 1);
+    router.assist.remove('a');
     expect(router.receive(Uint8List(80), 'a'), isFalse, reason: 'not a pad packet');
     router.update({});
     final letGo = bridges.sent.last.$2;
@@ -262,7 +267,11 @@ void main() {
       'requests': [
         {'userId': 'r', 'handle': 'r', 'displayName': 'R'},
       ],
-      'joinCode': {'code': 'K7QM3XPA', 'url': 'https://anytogether.net/join/K7QM3XPA', 'expiresAt': '2026-11-08T12:00:00Z'},
+      'joinCode': {
+        'code': 'K7QM3XPA',
+        'url': 'https://anytogether.net/join/K7QM3XPA',
+        'expiresAt': '2026-11-08T12:00:00Z',
+      },
     });
     expect(play.media, MediaRoute.sfu);
     expect(play.listing!.join, PublicJoin.open);
@@ -277,7 +286,14 @@ void main() {
       'language': 'de',
       'live': true,
     });
-    final plain = SharePlay.fromJson({'id': 's2', 'hostDevice': 'd', 'titleId': 't', 'open': false, 'maxViewers': 2, 'viewers': const <Object>[]});
+    final plain = SharePlay.fromJson({
+      'id': 's2',
+      'hostDevice': 'd',
+      'titleId': 't',
+      'open': false,
+      'maxViewers': 2,
+      'viewers': const <Object>[],
+    });
     expect([plain.listing, plain.joinCode, plain.requests], [null, null, isEmpty]);
   });
 
@@ -286,7 +302,10 @@ void main() {
     expect(ShareMedia.viewerChoices(const MediaLimits()), (min: 1, max: 4));
     const server = MediaLimits(sfu: true, maxShareViewers: 16);
     expect(ShareMedia.viewerChoices(server, watching: 6, current: 8), (min: 6, max: 16));
-    expect(ShareMedia.viewerChoices(null, watching: 2, current: 7), (min: 2, max: 7), reason: 'never below its own limit');
+    expect(ShareMedia.viewerChoices(null, watching: 2, current: 7), (
+      min: 2,
+      max: 7,
+    ), reason: 'never below its own limit');
     expect(ShareMedia.clampViewers(12, null), 4);
     expect(ShareMedia.clampViewers(12, server), 12);
     expect(ShareMedia.clampViewers(0, server), 1);
@@ -430,37 +449,44 @@ void main() {
       expect(session.stats['a']!.roundTripMs, 23);
     });
 
-    test('through the media server only pad holders, and older apps that ask while there is room, get a link here', () async {
-      SharePlay sfu(List<ShareViewer> viewers) => SharePlay(
-        id: 's1',
-        hostDevice: 'host',
-        titleId: 'PPSA01001',
-        open: true,
-        maxViewers: 10,
-        viewers: viewers,
-        media: MediaRoute.sfu,
-      );
-      await session.apply(share([viewer('a', 'd1', slot: 2), viewer('b', 'd2')]));
-      expect(engine.links, hasLength(2), reason: 'the mesh: everyone');
-      final viewers = [viewer('a', 'd1', slot: 2), viewer('b', 'd2'), for (final id in ['c', 'd', 'e', 'f']) viewer(id, '$id-dev')];
-      await session.apply(sfu(viewers));
-      expect(engine.links[1].closed, isTrue, reason: 'b watches from the media server now');
-      expect(session.links.keys, ['a']);
-      // An older app asks for a link: served while the host has fewer than four.
-      for (final id in ['c', 'd', 'e']) {
-        await session.receive(ShareSignal(sharePlayId: 's1', from: id, device: '$id-dev', kind: 'renegotiate'));
-      }
-      expect(session.links.keys.toSet(), {'a', 'c', 'd', 'e'});
-      await session.receive(const ShareSignal(sharePlayId: 's1', from: 'f', device: 'f-dev', kind: 'renegotiate'));
-      expect(session.links.keys, isNot(contains('f')), reason: 'four links already');
-      await session.receive(const ShareSignal(sharePlayId: 's1', from: 'z', device: 'z-dev', kind: 'renegotiate'));
-      expect(session.links.keys, isNot(contains('z')), reason: 'not watching');
-      // The next update keeps the ones who asked.
-      await session.apply(sfu(viewers));
-      expect(session.links.keys.toSet(), {'a', 'c', 'd', 'e'});
-      expect(ShareMedia.meshViewers(sfu(viewers), {'c'}).map((viewer) => viewer.user.id), ['a', 'c']);
-      expect(ShareMedia.meshViewers(share(viewers), const {}), hasLength(6));
-    });
+    test(
+      'through the media server only pad holders, and older apps that ask while there is room, get a link here',
+      () async {
+        SharePlay sfu(List<ShareViewer> viewers) => SharePlay(
+          id: 's1',
+          hostDevice: 'host',
+          titleId: 'PPSA01001',
+          open: true,
+          maxViewers: 10,
+          viewers: viewers,
+          media: MediaRoute.sfu,
+        );
+        await session.apply(share([viewer('a', 'd1', slot: 2), viewer('b', 'd2')]));
+        expect(engine.links, hasLength(2), reason: 'the mesh: everyone');
+        final viewers = [
+          viewer('a', 'd1', slot: 2),
+          viewer('b', 'd2'),
+          for (final id in ['c', 'd', 'e', 'f']) viewer(id, '$id-dev'),
+        ];
+        await session.apply(sfu(viewers));
+        expect(engine.links[1].closed, isTrue, reason: 'b watches from the media server now');
+        expect(session.links.keys, ['a']);
+        // An older app asks for a link: served while the host has fewer than four.
+        for (final id in ['c', 'd', 'e']) {
+          await session.receive(ShareSignal(sharePlayId: 's1', from: id, device: '$id-dev', kind: 'renegotiate'));
+        }
+        expect(session.links.keys.toSet(), {'a', 'c', 'd', 'e'});
+        await session.receive(const ShareSignal(sharePlayId: 's1', from: 'f', device: 'f-dev', kind: 'renegotiate'));
+        expect(session.links.keys, isNot(contains('f')), reason: 'four links already');
+        await session.receive(const ShareSignal(sharePlayId: 's1', from: 'z', device: 'z-dev', kind: 'renegotiate'));
+        expect(session.links.keys, isNot(contains('z')), reason: 'not watching');
+        // The next update keeps the ones who asked.
+        await session.apply(sfu(viewers));
+        expect(session.links.keys.toSet(), {'a', 'c', 'd', 'e'});
+        expect(ShareMedia.meshViewers(sfu(viewers), {'c'}).map((viewer) => viewer.user.id), ['a', 'c']);
+        expect(ShareMedia.meshViewers(share(viewers), const {}), hasLength(6));
+      },
+    );
 
     test('signals of another share play are not taken', () async {
       await session.apply(share([viewer('a', 'd1')]));
