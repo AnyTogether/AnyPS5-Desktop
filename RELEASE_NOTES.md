@@ -12,6 +12,10 @@ release when it is made.
 - **Devices in the encryption sheet go by their kind** ("Windows PC", "iPhone") and the day they
   were added, never by the computer's own name. This launcher now registers itself as "AnyPS5 on
   Windows" or "AnyPS5 on Linux".
+- **The browser pad goes full screen when you turn the phone**, as on the Mac. Turned to
+  landscape, the next touch on the pad takes it full screen and holds it in landscape, where the
+  browser allows it (Android, iPad). Before, it tried once on the first press, which browsers
+  refuse, so full screen was only in the menu. On an iPhone, add the page to the Home Screen.
 - **Share play for more than four viewers**, as on the Mac. With AnyTogether's media server
   (up to 16 viewers now), the Viewers row goes up to what the server takes. Past four, the
   game's picture and sound go once to the media server and everyone watches from there, while
