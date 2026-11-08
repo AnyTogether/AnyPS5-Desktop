@@ -545,6 +545,16 @@ class Discover {
 
   final TogetherAccount account;
 
+  /// How many are online now, a number only (stats/online): accounts that are invisible or show
+  /// their presence to nobody are not in it. Null when the server has no count.
+  Future<int?> online() async {
+    final read = await account.call('GET', 'stats/online');
+    return switch (read['online']) {
+      final int count when count >= 0 => count,
+      _ => null,
+    };
+  }
+
   // The board.
 
   Future<(List<LfgPost>, bool)> board(LfgFilter filter, {String? before}) async {

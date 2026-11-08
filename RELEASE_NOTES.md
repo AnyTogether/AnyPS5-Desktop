@@ -5,6 +5,11 @@ release when it is made.
 
 ## Next release
 
+- **How many are online now** by Find players' heading, as on the Mac and the website. It is a
+  number only. Accounts that are invisible or hide their status are not counted, and the
+  line's tooltip says so.
+- **A game's name in recent activity opens its hub**, as the website links it to the game's
+  page. Click the name in the feed or on a profile, or select an item on a profile.
 - **The browser pad goes full screen when you turn the phone**, as on the Mac. Turned to
   landscape, the next touch on the pad takes it full screen and holds it in landscape, where the
   browser allows it (Android, iPad). Before, it tried once on the first press, which browsers

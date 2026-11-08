@@ -99,6 +99,15 @@ extension TogetherProfiles on TogetherModel {
       (profile?.trophies.value?.length ?? 0) +
       (profile?.activity.value?.length ?? 0);
 
+  /// The recent activity item at [index] of the keys' items, or null on anything else.
+  Activity? profileActivityAt(int index) {
+    final page = profile;
+    if (page == null) return null;
+    final at = index - profileGamesFrom - (page.library.value?.length ?? 0) - (page.trophies.value?.length ?? 0);
+    final items = page.activity.value ?? const <Activity>[];
+    return at >= 0 && at < items.length ? items[at] : null;
+  }
+
   /// An activity item changed (the gateway's `feed.item`, a reaction in the feed): the profile
   /// shown takes it too.
   void profileActivityChanged(Activity item) {
@@ -135,6 +144,9 @@ extension TogetherProfiles on TogetherModel {
         app.refresh();
       case Command.select when profileIndex < profileActions.length:
         runProfileAction(profileActions[profileIndex]);
+      case Command.select:
+        // A recent activity item: its game's hub, as the game's name links on the website.
+        if (profileActivityAt(profileIndex) case final item? when item.game != null) openActivityGame(item);
       case Command.back || Command.options:
         closeProfile();
       default:
