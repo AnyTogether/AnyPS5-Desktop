@@ -141,6 +141,14 @@ extension TogetherSocial on TogetherModel {
           detail: T.text('discoverFindForDetail'),
           kind: ActionRow(() => openLfgPost(game.titleId, game.nameFor([T.language.code]))),
         ),
+      PanelRow(
+        id: 'game-hub',
+        title: T.format('discoverHubOf', [
+          game.nameFor([T.language.code]),
+        ]),
+        detail: T.text('discoverHubDetail'),
+        kind: ActionRow(() => openGameHub(game.titleId, game.nameFor([T.language.code]))),
+      ),
     ];
   }
 
@@ -561,8 +569,43 @@ extension TogetherSocial on TogetherModel {
       NoticeKind.challengeStarted => T.format('notifChallengeStarted', [TogetherChallenges.noticeTitle(note)]),
       NoticeKind.challengeEnded => TogetherChallenges.endedText(note),
       NoticeKind.warning => T.text('socialNotifWarning'),
-      NoticeKind.other => T.text('socialNotifOther'),
+      NoticeKind.other => familyNoticeText(note) ?? T.text('socialNotifOther'),
     };
+  }
+
+  /// What a family notification says (the Mac's familyNotificationText); null for any other kind.
+  String? familyNoticeText(Notice note) {
+    final name = note.actor == null ? '' : TogetherModel.shown(note.actor!).name;
+    final data = note.data;
+    final minutes = (data['minutes'] as num?)?.toInt() ?? 0;
+    final gameTitle = data['gameName'] as String? ?? (note.titleId == null ? '' : gameName(note.titleId!));
+    switch (note.kindName) {
+      case 'family_request':
+        return switch (data['kind']) {
+          'more_time' => T.format('familyNotifAsksTime', [name, minutes]),
+          'play_game' => T.format('familyNotifAsksGame', [name, gameTitle]),
+          _ => T.format('familyNotifAsksFriend', [name]),
+        };
+      case 'family_answer':
+        if (data['approved'] != true) return T.text('familyNotifSaidNo');
+        return switch (data['kind']) {
+          'more_time' => T.format('familyNotifGaveTime', [minutes]),
+          'play_game' => T.text('familyNotifGameYes'),
+          _ => T.text('familyNotifFriendYes'),
+        };
+      case 'family_alert':
+        return switch (data['event']) {
+          'limit_reached' => T.format('familyNotifReachedLimit', [name]),
+          'child_declined' => T.format('familyNotifDeclinedFamily', [name]),
+          _ => T.format('familyNotifJoinedFamily', [name]),
+        };
+      case 'family_invite':
+        return T.format('familyNotifFamilyInvite', [name, data['familyName'] as String? ?? '']);
+      case 'family_summary':
+        return T.text('familyNotifSummary');
+      default:
+        return null;
+    }
   }
 
   /// The game a looking-for-group notification is about, as this library or the server names it.

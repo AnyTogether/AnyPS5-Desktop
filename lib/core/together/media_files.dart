@@ -1,5 +1,6 @@
 import 'account.dart';
 import 'posts.dart';
+import 'profiles.dart';
 
 /// Photos and clips on AnyTogether, the user's own: uploaded (POST /me/media, checked and
 /// re-encoded there), a clip's poster, and the profile's gallery. As the Mac's TogetherStorage
@@ -27,6 +28,17 @@ class MediaFiles {
   static List<MediaItem> _items(Map<String, dynamic> answer) => [
     for (final item in answer['items'] as List<dynamic>? ?? const []) ?MediaItem.fromJson(item),
   ];
+
+  /// A profile's gallery, as the owner's setting shows it to this user.
+  Future<Section<List<MediaItem>>> gallery(String handle) async {
+    try {
+      return SectionShown(_items(await account.call('GET', 'users/${Uri.encodeComponent(handle)}/gallery')));
+    } on TogetherProblem catch (problem) {
+      return Profiles.isPrivate(problem) ? const SectionPrivate() : const SectionFailed();
+    } on Object {
+      return const SectionFailed();
+    }
+  }
 
   /// The profile gallery's photos and clips, in order.
   Future<List<MediaItem>> myGallery() async => _items(await account.call('GET', 'me/gallery'));

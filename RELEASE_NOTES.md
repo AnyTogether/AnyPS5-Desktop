@@ -5,6 +5,13 @@ release when it is made.
 
 ## Next release
 
+- **A profile shows its pinned gallery**, as on the Mac: the photos and clips someone pinned, as
+  their privacy setting shows them, open over the whole screen.
+- **The community's verdict is on the home screen**, as on the Mac: how the game runs on this
+  platform, once people have said so.
+- **A game's options lead to its hub**, as on the Mac.
+- **Family notifications say what they're about**, as on the Mac: who asks for more time or a
+  game, what a parent answered, and family alerts and invites.
 - **A new install gets the AnyPS5-ARM engine.** On a first start the welcome downloads
   AnyPS5-ARM's engine, which reads the phone controller and opens games full screen or at the
   window size you chose. If you already use upstream's engine, nothing changes on its own.

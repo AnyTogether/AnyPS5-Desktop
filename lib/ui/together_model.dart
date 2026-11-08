@@ -239,6 +239,10 @@ class TogetherModel {
   JoinPreview? codePreview;
   String? discordDraft;
 
+  /// The open profile's pinned gallery; null until read or where the server keeps no files.
+  Section<List<MediaItem>>? profileGallery;
+  int _profileGallerySeq = 0;
+
   /// Party: its chat's keys and field (together_party_chat.dart).
   final PartyChatKeys partyChatKeys = PartyChatKeys();
 
