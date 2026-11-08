@@ -91,7 +91,7 @@
   "engineDeleted": "Other engine versions deleted",
   "engineDeletedOne": "Deleted %@",
   "engineDeleteOne": "Delete %@",
-  "engineDeleteHint": "Select to delete",
+  "engineDeleteHint": "Select to delete.",
   "engineInUseNoDelete": "This engine is in use. Choose another one first.",
   "engineFollow": "Default (%@)",
   "engineGameMissing": "%@ is not on this computer. Download it to unlock this game.",

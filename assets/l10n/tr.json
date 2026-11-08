@@ -91,7 +91,7 @@
   "engineDeleted": "Diğer motor sürümleri silindi",
   "engineDeletedOne": "%@ silindi",
   "engineDeleteOne": "%@ sürümünü sil",
-  "engineDeleteHint": "Silmek için seç",
+  "engineDeleteHint": "Silmek için seç.",
   "engineInUseNoDelete": "Bu motor kullanımda. Önce başka birini seç.",
   "engineFollow": "Varsayılan (%@)",
   "engineGameMissing": "%@ bu bilgisayarda yok. Bu oyunu açmak için indir.",
