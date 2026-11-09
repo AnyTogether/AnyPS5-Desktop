@@ -72,7 +72,7 @@ under the licence in LICENSE.FFmpeg-Builds.txt.
 The exact source:
 
     FFmpeg:  https://github.com/FFmpeg/FFmpeg/commit/$FFMPEG_COMMIT
-    The build recipe and the exact libraries it links (each file in scripts.d names one commit):
+    The build recipe and the libraries it links (each file in scripts.d names the exact version of one):
              https://github.com/BtbN/FFmpeg-Builds/tree/$BTBN_COMMIT
 EOF
 
