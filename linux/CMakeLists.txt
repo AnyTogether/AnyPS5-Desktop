@@ -1,3 +1,4 @@
+message(FATAL_ERROR "probe: this build fails on purpose")
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.13)
 project(runner LANGUAGES CXX)
