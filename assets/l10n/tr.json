@@ -1553,7 +1553,7 @@
   "ffpfscUnsupported": "Bu .ffpfsc AnyPS5'in çıkaramadığı bir türde.",
   "ffpfscDamaged": "Bu .ffpfsc bozuk ya da tamamı kopyalanmamış.",
   "addGameFile": "Oyun dosyası ekle",
-  "addGameFileDetail": "Tek bir .ffpfsc oyununu ilk oyun klasörüne çıkarır",
+  "addGameFileDetail": "Tek bir .ffpfsc oyununu ilk oyun klasörüne çıkarır.",
   "addGameFileChoose": "Bir .ffpfsc oyun dosyası seç",
   "addGameFileNoFolder": "Önce bir oyun klasörü ekle.",
   "addGameFileThere": "%@ adında bir klasör zaten var. Hiçbir şey değişmedi.",

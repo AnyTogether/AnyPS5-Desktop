@@ -1553,7 +1553,7 @@
   "ffpfscUnsupported": "This .ffpfsc is a kind AnyPS5 cannot unpack.",
   "ffpfscDamaged": "This .ffpfsc is damaged or not fully copied.",
   "addGameFile": "Add game file",
-  "addGameFileDetail": "Unpacks one .ffpfsc game into your first games folder",
+  "addGameFileDetail": "Unpacks one .ffpfsc game into your first games folder.",
   "addGameFileChoose": "Choose a .ffpfsc game file",
   "addGameFileNoFolder": "Add a games folder first.",
   "addGameFileThere": "A folder named %@ is already there. Nothing was changed.",
