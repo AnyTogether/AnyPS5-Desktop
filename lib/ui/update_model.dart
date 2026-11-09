@@ -104,16 +104,18 @@ class LauncherUpdateModel {
     checkError = null;
     app.refresh();
     try {
-      // Stable: the release GitHub calls latest. Nightly: the newest of the recent ones,
-      // pre-releases too, in the order releases come out.
+      // Stable: the release GitHub calls latest. Nightly: the newest signed one for this system
+      // of the recent ones, pre-releases too, in the order releases come out.
       latest = app.updateChannel == UpdateChannel.nightly
-          ? ChannelReleases.newest(await source.all(), UpdateChannel.nightly)
+          ? LauncherUpdates.newestNightly(await source.all(), app.system, appImage: _appImage)
           : await source.latest();
       lastCheck = DateTime.now();
       if (!quiet) {
-        app.show(
-          available ? T.format('desktopUpdateAvailable', [latest!.version]) : T.format('desktopUpToDate', [current]),
-        );
+        app.show(switch (available) {
+          true => T.format('desktopUpdateAvailable', [latest!.version]),
+          false when ChannelReleases.stays(app.updateChannel, current) => T.format('updateChannelStays', [current]),
+          false => T.format('desktopUpToDate', [current]),
+        });
       }
     } on ToolkitFailure catch (failure) {
       checkError = failure.message;

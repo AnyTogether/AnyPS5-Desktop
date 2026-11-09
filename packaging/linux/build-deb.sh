@@ -41,10 +41,12 @@ depends="$depends, xdg-utils"
 # Devanagari, Bengali and Arabic in fonts-noto-core, Chinese, Japanese and Korean in fonts-noto-cjk.
 recommends="libsecret-tools, libsdl2-2.0-0, fonts-noto-core | fonts-noto, fonts-noto-cjk"
 
+# A nightly (0.1.21-nightly.20261109.1) comes before its release: dpkg sorts ~ before nothing.
+DEB_VERSION="$(printf '%s' "$VERSION" | sed 's/-/~/')"
 size=$(du -sk "$PKG" | cut -f1)
 cat > "$PKG/DEBIAN/control" <<CONTROL
 Package: anyps5-desktop
-Version: $VERSION
+Version: $DEB_VERSION
 Section: games
 Priority: optional
 Architecture: amd64

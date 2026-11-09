@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 
 import 'capture/game_sound.dart';
 import 'capture/video_encoders.dart';
+import 'capture/wayland_capture.dart';
 import 'host.dart';
 
 /// Starts a program and gives its process; Process.start by default.
@@ -19,8 +20,8 @@ typedef ProcessRunner = Future<ProcessResult> Function(String executable, List<S
 /// more than [seconds] and a segment or two. Nothing is kept unless Share asks: [save] joins the
 /// newest segments into one MP4 (no re-encoding) beside the game's screenshots.
 ///
-/// The screen comes from gdigrab on Windows and x11grab on X11 (Wayland lets no program read
-/// the screen without asking each time: not offered there), 720p at 30 frames a second. The
+/// The screen comes from gdigrab on Windows, x11grab on X11 and the desktop's portal under
+/// Wayland ([wayland], the game's window once the user shares it), 720p at 30 frames a second. The
 /// graphics card's encoder does the work when one works here ([encoder], chosen as for Remote
 /// Play); x264's ultrafast preset otherwise, about one CPU core while a game plays, which is why
 /// it is off until the user turns it on. The game's sound ([sound]) comes in on ffmpeg's
@@ -34,6 +35,7 @@ class ReplayBuffer {
     this.environment = const {},
     this.encoder,
     this.sound,
+    this.wayland,
     ProcessStarter? start,
     ProcessRunner? run,
   }) : _start = start ?? ((executable, arguments) => Process.start(executable, arguments)),
@@ -59,11 +61,18 @@ class ReplayBuffer {
 
   /// The game's sound, recorded with the picture; null for picture alone.
   final GameSound? sound;
+
+  /// Under Wayland, where the picture comes from; null on X11 and Windows.
+  final WaylandCapture? wayland;
   final ProcessStarter _start;
   final ProcessRunner _run;
 
   Process? _process;
+  WaylandFeed? _feed;
   bool _stopping = false;
+
+  /// Counts stops: a stop during the desktop's dialog ends that start.
+  int _stops = 0;
   Timer? _soundTick;
 
   /// The bit rate of the picture for the encoders that take one (x264 keeps its quality level).
@@ -74,7 +83,7 @@ class ReplayBuffer {
   /// The segments kept: enough for [seconds], the one being written and one spare.
   int get wrap => (seconds / segmentSeconds).ceil() + 2;
 
-  /// Whether the screen can be recorded on this desktop.
+  /// Whether the screen can be recorded without the portal (Wayland is [WaylandCapture]'s).
   static bool supported(HostSystem system, Map<String, String> environment) {
     if (system == HostSystem.windows) return true;
     final session = (environment['XDG_SESSION_TYPE'] ?? '').toLowerCase();
@@ -110,7 +119,9 @@ class ReplayBuffer {
     'error',
     '-nostdin',
     ...?encoder?.deviceArguments,
-    if (system == HostSystem.windows) ...[
+    if (_feed case final feed?)
+      ...feed.input
+    else if (system == HostSystem.windows) ...[
       '-f',
       'gdigrab',
       '-framerate',
@@ -186,9 +197,28 @@ class ReplayBuffer {
     try {
       _clear();
       Directory(folder).createSync(recursive: true);
+      if (wayland case final capture?) {
+        final stops = _stops;
+        final feed = await capture.openFeed(maxWidth: 1 << 14, maxHeight: height, framesPerSecond: framesPerSecond);
+        if (stops != _stops) {
+          await feed?.close();
+          return false;
+        }
+        if (feed == null) return false;
+        _feed = feed;
+      }
       final process = await _start(ffmpeg, captureArguments);
       _process = process;
       _stopping = false;
+      final picture = _feed;
+      // GStreamer gone: ffmpeg would wait on the pipe for ever.
+      if (picture != null) {
+        unawaited(
+          picture.ended.then((_) {
+            if (_process == process) process.kill();
+          }),
+        );
+      }
       // Its output is drained so it never blocks on a full pipe.
       process.stdout.listen((_) {}, onError: (_) {});
       process.stderr.listen((_) {}, onError: (_) {});
@@ -209,11 +239,15 @@ class ReplayBuffer {
       unawaited(
         process.exitCode.then((_) {
           if (_process == process) _process = null;
+          unawaited(picture?.close());
+          if (_feed == picture) _feed = null;
         }),
       );
       return true;
     } on Object {
       _process = null;
+      await _feed?.close();
+      _feed = null;
       return false;
     }
   }
@@ -303,6 +337,7 @@ class ReplayBuffer {
 
   /// Stops recording (ffmpeg is asked to finish, then ended) and deletes the segments.
   Future<void> stop() async {
+    _stops++;
     _soundTick?.cancel();
     _soundTick = null;
     await sound?.stop();
@@ -317,6 +352,8 @@ class ReplayBuffer {
         process.kill(ProcessSignal.sigkill);
       }
     }
+    await _feed?.close();
+    _feed = null;
     _clear();
   }
 
