@@ -60,6 +60,8 @@ void main() {
       ..profile = minePage()
       ..profileGallery = SectionShown(items);
     await pumpLauncher(tester, model);
+    // The pictures come out of their futures in the first frames: decoded only now.
+    await settle(tester);
     expect(find.text(T.text('cloudProfileGallery')), findsOneWidget);
     await expectLater(find.byType(LauncherShell), matchesGoldenFile('goldens/together_profile_gallery_en.png'));
   });
