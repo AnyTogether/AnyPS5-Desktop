@@ -1,7 +1,11 @@
 # Release notes
 
-Notes for the next GitHub release, written as changes land; the section is copied into the
-release when it is made.
+Notes for the next GitHub release, written as changes land. Each change adds one file,
+`release-notes/next/<date>-<topic>.md`, holding its bullet (`- **What changed**, ...`), so that
+pull requests do not conflict here. Do not add to the list under Next release below.
+`bash packaging/release-notes.sh` prints the next release's notes: that list, then the files by
+name. When a release is made, they go under its own heading here, the files are deleted, and the
+section is copied into the release.
 
 ## Next release
 
