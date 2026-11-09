@@ -63,6 +63,7 @@ extension StandaloneEmulators on AppModel {
     }
 
     sounds.play(Cue.select);
+    final turn = ++_startTurn;
     starting = game;
     _changed();
     final RunningGame run;
@@ -79,14 +80,23 @@ extension StandaloneEmulators on AppModel {
     } on Object catch (error) {
       if (_disposed) return;
       starting = null;
+      if (turn != _startTurn) {
+        _changed();
+        return;
+      }
       _padLog?.call('Could not start ${disc.platform.emulator}: $error');
       show(T.format('retroEmulatorStartFailed', [disc.platform.emulator]));
       _changed();
       return;
     }
 
-    if (_disposed) {
-      run.stop();
+    if (_disposed || turn != _startTurn) {
+      if (!run.stop()) run.kill();
+      await run.exitCode;
+      if (!_disposed) {
+        starting = null;
+        _changed();
+      }
       return;
     }
     starting = null;
@@ -113,5 +123,11 @@ extension StandaloneEmulators on AppModel {
     updates.gameEnded();
     if (!_stopped && code != 0) show(T.format('retroEmulatorExited', [disc.platform.emulator, code]));
     _changed();
+    final next = _launchAfterExit;
+    _launchAfterExit = null;
+    if (next != null) {
+      _quitAfterGame = null;
+      unawaited(_startAfterExit(next, Future<void>.value()));
+    }
   }
 }
