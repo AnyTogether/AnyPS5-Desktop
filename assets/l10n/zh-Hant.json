@@ -605,6 +605,7 @@
   "padAssistOff": "關閉",
   "padAssistControllers": "其他控制器",
   "padAssistOn": "%@ 正在協助玩家 1",
+  "assistShare": "協助玩家 1",
   "gyroSection": "陀螺儀瞄準",
   "gyro": "使用陀螺儀瞄準",
   "gyroDetail": "轉動控制器或手機即可移動右搖桿。",

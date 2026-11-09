@@ -122,6 +122,9 @@ class JoinPreview {
 
   bool get party => kind == 'party';
 
+  /// Nobody else fits.
+  bool get full => max > 0 && size >= max;
+
   JoinPreview withState(String state) =>
       JoinPreview(code: code, kind: kind, id: id, host: host, game: game, size: size, max: max, state: state);
 }
@@ -334,6 +337,9 @@ class Parties with Notifier {
   void Function(Person person, String via)? onRequest;
   void Function(bool accepted)? onRequestAnswered;
 
+  /// The lead of the party came to this account (handed over, or the leader left).
+  void Function()? onBecameLeader;
+
   String? get _me => account.user?.id;
 
   Future<void> refresh() async {
@@ -452,6 +458,15 @@ class Parties with Notifier {
     return state;
   }
 
+  /// The party as the server has it now, and whether the lead just came to this account.
+  void _partyUpdated(Party? before, Party updated) {
+    final me = _me;
+    final becameLeader = me != null && before != null && !before.leads(me) && updated.leads(me);
+    party = updated;
+    notifyListeners();
+    if (becameLeader) onBecameLeader?.call();
+  }
+
   void _keep(Map<String, dynamic> json) {
     party = Party.fromJson(json);
     kicked = false;
@@ -487,8 +502,7 @@ class Parties with Notifier {
       case 'party.updated':
         final updated = Party.fromJson(data);
         if (current?.id == updated.id || (current == null && updated.has(_me ?? ''))) {
-          party = updated;
-          notifyListeners();
+          _partyUpdated(current, updated);
         }
     }
   }
@@ -498,8 +512,7 @@ class Parties with Notifier {
     switch (type) {
       // A party view that names its party as partyId too.
       case 'party.updated' when data['id'] == current.id:
-        party = Party.fromJson(data);
-        notifyListeners();
+        _partyUpdated(current, Party.fromJson(data));
       case 'party.request':
         final from = data['from'];
         if (from is! Map<String, dynamic>) return;
