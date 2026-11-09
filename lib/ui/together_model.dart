@@ -124,6 +124,8 @@ class TogetherModel {
         via == 'code' ? T.format('partyAsksCode', [person.displayName]) : T.format('partyAsks', [person.displayName]),
       );
     };
+    // Handed the lead, as the Mac says it.
+    hub.parties.onBecameLeader = () => app.show(T.text('partyYouLead'));
     hub.parties.onRequestAnswered = (accepted) {
       // A yes is an invite, which says so itself.
       if (!accepted) app.show(T.text('partyRequestDeclined'));
@@ -143,6 +145,12 @@ class TogetherModel {
       app.show(T.format('friendsAsked', [person.displayName]));
     };
     hub.friends.onAccepted = (person) => app.show(T.format('friendsNowFriends', [person.displayName]));
+    // A friend went up a trophy level: only while the launcher is in front and no game runs, as
+    // on the Mac.
+    hub.friends.onLevelUp = (friend, level) {
+      if (!app.active || app.running != null) return;
+      app.show(T.format('friendLevelUp', [TogetherModel.shown(friend.person).name, level.level]));
+    };
     // A trophy level reached: the trophy's sound (heard over a game too) and the toast with the
     // badge.
     hub.self.onLevelUp = (level) {
@@ -244,10 +252,10 @@ class TogetherModel {
   /// Party: whether a party started now is open to friends.
   bool partyStartsOpen = false;
 
-  /// Party: a join code being typed, what the code looked up opens, and the Discord link being
-  /// typed (null while it is not).
-  String joinCodeDraft = '';
-  JoinPreview? codePreview;
+  /// Party: Join with a code as it stands, and the Discord link being typed (null while it is
+  /// not).
+  JoinEntry joinEntry = JoinEntry();
+  Timer? _joinLookup;
   String? discordDraft;
 
   /// Party: its chat's keys and field (together_party_chat.dart).
@@ -431,8 +439,8 @@ class TogetherModel {
       friendHandle = '';
       chosen = null;
       draft = '';
-      joinCodeDraft = '';
-      codePreview = null;
+      _joinLookup?.cancel();
+      joinEntry = JoinEntry();
       discordDraft = null;
       messagesIndex = 0;
       messagesSelectedKey = null;
@@ -1621,6 +1629,7 @@ class TogetherModel {
     calls.noAnswer?.cancel();
     unawaited(voiceNotes.dispose());
     unawaited(online.stop());
+    _joinLookup?.cancel();
     family.dispose();
     talkWatch?.stop();
     talkWatch?.reader.close();

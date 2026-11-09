@@ -605,6 +605,7 @@
   "padAssistOff": "Désactivé",
   "padAssistControllers": "Autres manettes",
   "padAssistOn": "%@ aide le joueur 1",
+  "assistShare": "Aider le joueur 1",
   "gyroSection": "Visée gyroscopique",
   "gyro": "Viser avec le gyroscope",
   "gyroDetail": "Tournez la manette ou le téléphone pour déplacer le stick droit.",
