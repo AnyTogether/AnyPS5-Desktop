@@ -94,6 +94,7 @@ extension TogetherChallenges on TogetherModel {
     screens
       ..challengeId = id
       ..challengeFailed = false
+      ..challengeGone = false
       ..challengeIndex = 0
       ..challengeOnActions = false
       ..challengeAction = 0;
@@ -119,9 +120,14 @@ extension TogetherChallenges on TogetherModel {
       }
       screens.challengeIndex = screens.challengeIndex.clamp(0, challengeLines.isEmpty ? 0 : challengeLines.length - 1);
       screens.challengeAction = screens.challengeAction.clamp(0, challengeActions.length - 1);
-    } on Object {
+    } on Object catch (error) {
       if (screens.challengeId != id) return;
-      screens.challengeFailed = screens.challenge == null;
+      // Deleted meanwhile: said as gone, not as a failure to read it.
+      if (error is TogetherProblem && error.status == 404) {
+        screens.challengeGone = true;
+      } else {
+        screens.challengeFailed = screens.challenge == null;
+      }
     }
     app.refresh();
   }
@@ -259,6 +265,8 @@ extension TogetherChallenges on TogetherModel {
       await loadChallenge();
     } on Object catch (error) {
       app.show(_challengeProblem(error));
+      // A 409 means it changed while it was on the screen: read what it is now.
+      if (error is TogetherProblem && error.status == 409) await loadChallenge();
     } finally {
       screens.challengeBusy = false;
       app.refresh();
@@ -305,14 +313,18 @@ extension TogetherChallenges on TogetherModel {
   /// A value as the metric reads: "1,830 pts", "5 trophies", "1 h 15 min".
   static String value(int value, ChallengeMetric metric) => switch (metric) {
     ChallengeMetric.time => TogetherProfiles.playTime(value),
-    ChallengeMetric.trophies => T.format('challengeTrophiesValue', [T.number(value)]),
-    _ => T.format('socialBoardPointsValue', [T.number(value)]),
+    ChallengeMetric.trophies => T.format(value == 1 ? 'challengeTrophyValue' : 'challengeTrophiesValue', [
+      T.number(value),
+    ]),
+    ChallengeMetric.points => T.format('socialBoardPointsValue', [T.number(value)]),
+    ChallengeMetric.other => T.number(value),
   };
 
   static String metricName(ChallengeMetric metric) => switch (metric) {
+    ChallengeMetric.points => T.text('challengeMetricPoints'),
     ChallengeMetric.trophies => T.text('challengeMetricTrophies'),
     ChallengeMetric.time => T.text('challengeMetricTime'),
-    _ => T.text('challengeMetricPoints'),
+    ChallengeMetric.other => T.text('challengeMetricOther'),
   };
 
   /// "For friends", "For Night Owls", "For everyone".

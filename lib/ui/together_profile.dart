@@ -532,7 +532,6 @@ extension TogetherProfiles on TogetherModel {
     if (running != null) {
       if (!app.preferences.friendsJoin || games.session != null || openingSession) return;
       final game = running.$1;
-      if (!SyncTitle.valid(game.titleId)) return;
       openingSession = true;
       unawaited(() async {
         try {
@@ -695,9 +694,4 @@ extension TogetherProfiles on TogetherModel {
     }
     return rows;
   }
-}
-
-/// The title IDs AnyTogether takes.
-abstract final class SyncTitle {
-  static bool valid(String titleId) => TogetherSync.titleIdPattern.hasMatch(titleId);
 }

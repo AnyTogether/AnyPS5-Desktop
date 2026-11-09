@@ -387,6 +387,16 @@ void main() {
       server.push('feed.item', activity('02', kind: 'platinum'));
       await until(() => social.feed.items.length == 2);
       expect(social.feed.items.first.kind, ActivityKind.platinum);
+
+      // The launcher's feed holds its focus around a new item: what goes in goes through it.
+      var held = 0;
+      social.holdFeedFocus = (change) {
+        held++;
+        change();
+      };
+      server.push('feed.item', activity('03', kind: 'platinum'));
+      await until(() => social.feed.items.length == 3);
+      expect(held, 1);
     });
 
     test('compatibility: a report gives the verdict, a game nobody reported is null', () async {
