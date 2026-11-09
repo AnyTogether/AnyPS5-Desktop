@@ -44,12 +44,7 @@ class PortalInfo {
 
 /// A window the user shared: the PipeWire node that carries it.
 class PortalGrant {
-  const PortalGrant({
-    required this.node,
-    this.width,
-    this.height,
-    this.restoreToken,
-  });
+  const PortalGrant({required this.node, this.width, this.height, this.restoreToken});
 
   final int node;
   final int? width;
@@ -61,9 +56,7 @@ class PortalGrant {
   ScreenArea? get area {
     final w = width;
     final h = height;
-    return w == null || h == null || w <= 0 || h <= 0
-        ? null
-        : ScreenArea(0, 0, w, h);
+    return w == null || h == null || w <= 0 || h <= 0 ? null : ScreenArea(0, 0, w, h);
   }
 }
 
@@ -84,14 +77,7 @@ abstract interface class ScreenCastPortal {
 /// reads. A pipe rather than the program's pipes because ffmpeg's standard input already takes
 /// the game's sound, and so that 100 MB a second never pass through the launcher.
 class WaylandFeed {
-  WaylandFeed._(
-    this._process,
-    this._folder,
-    this.pipe,
-    this.width,
-    this.height,
-    this.framesPerSecond,
-  ) {
+  WaylandFeed._(this._process, this._folder, this.pipe, this.width, this.height, this.framesPerSecond) {
     ended = _process.exitCode.then((_) {});
   }
 
@@ -159,20 +145,10 @@ class WaylandCapture {
     ProcessStarter? start,
     bool Function(String path)? exists,
     Directory Function()? newFolder,
-  }) : _run =
-           run ??
-           ((executable, arguments) => Process.run(executable, arguments)),
-       _start =
-           start ??
-           ((executable, arguments) => Process.start(executable, arguments)),
-       _exists =
-           exists ??
-           ((path) =>
-               FileSystemEntity.typeSync(path) !=
-               FileSystemEntityType.notFound),
-       _newFolder =
-           newFolder ??
-           (() => Directory.systemTemp.createTempSync('anyps5-wayland-'));
+  }) : _run = run ?? ((executable, arguments) => Process.run(executable, arguments)),
+       _start = start ?? ((executable, arguments) => Process.start(executable, arguments)),
+       _exists = exists ?? ((path) => FileSystemEntity.typeSync(path) != FileSystemEntityType.notFound),
+       _newFolder = newFolder ?? (() => Directory.systemTemp.createTempSync('anyps5-wayland-'));
 
   final ScreenCastPortal portal;
   final Map<String, String> environment;
@@ -190,18 +166,12 @@ class WaylandCapture {
   final Directory Function() _newFolder;
 
   /// The elements GStreamer needs: pipewiresrc comes in its own package on most systems.
-  static const elements = [
-    'pipewiresrc',
-    'videoconvert',
-    'videoscale',
-    'videorate',
-  ];
+  static const elements = ['pipewiresrc', 'videoconvert', 'videoscale', 'videorate'];
 
   /// Whether this desktop is recorded through the portal: exactly the sessions x11grab never
   /// served, so X11 goes on as it was.
   static bool applies(HostSystem system, Map<String, String> environment) =>
-      system == HostSystem.linux &&
-      (environment['XDG_SESSION_TYPE'] ?? '').toLowerCase() == 'wayland';
+      system == HostSystem.linux && (environment['XDG_SESSION_TYPE'] ?? '').toLowerCase() == 'wayland';
 
   PortalGrant? _grant;
   Future<PortalGrant?>? _asking;
@@ -212,9 +182,7 @@ class WaylandCapture {
   WaylandProblem? problem;
 
   /// The size of the window shared, standing in for a position Wayland does not reveal.
-  ScreenArea? get area => _grant == null
-      ? null
-      : (_grant!.area ?? const ScreenArea(0, 0, 1920, 1080));
+  ScreenArea? get area => _grant == null ? null : (_grant!.area ?? const ScreenArea(0, 0, 1920, 1080));
 
   /// What is missing here, without asking the user anything; null when all is in place.
   Future<WaylandProblem?> check() async {
@@ -229,9 +197,7 @@ class WaylandCapture {
     if (!info.sharesWindows) return problem = WaylandProblem.noWindowShare;
     final runtime = environment['XDG_RUNTIME_DIR'] ?? '';
     final elsewhere = (environment['PIPEWIRE_REMOTE'] ?? '').isNotEmpty;
-    if (runtime.isNotEmpty &&
-        !elsewhere &&
-        !_exists(p.posix.join(runtime, 'pipewire-0'))) {
+    if (runtime.isNotEmpty && !elsewhere && !_exists(p.posix.join(runtime, 'pipewire-0'))) {
       return problem = WaylandProblem.noPipeWire;
     }
     for (final element in elements) {
@@ -264,9 +230,7 @@ class WaylandCapture {
     final token = readToken?.call() ?? '';
     final PortalGrant? grant;
     try {
-      grant = await portal.shareWindow(
-        restoreToken: token.isEmpty ? null : token,
-      );
+      grant = await portal.shareWindow(restoreToken: token.isEmpty ? null : token);
     } on Object catch (error) {
       log?.call('wayland: the portal failed: $error');
       problem = WaylandProblem.failed;
@@ -325,11 +289,7 @@ class WaylandCapture {
 
   /// Starts the picture for one recording, within [maxWidth] by [maxHeight] in the window's own
   /// shape; null with [problem] set when it cannot be had.
-  Future<WaylandFeed?> openFeed({
-    required int maxWidth,
-    required int maxHeight,
-    required int framesPerSecond,
-  }) async {
+  Future<WaylandFeed?> openFeed({required int maxWidth, required int maxHeight, required int framesPerSecond}) async {
     final grant = await share();
     if (grant == null) return null;
     final (width, height) = ScreenGrab.fit(area, maxWidth, maxHeight);
@@ -338,13 +298,7 @@ class WaylandCapture {
       folder = _newFolder();
       final pipe = p.posix.join(folder.path, 'picture');
       final made = await _run('mkfifo', [pipe]);
-      if (made.exitCode != 0)
-        throw ProcessException(
-          'mkfifo',
-          [pipe],
-          'exit ${made.exitCode}',
-          made.exitCode,
-        );
+      if (made.exitCode != 0) throw ProcessException('mkfifo', [pipe], 'exit ${made.exitCode}', made.exitCode);
       final process = await _start(
         'gst-launch-1.0',
         gstreamerArguments(
@@ -360,20 +314,10 @@ class WaylandCapture {
       process.stderr.listen((data) {
         if (errors.length < 2000) errors.write(String.fromCharCodes(data));
       }, onError: (_) {});
-      final feed = WaylandFeed._(
-        process,
-        folder,
-        pipe,
-        width,
-        height,
-        framesPerSecond,
-      );
+      final feed = WaylandFeed._(process, folder, pipe, width, height, framesPerSecond);
       unawaited(
         process.exitCode.then((code) {
-          if (!feed._closed)
-            log?.call(
-              'wayland: GStreamer ended ($code) ${errors.toString().trim()}',
-            );
+          if (!feed._closed) log?.call('wayland: GStreamer ended ($code) ${errors.toString().trim()}');
         }),
       );
       return feed;

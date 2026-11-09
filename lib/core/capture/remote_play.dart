@@ -40,9 +40,7 @@ class RemotePlayStream {
     this.wayland,
     ProcessStarter? start,
     this.log,
-  }) : _start =
-           start ??
-           ((executable, arguments) => Process.start(executable, arguments));
+  }) : _start = start ?? ((executable, arguments) => Process.start(executable, arguments));
 
   final String ffmpeg;
   final HostSystem system;
@@ -78,17 +76,10 @@ class RemotePlayStream {
 
   /// The bit rate for a picture of [width] by [height]: about 0.2 bit a pixel at 60 frames a
   /// second (11 Mbit/s for 1280 x 720), as the Mac sends.
-  static int bitRateFor(int width, int height) =>
-      max(2000000, (width * height * framesPerSecond * 0.2).round());
+  static int bitRateFor(int width, int height) => max(2000000, (width * height * framesPerSecond * 0.2).round());
 
   /// ffmpeg's arguments for the game in [area], made [width] by [height].
-  List<String> arguments(
-    VideoEncoder encoder,
-    ScreenArea area,
-    int width,
-    int height, {
-    WaylandFeed? feed,
-  }) => [
+  List<String> arguments(VideoEncoder encoder, ScreenArea area, int width, int height, {WaylandFeed? feed}) => [
     '-hide_banner',
     '-loglevel',
     'error',
@@ -104,11 +95,7 @@ class RemotePlayStream {
     '-an',
     '-vf',
     'scale=$width:$height:flags=bilinear,${encoder.filterTail}',
-    ...encoder.arguments(
-      use: EncodeUse.live,
-      bitRate: bitRateFor(width, height),
-      keyEvery: framesPerSecond,
-    ),
+    ...encoder.arguments(use: EncodeUse.live, bitRate: bitRateFor(width, height), keyEvery: framesPerSecond),
     '-flush_packets',
     '1',
     '-flvflags',
@@ -162,8 +149,7 @@ class RemotePlayStream {
     // The window moved or changed size (full screen and back): recorded again where it is now.
     _follow = Timer.periodic(followEvery, (_) {
       final now = areaOf(pid);
-      if (now != null && now != _area && _video != null)
-        unawaited(_startVideo(encoder, now));
+      if (now != null && now != _area && _video != null) unawaited(_startVideo(encoder, now));
     });
     return RemotePlayStart.on;
   }
@@ -177,24 +163,15 @@ class RemotePlayStream {
     final (width, height) = ScreenGrab.fit(area, wanted.$1, wanted.$2);
     WaylandFeed? feed;
     if (wayland case final capture?) {
-      feed = await capture.openFeed(
-        maxWidth: wanted.$1,
-        maxHeight: wanted.$2,
-        framesPerSecond: framesPerSecond,
-      );
+      feed = await capture.openFeed(maxWidth: wanted.$1, maxHeight: wanted.$2, framesPerSecond: framesPerSecond);
       if (feed == null) {
-        log?.call(
-          'remote play: no picture from the desktop (${capture.problem?.name})',
-        );
+        log?.call('remote play: no picture from the desktop (${capture.problem?.name})');
         return false;
       }
     }
     final Process process;
     try {
-      process = await _start(
-        ffmpeg,
-        arguments(encoder, area, width, height, feed: feed),
-      );
+      process = await _start(ffmpeg, arguments(encoder, area, width, height, feed: feed));
     } on Object catch (error) {
       log?.call('remote play: ffmpeg did not start: $error');
       await feed?.close();
@@ -211,12 +188,7 @@ class RemotePlayStream {
       if (_video != process) return;
       _frame = (_frame + 1) & 0xFFFFFFFF;
       _send?.call(
-        StreamPacket.video(
-          frame.data,
-          number: _frame,
-          key: frame.key,
-          milliseconds: _clock.elapsedMilliseconds,
-        ),
+        StreamPacket.video(frame.data, number: _frame, key: frame.key, milliseconds: _clock.elapsedMilliseconds),
       );
     });
     process.stdout.listen((data) {
@@ -235,15 +207,12 @@ class RemotePlayStream {
         await picture?.close();
         if (_video != process) return;
         _video = null;
-        log?.call(
-          'remote play: ffmpeg ended ($code) ${errors.toString().trim()}',
-        );
+        log?.call('remote play: ffmpeg ended ($code) ${errors.toString().trim()}');
         // Once more after a moment (the window was changing); then the phone is told.
         if (_restarts++ < 3 && _pid != null) {
           await Future<void>.delayed(const Duration(seconds: 1));
           final now = _pid == null ? null : areaOf(_pid!);
-          if (now != null && _video == null && _pid != null)
-            await _startVideo(encoder, now);
+          if (now != null && _video == null && _pid != null) await _startVideo(encoder, now);
         }
       }),
     );

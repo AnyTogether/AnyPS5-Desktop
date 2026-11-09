@@ -56,8 +56,7 @@ enum VideoEncoder {
   static const vaapiDevice = '/dev/dri/renderD128';
 
   /// Arguments before the inputs (VA-API's device).
-  List<String> get deviceArguments =>
-      this == vaapi ? const ['-vaapi_device', vaapiDevice] : const [];
+  List<String> get deviceArguments => this == vaapi ? const ['-vaapi_device', vaapiDevice] : const [];
 
   /// The end of the filter chain: the pixel format the encoder takes, uploaded to the graphics
   /// card for VA-API.
@@ -68,11 +67,7 @@ enum VideoEncoder {
   };
 
   /// The encoder's arguments: [bitRate] in bit/s, a key frame every [keyEvery] frames.
-  List<String> arguments({
-    required EncodeUse use,
-    required int bitRate,
-    required int keyEvery,
-  }) {
+  List<String> arguments({required EncodeUse use, required int bitRate, required int keyEvery}) {
     final live = use == EncodeUse.live;
     final buffer = switch (use) {
       // Half a second: frames stay even in size, so none waits behind a large one.
@@ -80,16 +75,7 @@ enum VideoEncoder {
       EncodeUse.broadcast => bitRate * 2,
       EncodeUse.replay => bitRate * 2,
     };
-    final rate = [
-      '-b:v',
-      '$bitRate',
-      '-maxrate',
-      '$bitRate',
-      '-bufsize',
-      '$buffer',
-      '-g',
-      '$keyEvery',
-    ];
+    final rate = ['-b:v', '$bitRate', '-maxrate', '$bitRate', '-bufsize', '$buffer', '-g', '$keyEvery'];
     return switch (this) {
       nvenc => [
         '-c:v',
@@ -179,11 +165,7 @@ enum VideoEncoder {
 
 /// The first encoder that works with this ffmpeg on this computer, asked once and kept.
 class EncoderChoice {
-  EncoderChoice({
-    required this.ffmpeg,
-    required this.system,
-    required this.run,
-  });
+  EncoderChoice({required this.ffmpeg, required this.system, required this.run});
 
   final String ffmpeg;
   final HostSystem system;
@@ -198,13 +180,8 @@ class EncoderChoice {
   Future<VideoEncoder?> _choose() async {
     for (final candidate in VideoEncoder.candidates(system)) {
       try {
-        final result = await run(
-          ffmpeg,
-          candidate.probeArguments(),
-        ).timeout(const Duration(seconds: 10));
-        tried.add(
-          '${candidate.codec}: ${result.exitCode == 0 ? 'works' : 'exit ${result.exitCode}'}',
-        );
+        final result = await run(ffmpeg, candidate.probeArguments()).timeout(const Duration(seconds: 10));
+        tried.add('${candidate.codec}: ${result.exitCode == 0 ? 'works' : 'exit ${result.exitCode}'}');
         if (result.exitCode == 0) return candidate;
       } on Object catch (error) {
         tried.add('${candidate.codec}: $error');
@@ -248,14 +225,7 @@ abstract final class ScreenGrab {
         '$framesPerSecond',
         '-draw_mouse',
         '0',
-        if (area != null) ...[
-          '-offset_x',
-          '${area.x}',
-          '-offset_y',
-          '${area.y}',
-          '-video_size',
-          '${width}x$height',
-        ],
+        if (area != null) ...['-offset_x', '${area.x}', '-offset_y', '${area.y}', '-video_size', '${width}x$height'],
         '-i',
         'desktop',
       ];

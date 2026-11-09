@@ -6,8 +6,7 @@ import 'wayland_capture.dart';
 
 /// The desktop's ScreenCast portal over the session bus.
 class DbusScreenCastPortal implements ScreenCastPortal {
-  DbusScreenCastPortal({DBusClient Function()? client})
-    : _newClient = client ?? DBusClient.session;
+  DbusScreenCastPortal({DBusClient Function()? client}) : _newClient = client ?? DBusClient.session;
 
   static const _bus = 'org.freedesktop.portal.Desktop';
   static const _interface = 'org.freedesktop.portal.ScreenCast';
@@ -40,14 +39,8 @@ class DbusScreenCastPortal implements ScreenCastPortal {
     try {
       final object = DBusRemoteObject(client, name: _bus, path: _path);
       final version = await object.getProperty(_interface, 'version');
-      final sources = await object.getProperty(
-        _interface,
-        'AvailableSourceTypes',
-      );
-      return PortalInfo(
-        version: version.asUint32(),
-        sharesWindows: sources.asUint32() & windowSource != 0,
-      );
+      final sources = await object.getProperty(_interface, 'AvailableSourceTypes');
+      return PortalInfo(version: version.asUint32(), sharesWindows: sources.asUint32() & windowSource != 0);
     } on Object {
       return null;
     } finally {
@@ -75,9 +68,7 @@ class DbusScreenCastPortal implements ScreenCastPortal {
       ], replySignature: DBusSignature('o'));
     });
     if (created == null) return null;
-    final session = _session = DBusObjectPath(
-      created['session_handle']!.asString(),
-    );
+    final session = _session = DBusObjectPath(created['session_handle']!.asString());
 
     final selected = await _request(client, cancelled, (handle) async {
       await object.callMethod(_interface, 'SelectSources', [
@@ -86,10 +77,8 @@ class DbusScreenCastPortal implements ScreenCastPortal {
           'handle_token': DBusString(handle),
           'types': const DBusUint32(windowSource),
           'multiple': const DBusBoolean(false),
-          if (info.version >= restoreVersion)
-            'persist_mode': const DBusUint32(persistUntilRevoked),
-          if (info.version >= restoreVersion && restoreToken != null)
-            'restore_token': DBusString(restoreToken),
+          if (info.version >= restoreVersion) 'persist_mode': const DBusUint32(persistUntilRevoked),
+          if (info.version >= restoreVersion && restoreToken != null) 'restore_token': DBusString(restoreToken),
         }),
       ], replySignature: DBusSignature('o'));
     });
@@ -131,30 +120,16 @@ class DbusScreenCastPortal implements ScreenCastPortal {
   ) async {
     final handle = 'anyps5_request_${_nextToken()}';
     final sender = client.uniqueName.substring(1).replaceAll('.', '_');
-    final path = DBusObjectPath(
-      '/org/freedesktop/portal/desktop/request/$sender/$handle',
-    );
+    final path = DBusObjectPath('/org/freedesktop/portal/desktop/request/$sender/$handle');
     final answer = Completer<Map<String, DBusValue>?>();
-    final signals = DBusSignalStream(
-      client,
-      interface: 'org.freedesktop.portal.Request',
-      name: 'Response',
-      path: path,
-    );
+    final signals = DBusSignalStream(client, interface: 'org.freedesktop.portal.Request', name: 'Response', path: path);
     final listening = signals.listen((signal) {
       if (answer.isCompleted || signal.values.length < 2) return;
-      answer.complete(
-        signal.values[0].asUint32() == 0
-            ? signal.values[1].asStringVariantDict()
-            : null,
-      );
+      answer.complete(signal.values[0].asUint32() == 0 ? signal.values[1].asStringVariantDict() : null);
     });
     try {
       await call(handle);
-      return await Future.any([
-        answer.future,
-        cancelled.future.then((_) => null),
-      ]);
+      return await Future.any([answer.future, cancelled.future.then((_) => null)]);
     } finally {
       await listening.cancel();
     }
@@ -174,12 +149,11 @@ class DbusScreenCastPortal implements ScreenCastPortal {
     if (client == null) return;
     try {
       if (session != null) {
-        await DBusRemoteObject(client, name: _bus, path: session).callMethod(
-          'org.freedesktop.portal.Session',
-          'Close',
-          const [],
-          replySignature: DBusSignature(''),
-        );
+        await DBusRemoteObject(
+          client,
+          name: _bus,
+          path: session,
+        ).callMethod('org.freedesktop.portal.Session', 'Close', const [], replySignature: DBusSignature(''));
       }
     } on Object {
       // Already closed on its side.

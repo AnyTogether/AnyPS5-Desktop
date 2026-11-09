@@ -20,10 +20,7 @@ void main() {
   late FakePortal portal;
   late bool toolsInstalled;
 
-  const environment = {
-    'XDG_SESSION_TYPE': 'wayland',
-    'XDG_RUNTIME_DIR': '/run/user/1000',
-  };
+  const environment = {'XDG_SESSION_TYPE': 'wayland', 'XDG_RUNTIME_DIR': '/run/user/1000'};
 
   setUp(() {
     portal = FakePortal();
@@ -41,10 +38,7 @@ void main() {
       ),
       replay: (seconds) => ReplayBuffer(
         ffmpeg: 'ffmpeg',
-        folder: p.join(
-          Directory.systemTemp.path,
-          'anyps5-replay-wayland-${DateTime.now().microsecondsSinceEpoch}',
-        ),
+        folder: p.join(Directory.systemTemp.path, 'anyps5-replay-wayland-${DateTime.now().microsecondsSinceEpoch}'),
         seconds: seconds,
         system: HostSystem.linux,
         start: (_, _) async => FakeProcess(),
@@ -67,16 +61,8 @@ void main() {
 
   ToggleRow replayToggle() {
     model.open(Layer.settings);
-    model.selectCategory(
-      model.panelCategories().indexWhere(
-        (category) => category.id == 'captures',
-      ),
-    );
-    return model
-            .panelCategories()[model.panelCategory]
-            .rows
-            .firstWhere((row) => row.id == 'replayBuffer')
-            .kind
+    model.selectCategory(model.panelCategories().indexWhere((category) => category.id == 'captures'));
+    return model.panelCategories()[model.panelCategory].rows.firstWhere((row) => row.id == 'replayBuffer').kind
         as ToggleRow;
   }
 

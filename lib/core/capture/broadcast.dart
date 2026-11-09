@@ -56,9 +56,7 @@ enum BroadcastQuality {
   /// "720p60, 3 Mbit/s"
   String get title {
     final rate = bitRate / 1000000;
-    final mbit = rate == rate.roundToDouble()
-        ? '${rate.round()}'
-        : rate.toStringAsFixed(1);
+    final mbit = rate == rate.roundToDouble() ? '${rate.round()}' : rate.toStringAsFixed(1);
     return '${height}p$frameRate, $mbit Mbit/s';
   }
 }
@@ -75,30 +73,19 @@ class BroadcastSettings {
     this.viewerLink = '',
   });
 
-  factory BroadcastSettings.fromJson(Map<String, dynamic> json) =>
-      BroadcastSettings(
-        service:
-            BroadcastService.values
-                .where((service) => service.name == json['service'])
-                .firstOrNull ??
-            BroadcastService.twitch,
-        customUrl: json['customURL'] is String
-            ? json['customURL'] as String
-            : '',
-        quality:
-            BroadcastQuality.values
-                .where((quality) => quality.name == json['quality'])
-                .firstOrNull ??
-            BroadcastQuality.hd720p60,
-        microphone: json['microphone'] == true,
-        microphoneLevel: json['microphoneLevel'] is num
-            ? (json['microphoneLevel'] as num).toInt().clamp(10, 100)
-            : 80,
-        liveBadge: json['liveBadge'] is bool ? json['liveBadge'] as bool : true,
-        viewerLink: json['viewerLink'] is String
-            ? json['viewerLink'] as String
-            : '',
-      );
+  factory BroadcastSettings.fromJson(Map<String, dynamic> json) => BroadcastSettings(
+    service:
+        BroadcastService.values.where((service) => service.name == json['service']).firstOrNull ??
+        BroadcastService.twitch,
+    customUrl: json['customURL'] is String ? json['customURL'] as String : '',
+    quality:
+        BroadcastQuality.values.where((quality) => quality.name == json['quality']).firstOrNull ??
+        BroadcastQuality.hd720p60,
+    microphone: json['microphone'] == true,
+    microphoneLevel: json['microphoneLevel'] is num ? (json['microphoneLevel'] as num).toInt().clamp(10, 100) : 80,
+    liveBadge: json['liveBadge'] is bool ? json['liveBadge'] as bool : true,
+    viewerLink: json['viewerLink'] is String ? json['viewerLink'] as String : '',
+  );
 
   BroadcastService service;
 
@@ -139,9 +126,7 @@ class BroadcastSettings {
 
   static BroadcastSettings load(String file) {
     try {
-      return BroadcastSettings.fromJson(
-        jsonDecode(File(file).readAsStringSync()) as Map<String, dynamic>,
-      );
+      return BroadcastSettings.fromJson(jsonDecode(File(file).readAsStringSync()) as Map<String, dynamic>);
     } on Object {
       return BroadcastSettings();
     }
@@ -168,41 +153,18 @@ abstract final class BroadcastMicrophone {
     required ProcessRunner run,
   }) async {
     if (system == HostSystem.linux) {
-      return const [
-        '-thread_queue_size',
-        '1024',
-        '-f',
-        'pulse',
-        '-ar',
-        '48000',
-        '-ac',
-        '2',
-        '-i',
-        'default',
-      ];
+      return const ['-thread_queue_size', '1024', '-f', 'pulse', '-ar', '48000', '-ac', '2', '-i', 'default'];
     }
     final ProcessResult listing;
     try {
-      listing = await run(ffmpeg, const [
-        '-hide_banner',
-        '-list_devices',
-        'true',
-        '-f',
-        'dshow',
-        '-i',
-        'dummy',
-      ]);
+      listing = await run(ffmpeg, const ['-hide_banner', '-list_devices', 'true', '-f', 'dshow', '-i', 'dummy']);
     } on Object {
       return null;
     }
     final names = audioDevices('${listing.stdout}\n${listing.stderr}');
     // A microphone before anything else Windows records (Stereo Mix).
-    final name =
-        names.where((name) => name.toLowerCase().contains('mic')).firstOrNull ??
-        names.firstOrNull;
-    return name == null
-        ? null
-        : ['-thread_queue_size', '1024', '-f', 'dshow', '-i', 'audio=$name'];
+    final name = names.where((name) => name.toLowerCase().contains('mic')).firstOrNull ?? names.firstOrNull;
+    return name == null ? null : ['-thread_queue_size', '1024', '-f', 'dshow', '-i', 'audio=$name'];
   }
 
   /// The audio devices in `ffmpeg -list_devices true -f dshow`'s listing, either way it prints
@@ -219,8 +181,7 @@ abstract final class BroadcastMicrophone {
       if (line.contains('Alternative name')) continue;
       final name = RegExp('"([^"]+)"').firstMatch(line)?.group(1);
       if (name == null) continue;
-      if (line.trimRight().endsWith('(audio)') || underAudioHeading)
-        names.add(name);
+      if (line.trimRight().endsWith('(audio)') || underAudioHeading) names.add(name);
     }
     return names;
   }
@@ -290,21 +251,14 @@ class RtmpEndpoint {
     while (path.endsWith('/')) {
       path = path.substring(0, path.length - 1);
     }
-    if (streamKey.isEmpty &&
-        path.split('/').where((part) => part.isNotEmpty).length > 1) {
+    if (streamKey.isEmpty && path.split('/').where((part) => part.isNotEmpty).length > 1) {
       final last = path.lastIndexOf('/');
       streamKey = path.substring(last + 1);
       path = path.substring(0, last);
     }
     if (path.isEmpty) throw EndpointProblem.noApplication;
     if (streamKey.isEmpty) throw EndpointProblem.noKey;
-    return RtmpEndpoint(
-      tls: tls,
-      host: host,
-      port: port,
-      app: path,
-      streamKey: streamKey,
-    );
+    return RtmpEndpoint(tls: tls, host: host, port: port, app: path, streamKey: streamKey);
   }
 }
 
@@ -318,8 +272,9 @@ class BroadcastKeys {
 
   Map<String, String> _all() {
     try {
-      return (jsonDecode(File(file).readAsStringSync()) as Map<String, dynamic>)
-          .map((key, value) => MapEntry(key, '$value'));
+      return (jsonDecode(File(file).readAsStringSync()) as Map<String, dynamic>).map(
+        (key, value) => MapEntry(key, '$value'),
+      );
     } on Object {
       return {};
     }
@@ -338,8 +293,7 @@ class BroadcastKeys {
     try {
       final target = File(file)..parent.createSync(recursive: true);
       target.writeAsStringSync(jsonEncode(keys));
-      if (system != HostSystem.windows)
-        Process.runSync('chmod', ['600', target.path]);
+      if (system != HostSystem.windows) Process.runSync('chmod', ['600', target.path]);
     } on Object {
       // Unsaved: asked again next time.
     }
@@ -358,10 +312,7 @@ class BroadcastKeys {
 /// How a broadcast is going.
 sealed class BroadcastPhase {
   const BroadcastPhase();
-  bool get active =>
-      this is BroadcastStarting ||
-      this is BroadcastLive ||
-      this is BroadcastReconnecting;
+  bool get active => this is BroadcastStarting || this is BroadcastLive || this is BroadcastReconnecting;
 }
 
 class BroadcastOff extends BroadcastPhase {
@@ -424,12 +375,8 @@ class Broadcaster {
       Duration(seconds: 30),
     ],
     this.log,
-  }) : _start =
-           start ??
-           ((executable, arguments) => Process.start(executable, arguments)),
-       _runTool =
-           run ??
-           ((executable, arguments) => Process.run(executable, arguments));
+  }) : _start = start ?? ((executable, arguments) => Process.start(executable, arguments)),
+       _runTool = run ?? ((executable, arguments) => Process.run(executable, arguments));
 
   final String ffmpeg;
   final HostSystem system;
@@ -491,19 +438,13 @@ class Broadcaster {
   /// The microphone being used this run: its input arguments and level, when it is on and found.
   ({List<String> input, int level})? get _liveMicrophone {
     final input = _microphone;
-    return input == null || !_microphoneOn || _microphoneFailed
-        ? null
-        : (input: input, level: microphoneLevel!.call());
+    return input == null || !_microphoneOn || _microphoneFailed ? null : (input: input, level: microphoneLevel!.call());
   }
 
   /// Finds the microphone for ffmpeg when it is wanted and not known yet; says when there is none.
   Future<void> _findMicrophone() async {
     if (!_microphoneOn || _microphone != null || _microphoneFailed) return;
-    _microphone = await BroadcastMicrophone.input(
-      system: system,
-      ffmpeg: ffmpeg,
-      run: _runTool,
-    );
+    _microphone = await BroadcastMicrophone.input(system: system, ffmpeg: ffmpeg, run: _runTool);
     if (_microphone == null && !_microphoneFailed) {
       _microphoneFailed = true;
       noMicrophone?.call();
@@ -519,10 +460,7 @@ class Broadcaster {
     final current = _liveMicrophone;
     _microphoneRestart?.cancel();
     if (wanted == (current != null) && !wanted) return;
-    _microphoneRestart = Timer(
-      const Duration(milliseconds: 900),
-      () => unawaited(_restartWithMicrophone()),
-    );
+    _microphoneRestart = Timer(const Duration(milliseconds: 900), () => unawaited(_restartWithMicrophone()));
   }
 
   Future<void> _restartWithMicrophone() async {
@@ -568,10 +506,7 @@ class Broadcaster {
       '-i',
       'pipe:0',
       ...?microphone?.input,
-      if (microphone != null) ...[
-        '-filter_complex',
-        BroadcastMicrophone.filter(microphone.level),
-      ],
+      if (microphone != null) ...['-filter_complex', BroadcastMicrophone.filter(microphone.level)],
       '-map',
       '0:v',
       '-map',
@@ -580,11 +515,7 @@ class Broadcaster {
       '-vf',
       'scale=$width:$height:force_original_aspect_ratio=decrease:flags=bicubic,'
           'pad=$width:$height:(ow-iw)/2:(oh-ih)/2,fps=${quality.frameRate},${encoder.filterTail}',
-      ...encoder.arguments(
-        use: EncodeUse.broadcast,
-        bitRate: quality.bitRate,
-        keyEvery: quality.frameRate * 2,
-      ),
+      ...encoder.arguments(use: EncodeUse.broadcast, bitRate: quality.bitRate, keyEvery: quality.frameRate * 2),
       if (microphone == null) ...['-af', 'aresample=async=1'],
       '-c:a',
       'aac',
@@ -601,11 +532,7 @@ class Broadcaster {
   }
 
   /// Broadcasts the game with process [pid] to [endpoint].
-  Future<void> start({
-    required int pid,
-    required RtmpEndpoint endpoint,
-    required BroadcastQuality quality,
-  }) async {
+  Future<void> start({required int pid, required RtmpEndpoint endpoint, required BroadcastQuality quality}) async {
     if (phase.active) return;
     this.pid = pid;
     _endpoint = endpoint;
@@ -634,8 +561,7 @@ class Broadcaster {
     final encoder = _encoder;
     final endpoint = _endpoint;
     final pid = this.pid;
-    if (encoder == null || endpoint == null || pid == null || !phase.active)
-      return;
+    if (encoder == null || endpoint == null || pid == null || !phase.active) return;
     WaylandFeed? feed;
     if (wayland case final capture?) {
       feed = await capture.openFeed(
@@ -647,25 +573,14 @@ class Broadcaster {
         await feed?.close();
         return;
       }
-      if (feed == null)
-        return _fail((capture.problem ?? WaylandProblem.failed).textKey);
+      if (feed == null) return _fail((capture.problem ?? WaylandProblem.failed).textKey);
     }
     final area = areaOf(pid);
     _area = area;
     final microphone = _liveMicrophone;
     final Process process;
     try {
-      process = await _start(
-        ffmpeg,
-        arguments(
-          encoder,
-          area,
-          endpoint,
-          _quality,
-          microphone: microphone,
-          feed: feed,
-        ),
-      );
+      process = await _start(ffmpeg, arguments(encoder, area, endpoint, _quality, microphone: microphone, feed: feed));
     } on Object catch (error) {
       await feed?.close();
       return _fail('$error');
@@ -691,27 +606,19 @@ class Broadcaster {
       steady.tick();
       // The window changed (full screen and back): published again from where it is now.
       final now = areaOf(pid);
-      if (now != null &&
-          _area != null &&
-          now != _area &&
-          phase is BroadcastLive) {
+      if (now != null && _area != null && now != _area && phase is BroadcastLive) {
         _area = now;
         process.kill();
       }
     });
     unawaited(process.stdin.done.catchError((_) {}));
     final progress = <String, String>{};
-    process.stdout
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .listen((line) {
-          final equals = line.indexOf('=');
-          if (equals < 0) return;
-          progress[line.substring(0, equals).trim()] = line
-              .substring(equals + 1)
-              .trim();
-          if (line.startsWith('progress=')) _progress(progress);
-        }, onError: (_) {});
+    process.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen((line) {
+      final equals = line.indexOf('=');
+      if (equals < 0) return;
+      progress[line.substring(0, equals).trim()] = line.substring(equals + 1).trim();
+      if (line.startsWith('progress=')) _progress(progress);
+    }, onError: (_) {});
     final errors = StringBuffer();
     process.stderr.transform(utf8.decoder).listen((text) {
       if (errors.length < 4000) errors.write(text);
@@ -729,9 +636,7 @@ class Broadcaster {
       return _run();
     }
     final reason = _reason(errors.toString(), code);
-    log?.call(
-      'broadcast: ffmpeg ended ($code): ${_scrub(errors.toString().trim())}',
-    );
+    log?.call('broadcast: ffmpeg ended ($code): ${_scrub(errors.toString().trim())}');
     // ffmpeg could not open the microphone: the broadcast goes on without it.
     if (microphone != null && !_wentLive) {
       log?.call('broadcast: going on without the microphone');
@@ -739,8 +644,7 @@ class Broadcaster {
       noMicrophone?.call();
       return _run();
     }
-    if (phase is BroadcastStarting && _attempt == 0 && !_wentLive)
-      return _fail(reason);
+    if (phase is BroadcastStarting && _attempt == 0 && !_wentLive) return _fail(reason);
     if (_attempt >= retryDelays.length) return _fail(reason);
     final delay = retryDelays[_attempt++];
     _set(BroadcastReconnecting(_attempt, delay));
@@ -752,8 +656,7 @@ class Broadcaster {
   void _progress(Map<String, String> progress) {
     final frames = int.tryParse(progress['frame'] ?? '') ?? 0;
     final dropped = int.tryParse(progress['drop_frames'] ?? '') ?? 0;
-    final rate = RegExp(r'([\d.]+)kbits/s')
-        .firstMatch(progress['bitrate'] ?? '');
+    final rate = RegExp(r'([\d.]+)kbits/s').firstMatch(progress['bitrate'] ?? '');
     if (frames > 0 && phase is! BroadcastLive) {
       if (!_wentLive) {
         _live
@@ -767,28 +670,21 @@ class Broadcaster {
     stats
       ..frames = frames
       ..dropped = dropped
-      ..bitRate = rate == null
-          ? stats.bitRate
-          : (double.parse(rate.group(1)!) * 1000).round()
+      ..bitRate = rate == null ? stats.bitRate : (double.parse(rate.group(1)!) * 1000).round()
       ..duration = _live.elapsed;
     changed();
   }
 
   /// What ffmpeg's error says, in short.
   static String _reason(String errors, int code) {
-    final lines = errors
-        .split('\n')
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty)
-        .toList();
+    final lines = errors.split('\n').map((line) => line.trim()).where((line) => line.isNotEmpty).toList();
     if (lines.isEmpty) return 'ffmpeg ended ($code)';
     final last = _scrub(lines.last);
     return last.length > 160 ? '${last.substring(0, 160)}…' : last;
   }
 
   /// A line with the stream key taken out (ffmpeg names the URL it failed on).
-  static String _scrub(String text) =>
-      text.replaceAll(RegExp(r'rtmps?://\S+'), 'rtmp://…');
+  static String _scrub(String text) => text.replaceAll(RegExp(r'rtmps?://\S+'), 'rtmp://…');
 
   void _fail(String reason) {
     _cleanUp();
@@ -826,8 +722,6 @@ class Broadcaster {
   }
 
   /// The settings folder's files for broadcasting.
-  static String settingsFile(String config) =>
-      p.join(config, 'Broadcast', 'settings.json');
-  static String keysFile(String config) =>
-      p.join(config, 'Broadcast', 'keys.json');
+  static String settingsFile(String config) => p.join(config, 'Broadcast', 'settings.json');
+  static String keysFile(String config) => p.join(config, 'Broadcast', 'keys.json');
 }

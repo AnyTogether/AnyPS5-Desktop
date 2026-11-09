@@ -20,12 +20,7 @@ class FakePortal implements ScreenCastPortal {
   FakePortal({this.info = const PortalInfo(version: 5, sharesWindows: true)});
 
   PortalInfo? info;
-  PortalGrant? grant = const PortalGrant(
-    node: 77,
-    width: 1920,
-    height: 1080,
-    restoreToken: 'next',
-  );
+  PortalGrant? grant = const PortalGrant(node: 77, width: 1920, height: 1080, restoreToken: 'next');
   Completer<void>? dialog;
   final asked = <String?>[];
   int closed = 0;
@@ -44,10 +39,7 @@ class FakePortal implements ScreenCastPortal {
   Future<void> close() async => closed++;
 }
 
-const _wayland = {
-  'XDG_SESSION_TYPE': 'wayland',
-  'XDG_RUNTIME_DIR': '/run/user/1000',
-};
+const _wayland = {'XDG_SESSION_TYPE': 'wayland', 'XDG_RUNTIME_DIR': '/run/user/1000'};
 
 void main() {
   late FakePortal portal;
@@ -66,19 +58,11 @@ void main() {
     readToken: () => token,
     saveToken: (value) => token = value,
     exists: (_) => pipeWire,
-    newFolder: () =>
-        Directory(p.join(temp.path, 'feed-${ran.length}'))
-          ..createSync(recursive: true),
+    newFolder: () => Directory(p.join(temp.path, 'feed-${ran.length}'))..createSync(recursive: true),
     run: (executable, arguments) async {
       ran.add((executable, arguments));
-      if (executable == 'gst-inspect-1.0' && !toolsInstalled)
-        throw ProcessException(executable, arguments);
-      return ProcessResult(
-        1,
-        executable == 'gst-inspect-1.0' ? inspectExit : 0,
-        '',
-        '',
-      );
+      if (executable == 'gst-inspect-1.0' && !toolsInstalled) throw ProcessException(executable, arguments);
+      return ProcessResult(1, executable == 'gst-inspect-1.0' ? inspectExit : 0, '', '');
     },
     start: (executable, arguments) async {
       started.add((executable, arguments));
@@ -100,37 +84,14 @@ void main() {
   tearDown(() => temp.deleteSync(recursive: true));
 
   test('only a Wayland session goes through the portal', () {
-    expect(
-      WaylandCapture.applies(HostSystem.linux, const {
-        'XDG_SESSION_TYPE': 'wayland',
-      }),
-      isTrue,
-    );
-    expect(
-      WaylandCapture.applies(HostSystem.linux, const {
-        'XDG_SESSION_TYPE': 'x11',
-        'DISPLAY': ':0',
-      }),
-      isFalse,
-    );
-    expect(
-      WaylandCapture.applies(HostSystem.linux, const {'DISPLAY': ':0'}),
-      isFalse,
-    );
-    expect(
-      WaylandCapture.applies(HostSystem.windows, const {
-        'XDG_SESSION_TYPE': 'wayland',
-      }),
-      isFalse,
-    );
+    expect(WaylandCapture.applies(HostSystem.linux, const {'XDG_SESSION_TYPE': 'wayland'}), isTrue);
+    expect(WaylandCapture.applies(HostSystem.linux, const {'XDG_SESSION_TYPE': 'x11', 'DISPLAY': ':0'}), isFalse);
+    expect(WaylandCapture.applies(HostSystem.linux, const {'DISPLAY': ':0'}), isFalse);
+    expect(WaylandCapture.applies(HostSystem.windows, const {'XDG_SESSION_TYPE': 'wayland'}), isFalse);
   });
 
   test('X11 keeps x11grab: no feed, the same input as before', () {
-    final x11 = ScreenGrab.input(
-      system: HostSystem.linux,
-      environment: const {'DISPLAY': ':1'},
-      framesPerSecond: 30,
-    );
+    final x11 = ScreenGrab.input(system: HostSystem.linux, environment: const {'DISPLAY': ':1'}, framesPerSecond: 30);
     expect(x11, containsAllInOrder(['-f', 'x11grab']));
     expect(x11.last, ':1');
   });
@@ -178,11 +139,7 @@ void main() {
       for (final language in ['en', 'tr']) {
         final texts = File('assets/l10n/$language.json').readAsStringSync();
         for (final problem in WaylandProblem.values) {
-          expect(
-            texts,
-            contains('"${problem.textKey}"'),
-            reason: '${problem.textKey} in $language',
-          );
+          expect(texts, contains('"${problem.textKey}"'), reason: '${problem.textKey} in $language');
         }
       }
     });
@@ -258,89 +215,49 @@ void main() {
       portal.dialog!.complete();
       expect(await sharing, isNull);
       expect(wayland.area, isNull);
-      expect(
-        portal.closed,
-        greaterThanOrEqualTo(2),
-        reason: 'the late sharing is closed too',
-      );
+      expect(portal.closed, greaterThanOrEqualTo(2), reason: 'the late sharing is closed too');
     });
 
-    test(
-      'an error from the portal is a failure, not a question repeated',
-      () async {
-        final wayland = WaylandCapture(
-          portal: _ThrowingPortal(),
-          environment: _wayland,
-          exists: (_) => true,
-          run: (_, _) async => ProcessResult(1, 0, '', ''),
-        );
-        expect(await wayland.share(), isNull);
-        expect(wayland.problem, WaylandProblem.failed);
-      },
-    );
+    test('an error from the portal is a failure, not a question repeated', () async {
+      final wayland = WaylandCapture(
+        portal: _ThrowingPortal(),
+        environment: _wayland,
+        exists: (_) => true,
+        run: (_, _) async => ProcessResult(1, 0, '', ''),
+      );
+      expect(await wayland.share(), isNull);
+      expect(wayland.problem, WaylandProblem.failed);
+    });
   });
 
   group('the picture', () {
-    test(
-      'GStreamer reads the node and writes the size ffmpeg is told',
-      () async {
-        final wayland = capture();
-        final feed = await wayland.openFeed(
-          maxWidth: 1280,
-          maxHeight: 720,
-          framesPerSecond: 60,
-        );
-        expect(feed, isNotNull);
-        final (executable, arguments) = started.single;
-        expect(executable, 'gst-launch-1.0');
-        expect(arguments, containsAllInOrder(['pipewiresrc', 'path=77']));
-        expect(
-          arguments,
-          contains(
-            'video/x-raw,format=BGRx,width=1280,height=720,framerate=60/1,pixel-aspect-ratio=1/1',
-          ),
-        );
-        expect(arguments, contains('location=${feed!.pipe}'));
-        expect(
-          feed.input,
-          containsAllInOrder([
-            '-f',
-            'rawvideo',
-            '-pixel_format',
-            'bgr0',
-            '-video_size',
-            '1280x720',
-          ]),
-        );
-        expect(
-          feed.input,
-          containsAllInOrder(['-framerate', '60', '-i', feed.pipe]),
-        );
-        expect(
-          ran.where((run) => run.$1 == 'mkfifo').single.$2.single,
-          feed.pipe,
-        );
-        await feed.close();
-      },
-    );
+    test('GStreamer reads the node and writes the size ffmpeg is told', () async {
+      final wayland = capture();
+      final feed = await wayland.openFeed(maxWidth: 1280, maxHeight: 720, framesPerSecond: 60);
+      expect(feed, isNotNull);
+      final (executable, arguments) = started.single;
+      expect(executable, 'gst-launch-1.0');
+      expect(arguments, containsAllInOrder(['pipewiresrc', 'path=77']));
+      expect(
+        arguments,
+        contains('video/x-raw,format=BGRx,width=1280,height=720,framerate=60/1,pixel-aspect-ratio=1/1'),
+      );
+      expect(arguments, contains('location=${feed!.pipe}'));
+      expect(feed.input, containsAllInOrder(['-f', 'rawvideo', '-pixel_format', 'bgr0', '-video_size', '1280x720']));
+      expect(feed.input, containsAllInOrder(['-framerate', '60', '-i', feed.pipe]));
+      expect(ran.where((run) => run.$1 == 'mkfifo').single.$2.single, feed.pipe);
+      await feed.close();
+    });
 
     test('keeps the window\'s shape and is never larger than it', () async {
       portal.grant = const PortalGrant(node: 1, width: 1000, height: 500);
-      final feed = await capture().openFeed(
-        maxWidth: 1280,
-        maxHeight: 720,
-        framesPerSecond: 30,
-      );
+      final feed = await capture().openFeed(maxWidth: 1280, maxHeight: 720, framesPerSecond: 30);
       expect((feed!.width, feed.height), (1000, 500));
       await feed.close();
     });
 
     test('closing ends GStreamer and takes the pipe\'s folder', () async {
-      final feed = await capture().openFeed(
-        maxWidth: 1280,
-        maxHeight: 720,
-        framesPerSecond: 30,
-      );
+      final feed = await capture().openFeed(maxWidth: 1280, maxHeight: 720, framesPerSecond: 30);
       final folder = Directory(p.dirname(feed!.pipe));
       expect(folder.existsSync(), isTrue);
       await feed.close();
@@ -351,14 +268,7 @@ void main() {
     test('no share, no picture', () async {
       portal.grant = null;
       final wayland = capture();
-      expect(
-        await wayland.openFeed(
-          maxWidth: 1280,
-          maxHeight: 720,
-          framesPerSecond: 30,
-        ),
-        isNull,
-      );
+      expect(await wayland.openFeed(maxWidth: 1280, maxHeight: 720, framesPerSecond: 30), isNull);
       expect(started, isEmpty);
     });
 
@@ -368,18 +278,10 @@ void main() {
         environment: _wayland,
         exists: (_) => true,
         newFolder: () => Directory(p.join(temp.path, 'nofifo'))..createSync(),
-        run: (executable, _) async =>
-            ProcessResult(1, executable == 'mkfifo' ? 1 : 0, '', ''),
+        run: (executable, _) async => ProcessResult(1, executable == 'mkfifo' ? 1 : 0, '', ''),
         start: (executable, arguments) async => fail('nothing to start'),
       );
-      expect(
-        await wayland.openFeed(
-          maxWidth: 1280,
-          maxHeight: 720,
-          framesPerSecond: 30,
-        ),
-        isNull,
-      );
+      expect(await wayland.openFeed(maxWidth: 1280, maxHeight: 720, framesPerSecond: 30), isNull);
       expect(wayland.problem, WaylandProblem.failed);
     });
   });
@@ -412,17 +314,7 @@ void main() {
       expect(await recorder.start(), isTrue);
       final arguments = ffmpegRuns.single;
       expect(arguments, isNot(contains('x11grab')));
-      expect(
-        arguments,
-        containsAllInOrder([
-          '-f',
-          'rawvideo',
-          '-video_size',
-          '1280x720',
-          '-framerate',
-          '30',
-        ]),
-      );
+      expect(arguments, containsAllInOrder(['-f', 'rawvideo', '-video_size', '1280x720', '-framerate', '30']));
       expect(started.single.$1, 'gst-launch-1.0');
       await recorder.stop();
       expect(gstreamer.killed, isNotEmpty);
@@ -447,17 +339,14 @@ void main() {
       expect(ffmpegRuns, isEmpty);
     });
 
-    test(
-      'GStreamer ending stops ffmpeg, which would wait on the pipe for ever',
-      () async {
-        final recorder = buffer(capture());
-        await recorder.start();
-        gstreamer.kill();
-        await pumpEventQueue();
-        expect(ffmpeg.killed, isNotEmpty);
-        expect(recorder.running, isFalse);
-      },
-    );
+    test('GStreamer ending stops ffmpeg, which would wait on the pipe for ever', () async {
+      final recorder = buffer(capture());
+      await recorder.start();
+      gstreamer.kill();
+      await pumpEventQueue();
+      expect(ffmpeg.killed, isNotEmpty);
+      expect(recorder.running, isFalse);
+    });
   });
 
   test('Remote Play sends the shared window through the feed', () async {
@@ -482,18 +371,10 @@ void main() {
         return ffmpeg;
       },
     );
-    final result = await stream.start(
-      pid: 9,
-      width: 1280,
-      height: 720,
-      send: (_) {},
-    );
+    final result = await stream.start(pid: 9, width: 1280, height: 720, send: (_) {});
     expect(result, RemotePlayStart.on);
     expect(arguments.single, isNot(contains('x11grab')));
-    expect(
-      arguments.single,
-      containsAllInOrder(['-f', 'rawvideo', '-video_size', '1280x720']),
-    );
+    expect(arguments.single, containsAllInOrder(['-f', 'rawvideo', '-video_size', '1280x720']));
     await stream.stop();
     await pumpEventQueue();
     expect(gstreamer.killed, isNotEmpty);
@@ -526,33 +407,23 @@ void main() {
 
     test('no stream, no grant', () {
       expect(DbusScreenCastPortal.grantFrom({}), isNull);
-      expect(
-        DbusScreenCastPortal.grantFrom({
-          'streams': DBusArray(DBusSignature('(ua{sv})'), const []),
-        }),
-        isNull,
-      );
+      expect(DbusScreenCastPortal.grantFrom({'streams': DBusArray(DBusSignature('(ua{sv})'), const [])}), isNull);
     });
 
     test('a window with no size gives a usable shape', () {
       const grant = PortalGrant(node: 1);
       expect(grant.area, isNull);
-      expect(
-        const PortalGrant(node: 1, width: 800, height: 600).area,
-        const ScreenArea(0, 0, 800, 600),
-      );
+      expect(const PortalGrant(node: 1, width: 800, height: 600).area, const ScreenArea(0, 0, 800, 600));
     });
   });
 }
 
 class _ThrowingPortal implements ScreenCastPortal {
   @override
-  Future<PortalInfo?> probe() async =>
-      const PortalInfo(version: 5, sharesWindows: true);
+  Future<PortalInfo?> probe() async => const PortalInfo(version: 5, sharesWindows: true);
 
   @override
-  Future<PortalGrant?> shareWindow({String? restoreToken}) =>
-      Future.error(StateError('bus gone'));
+  Future<PortalGrant?> shareWindow({String? restoreToken}) => Future.error(StateError('bus gone'));
 
   @override
   Future<void> close() async {}

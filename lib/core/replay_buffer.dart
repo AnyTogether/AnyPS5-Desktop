@@ -10,16 +10,10 @@ import 'capture/wayland_capture.dart';
 import 'host.dart';
 
 /// Starts a program and gives its process; Process.start by default.
-typedef ProcessStarter = Future<Process> Function(
-  String executable,
-  List<String> arguments,
-);
+typedef ProcessStarter = Future<Process> Function(String executable, List<String> arguments);
 
 /// Runs a program to its end; Process.run by default.
-typedef ProcessRunner = Future<ProcessResult> Function(
-  String executable,
-  List<String> arguments,
-);
+typedef ProcessRunner = Future<ProcessResult> Function(String executable, List<String> arguments);
 
 /// The last minutes of play, kept by ffmpeg in a temporary folder only while a game runs: the
 /// screen is recorded into short MPEG-TS segments that wrap around, so the folder never holds
@@ -44,12 +38,8 @@ class ReplayBuffer {
     this.wayland,
     ProcessStarter? start,
     ProcessRunner? run,
-  }) : _start =
-           start ??
-           ((executable, arguments) => Process.start(executable, arguments)),
-       _run =
-           run ??
-           ((executable, arguments) => Process.run(executable, arguments));
+  }) : _start = start ?? ((executable, arguments) => Process.start(executable, arguments)),
+       _run = run ?? ((executable, arguments) => Process.run(executable, arguments));
 
   /// The lengths offered in Settings › Captures, in seconds.
   static const lengths = [30, 60, 180, 300];
@@ -112,15 +102,11 @@ class ReplayBuffer {
     final found = exists ?? (path) => File(path).existsSync();
     final folders = [
       ?launcherFolder,
-      ...(environment['PATH'] ?? environment['Path'] ?? '').split(
-        system == HostSystem.windows ? ';' : ':',
-      ),
+      ...(environment['PATH'] ?? environment['Path'] ?? '').split(system == HostSystem.windows ? ';' : ':'),
     ];
     for (final folder in folders) {
       if (folder.trim().isEmpty) continue;
-      final path = system == HostSystem.windows
-          ? p.windows.join(folder, name)
-          : p.posix.join(folder, name);
+      final path = system == HostSystem.windows ? p.windows.join(folder, name) : p.posix.join(folder, name);
       if (found(path)) return path;
     }
     return null;
@@ -186,20 +172,9 @@ class ReplayBuffer {
     ] else ...[
       '-vf',
       'scale=-2:$height,${encoder!.filterTail}',
-      ...encoder!.arguments(
-        use: EncodeUse.replay,
-        bitRate: bitRate,
-        keyEvery: framesPerSecond * segmentSeconds,
-      ),
+      ...encoder!.arguments(use: EncodeUse.replay, bitRate: bitRate, keyEvery: framesPerSecond * segmentSeconds),
     ],
-    if (sound != null) ...[
-      '-af',
-      'aresample=async=1',
-      '-c:a',
-      'aac',
-      '-b:a',
-      '128000',
-    ],
+    if (sound != null) ...['-af', 'aresample=async=1', '-c:a', 'aac', '-b:a', '128000'],
     // A key frame at every segment's start, so each one can be joined on its own.
     '-force_key_frames',
     'expr:gte(t,n_forced*$segmentSeconds)',
@@ -224,11 +199,7 @@ class ReplayBuffer {
       Directory(folder).createSync(recursive: true);
       if (wayland case final capture?) {
         final stops = _stops;
-        final feed = await capture.openFeed(
-          maxWidth: 1 << 14,
-          maxHeight: height,
-          framesPerSecond: framesPerSecond,
-        );
+        final feed = await capture.openFeed(maxWidth: 1 << 14, maxHeight: height, framesPerSecond: framesPerSecond);
         if (stops != _stops) {
           await feed?.close();
           return false;
@@ -263,10 +234,7 @@ class ReplayBuffer {
         });
         unawaited(process.stdin.done.catchError((_) {}));
         await heard.start(steady.add);
-        _soundTick = Timer.periodic(
-          const Duration(milliseconds: 20),
-          (_) => steady.tick(),
-        );
+        _soundTick = Timer.periodic(const Duration(milliseconds: 20), (_) => steady.tick());
       }
       unawaited(
         process.exitCode.then((_) {
@@ -290,10 +258,7 @@ class ReplayBuffer {
     final found = <(File, DateTime)>[];
     try {
       for (final entity in Directory(folder).listSync()) {
-        if (entity is! File ||
-            !p.basename(entity.path).startsWith('segment') ||
-            !entity.path.endsWith('.ts'))
-          continue;
+        if (entity is! File || !p.basename(entity.path).startsWith('segment') || !entity.path.endsWith('.ts')) continue;
         final stat = entity.statSync();
         if (stat.size == 0) continue;
         found.add((entity, stat.modified));
@@ -306,9 +271,7 @@ class ReplayBuffer {
       return byTime != 0 ? byTime : a.$1.path.compareTo(b.$1.path);
     });
     final wanted = (seconds / segmentSeconds).ceil() + 1;
-    final kept = found.length > wanted
-        ? found.sublist(found.length - wanted)
-        : found;
+    final kept = found.length > wanted ? found.sublist(found.length - wanted) : found;
     return [for (final (file, _) in kept) file.path];
   }
 
@@ -322,8 +285,7 @@ class ReplayBuffer {
       Directory(p.dirname(destination)).createSync(recursive: true);
       final list = File(p.join(folder, 'join.txt'));
       list.writeAsStringSync(
-        [for (final part in parts) "file '${part.replaceAll("'", r"'\''")}'"]
-            .join('\n'),
+        [for (final part in parts) "file '${part.replaceAll("'", r"'\''")}'"].join('\n'),
         encoding: utf8,
       );
       final joined = await _run(ffmpeg, [
@@ -371,8 +333,7 @@ class ReplayBuffer {
   }
 
   /// The picture of a clip's last moment, beside it.
-  static String thumbnailOf(String clip) =>
-      '${p.withoutExtension(clip)}.thumb.jpg';
+  static String thumbnailOf(String clip) => '${p.withoutExtension(clip)}.thumb.jpg';
 
   /// Stops recording (ffmpeg is asked to finish, then ended) and deletes the segments.
   Future<void> stop() async {
