@@ -26,7 +26,8 @@ class FakeRelease {
 
 /// GitHub's releases API and download servers on loopback, as the launcher uses them:
 ///
-/// - `GET /api/repos/<repo>/releases/latest` and `/api/repos/<repo>/releases`
+/// - `GET /api/repos/<repo>/releases/latest`, `/api/repos/<repo>/releases` and
+///   `/api/repos/<repo>/releases/tags/<tag>`
 /// - `GET /download/<tag>/<name>`, a redirect to `/blob/<tag>/<name>` (GitHub sends release
 ///   downloads on to another host), which honours `Range: bytes=N-`.
 class FakeGitHub {
@@ -113,6 +114,14 @@ class FakeGitHub {
           return response.close();
         }
         response.write(jsonEncode(_json(latest)));
+      } else if (path.startsWith('$apiPrefix/tags/')) {
+        final tag = path.substring('$apiPrefix/tags/'.length);
+        final found = releases.where((release) => release.tag == tag && !release.draft).firstOrNull;
+        if (found == null) {
+          response.statusCode = HttpStatus.notFound;
+          return response.close();
+        }
+        response.write(jsonEncode(_json(found)));
       } else {
         response.write(jsonEncode([for (final release in releases) _json(release)]));
       }

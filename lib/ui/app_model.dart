@@ -33,6 +33,7 @@ import '../core/desktop/window_backdrop.dart';
 import '../core/font_download.dart';
 import '../core/free_space.dart';
 import '../core/family/family_rules.dart' show TitleVerdict;
+import '../core/ffmpeg_download.dart' show FfmpegBuild;
 import '../core/gamepad/feel.dart';
 import '../core/gamepad/guide_switch.dart';
 import '../core/gamepad/pad_gate.dart';
@@ -90,6 +91,7 @@ import 'controllers_model.dart';
 import 'crash_model.dart';
 import 'discord_model.dart';
 import 'engine_model.dart';
+import 'ffmpeg_model.dart';
 import 'fonts_model.dart';
 import 'media_model.dart';
 import 'share_play_model.dart';
@@ -1069,6 +1071,8 @@ class LauncherServices {
     this.audio,
     this.decodeSong,
     this.armEngineReleases,
+    this.ffmpegReleases,
+    this.ffmpegRun,
     this.pads,
     this.systemProbe,
     this.desktop,
@@ -1171,6 +1175,13 @@ class LauncherServices {
   /// Where AnyPS5-ARM's engine is read from (its signed GitHub releases); none in tests without
   /// a fake.
   final GitHubReleases? armEngineReleases;
+
+  /// Where the launcher's own ffmpeg comes from: this repository's releases, signed; null in
+  /// tests that have no GitHub, so nothing is offered.
+  final GitHubReleases? ffmpegReleases;
+
+  /// Tests: runs the downloaded ffmpeg to see that it starts; Process.run by default.
+  final ProcessRunner? ffmpegRun;
 
   /// Where controller input comes from (XInput and winmm on Windows, evdev on Linux); none when
   /// not given.
@@ -4756,12 +4767,11 @@ class AppModel extends ChangeNotifier {
     _changed();
   }
 
-  /// ffmpeg for the replay buffer: beside the launcher or on the PATH.
-  late final String? replayFfmpeg = ReplayBuffer.locate(
-    system: system,
-    environment: services.environment ?? Platform.environment,
-    launcherFolder: p.dirname(Platform.resolvedExecutable),
-  );
+  /// ffmpeg found on this computer, or the one downloaded for the launcher ([FfmpegModel]).
+  late final FfmpegModel ffmpegTool = FfmpegModel(this);
+
+  /// ffmpeg for the replay buffer and everything else that records or decodes.
+  String? get replayFfmpeg => ffmpegTool.path;
 
   /// Why the replay buffer cannot record here (no ffmpeg, no desktop to record), or null when it
   /// can. What the Wayland portal needs is checked when the buffer is turned on.
@@ -5766,6 +5776,7 @@ class AppModel extends ChangeNotifier {
         title: T.text('about'),
         rows: [
           PanelRow(id: 'about', title: 'AnyPS5', kind: InfoRow(T.text('aboutText'))),
+          PanelRow(id: 'aboutFfmpeg', title: 'ffmpeg', kind: InfoRow(T.format('aboutFfmpeg', [FfmpegBuild.version]))),
           PanelRow(
             id: 'toolkitVersion',
             title: T.text('toolkitVersion'),
@@ -5810,6 +5821,7 @@ class AppModel extends ChangeNotifier {
           unawaited(value ? _startReplay() : _stopReplay());
         }),
       ),
+      ...ffmpegTool.rows(),
       if (preferences.replayBuffer && unavailable == null)
         PanelRow(
           id: 'replayLength',
