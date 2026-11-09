@@ -4,7 +4,7 @@
 # with the other one, or none, could not start the launcher. This copies that libmpv into the
 # bundle's lib/ with the libraries it needs that the launcher does not need already (FFmpeg's and
 # the rest), points each of them and the plugin at lib/ ($ORIGIN), and copies their packages'
-# copyright files to lib/licenses/. Left to the system: glibc, the C++ runtime, the GPU drivers'
+# copyright files, and the long licences those name, to lib/licenses/. Left to the system: glibc, the C++ runtime, the GPU drivers'
 # libraries (GL, EGL, DRM, GBM) and the X11 and Wayland client libraries, as AppImages leave them
 # (pkg2appimage's excludelist), and every library the launcher already links (GTK and the rest).
 #
@@ -99,6 +99,13 @@ if command -v dpkg >/dev/null; then
       cp "/usr/share/doc/$package/copyright" "$LIB/licenses/$package.txt"
     fi
   done
+  # Those files only name the long licences, which Debian and Ubuntu keep in
+  # /usr/share/common-licenses and other systems do not have: the bundle carries the ones they name.
+  mkdir -p "$LIB/licenses/common-licenses"
+  { grep -rhoE '/usr/share/common-licenses/[A-Za-z0-9.+_-]+' "$LIB/licenses" || true; } | sed 's/\.$//' | sort -u |
+    while read -r licence; do
+      if [ -f "$licence" ]; then cp -L "$licence" "$LIB/licenses/common-licenses/"; fi
+    done
 fi
 
 size=$(for name in "${copied[@]}"; do stat -c %s "$LIB/$name"; done | awk '{s += $1} END {printf "%.1f", s / 1048576}')

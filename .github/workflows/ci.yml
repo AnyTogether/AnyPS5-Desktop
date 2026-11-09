@@ -221,6 +221,11 @@ jobs:
           du -sh build/linux/x64/release/bundle build/linux/x64/release/bundle/lib
           ls build/linux/x64/release/bundle/lib | grep -c . | xargs echo "files in lib/:"
           ls build/linux/x64/release/bundle/lib/libmpv.so.*
+          ls build/linux/x64/release/bundle/lib/licenses/ | grep -c . | xargs echo "licence files in lib/licenses/:"
+          ls build/linux/x64/release/bundle/lib/licenses/libmpv*.txt
+          ls build/linux/x64/release/bundle/lib/licenses/common-licenses/ | grep -c . | xargs echo "long licences in lib/licenses/common-licenses/:"
+          test -f build/linux/x64/release/bundle/lib/licenses/common-licenses/LGPL-2.1
+          test -f build/linux/x64/release/bundle/lib/licenses/common-licenses/GPL-3
       # Ubuntu 24.04 has libmpv.so.2, not the 22.04 build machine's libmpv.so.1: the clip player's
       # plugin and the libmpv it carries have to find everything they link in lib/ or in what a
       # GTK desktop has.
@@ -323,6 +328,9 @@ jobs:
           foreach ($dll in "SDL2.dll", "libmpv-2.dll", "libEGL.dll", "libGLESv2.dll", "media_kit_video_plugin.dll") {
             if (-not (Test-Path (Join-Path $release $dll))) { Write-Error "no $dll in $release"; exit 1 }
           }
+          foreach ($licence in "libmpv-LICENSE.txt", "ANGLE-LICENSE.txt") {
+            if (-not (Test-Path (Join-Path $release $licence))) { Write-Error "no $licence in $release"; exit 1 }
+          }
           Get-ChildItem $release -Filter *.dll | Sort-Object Length -Descending | Select-Object -First 8 Name, @{n = "MiB"; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize
       - name: Package the installer (Inno Setup 6)
         if: github.event_name != 'pull_request'
@@ -333,6 +341,20 @@ jobs:
           powershell -ExecutionPolicy Bypass -File packaging\windows\build-installer.ps1 -SkipBuild
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\installer\AnyPS5-Desktop-windows-x64.zip
+      # The installer's contents can only be seen by installing it (7-Zip and innoextract do not read
+      # this Inno Setup): silently, into a temporary folder on the runner.
+      - name: Install the package into a folder and check what it put there
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          $setup = Get-Item build\installer\AnyPS5-Desktop-Setup-*.exe
+          $target = Join-Path $env:RUNNER_TEMP "anyps5-install"
+          $run = Start-Process -FilePath $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$target" -Wait -PassThru
+          if ($run.ExitCode) { Write-Error "the installer ended with $($run.ExitCode)"; exit 1 }
+          foreach ($file in "anyps5_desktop.exe", "SDL2.dll", "SDL2-LICENSE.txt", "libmpv-2.dll", "libmpv-LICENSE.txt", "ANGLE-LICENSE.txt") {
+            if (-not (Test-Path (Join-Path $target $file))) { Write-Error "no $file installed"; exit 1 }
+          }
+          Get-ChildItem $target -Filter *LICENSE* | Select-Object Name, Length | Format-Table -AutoSize
       - uses: actions/upload-artifact@v7
         if: github.event_name != 'pull_request'
         with:

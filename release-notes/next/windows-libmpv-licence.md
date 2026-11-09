@@ -1,0 +1,1 @@
+- **The Windows package now carries the clip player's licences**: `libmpv-LICENSE.txt` beside `libmpv-2.dll` (GNU LGPL version 3 or later, with where its source is) and `ANGLE-LICENSE.txt` beside the ANGLE libraries. The .zip and the installer both take them. On Linux the bundle now also carries the full licence texts its libraries' copyright files refer to.
