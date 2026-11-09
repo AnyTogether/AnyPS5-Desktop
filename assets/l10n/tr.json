@@ -1719,7 +1719,7 @@
   "waylandDeclined": "Masaüstün bir pencere paylaşmadı, bu yüzden bu oyun kaydedilmiyor",
   "waylandFailed": "Oyunun penceresi kaydedilemedi",
   "waylandAskTitle": "Önce masaüstün soracak",
-  "waylandAskDetail": "Wayland, bir programın pencereyi yalnızca senin izninle kaydetmesine izin verir. Oyun açılınca masaüstünün gösterdiği pencerede oyunun penceresini seç",
+  "waylandAskDetail": "Wayland, bir programın pencereyi yalnızca senin izninle kaydetmesine izin verir. Oyun açılınca masaüstünün gösterdiği pencerede oyunun penceresini seç.",
   "sharePlayNoWayland": "Ortak oynatma için X11 oturumu gerekir",
   "sharePlaySharing": "%@ paylaşılıyor",
   "sharePlayWatching": "%d / %d izliyor",

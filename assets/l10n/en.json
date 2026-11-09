@@ -1719,7 +1719,7 @@
   "waylandDeclined": "Your desktop did not share a window, so this game is not recorded",
   "waylandFailed": "The game's window could not be recorded",
   "waylandAskTitle": "Your desktop will ask first",
-  "waylandAskDetail": "Wayland lets a program record a window only when you say so. When a game opens, choose its window in the dialog your desktop shows",
+  "waylandAskDetail": "Wayland lets a program record a window only when you say so. When a game opens, choose its window in the dialog your desktop shows.",
   "sharePlayNoWayland": "Share play needs an X11 session",
   "sharePlaySharing": "Sharing %@",
   "sharePlayWatching": "%d of %d watching",
