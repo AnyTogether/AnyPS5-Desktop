@@ -296,8 +296,8 @@ jobs:
           key: ${{ steps.archives.outputs.key }}
           path: ${{ env.WINDOWS_ARCHIVES }}
       - run: flutter build windows --release
-      # SDL2 failing to download is only a warning to the build, so keep the archives only when
-      # all of them arrived: a cache without one would stay that way until the versions change.
+      # A failed download stops the build before this step; this keeps the rule that the cache
+      # only holds archives that all arrived, since one without them would stay until the versions change.
       - name: See whether every archive arrived
         id: archives-whole
         if: steps.archives-restore.outputs.cache-hit != 'true'
@@ -314,13 +314,13 @@ jobs:
         with:
           key: ${{ steps.archives.outputs.key }}
           path: ${{ env.WINDOWS_ARCHIVES }}
-      # The clip player's libmpv and ANGLE (media_kit_libs_windows_video) beside the launcher: the
-      # installer and the .zip take the whole folder.
-      - name: Check the clip player's libraries are beside the launcher
+      # The clip player's libmpv and ANGLE (media_kit_libs_windows_video) and SDL2 beside the
+      # launcher: the installer and the .zip take the whole folder.
+      - name: Check SDL2 and the clip player's libraries are beside the launcher
         shell: pwsh
         run: |
           $release = "build\windows\x64\runner\Release"
-          foreach ($dll in "libmpv-2.dll", "libEGL.dll", "libGLESv2.dll", "media_kit_video_plugin.dll") {
+          foreach ($dll in "SDL2.dll", "libmpv-2.dll", "libEGL.dll", "libGLESv2.dll", "media_kit_video_plugin.dll") {
             if (-not (Test-Path (Join-Path $release $dll))) { Write-Error "no $dll in $release"; exit 1 }
           }
           Get-ChildItem $release -Filter *.dll | Sort-Object Length -Descending | Select-Object -First 8 Name, @{n = "MiB"; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize
@@ -341,10 +341,57 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # The Remote Play key frame request against the ffmpeg the launcher offers, on the real platforms:
+  # standard input pipes behave differently on Windows, and this ffmpeg is what users get.
+  key-frames:
+    name: key frame request with the pinned ffmpeg (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      # The native hook builds the ATRAC9 decoder with the system compiler for flutter test too.
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends $LINUX_PACKAGES
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Fetch the pinned ffmpeg
+        shell: bash
+        run: |
+          set -euo pipefail
+          tr -d '\r' < packaging/ffmpeg/pinned.env > pinned.env
+          . ./pinned.env
+          mkdir ffmpeg-pinned
+          if [ "$RUNNER_OS" = Windows ]; then
+            curl -fsSL --retry 5 -o ffmpeg.zip "https://github.com/BtbN/FFmpeg-Builds/releases/download/$BTBN_RELEASE/$WINDOWS_ASSET"
+            echo "$WINDOWS_SHA256  ffmpeg.zip" | sha256sum -c -
+            7z e -y -offmpeg-pinned ffmpeg.zip "${WINDOWS_ASSET%.zip}/bin/ffmpeg.exe" >/dev/null
+            echo "ANYPS5_TEST_FFMPEG=$(cygpath -m "$PWD")/ffmpeg-pinned/ffmpeg.exe" >> "$GITHUB_ENV"
+          else
+            curl -fsSL --retry 5 -o ffmpeg.tar.xz "https://github.com/BtbN/FFmpeg-Builds/releases/download/$BTBN_RELEASE/$LINUX_ASSET"
+            echo "$LINUX_SHA256  ffmpeg.tar.xz" | sha256sum -c -
+            tar -xJf ffmpeg.tar.xz --strip-components=2 -C ffmpeg-pinned --wildcards '*/bin/ffmpeg'
+            echo "ANYPS5_TEST_FFMPEG=$PWD/ffmpeg-pinned/ffmpeg" >> "$GITHUB_ENV"
+          fi
+          ls -la ffmpeg-pinned
+      - run: flutter test test/core/capture/remote_play_test.dart --plain-name "a real ffmpeg"
+        env:
+          ANYPS5_SKIP_GOLDENS: 1
+
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [changes, analyze, test, goldens, linux, windows]
+    needs: [changes, analyze, test, goldens, linux, windows, key-frames]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

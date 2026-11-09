@@ -1,0 +1,1 @@
+- **One player now reads as one player** in Find players, leaderboards and game invites, instead of "1 players".

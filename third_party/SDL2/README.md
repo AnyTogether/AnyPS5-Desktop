@@ -8,7 +8,8 @@ https://www.libsdl.org/ (LICENSE.txt beside this file).
   https://github.com/libsdl-org/SDL/releases/tag/release-2.32.10, downloaded by windows/CMakeLists.txt
   at build time and checked against its SHA-256
   (`6cf9706eefd0a4a06dc764007934d428afaf029fabdd408a9e646048c91e18fb`); `SDL2.dll` goes beside the
-  launcher with `SDL2-LICENSE.txt`.
+  launcher with `SDL2-LICENSE.txt`. A failed download stops the build, and the installer script
+  stops when `SDL2.dll` is not in the build output.
 - **Linux:** the system's `libSDL2-2.0.so.0` (package `libsdl2-2.0-0`, `SDL2` or `sdl2`), copied into
   the bundle's `lib/` when the build machine has it, so the AppImage carries its own.
 

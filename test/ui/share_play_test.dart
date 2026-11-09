@@ -170,8 +170,28 @@ void main() {
     (assist().kind as ToggleRow).set(true);
     expect((assist().kind as ToggleRow).value, isTrue);
 
+    // Stop and Remove ask first, in place, Cancel focused, as on the Mac: Back answers Cancel.
+    model.open(Layer.quickMenu);
+    List<String> rowsNow() => model.panelCategories().single.rows.map((row) => row.id).toList();
+    String focusedRow() => rowsNow()[model.panelRow];
+    choose('share-remove-u-ana');
+    expect(rowsNow(), containsAllInOrder(['share-remove-u-ana-ask', 'share-remove-u-ana-yes', 'share-remove-u-ana-cancel']));
+    expect(focusedRow(), 'share-remove-u-ana-cancel');
+    model.command(Command.back);
+    expect(model.overlay, Layer.quickMenu, reason: 'Back cancels the question, not the menu');
+    expect(rowsNow(), contains('share-remove-u-ana'));
+    expect(focusedRow(), 'share-remove-u-ana');
+
+    choose('share-stop');
+    expect(rowsNow(), containsAllInOrder(['share-stop-ask', 'share-stop-yes', 'share-stop-cancel']));
+    expect(model.sharePlay.active, isTrue, reason: 'nothing stops at the question');
+    expect(focusedRow(), 'share-stop-cancel');
+    choose('share-stop-cancel');
+    expect(rowsNow(), contains('share-stop'));
+
     server.answers['DELETE share-plays/sp-1'] = (204, null);
     choose('share-stop');
+    choose('share-stop-yes');
     await until(() => engine.stopped);
     expect(model.sharePlay.active, isFalse);
     expect(engine.links.single.closed, isTrue);
@@ -271,6 +291,7 @@ void main() {
 
     server.answers['DELETE share-plays/sp-1'] = (204, null);
     choose('share-stop');
+    choose('share-stop-yes');
     await until(() => engine.stopped);
     expect(engine.publisher!.closed, isTrue);
     model.stopGame();
@@ -288,6 +309,7 @@ void main() {
     expect(max.detail, T.text('sharePlayMaxViewersDetail'));
     server.answers['DELETE share-plays/sp-1'] = (204, null);
     choose('share-stop');
+    choose('share-stop-yes');
     await until(() => engine.stopped);
     model.stopGame();
     await playing;
