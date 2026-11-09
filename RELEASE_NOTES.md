@@ -5,6 +5,11 @@ release when it is made.
 
 ## Next release
 
+- **ffmpeg can be downloaded with one press** when Replay, Remote Play, Go Live, a video background
+  or clip tools need it and none is found: progress, Stop and a true error message, from a signed
+  build this project publishes, kept beside the toolkits. An ffmpeg already beside the launcher or
+  on the PATH keeps being used. Until that build is published the launcher says it is not
+  available yet.
 - **Play Together player rows say how each player is reached** (Direct or Relay, with the round
   trip in ms), as on the Mac. Where the system cannot say, the row stays at Connected.
 - **A Play Together offer or a game invite is said over the game** in a desktop notice, as on the

@@ -121,6 +121,9 @@ extension TogetherCaptures on TogetherModel {
   /// Captures need a server that keeps files (or one not asked yet).
   bool get capturesOffered => signedIn && storage?.enabled != false;
 
+  /// A clip too big to send that only ffmpeg could make smaller.
+  static const _ffmpegNeeded = 'ffmpeg_needed';
+
   ClipTools? get clipTools => clipToolsOverride ?? app.replayFfmpeg?.let(FfmpegClipTools.new);
 
   String? get _shot {
@@ -343,12 +346,19 @@ extension TogetherCaptures on TogetherModel {
     if (size <= maxBytes) return (file, null);
     final tools = clipTools;
     final ms = await tools?.durationMs(file);
-    if (tools == null || ms == null) throw const TogetherProblem(413, 'payload_too_large', 'The file is too big');
+    if (tools == null || ms == null) {
+      if (tools == null && app.ffmpegTool.offered) throw const TogetherProblem(413, _ffmpegNeeded, 'ffmpeg is needed');
+      throw const TogetherProblem(413, 'payload_too_large', 'The file is too big');
+    }
     final temp = Directory.systemTemp.createTempSync('anyps5_share');
     try {
       return (await tools.shrink(file, maxBytes: maxBytes, durationMs: ms, folder: temp.path), temp);
     } on Object {
       temp.deleteSync(recursive: true);
+      // An ffmpeg on this computer that lacks x264: the download can do what it cannot.
+      if (await app.ffmpegTool.systemLacksX264()) {
+        throw const TogetherProblem(413, _ffmpegNeeded, 'ffmpeg cannot make the clip smaller');
+      }
       throw const TogetherProblem(413, 'payload_too_large', 'The file is too big');
     }
   }
@@ -393,6 +403,8 @@ extension TogetherCaptures on TogetherModel {
           return T.text('cloudQuotaFull');
         case 'payload_too_large':
           return T.text('cloudMediaTooBig');
+        case _ffmpegNeeded:
+          return T.text('clipNeedsFfmpeg');
         case 'bad_media' || 'bad_image':
           return T.text('cloudBadMedia');
         case 'storage_disabled':
