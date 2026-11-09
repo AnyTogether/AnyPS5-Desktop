@@ -187,7 +187,8 @@ void main() {
         'frame': 1,
       });
       await until(() => model.together.hub.friends.byId('u-bora')?.level?.level == 43);
-      expect(model.toast, 'Trophy level 12', reason: "a friend's level is no toast");
+      // A friend's level: a word while the launcher is in front and no game runs, as on the Mac.
+      await until(() => model.toast == 'Bora reached trophy level 43');
       model.open(Layer.friends);
       expect(row('friend-u-bora').level?.level, 43);
     });

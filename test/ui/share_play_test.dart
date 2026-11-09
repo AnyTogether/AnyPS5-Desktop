@@ -122,6 +122,11 @@ void main() {
     return model.panelCategories().single.rows.map((row) => row.id).toList();
   }
 
+  PanelRow quickRow(String id) {
+    model.open(Layer.quickMenu);
+    return model.panelCategories().single.rows.firstWhere((row) => row.id == id);
+  }
+
   void choose(String id) {
     final row = model.panelCategories().expand((category) => category.rows).firstWhere((row) => row.id == id);
     switch (row.kind) {
@@ -156,6 +161,14 @@ void main() {
     choose('share-play-u-ana');
     await until(() => quickRows().contains('share-stop-u-ana'));
     expect(model.toast, T.format('sharePlayNowPlays', ['Ana', 2]));
+
+    // As on the Mac: a guest with a pad helps player 1 instead of playing their own.
+    PanelRow assist() => quickRow('share-assist-u-ana');
+    expect(assist().title, 'Assist Player 1');
+    expect(assist().detail, 'Ana helps you play player 1 instead of playing their own.');
+    expect((assist().kind as ToggleRow).value, isFalse);
+    (assist().kind as ToggleRow).set(true);
+    expect((assist().kind as ToggleRow).value, isTrue);
 
     server.answers['DELETE share-plays/sp-1'] = (204, null);
     choose('share-stop');
