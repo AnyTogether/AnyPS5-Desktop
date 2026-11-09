@@ -43,6 +43,7 @@ import '../core/game_log.dart';
 import '../core/game_process.dart';
 import '../core/game_presets.dart';
 import '../core/game_settings.dart';
+import '../core/launch_resolution.dart';
 import '../core/gyro_aiming.dart';
 import '../core/host.dart';
 import '../core/installer.dart';
@@ -152,6 +153,7 @@ class Preferences {
     ..onlinePlay = json['onlinePlay'] == true
     ..onlinePlatformGroups = json['onlinePlatformGroups'] as bool? ?? true
     ..pushToTalk = json['pushToTalk'] as bool? ?? false
+    ..noiseSuppression = json['noiseSuppression'] as bool? ?? true
     ..talkKey = (json['talkKey'] as num?)?.toInt()
     ..sounds = json['sounds'] as bool? ?? true
     ..soundVolume = (json['soundVolume'] as num?)?.toInt()
@@ -283,6 +285,9 @@ class Preferences {
   /// In party voice: the talk key held to talk (else it turns the microphone on and off), and
   /// which key it is (a USB HID usage; null for the default).
   bool pushToTalk = false;
+
+  /// WebRTC's noise suppression on the microphone in calls; on unless turned off.
+  bool noiseSuppression = true;
   int? talkKey;
 
   /// Interface sounds, and their volume and the selected game's theme song's in percent; null
@@ -429,6 +434,7 @@ class Preferences {
     'onlinePlay': onlinePlay,
     if (!onlinePlatformGroups) 'onlinePlatformGroups': false,
     'pushToTalk': pushToTalk,
+    if (!noiseSuppression) 'noiseSuppression': false,
     'talkKey': talkKey,
     'sounds': sounds,
     'soundVolume': soundVolume,
@@ -2647,6 +2653,32 @@ class AppModel extends ChangeNotifier {
     return ResolutionPatch.lower(current, ResolutionPatch.choices) ?? own;
   }
 
+  /// A game about to start: one step lower under a Battery & Heat profile that asks for it,
+  /// the resolution it was unlocked with otherwise, written into its executable as on the Mac
+  /// (LaunchResolution). A note for its log when that was done; a toolkit whose output cannot
+  /// take it keeps the unlock's resolution.
+  Future<String?> _setLaunchResolution(Game game, String folder) async {
+    final kit = toolkitFor(game);
+    final patch = kit?.patchFile(game.titleId);
+    if (kit == null || patch == null) return null;
+    try {
+      final text = File(patch).readAsStringSync();
+      final title = ResolutionPatch.defaultOf(text);
+      if (!ResolutionPatch.supports(text) || title == null) return null;
+      final unlocked = records[game.id]?.resolution ?? title;
+      final wanted = powerWatch.adjustment.lowerResolution ? (_unlockResolution(game, kit) ?? unlocked) : unlocked;
+      final result = await LaunchResolution.apply(
+        executable: p.join(Installer.installedFolder(game, folder), system.executableName),
+        patch: text,
+        wanted: wanted,
+        known: {title, unlocked, wanted, ...ResolutionPatch.choices},
+      );
+      return result == LaunchResolutionResult.written ? '[anyps5-launcher] resolution for this start: $wanted' : null;
+    } on Object {
+      return null;
+    }
+  }
+
   /// Whether the title's patch file lets Game Settings choose its resolution.
   bool supportsResolution(Game game) => _factsOf(game).resolution;
 
@@ -3090,8 +3122,9 @@ class AppModel extends ChangeNotifier {
         cancelUnlock(game);
       case Unreadable():
         show(T.text('unreadableDump'));
+      // The game back in front, as on the Mac; Stop is in the game's menu and the quick menu.
       case Running():
-        unawaited(stopRunningGame());
+        if (running?.$2 case final RunningGame run) unawaited(_showGame(run));
       case Starting() || Stopping():
         break;
       case FamilyLocked():
@@ -3714,6 +3747,7 @@ class AppModel extends ChangeNotifier {
         ...once,
       };
       fonts.watch(game, logFile);
+      final resolutionNote = await _setLaunchResolution(game, folder);
       final run = await startGame(
         installed: Installer.installedFolder(game, folder),
         environment: environment,
@@ -3724,6 +3758,7 @@ class AppModel extends ChangeNotifier {
         notes: [
           for (final line in controllers.reportLines) '[anyps5-launcher] controllers: $line',
           if (phonesConnected) '[anyps5-launcher] phones: ${_phoneReachNote(game)}',
+          ?resolutionNote,
           for (final MapEntry(:key, :value) in once.entries) '[anyps5-launcher] this start only: $key=$value',
         ],
       );
@@ -3872,8 +3907,10 @@ class AppModel extends ChangeNotifier {
     }
   }
 
-  /// Saves the game's window as it is now as the picture of [trophy]; its path, or null.
+  /// Saves the game's window as it is now as the picture of [trophy]; its path, or null. With
+  /// the family's media setting off no picture is taken, as on the Mac.
   Future<String?> _trophyShot(Game game, Trophy trophy, int pid) async {
+    if (!together.family.mediaAllowed) return null;
     try {
       final frame = await desktop.captureGame(pid);
       if (frame == null) return null;

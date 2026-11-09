@@ -98,6 +98,32 @@ void main() {
       expect(server.callsTo('auth/logout'), hasLength(1));
     });
 
+    test('the public profile switch: saved with the website\'s call, refused for a child with its reason', () async {
+      final together = model.together;
+      together.email = 'utku@example.com';
+      await together.sendCode();
+      together.code = '123456';
+      await together.verify();
+      await until(() => together.signedIn);
+      server.me['publicProfile'] = false;
+      await together.hub.self.refresh();
+      openTogether();
+      PanelRow row() =>
+          model.panelCategories()[model.panelCategory].rows.firstWhere((r) => r.id == 'together-public-profile');
+      expect(row().title, 'Public profile');
+      expect(row().detail, endsWith('While your profile is not public, Everyone works like Friends.'));
+      expect((row().kind as ToggleRow).value, isFalse);
+      (row().kind as ToggleRow).set(true);
+      await until(() => server.callsTo('me/public-profile').isNotEmpty);
+      expect(server.callsTo('me/public-profile').single.body, {'publicProfile': true});
+      await until(() => (row().kind as ToggleRow).value);
+      expect(row().detail, isNot(contains('While your profile')));
+      server.answers['PATCH me/public-profile'] = (403, {'code': 'restricted_by_family'});
+      (row().kind as ToggleRow).set(false);
+      await until(() => model.toast == 'Your family settings keep your profile to friends.');
+      expect((row().kind as ToggleRow).value, isTrue, reason: 'turned back when the server says no');
+    });
+
     test('a wrong code says so and keeps the code row', () async {
       model.together.email = 'utku@example.com';
       await model.together.sendCode();
@@ -537,7 +563,7 @@ void main() {
       model.open(Layer.party);
       await together.joinVoice();
       expect(model.toast, "You're in voice");
-      expect(rowIds().take(5), ['voice-mic', 'voice-deafen', 'voice-ptt', 'voice-key', 'voice-leave']);
+      expect(rowIds().take(6), ['voice-mic', 'voice-noise', 'voice-deafen', 'voice-ptt', 'voice-key', 'voice-leave']);
       final mic = model.panelCategories().single.rows.first;
       expect(mic.detail, 'V turns the microphone on and off, in a game too.');
 
@@ -564,10 +590,23 @@ void main() {
       expect(model.preferences.talkKey, 0x0A);
       expect(model.toast, 'Talk key: G');
 
+      // Noise suppression: on by default, off in the call as it is, kept for the next one.
+      final noise = voiceRow('voice-noise');
+      expect(noise.title, 'Noise suppression');
+      expect(noise.detail, 'Background noise is filtered out of your microphone.');
+      expect((noise.kind as ToggleRow).value, isTrue);
+      (noise.kind as ToggleRow).set(false);
+      await until(() => !together.hub.voice.noiseSuppression);
+      expect(model.preferences.noiseSuppression, isFalse);
+      expect(model.preferences.toJson()['noiseSuppression'], isFalse);
+      expect(voiceRow('voice-noise').detail, 'Your microphone goes as it is: for music, or a quiet room.');
+      expect(together.hub.voice.active, isTrue, reason: 'still in the same call');
+      together.setNoiseSuppression(true);
+
       together.setPushToTalk(true);
       expect(model.preferences.pushToTalk, isTrue);
-      expect(rowIds().take(4), ['voice-deafen', 'voice-ptt', 'voice-key', 'voice-leave']);
-      expect(model.panelCategories().single.rows[1].detail, 'Hold G to talk, in a game too.');
+      expect(rowIds().take(5), ['voice-noise', 'voice-deafen', 'voice-ptt', 'voice-key', 'voice-leave']);
+      expect(voiceRow('voice-ptt').detail, 'Hold G to talk, in a game too.');
       // Without a desktop key reader, the launcher's own keys hold it.
       expect(together.talkKeyInWindow(0x0A, down: true), isTrue);
       expect(together.hub.voice.sending, isTrue);
@@ -1426,6 +1465,7 @@ void main() {
       await together.hub.self.refresh();
       openTogether();
       PanelRow row(String id) => model.panelCategories()[model.panelCategory].rows.firstWhere((r) => r.id == id);
+      expect(rowIds(), contains('together-public-profile'));
       expect(
         rowIds(),
         containsAllInOrder([

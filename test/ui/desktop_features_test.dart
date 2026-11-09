@@ -462,6 +462,21 @@ void main() {
       await playing;
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
 
+    test('a game playing: the main button brings it to the front', () async {
+      final orbit = model.games.firstWhere((game) => game.titleId == 'PPSA01001');
+      final installed = Installer.installedFolder(orbit, model.root!);
+      File(p.join(installed, 'app.elf')).writeAsStringSync('#!/bin/sh\nsleep 6\n');
+      if (!Platform.isWindows) Process.runSync('chmod', ['755', p.join(installed, 'app.elf')]);
+      final playing = model.play(orbit);
+      await until(() => model.running != null);
+      desktop.calls.clear();
+      model.primaryAction(orbit);
+      await until(() => desktop.calls.contains('focus'));
+      expect(model.stopping, isFalse);
+      model.stopGame();
+      await playing;
+    }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
+
     test('where no card can be shown, a notification says it', () async {
       desktop.cardsWork = false;
       final orbit = model.games.firstWhere((game) => game.titleId == 'PPSA01001');

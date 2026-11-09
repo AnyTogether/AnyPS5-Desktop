@@ -73,14 +73,14 @@ void main() {
       model.progress.clear();
     });
 
-    testWidgets('home, sunset, back from a game playing: a red Stop', (tester) async {
+    testWidgets('home, sunset, back from a game playing: the button says Playing', (tester) async {
       fixture = makeFixture(theme: 2);
       final model = fixture.model;
       model.select(indexOf(model, 'PPSA01001'));
       model.running = (model.games[indexOf(model, 'PPSA01001')], runningFor(FakeGameProcess()));
       model.handle(Command.down);
       await pumpLauncher(tester, model);
-      await expectLater(shell, matchesGoldenFile('goldens/home_stop.png'));
+      await expectLater(shell, matchesGoldenFile('goldens/home_playing.png'));
       model.running = null;
     });
 

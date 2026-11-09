@@ -66,6 +66,9 @@ class Voice with Notifier {
 
   /// Push-to-talk: the microphone sends only while [held].
   bool pushToTalk = false;
+
+  /// WebRTC's noise suppression on the microphone; changes the call in progress too.
+  bool noiseSuppression = true;
   bool held = false;
   VoiceProblem? problem;
 
@@ -157,7 +160,7 @@ class Voice with Notifier {
     notifyListeners();
     final engine = this.engine();
     try {
-      await engine.start();
+      await engine.start(noiseSuppression: noiseSuppression);
     } on Object {
       problem = VoiceProblem.microphone;
       joining = false;
@@ -358,6 +361,18 @@ class Voice with Notifier {
       await account.call('POST', 'calls/$id/mute', {'muted': muted, 'deafened': deafened});
     } on Object {
       // Only the mute mark is lost; the microphone itself is off.
+    }
+  }
+
+  /// Noise suppression on or off, in the call now too (nothing reconnects).
+  Future<void> setNoiseSuppression(bool on) async {
+    if (noiseSuppression == on) return;
+    noiseSuppression = on;
+    notifyListeners();
+    try {
+      await _mesh?.engine.setNoiseSuppression(on);
+    } on Object {
+      // The microphone keeps the processing it had; the next call takes the new one.
     }
   }
 
