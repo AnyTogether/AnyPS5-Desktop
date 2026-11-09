@@ -11,11 +11,15 @@ class PartyChatKeys {
   ChatMessage? editing;
   String draft = '';
 
+  /// Which of the quick replies and the field the keys are on, as in Messages; the field first.
+  int place = TogetherMessages.composer;
+
   /// Everything but the words: the party screen opened again.
   void reset() {
     focused = false;
     cursor = null;
     menu = null;
+    place = TogetherMessages.composer;
   }
 }
 
@@ -39,7 +43,12 @@ extension TogetherPartyChat on TogetherModel {
   static const draftRow = 'party-chat-draft';
 
   /// The chat shows on the party screen: a party with a chat (an older server sends none).
-  bool get partyChatShown => signedIn && hub.parties.party?.conversationId != null;
+  /// A parent's rule against messages hides it, as on the Mac.
+  bool get partyChatShown => signedIn && hub.parties.party?.conversationId != null && family.messagesAllowed;
+
+  /// Others' messages in the party's chat since the party screen was last shown: the dot on the
+  /// Party tile, as on the Mac.
+  int get partyChatUnread => app.overlay == Layer.party || !family.messagesAllowed ? 0 : hub.partyChat.unread;
 
   /// The party screen opened: the keys on its rows, the chat's newest messages, read.
   void partyScreenOpened() {
@@ -74,7 +83,19 @@ extension TogetherPartyChat on TogetherModel {
     }
     switch (command) {
       case Command.left:
-        leavePartyChat();
+        if (keys.place > 0) {
+          keys.place--;
+          app.sounds.play(Cue.move);
+          app.refresh();
+        } else {
+          leavePartyChat();
+        }
+      case Command.right:
+        if (keys.place < TogetherMessages.composer) {
+          keys.place++;
+          app.sounds.play(Cue.move);
+          app.refresh();
+        }
       case Command.up:
         // Up from the field: onto the newest message, then older ones.
         if (hub.partyChat.thread.isEmpty) {
@@ -85,6 +106,10 @@ extension TogetherPartyChat on TogetherModel {
           app.refresh();
         }
       case Command.select:
+        if (keys.place < TogetherMessages.composer) {
+          unawaited(sendPartyMessage(TogetherMessages.quickReplies[keys.place]));
+          return true;
+        }
         final failed = hub.partyChat.thread.where((message) => message.failed).lastOrNull;
         if (failed != null && keys.draft.isEmpty && keys.editing == null) {
           unawaited(hub.partyChat.retry(failed));
@@ -108,7 +133,8 @@ extension TogetherPartyChat on TogetherModel {
   void enterPartyChat() {
     partyChatKeys
       ..focused = true
-      ..cursor = null;
+      ..cursor = null
+      ..place = TogetherMessages.composer;
     app.sounds.play(Cue.move);
     app.refresh();
   }

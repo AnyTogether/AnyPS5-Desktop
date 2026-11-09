@@ -461,4 +461,79 @@ void main() {
       reason: 'a player who leaves breaks the streams with them',
     );
   });
+
+  group('how a player is reached', () {
+    GameLinkStat stat(String id, String type, Map<String, String> values) => GameLinkStat(id, type, values);
+    final local = stat('l', 'local-candidate', const {'candidateType': 'host'});
+    final remote = stat('r', 'remote-candidate', const {'candidateType': 'srflx'});
+    final relayed = stat('r', 'remote-candidate', const {'candidateType': 'relay'});
+
+    test('direct from the selected pair, with the round trip', () {
+      final pair = stat('p', 'candidate-pair', const {
+        'localCandidateId': 'l',
+        'remoteCandidateId': 'r',
+        'currentRoundTripTime': '0.023',
+      });
+      final path = PeerPath.of([
+        stat('t', 'transport', const {'selectedCandidatePairId': 'p'}),
+        pair,
+        local,
+        remote,
+      ]);
+      expect(path.route, PeerRoute.direct);
+      expect(path.rttMs, 23);
+    });
+
+    test('relayed when either end is a relay candidate', () {
+      final path = PeerPath.of([
+        stat('p', 'candidate-pair', const {
+          'state': 'succeeded',
+          'nominated': 'true',
+          'localCandidateId': 'l',
+          'remoteCandidateId': 'r',
+        }),
+        local,
+        relayed,
+      ]);
+      expect(path.route, PeerRoute.relay);
+      expect(path.rttMs, isNull);
+    });
+
+    test('no route is guessed from statistics that do not say', () {
+      expect(PeerPath.of(const []).route, PeerRoute.connected);
+      final noCandidates = PeerPath.of([
+        stat('t', 'transport', const {'selectedCandidatePairId': 'p'}),
+        stat('p', 'candidate-pair', const {'localCandidateId': 'l', 'remoteCandidateId': 'r'}),
+      ]);
+      expect(noCandidates.route, PeerRoute.connected);
+    });
+
+    test('a mesh gives each player\'s path; statistics that fail are only "connected"', () async {
+      final players = Players([alice, bob]);
+      addTearDown(players.stop);
+      await players.start(alice);
+      await players.start(bob);
+      await players.plays[bob]!.follow(players.together.id);
+      await players.plays[alice]!.follow(players.together.id);
+      final mesh = players.meshes[alice]!;
+      expect(await eventually(() => mesh.states[bob] == PeerState.connected), isTrue);
+      players.network.stats = [
+        stat('t', 'transport', const {'selectedCandidatePairId': 'p'}),
+        stat('p', 'candidate-pair', const {
+          'localCandidateId': 'l',
+          'remoteCandidateId': 'r',
+          'currentRoundTripTime': '0.08',
+        }),
+        local,
+        relayed,
+      ];
+      var links = await mesh.paths();
+      expect(links[bob]!.route, PeerRoute.relay);
+      expect(links[bob]!.rttMs, 80);
+      players.network.stats = null;
+      links = await mesh.paths();
+      expect(links[bob]!.route, PeerRoute.connected);
+      expect(links[bob]!.rttMs, isNull);
+    });
+  });
 }

@@ -5,6 +5,14 @@ release when it is made.
 
 ## Next release
 
+- **Play Together player rows say how each player is reached** (Direct or Relay, with the round
+  trip in ms), as on the Mac. Where the system cannot say, the row stays at Connected.
+- **A Play Together offer or a game invite is said over the game** in a desktop notice, as on the
+  Mac, unless you're on Do Not Disturb. The party offer shows a friend's private name.
+- **Party chat has quick replies**, as on the Mac: Hello, GG and the others, sent with one press.
+  The Party tile gets a dot when someone writes while the party screen is closed, a parent's rule
+  against messages hides the chat, and after a lost connection the chat reads every page it
+  missed.
 - **Play on a second game from the phone switches games**, as on the Mac. The game playing closes
   and the one you picked starts once it has gone and its saves have synced. Before, the first game
   closed and nothing else happened.

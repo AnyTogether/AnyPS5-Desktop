@@ -10,6 +10,7 @@ import 'package:anyps5_desktop/core/trophies.dart';
 import 'package:anyps5_desktop/ui/app_model.dart' hide Command, GameState;
 import 'package:anyps5_desktop/ui/family_gate.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
+import 'package:anyps5_desktop/ui/together_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
@@ -176,6 +177,19 @@ void main() {
     // The play counts here until the server has it.
     final kept = model.together.family.kept as FamilyCacheKept;
     expect(kept.plays, hasLength(1));
+  });
+
+  test("a parent's rule against messages hides the party chat, as on the Mac", () async {
+    status(FamilySigner.childStatus(issuedAt: DateTime.now(), messages: 'nobody'));
+    final ana = FakeTogether.card('u-ana', 'ana', 'Ana');
+    server
+      ..inParty([ana])
+      ..partyChat('chat-1', texts: [('u-ana', 'Hi')]);
+    await signIn();
+    await until(() => model.together.hub.parties.party?.conversationId != null);
+    expect(model.together.family.messagesAllowed, isFalse);
+    expect(model.together.partyChatShown, isFalse);
+    expect(model.together.partyChatUnread, 0);
   });
 
   test('friends through a parent, voice off, the server kept; a free account has none of it', () async {
