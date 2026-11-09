@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "التحقق من وجود تحديثات",
   "updateChannel": "قناة التحديث",
   "updateChannelStableDetail": "إصدارات تمت تجربتها قبل صدورها.",
-  "updateChannelNightlyDetail": "أحدث إصدار من المحرك من main، يظهر في منتقي المحرك. الجديد أولًا، والأخطاء الجديدة أيضًا.",
   "channelStable": "مستقر",
   "channelNightly": "ليلي (إصدار تجريبي)",
   "checkUpdates": "التحقق من وجود تحديثات",

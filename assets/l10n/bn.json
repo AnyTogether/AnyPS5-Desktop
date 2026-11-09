@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "আপডেটের জন্য চেক করুন",
   "updateChannel": "আপডেট চ্যানেল",
   "updateChannelStableDetail": "প্রকাশের আগে পরীক্ষা করা রিলিজ।",
-  "updateChannelNightlyDetail": "main-এর সর্বশেষ ইঞ্জিন বিল্ড, ইঞ্জিন বাছাইকারীতে দেওয়া হয়। নতুন জিনিস আগে আসে, নতুন বাগও আসে।",
   "channelStable": "স্টেবল",
   "channelNightly": "নাইটলি (প্রি-রিলিজ)",
   "checkUpdates": "আপডেটের জন্য চেক করুন",

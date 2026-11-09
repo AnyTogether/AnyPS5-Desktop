@@ -73,17 +73,81 @@ void main() {
   test('an unsigned release, or one signed by another key, is never downloaded', () async {
     github.releases.add(desktopRelease('0.1.3'));
     var latest = await releases.latest();
-    var refused = await failure(LauncherUpdates.download(latest, LauncherUpdates.assetFor(latest, HostSystem.windows)!, temp.path));
+    var refused = await failure(
+      LauncherUpdates.download(latest, LauncherUpdates.assetFor(latest, HostSystem.windows)!, temp.path),
+    );
     expect(refused.kind, ToolkitFailureKind.signature);
     expect(refused.message, 'AnyPS5 Desktop 0.1.3 is not signed');
     github.releases
       ..clear()
       ..add(signed(desktopRelease('0.1.4'), [TestReleaseKey('stranger')]));
     latest = await releases.latest();
-    refused = await failure(LauncherUpdates.download(latest, LauncherUpdates.assetFor(latest, HostSystem.windows)!, temp.path));
+    refused = await failure(
+      LauncherUpdates.download(latest, LauncherUpdates.assetFor(latest, HostSystem.windows)!, temp.path),
+    );
     expect(refused.kind, ToolkitFailureKind.signature);
     expect(refused.message, contains('does not trust'));
     expect(github.downloads.where((path) => !path.contains('SHA256SUMS')), isEmpty);
+  });
+
+  group('the Nightly channel', () {
+    const signedTag = '0.1.21-nightly.20261109.1';
+    const unsignedTag = '0.1.21-nightly.20261110.1';
+
+    FakeRelease nightly(String version) {
+      final release = desktopRelease(version);
+      return FakeRelease(release.tag, release.files, prerelease: true);
+    }
+
+    test('offers the newest signed build, not one CI has just published unsigned', () async {
+      github.releases
+        ..add(nightly(unsignedTag))
+        ..add(signed(nightly(signedTag), [key]))
+        ..add(signed(desktopRelease('0.1.20'), [key]));
+      final found = LauncherUpdates.newestNightly(await releases.all(), HostSystem.windows)!;
+      expect(found.version, signedTag);
+      expect(found.prerelease, isTrue);
+      final setup = LauncherUpdates.assetFor(found, HostSystem.windows)!;
+      expect(setup.name, 'AnyPS5-Desktop-Setup-$signedTag-x64.exe');
+      expect(File(await LauncherUpdates.download(found, setup, temp.path)).existsSync(), isTrue);
+    });
+
+    test('takes the unsigned build once it is signed, and a release once one is newer', () async {
+      github.releases
+        ..add(signed(nightly(unsignedTag), [key]))
+        ..add(signed(nightly(signedTag), [key]));
+      expect(LauncherUpdates.newestNightly(await releases.all(), HostSystem.linux)!.version, unsignedTag);
+      github.releases.add(signed(desktopRelease('0.1.21'), [key]));
+      expect(LauncherUpdates.newestNightly(await releases.all(), HostSystem.linux)!.version, '0.1.21');
+    });
+
+    test('leaves out a build without a file for this system', () async {
+      final noWindows = nightly(signedTag)..files.remove('AnyPS5-Desktop-Setup-$signedTag-x64.exe');
+      github.releases
+        ..add(signed(noWindows, [key]))
+        ..add(signed(desktopRelease('0.1.20'), [key]));
+      final all = await releases.all();
+      expect(LauncherUpdates.newestNightly(all, HostSystem.windows)!.version, '0.1.20');
+      expect(LauncherUpdates.newestNightly(all, HostSystem.linux, appImage: true)!.version, signedTag);
+    });
+
+    test('Stable never sees a nightly: GitHub calls the release the latest', () async {
+      github.releases
+        ..add(signed(nightly(signedTag), [key]))
+        ..add(signed(desktopRelease('0.1.20'), [key]));
+      expect((await releases.latest()).version, '0.1.20');
+    });
+
+    test('an installer left by Later for a newer nightly runs, an older one does not', () {
+      final installer = p.join(temp.path, 'setup.exe');
+      File(installer).writeAsBytesSync([1, 2, 3]);
+      LauncherUpdates.writePending(temp.path, '0.1.21-nightly.20261109.10', installer);
+      expect(LauncherUpdates.takePending(temp.path, '0.1.21-nightly.20261109.9'), installer);
+      LauncherUpdates.writePending(temp.path, '0.1.21-nightly.20261109.1', installer);
+      expect(LauncherUpdates.takePending(temp.path, '0.1.21-nightly.20261109.2'), isNull);
+      LauncherUpdates.writePending(temp.path, '0.1.21', installer);
+      expect(LauncherUpdates.takePending(temp.path, '0.1.21-nightly.20261109.2'), installer);
+    });
   });
 
   test('the launcher reads its own repository with the built-in keys', () {

@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "अद्यतन के लिए जाँच",
   "updateChannel": "अपडेट चैनल",
   "updateChannelStableDetail": "रिलीज़ जिन्हें जारी होने से पहले आज़माया गया।",
-  "updateChannelNightlyDetail": "main का सबसे नया इंजन बिल्ड, जो इंजन चयन में दिया जाता है। नई चीज़ें पहले आती हैं, और नए बग भी।",
   "channelStable": "स्थिर",
   "channelNightly": "नाइटली (प्री-रिलीज़)",
   "checkUpdates": "अद्यतन के लिए जाँच",

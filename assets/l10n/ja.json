@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "アップデートを確認してください",
   "updateChannel": "アップデートチャンネル",
   "updateChannelStableDetail": "公開前にお試しできたリリースです。",
-  "updateChannelNightlyDetail": "main の最新のエンジンビルドで、エンジン選択に表示されます。新機能がいち早く届きますが、新しい不具合も含まれます。",
   "channelStable": "安定版",
   "channelNightly": "Nightly (プレリリース)",
   "checkUpdates": "アップデートを確認してください",

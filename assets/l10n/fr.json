@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "Rechercher des mises à jour",
   "updateChannel": "Canal de mise à jour",
   "updateChannelStableDetail": "Versions testées avant leur sortie.",
-  "updateChannelNightlyDetail": "La dernière version du moteur de main, proposée dans le sélecteur de moteur. Les nouveautés en premier, et les nouveaux bugs aussi.",
   "channelStable": "Stable",
   "channelNightly": "Nightly (préversion)",
   "checkUpdates": "Rechercher des mises à jour",

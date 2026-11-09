@@ -417,6 +417,11 @@ use those once changed in the game.
   already into the bundle's `lib/`, with their packages' copyright files in `lib/licenses/`, so
   the bundle, the AppImage and the .deb start on systems with another libmpv or none.
 
+- Nightly builds: `.github/workflows/nightly.yml` builds main once a day when the launcher
+  changed and publishes an unsigned pre-release, `v<next>-nightly.<YYYYMMDD>.<n>`. The launcher's
+  Nightly channel offers it once it is signed on the release Mac (`tools/release/sign_nightly.sh`
+  in AnyPS5-ARM). It never reaches Stable.
+
 ## Credits
 
 **The core**

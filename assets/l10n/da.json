@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "Søg efter opdateringer",
   "updateChannel": "Opdateringskanal",
   "updateChannelStableDetail": "Udgivelser, der er afprøvet, før de udkom.",
-  "updateChannelNightlyDetail": "Den nyeste enginebuild af main, som tilbydes i engine-vælgeren. Nye ting kommer først, og nye fejl også.",
   "channelStable": "Stabil",
   "channelNightly": "Nightly (forhåndsudgivelse)",
   "checkUpdates": "Søg efter opdateringer",

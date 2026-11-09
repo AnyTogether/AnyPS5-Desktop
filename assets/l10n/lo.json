@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "ກວດສອບຫາ ການອັບເດດ",
   "updateChannel": "ຊ່ອງທາງອັບເດດ",
   "updateChannelStableDetail": "ເວີຊັນທີ່ຖືກທົດລອງກ່ອນປ່ອຍອອກມາ.",
-  "updateChannelNightlyDetail": "ບິວ engine ໃໝ່ສຸດຂອງ main, ມີໃຫ້ເລືອກໃນຕົວເລືອກ engine. ມີຂອງໃໝ່ກ່ອນ, ແລະ ມີບັກໃໝ່ນຳ.",
   "channelStable": "ເສັ້ນຄົງທີ່ (Stable)",
   "channelNightly": "Nightly (ກ່ອນປ່ອຍຈິງ)",
   "checkUpdates": "ກວດສອບການອັບເດດ",

@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "檢查更新",
   "updateChannel": "更新頻道",
   "updateChannelStableDetail": "在正式發行前已先行測試的版本。",
-  "updateChannelNightlyDetail": "main 的最新引擎建置版本，會在引擎選擇器中提供。新功能最先到，新問題也一樣。",
   "channelStable": "穩定版",
   "channelNightly": "Nightly（預先發行版）",
   "checkUpdates": "檢查更新",

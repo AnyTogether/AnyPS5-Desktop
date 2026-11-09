@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "ዝማኔዎችን ያረጋግጡ",
   "updateChannel": "የዝማኔ ቻናል",
   "updateChannelStableDetail": "ከመውጣታቸው በፊት የተሞከሩ ልቀቶች።",
-  "updateChannelNightlyDetail": "የmain አዲሱ የኤንጂን ግንባታ፣ በኤንጂን መምረጫው ውስጥ ይቀርባል። አዳዲስ ነገሮች መጀመሪያ፣ አዳዲስ ስህተቶችም ጭምር።",
   "channelStable": "የተረጋጋ",
   "channelNightly": "Nightly (ቅድመ-ልቀት)",
   "checkUpdates": "ለዝማኔዎች ያረጋግጡ",

@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "Sök efter uppdateringar",
   "updateChannel": "Uppdateringskanal",
   "updateChannelStableDetail": "Utgåvor som testades innan de släpptes.",
-  "updateChannelNightlyDetail": "Det senaste motorbygget av main, som erbjuds i motorvalet. Nya saker kommer först, och nya buggar också.",
   "channelStable": "Stabil",
   "channelNightly": "Nightly (förhandsversion)",
   "checkUpdates": "Sök efter uppdateringar",
