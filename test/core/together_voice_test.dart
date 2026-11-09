@@ -401,6 +401,8 @@ void main() {
       await voice.join();
       expect(voice.active, isTrue);
       expect(voice.movedTo, isNull);
+    });
+
     test('noise suppression opens the microphone as set and changes the call without reconnecting', () async {
       voice.noiseSuppression = false;
       await voice.join();
