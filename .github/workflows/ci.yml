@@ -341,6 +341,20 @@ jobs:
           powershell -ExecutionPolicy Bypass -File packaging\windows\build-installer.ps1 -SkipBuild
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\installer\AnyPS5-Desktop-windows-x64.zip
+      # The installer's contents can only be seen by installing it (7-Zip and innoextract do not read
+      # this Inno Setup): silently, into a temporary folder on the runner.
+      - name: Install the package into a folder and check what it put there
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          $setup = Get-Item build\installer\AnyPS5-Desktop-Setup-*.exe
+          $target = Join-Path $env:RUNNER_TEMP "anyps5-install"
+          $run = Start-Process -FilePath $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$target" -Wait -PassThru
+          if ($run.ExitCode) { Write-Error "the installer ended with $($run.ExitCode)"; exit 1 }
+          foreach ($file in "anyps5_desktop.exe", "SDL2.dll", "SDL2-LICENSE.txt", "libmpv-2.dll", "libmpv-LICENSE.txt", "ANGLE-LICENSE.txt") {
+            if (-not (Test-Path (Join-Path $target $file))) { Write-Error "no $file installed"; exit 1 }
+          }
+          Get-ChildItem $target -Filter *LICENSE* | Select-Object Name, Length | Format-Table -AutoSize
       - uses: actions/upload-artifact@v7
         if: github.event_name != 'pull_request'
         with:
