@@ -1,0 +1,1 @@
+- **Screen readers now read Activity, Leaderboards, Challenges, Compare, Profile, Share Play and the first-start steps**, and Party, Play Together and Find Players rows read their words, as on the Mac.

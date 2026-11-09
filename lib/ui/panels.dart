@@ -591,7 +591,20 @@ class PanelRows extends StatelessWidget {
 }
 
 class _RowView extends StatelessWidget {
-  static const _labelledMenus = {Layer.quickMenu, Layer.homeMenu, Layer.launcherReport, Layer.profileMenu};
+  // The menus over the game, Home and the screens of rows that go with people (Party, Play Together,
+  // Find Players, a friend's options), read by their rows' names and details, as on the Mac.
+  static const _labelledMenus = {
+    Layer.quickMenu,
+    Layer.homeMenu,
+    Layer.launcherReport,
+    Layer.profileMenu,
+    Layer.party,
+    Layer.friends,
+    Layer.friendOptions,
+    Layer.findPlayers,
+    Layer.lfgPost,
+    Layer.gameHub,
+  };
 
   const _RowView({
     super.key,
@@ -934,10 +947,15 @@ class _RowView extends StatelessWidget {
       ),
     );
     // The menus over the game and Home are read by their rows' names, as on the Mac.
-    if (!_labelledMenus.contains(model.overlay)) return view;
+    if (!_labelledMenus.contains(model.overlay) || !(kind is ActionRow || kind is ToggleRow || kind is InfoRow)) {
+      return view;
+    }
+    final parts = [row.title, if (row.detail case final detail?) detail];
     return Semantics(
-      button: true,
-      label: row.title,
+      button: kind is ActionRow,
+      toggled: kind is ToggleRow ? kind.value : null,
+      enabled: row.focusable,
+      label: parts.join(', '),
       excludeSemantics: true,
       onTap: row.focusable ? onTap : null,
       child: view,

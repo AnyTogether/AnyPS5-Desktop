@@ -274,6 +274,25 @@ void main() {
       expect(identical(model.together.profile, before), isTrue);
     });
 
+    testWidgets('a leaderboard is read by its tabs and its rows', (tester) async {
+      final semantics = tester.ensureSemantics();
+      fixture = makeFixture();
+      model = fixture.model;
+      signedIn();
+      final neon = model.games.firstWhere((game) => game.titleId == 'PPSA02002');
+      model.together.screens
+        ..boardTitleId = neon.titleId
+        ..boardName = neon.name
+        ..boardScope = BoardScope.global
+        ..board = board()
+        ..boardIndex = 0;
+      model.open(Layer.leaderboard);
+      await pumpLauncher(tester, model);
+      expect(find.bySemanticsLabel(RegExp('^1, Ana, ')), findsOneWidget);
+      expect(find.bySemanticsLabel(T.text('socialScopeFriends')), findsOneWidget);
+      semantics.dispose();
+    });
+
     testWidgets('golden: a game\'s leaderboard with the gap and the user\'s place (tr)', (tester) async {
       fixture = makeFixture(language: Language.byCode('tr'));
       model = fixture.model;
