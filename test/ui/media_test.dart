@@ -205,6 +205,19 @@ void main() {
     level.set(50);
     expect(model.media.settings.microphoneLevel, 50);
     expect(File(Broadcaster.settingsFile(model.paths.config)).readAsStringSync(), contains('"microphoneLevel":50'));
+    // Windows: which device is the microphone.
+    expect(has('broadcast-mic-device'), isFalse);
+    model.media.micDevicesOverride = ['Mic A', 'Mic B'];
+    final device = row('broadcast-mic-device').kind as ChoiceRow;
+    expect(device.options, ['Automatic', 'Mic A', 'Mic B']);
+    device.set(2);
+    expect(model.media.settings.microphoneDevice, 'Mic B');
+    expect(
+      File(Broadcaster.settingsFile(model.paths.config)).readAsStringSync(),
+      contains('"microphoneDevice":"Mic B"'),
+    );
+    (row('broadcast-mic-device').kind as ChoiceRow).set(0);
+    expect(model.media.settings.microphoneDevice, isNull);
     final badge = row('broadcast-badge').kind;
     expect(badge, isA<InfoRow>());
     expect((badge as InfoRow).text, T.text('broadcastBadgeLinux'));

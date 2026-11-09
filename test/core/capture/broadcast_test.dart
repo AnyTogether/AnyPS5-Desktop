@@ -106,6 +106,19 @@ void main() {
       expect(await BroadcastMicrophone.input(system: HostSystem.windows, ffmpeg: 'ffmpeg', run: run), isNull);
     });
 
+    test('Windows takes the device picked while ffmpeg lists it, else finds one', () async {
+      Future<ProcessResult> run(String executable, List<String> arguments) async =>
+          ProcessResult(1, 1, '', '[dshow] "Stereo Mix" (audio)\n[dshow] "Mic A" (audio)\n');
+      expect(
+        await BroadcastMicrophone.input(system: HostSystem.windows, ffmpeg: 'ffmpeg', run: run, device: 'Stereo Mix'),
+        contains('audio=Stereo Mix'),
+      );
+      expect(
+        await BroadcastMicrophone.input(system: HostSystem.windows, ffmpeg: 'ffmpeg', run: run, device: 'Unplugged'),
+        contains('audio=Mic A'),
+      );
+    });
+
     test('the settings keep the microphone and the badge', () {
       final folder = Directory.systemTemp.createTempSync('broadcast');
       addTearDown(() => folder.deleteSync(recursive: true));

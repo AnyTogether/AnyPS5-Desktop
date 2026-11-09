@@ -43,6 +43,7 @@ import '../core/game_log.dart';
 import '../core/game_process.dart';
 import '../core/game_presets.dart';
 import '../core/game_settings.dart';
+import '../core/launch_resolution.dart';
 import '../core/gyro_aiming.dart';
 import '../core/host.dart';
 import '../core/installer.dart';
@@ -95,6 +96,7 @@ import 'share_play_model.dart';
 import 'game_files_model.dart';
 import 'steam_model.dart';
 import 'glass.dart';
+import 'phone_art.dart';
 import 'power_model.dart';
 import 'profile_picture.dart';
 import 'save_sync_model.dart';
@@ -152,6 +154,7 @@ class Preferences {
     ..onlinePlay = json['onlinePlay'] == true
     ..onlinePlatformGroups = json['onlinePlatformGroups'] as bool? ?? true
     ..pushToTalk = json['pushToTalk'] as bool? ?? false
+    ..noiseSuppression = json['noiseSuppression'] as bool? ?? true
     ..talkKey = (json['talkKey'] as num?)?.toInt()
     ..sounds = json['sounds'] as bool? ?? true
     ..soundVolume = (json['soundVolume'] as num?)?.toInt()
@@ -283,6 +286,9 @@ class Preferences {
   /// In party voice: the talk key held to talk (else it turns the microphone on and off), and
   /// which key it is (a USB HID usage; null for the default).
   bool pushToTalk = false;
+
+  /// WebRTC's noise suppression on the microphone in calls; on unless turned off.
+  bool noiseSuppression = true;
   int? talkKey;
 
   /// Interface sounds, and their volume and the selected game's theme song's in percent; null
@@ -429,6 +435,7 @@ class Preferences {
     'onlinePlay': onlinePlay,
     if (!onlinePlatformGroups) 'onlinePlatformGroups': false,
     'pushToTalk': pushToTalk,
+    if (!noiseSuppression) 'noiseSuppression': false,
     'talkKey': talkKey,
     'sounds': sounds,
     'soundVolume': soundVolume,
@@ -1682,6 +1689,9 @@ class AppModel extends ChangeNotifier {
     return navigator;
   }
 
+  /// The pictures sent to the phones, made small and kept.
+  final PhoneArt phoneArt = PhoneArt();
+
   /// The phones' pads (the Remote app's, browser pads) as controller events.
   late final PhonePadEvents _phonePads = PhonePadEvents(_phonePadEvent);
 
@@ -2647,6 +2657,32 @@ class AppModel extends ChangeNotifier {
     return ResolutionPatch.lower(current, ResolutionPatch.choices) ?? own;
   }
 
+  /// A game about to start: one step lower under a Battery & Heat profile that asks for it,
+  /// the resolution it was unlocked with otherwise, written into its executable as on the Mac
+  /// (LaunchResolution). A note for its log when that was done; a toolkit whose output cannot
+  /// take it keeps the unlock's resolution.
+  Future<String?> _setLaunchResolution(Game game, String folder) async {
+    final kit = toolkitFor(game);
+    final patch = kit?.patchFile(game.titleId);
+    if (kit == null || patch == null) return null;
+    try {
+      final text = File(patch).readAsStringSync();
+      final title = ResolutionPatch.defaultOf(text);
+      if (!ResolutionPatch.supports(text) || title == null) return null;
+      final unlocked = records[game.id]?.resolution ?? title;
+      final wanted = powerWatch.adjustment.lowerResolution ? (_unlockResolution(game, kit) ?? unlocked) : unlocked;
+      final result = await LaunchResolution.apply(
+        executable: p.join(Installer.installedFolder(game, folder), system.executableName),
+        patch: text,
+        wanted: wanted,
+        known: {title, unlocked, wanted, ...ResolutionPatch.choices},
+      );
+      return result == LaunchResolutionResult.written ? '[anyps5-launcher] resolution for this start: $wanted' : null;
+    } on Object {
+      return null;
+    }
+  }
+
   /// Whether the title's patch file lets Game Settings choose its resolution.
   bool supportsResolution(Game game) => _factsOf(game).resolution;
 
@@ -2693,6 +2729,7 @@ class AppModel extends ChangeNotifier {
     if (launcherProblem != null) offerLauncherReport();
     notifyListeners();
     _publishLibrary();
+    _publishActivity();
     _prepareWhenChanged();
   }
 
@@ -3090,8 +3127,9 @@ class AppModel extends ChangeNotifier {
         cancelUnlock(game);
       case Unreadable():
         show(T.text('unreadableDump'));
+      // The game back in front, as on the Mac; Stop is in the game's menu and the quick menu.
       case Running():
-        unawaited(stopRunningGame());
+        if (running?.$2 case final RunningGame run) unawaited(_showGame(run));
       case Starting() || Stopping():
         break;
       case FamilyLocked():
@@ -3671,9 +3709,12 @@ class AppModel extends ChangeNotifier {
     }
     sounds.play(Cue.select);
     starting = game;
+    final turn = ++_startTurn;
     _phoneToldFor = null;
     // A game linked to its dump cannot start once the dump moved: said instead of a crash.
-    if (await Installer.brokenLink(Installer.installedFolder(game, folder)) != null) {
+    final broken = await Installer.brokenLink(Installer.installedFolder(game, folder));
+    if (turn != _startTurn) return;
+    if (broken != null) {
       starting = null;
       sounds.play(Cue.back);
       show(T.text('dumpMoved'));
@@ -3692,6 +3733,10 @@ class AppModel extends ChangeNotifier {
       // Settings › AnyTogether › Online play: the loopback bridge the engine connects to
       // (ANYPS5_ONLINE, ANYPS5_ONLINE_SECRET) and the title's observation log; nothing when off.
       final online = await together.onlineEnvironment(game);
+      if (turn != _startTurn) {
+        if (starting == null) unawaited(together.onlineGameEnded());
+        return;
+      }
       final environment = {
         ...settings.environment(
           launcherLanguage: T.language.consoleLanguage,
@@ -3714,6 +3759,7 @@ class AppModel extends ChangeNotifier {
         ...once,
       };
       fonts.watch(game, logFile);
+      final resolutionNote = await _setLaunchResolution(game, folder);
       final run = await startGame(
         installed: Installer.installedFolder(game, folder),
         environment: environment,
@@ -3724,9 +3770,17 @@ class AppModel extends ChangeNotifier {
         notes: [
           for (final line in controllers.reportLines) '[anyps5-launcher] controllers: $line',
           if (phonesConnected) '[anyps5-launcher] phones: ${_phoneReachNote(game)}',
+          ?resolutionNote,
           for (final MapEntry(:key, :value) in once.entries) '[anyps5-launcher] this start only: $key=$value',
         ],
       );
+      // Closed while it was starting: the process goes again.
+      if (turn != _startTurn) {
+        run.stop();
+        fonts.ended();
+        if (starting == null) unawaited(together.onlineGameEnded());
+        return;
+      }
       starting = null;
       running = (game, run);
       _gameBegan = DateTime.now();
@@ -3780,10 +3834,19 @@ class AppModel extends ChangeNotifier {
         askPhoneEngine(again: true);
       }
       // The saves it made go to the other computers (or the cloud).
-      unawaited(saveSync.sync(game));
+      final saves = saveSync.sync(game);
       // "How did it run?", once the launcher is back over the home screen.
       together.askHowItRan(game, DateTime.now().difference(began));
       _changed();
+      // The phone asked for another game while this one played: it starts now this one has gone
+      // (and its saves have synced, which a start waits for), as on the Mac.
+      final next = _launchAfterExit;
+      _launchAfterExit = null;
+      if (next != null) {
+        _quitAfterGame = null;
+        unawaited(_startAfterExit(next, saves));
+        return;
+      }
       // Started from a Steam shortcut of the game: the launcher goes with it, so Steam sees
       // the game end. A crash keeps it open on its report.
       if (_quitAfterGame == game.id) {
@@ -3791,6 +3854,8 @@ class AppModel extends ChangeNotifier {
         if (code == 0 || _stopped) (services.quit ?? exit)(0);
       }
     } on Object catch (error) {
+      // A start given up meanwhile has nothing more to say.
+      if (turn != _startTurn) return;
       starting = null;
       fonts.ended();
       unawaited(together.onlineGameEnded());
@@ -3798,6 +3863,35 @@ class AppModel extends ChangeNotifier {
       show('${T.text('startFailed')}: $error');
       _changed();
     }
+  }
+
+  /// Counts the starts: a start given up ([cancelStart]) sees it has changed after each wait.
+  int _startTurn = 0;
+
+  /// The game the phone asked for while another played; it starts when that one has gone.
+  String? _launchAfterExit;
+
+  /// Gives up the game starting (Close on the phone while it starts), as on the Mac.
+  void cancelStart() {
+    if (starting == null) return;
+    _startTurn++;
+    sounds.play(Cue.back);
+    starting = null;
+    _changed();
+  }
+
+  /// The game the phone asked for, once the one before it has gone and its saves have synced.
+  Future<void> _startAfterExit(String id, Future<void> saves) async {
+    try {
+      await saves;
+    } on Object {
+      // The sync said why; the game the phone asked for still starts.
+    }
+    if (_disposed || running != null || starting != null) return;
+    final game = games.where((game) => game.id == id).firstOrNull;
+    if (game == null) return;
+    select(games.indexOf(game));
+    primaryAction(game);
   }
 
   /// While a game runs, a trophy it earns shows and goes to the phones.
@@ -3823,17 +3917,25 @@ class AppModel extends ChangeNotifier {
         if (running case (final Game playing, final RunningGame run) when playing == game) {
           unawaited(celebrate(game, trophy, run.pid));
         }
-        remote?.publish(
-          RemoteTrophy(
-            name: trophy.name,
-            detail: trophy.detail,
-            grade: trophy.grade.name,
-            icon: trophy.icon == null ? null : base64.encode(trophy.icon!),
-          ),
-        );
+        unawaited(_tellTrophy(trophy));
       }
       _changed();
     });
+  }
+
+  /// A trophy earned, to the phones: its icon at most [PhoneArt.trophySide] a side, as on the Mac.
+  Future<void> _tellTrophy(Trophy trophy) async {
+    final icon = trophy.icon;
+    final small = icon == null ? null : await PhoneArt.smaller(icon, PhoneArt.trophySide);
+    if (_disposed) return;
+    remote?.publish(
+      RemoteTrophy(
+        name: trophy.name,
+        detail: trophy.detail,
+        grade: trophy.grade.name,
+        icon: small == null ? null : base64.encode(small),
+      ),
+    );
   }
 
   Future<void> _cards = Future.value();
@@ -3872,8 +3974,10 @@ class AppModel extends ChangeNotifier {
     }
   }
 
-  /// Saves the game's window as it is now as the picture of [trophy]; its path, or null.
+  /// Saves the game's window as it is now as the picture of [trophy]; its path, or null. With
+  /// the family's media setting off no picture is taken, as on the Mac.
   Future<String?> _trophyShot(Game game, Trophy trophy, int pid) async {
+    if (!together.family.mediaAllowed) return null;
     try {
       final frame = await desktop.captureGame(pid);
       if (frame == null) return null;
@@ -4832,6 +4936,11 @@ class AppModel extends ChangeNotifier {
   /// Said as a capture is ([_captureSaid]), with a second line in the desktop notice.
   Future<void> notice(String text, {String? detail}) async {
     show(detail == null ? text : '$text. $detail');
+    await noticeOverGame(text, detail: detail);
+  }
+
+  /// The desktop notice alone: with a game in front, a word the launcher's toast cannot give.
+  Future<void> noticeOverGame(String text, {String? detail}) async {
     if (launcherInFront) return;
     if (!await desktop.notify(text, detail ?? 'AnyPS5')) desktopNotify(text, detail ?? 'AnyPS5');
   }
@@ -7034,6 +7143,10 @@ class AppModel extends ChangeNotifier {
           pairing = request;
           sounds.play(Cue.select);
           _changed();
+          // A game in front keeps its focus: the phone asks through a notice over it instead.
+          unawaited(
+            noticeOverGame(T.text('phonePairingTitle'), detail: T.format('phoneOpenLauncher', [request.deviceName])),
+          );
         },
         connecting: (device) {
           phoneConnecting = device;
@@ -7044,9 +7157,14 @@ class AppModel extends ChangeNotifier {
           phoneConnecting = null;
           pairing = null;
           show(T.format('phoneConnected', [device]));
+          // A game in front hears of it through a notice over it.
+          unawaited(noticeOverGame(T.format('phoneConnected', [device]), detail: T.text('phoneConnectedDetail')));
           _toldLibrary = null;
           _changed();
           _publishLook();
+          // The new phone hears what the launcher is busy with, even if it is nothing.
+          _activityTold = false;
+          _publishActivity();
           // Its Go Live button shows what the launcher does now.
           if (media.phase.active) remote?.publish(const RemoteBroadcast(true));
           // A phone that comes while a game runs hears at once whether that game reads it.
@@ -7135,13 +7253,22 @@ class AppModel extends ChangeNotifier {
       case RemoteLaunch(:final id):
         final game = games.where((game) => game.id == id).firstOrNull;
         if (game == null) return;
+        // One game at a time: the one playing stops, and the new one starts when it has gone.
+        if (running != null && running!.$1 != game) {
+          _launchAfterExit = game.id;
+          stopGame();
+          return;
+        }
         select(games.indexOf(game));
         // Launch on the game playing is no Stop: the phone has Close for that.
         if (stateOf(game) is Running || stateOf(game) is Stopping) return;
-        if (running != null && running!.$1 != game) stopGame();
         primaryAction(game);
       case RemoteClose():
-        stopGame();
+        if (starting != null) {
+          cancelStart();
+        } else {
+          stopGame();
+        }
       case RemoteHome():
         handle(Command.home);
       case RemoteKeyFrame():
@@ -7166,6 +7293,8 @@ class AppModel extends ChangeNotifier {
           _ => null,
         };
         if (command == null) return;
+        // The launcher comes forward for its D-pad, as on the Mac.
+        if (!launcherInFront) unawaited(raiseLauncher());
         // The phone's pad moves the launcher as a controller does (the sections, edit mode).
         _usedInput(InputMode.pad);
         _viaPad = true;
@@ -7177,15 +7306,7 @@ class AppModel extends ChangeNotifier {
       case RemoteWantArt(:final id):
         final game = games.where((game) => game.id == id).firstOrNull;
         if (game == null) return;
-        String? encode(String? file) {
-          if (file == null) return null;
-          try {
-            return base64.encode(File(file).readAsBytesSync());
-          } on FileSystemException {
-            return null;
-          }
-        }
-        remote?.tell(RemoteArt(id: id, icon: encode(game.icon), background: encode(game.background)), deviceId);
+        unawaited(_tellArt(game, deviceId));
       case RemoteSaveLayout(:final id, :final layout):
         final game = games.where((game) => game.id == id).firstOrNull;
         if (game != null) saveSettings(game, currentSettings(game).copyWith(phoneLayout: layout));
@@ -7194,6 +7315,15 @@ class AppModel extends ChangeNotifier {
       default:
         break;
     }
+  }
+
+  /// A game's pictures, small enough for the control channel: 256 and 1280 pixels at most on the
+  /// longest side, as on the Mac.
+  Future<void> _tellArt(Game game, String deviceId) async {
+    final icon = await phoneArt.encoded(game.icon, PhoneArt.iconSide);
+    final background = await phoneArt.encoded(game.background, PhoneArt.backgroundSide);
+    if (_disposed) return;
+    remote?.tell(RemoteArt(id: game.id, icon: icon, background: background), deviceId);
   }
 
   void _publishLibrary() {
@@ -7224,7 +7354,7 @@ class AppModel extends ChangeNotifier {
           ),
       ],
       selected: selectedGame?.id,
-      running: running?.$1.id,
+      running: (running?.$1 ?? starting)?.id,
       language: T.language.code,
     );
     if (library == _toldLibrary) return;
@@ -7234,27 +7364,56 @@ class AppModel extends ChangeNotifier {
 
   RemoteActivity? _toldActivity;
 
-  void _publishActivity() {
-    final server = remote;
-    if (server == null) return;
-    RemoteActivity? now;
-    for (final entry in progress.entries) {
-      final (step, fraction) = entry.value;
-      now = RemoteActivity(
-        id: entry.key,
-        phase: switch (step) {
+  /// False before the phones heard anything, and when a new one connects.
+  bool _activityTold = false;
+
+  /// The game the launcher is busy with and since when, so the phone counts the whole of it:
+  /// waiting, updating and starting.
+  ({String id, DateTime since})? _activitySince;
+
+  /// The game starting, else the one installing, else the next one waiting, as on the Mac.
+  RemoteActivity? _activityForPhone() {
+    final game =
+        starting ??
+        games.where((game) => progress[game.id] != null).firstOrNull ??
+        games.where((game) => queue.contains(game.id)).firstOrNull;
+    if (game == null) {
+      _activitySince = null;
+      return null;
+    }
+    if (_activitySince?.id != game.id) _activitySince = (id: game.id, since: DateTime.now());
+    var phase = RemotePhase.queued;
+    double? fraction;
+    switch (stateOf(game)) {
+      case Starting():
+        phase = RemotePhase.starting;
+      case final Installing state:
+        phase = switch (state.step) {
           InstallStep.unwrap => RemotePhase.unwrap,
           InstallStep.relink => RemotePhase.relink,
           InstallStep.copy => RemotePhase.copy,
           InstallStep.layout => RemotePhase.bundle,
           InstallStep.finish => RemotePhase.finish,
-        },
-        updating: records.containsKey(entry.key),
-        fraction: InstallSpan.overall(step, fraction),
-        elapsed: 0,
-      );
+        };
+        fraction = state.overall;
+      default:
+        break;
     }
-    if (RemoteActivity.same(_toldActivity, now)) return;
+    return RemoteActivity(
+      id: game.id,
+      phase: phase,
+      updating: records.containsKey(game.id),
+      fraction: fraction,
+      elapsed: DateTime.now().difference(_activitySince!.since).inMilliseconds / 1000,
+    );
+  }
+
+  void _publishActivity() {
+    final server = remote;
+    if (server == null) return;
+    final now = _activityForPhone();
+    if (_activityTold && RemoteActivity.same(_toldActivity, now)) return;
+    _activityTold = true;
     _toldActivity = now;
     server.publish(RemoteActivityUpdate(now));
   }

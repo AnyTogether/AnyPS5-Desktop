@@ -540,6 +540,27 @@ abstract final class ResolutionPatch {
     return best;
   }
 
+  /// The guest address of the width or height entry [name], for a 4-byte value in the main
+  /// executable; null without one.
+  static int? addressOf(String toml, String name) {
+    final range = _entryNamed(toml, name);
+    if (range == null) return null;
+    String? field(String key) {
+      for (final line in toml.split('\n').sublist(range.$1, range.$2)) {
+        final match = RegExp('^\\s*$key\\s*=\\s*([^#\\s]+)').firstMatch(line);
+        if (match != null) return match.group(1)!.replaceAll('"', '');
+      }
+      return null;
+    }
+
+    final type = field('type');
+    if (type != 'u32' && type != 'i32') return null;
+    final target = field('target');
+    if (target != null && target != 'eboot.bin') return null;
+    final address = field('va');
+    return address == null ? null : int.tryParse(address);
+  }
+
   /// The patch file with the width and height entries' `value` set to [resolution]; the file as
   /// it is when it has no such entries or the text is not a resolution.
   static String apply(String toml, String resolution) {

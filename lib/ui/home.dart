@@ -8,6 +8,7 @@ import '../core/game_addons.dart';
 import '../core/game_library.dart';
 import '../core/update_notice.dart' show SelfApply;
 import '../core/controllers/troubleshooter.dart';
+import '../core/together/compat.dart' show CompatStatus, CompatSummary;
 import 'app_model.dart';
 import 'background.dart';
 import 'components.dart';
@@ -347,7 +348,7 @@ class TopBar extends StatelessWidget {
     // The status the user chose, when it is not plain online: its dot and its word.
     final ownDot = together.signedIn ? TogetherModel.ownDot(together.myStatus) : null;
     final glass = LookScope.isGlass(context);
-    Widget iconButton(IconData icon, int index, VoidCallback action, {int badge = 0}) {
+    Widget iconButton(IconData icon, int index, VoidCallback action, {int badge = 0, bool dot = false}) {
       final focused = model.focus == HomeFocus.top(index) && model.overlay == null;
       return Pressable(
         onTap: action,
@@ -387,6 +388,22 @@ class TopBar extends StatelessWidget {
                     icon,
                     size: 20 * scale,
                     color: focused ? Colors.black : Colors.white.withValues(alpha: 0.9),
+                  ),
+                ),
+              // Something unread that is not worth a number (the party chat), as on the Mac.
+              if (dot && badge == 0)
+                PositionedDirectional(
+                  end: 0,
+                  top: 0,
+                  child: Container(
+                    key: ValueKey('home-dot-$index'),
+                    width: 12 * scale,
+                    height: 12 * scale,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.black.withValues(alpha: 0.5), width: 1.5 * scale),
+                    ),
                   ),
                 ),
               if (badge > 0)
@@ -473,6 +490,7 @@ class TopBar extends StatelessWidget {
           4,
           () => model.open(Layer.party),
           badge: together.partyBadge,
+          dot: together.partyChatUnread > 0,
         ),
         SizedBox(width: 22 * scale),
         // AnyTogether's notifications, while signed in: the bell with the unread count.
@@ -1257,9 +1275,12 @@ class HeroInfo extends StatelessWidget {
               icon: Icons.sell_rounded,
               child: _VersionText(model: model, game: game),
             ),
+            // The community's verdict, once there is one.
+            if (model.together.screens.compat[game.titleId] case final summary?) _CommunityCard(summary: summary),
             if (game.addons.isNotEmpty) _AddonsCard(addons: game.addons),
           ],
         ),
+        _CompatWatch(model: model, titleId: game.titleId),
       ],
     );
   }
@@ -1352,6 +1373,104 @@ class _VersionText extends StatelessWidget {
       ],
     );
   }
+}
+
+/// The game's card for how the community says it runs on this platform, as on the Mac.
+class _CommunityCard extends StatelessWidget {
+  const _CommunityCard({required this.summary});
+
+  final CompatSummary summary;
+
+  static Color _dot(CompatStatus? status) => switch (status) {
+    CompatStatus.nothing => const Color.fromRGBO(255, 115, 115, 1),
+    CompatStatus.boots => const Color.fromRGBO(255, 158, 89, 1),
+    CompatStatus.menus => const Color.fromRGBO(255, 214, 102, 1),
+    CompatStatus.ingame => const Color.fromRGBO(122, 199, 255, 1),
+    CompatStatus.playable => const Color.fromRGBO(115, 230, 153, 1),
+    null => Colors.white.withValues(alpha: 0.6),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = LayoutScale.of(context);
+    final status = summary.status;
+    return InfoCard(
+      title: T.text('socialCompatCommunity'),
+      icon: Icons.groups_rounded,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 9 * scale,
+            height: 9 * scale,
+            decoration: BoxDecoration(color: _dot(status), shape: BoxShape.circle),
+          ),
+          SizedBox(width: 8 * scale),
+          Flexible(
+            child: Text(
+              status == null ? summary.statusName : TogetherSocial.compatName(status),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppText.display(16 * scale, weight: FontWeight.w600),
+            ),
+          ),
+          SizedBox(width: 8 * scale),
+          Flexible(
+            child: Text(
+              summary.version,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppText.display(13 * scale, weight: FontWeight.w500, color: Colors.white.withValues(alpha: 0.5)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Asks for the community's verdict once the selection rests on the game (as the Mac does), not
+/// for every game a held direction passes.
+class _CompatWatch extends StatefulWidget {
+  const _CompatWatch({required this.model, required this.titleId});
+
+  final AppModel model;
+  final String titleId;
+
+  @override
+  State<_CompatWatch> createState() => _CompatWatchState();
+}
+
+class _CompatWatchState extends State<_CompatWatch> {
+  static const _settle = Duration(milliseconds: 180);
+  Timer? _timer;
+
+  void _ask() {
+    _timer?.cancel();
+    if (!widget.model.together.signedIn) return;
+    _timer = Timer(_settle, () => unawaited(widget.model.together.loadCompat(widget.titleId)));
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _ask();
+  }
+
+  @override
+  void didUpdateWidget(_CompatWatch old) {
+    super.didUpdateWidget(old);
+    if (old.titleId != widget.titleId) _ask();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
 /// The add-ons dumped beside the game: the engine mounts each one the game asks for.

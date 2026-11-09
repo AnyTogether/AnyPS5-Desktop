@@ -109,7 +109,9 @@ class TogetherModel {
     hub.games.onInvite = (invite) {
       _noticeSound();
       app.vibrate(HapticCue.ring);
-      app.show(T.format('gameInvitedYou', [invite.from?.displayName ?? '', gameName(invite.titleId)]));
+      final text = T.format('gameInvitedYou', [invite.from?.displayName ?? '', gameName(invite.titleId)]);
+      app.show(text);
+      if (!doNotDisturb) unawaited(app.noticeOverGame(text, detail: T.text('friendsTitle')));
     };
     hub.games.onEnded = (host) => app.show(
       T.format(hub.games.ended?.together == true ? 'togetherEnded' : 'sessionEnded', [host?.displayName ?? '']),
@@ -186,6 +188,7 @@ class TogetherModel {
       ..onSendFailed = partySendFailed;
     hub.voice
       ..pushToTalk = app.preferences.pushToTalk
+      ..noiseSuppression = app.preferences.noiseSuppression
       ..onMoved = (client) {
         app.show(T.text(client == 'phone' ? 'voiceMovedPhone' : 'voiceMovedAway'));
       }
@@ -258,6 +261,10 @@ class TogetherModel {
   JoinEntry joinEntry = JoinEntry();
   Timer? _joinLookup;
   String? discordDraft;
+
+  /// The open profile's pinned gallery; null until read or where the server keeps no files.
+  Section<List<MediaItem>>? profileGallery;
+  int _profileGallerySeq = 0;
 
   /// Party: its chat's keys and field (together_party_chat.dart).
   final PartyChatKeys partyChatKeys = PartyChatKeys();
@@ -609,6 +616,13 @@ class TogetherModel {
   /// What this user chose to show friends.
   PresenceStatus get myStatus => hub.self.status;
 
+  /// The user's own Do Not Disturb: no word over a game for what comes in.
+  bool get doNotDisturb => myStatus == PresenceStatus.dnd;
+
+  /// How each other player in the Play Together session is reached ([TogetherPlay.linkText]).
+  Map<String, PeerPath> togetherLinks = const {};
+  Timer? _linkPoll;
+
   /// The dot for a status this user chose; null for online, which needs none on their own rows.
   static PersonStatus? ownDot(PresenceStatus status) => switch (status) {
     PresenceStatus.online => null,
@@ -649,6 +663,20 @@ class TogetherModel {
 
   /// Read receipts on or off: shown at once, turned back with a word when the server cannot; the
   /// others' receipts change with it, so the conversations are read again.
+  Future<void> setPublicProfile(bool on) async {
+    if (on == hub.self.publicProfile) return;
+    try {
+      await hub.self.setPublicProfile(on);
+    } on Object catch (error) {
+      app.show(
+        error is TogetherProblem && error.code == 'restricted_by_family'
+            ? T.text('publicProfileFamily')
+            : message(error),
+      );
+    }
+    app.refresh();
+  }
+
   Future<void> setReadReceipts(bool on) async {
     if (on == hub.self.readReceipts) return;
     try {
@@ -1149,6 +1177,15 @@ class TogetherModel {
         ),
         ...profileEditRows(),
         ...privateIdentityRows(),
+        if (hub.self.loaded)
+          PanelRow(
+            id: 'together-public-profile',
+            title: T.text('publicProfile'),
+            detail: hub.self.publicProfile
+                ? T.text('publicProfileHint')
+                : '${T.text('publicProfileHint')} ${T.text('publicProfileOffNote')}',
+            kind: ToggleRow(hub.self.publicProfile, (value) => unawaited(setPublicProfile(value))),
+          ),
         ...privacyRows(),
         ...discoveryRows(),
         PanelRow(
@@ -1626,6 +1663,8 @@ class TogetherModel {
   }
 
   void dispose() {
+    _linkPoll?.cancel();
+    _linkPoll = null;
     stopRinging();
     calls.noAnswer?.cancel();
     unawaited(voiceNotes.dispose());

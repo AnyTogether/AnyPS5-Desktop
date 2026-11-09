@@ -81,7 +81,12 @@ void main() {
     expect(together.focusedPartyMessage!.text, 'Bye all');
     model.handle(launcher.Command.back);
     expect(together.focusedPartyMessage, isNull);
+    // ← from the field goes onto the quick replies; Back leaves the chat, as ← does past the
+    // first of them.
     model.handle(launcher.Command.left);
+    expect(together.partyChatKeys.focused, isTrue);
+    expect(together.partyChatKeys.place, TogetherMessages.composer - 1);
+    model.handle(launcher.Command.back);
     expect(together.partyChatKeys.focused, isFalse);
     expect(model.overlay, Layer.party);
 
@@ -237,6 +242,45 @@ void main() {
     server.receive('chat-1', 'u-cem', 'Seen');
     await until(() => server.callsTo('conversations/chat-1/read').length == 2);
     expect(server.callsTo('conversations/chat-1/read').last.body, {'upToSeq': 5});
+  });
+
+  test('quick replies: ← and → reach them, Enter sends one, ← past the first leaves, as on the Mac', () async {
+    await signIn();
+    final together = model.together;
+    final chat = together.hub.partyChat;
+    model.open(Layer.party);
+    await until(() => chat.thread.length == 3);
+    model.handle(launcher.Command.right);
+    expect(together.partyChatKeys.place, TogetherMessages.composer, reason: 'the field first');
+    for (var step = 0; step < TogetherMessages.composer - 1; step++) {
+      model.handle(launcher.Command.left);
+    }
+    expect(together.partyChatKeys.place, 1, reason: 'on GG');
+    model.handle(launcher.Command.select);
+    await until(() => server.threads['chat-1']!.length == 4);
+    expect(server.threads['chat-1']!.last['text'], 'GG');
+    model.handle(launcher.Command.right);
+    expect(together.partyChatKeys.place, 2);
+    while (together.partyChatKeys.focused) {
+      model.handle(launcher.Command.left);
+    }
+    expect(model.overlay, Layer.party);
+  });
+
+  test('others\' messages count for the Party tile until the party screen is shown', () async {
+    await signIn();
+    final together = model.together;
+    expect(together.partyChatUnread, 0);
+    server.receive('chat-1', 'u-ana', 'Over here');
+    server.receive('chat-1', 'u-cem', 'Yes');
+    await until(() => together.partyChatUnread == 2);
+    model.open(Layer.party);
+    expect(together.partyChatUnread, 0, reason: 'zero while the screen shows the chat');
+    await until(() => together.hub.partyChat.thread.length == 5);
+    model.closeOverlay();
+    expect(together.partyChatUnread, 0, reason: 'read on opening');
+    server.receive('chat-1', 'u-cem', 'Later');
+    await until(() => together.partyChatUnread == 1);
   });
 
   test('an older server sends no chat: the party screen is as before', () async {

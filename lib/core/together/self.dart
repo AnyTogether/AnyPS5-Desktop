@@ -38,6 +38,11 @@ class SelfProfile with Notifier {
   /// Others see when this user has read their messages (and this user sees theirs); on unless
   /// turned off.
   bool readReceipts = true;
+
+  /// Whether people who are not friends see more than the minimal card (PATCH /me/public-profile);
+  /// off where a new account starts.
+  bool publicProfile = false;
+  int _changingPublicProfile = 0;
   bool loaded = false;
 
   /// The name and picture only accepted friends see (null when not set, or an older server);
@@ -97,6 +102,7 @@ class SelfProfile with Notifier {
       // Not while a change of ours is on its way: that answer decides.
       if (_changing == 0) status = _statusIn(profile) ?? status;
       if (_changingReceipts == 0) readReceipts = profile['readReceipts'] != false;
+      if (_changingPublicProfile == 0) publicProfile = profile['publicProfile'] == true;
       privateName = _text(profile['privateName']);
       privateAvatar = _text(profile['privateAvatar']);
       if (profile.containsKey('theme')) wornTheme = ProfileTheme.fromJson(profile['theme']);
@@ -218,6 +224,25 @@ class SelfProfile with Notifier {
       rethrow;
     } finally {
       _changingReceipts--;
+      notifyListeners();
+    }
+  }
+
+  /// The public profile on or off: shown at once, turned back (and thrown) when the server says
+  /// no (a child's is refused with restricted_by_family).
+  Future<void> setPublicProfile(bool on) async {
+    final before = publicProfile;
+    publicProfile = on;
+    _changingPublicProfile++;
+    notifyListeners();
+    try {
+      final answer = await account.call('PATCH', 'me/public-profile', {'publicProfile': on});
+      publicProfile = answer['publicProfile'] == true;
+    } on Object {
+      publicProfile = before;
+      rethrow;
+    } finally {
+      _changingPublicProfile--;
       notifyListeners();
     }
   }
