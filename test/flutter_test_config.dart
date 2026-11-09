@@ -28,7 +28,7 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
 
 /// Compares as usual. A golden with no file yet has nothing to compare with, so flutter_test
 /// fails it without an image: this leaves the new picture where a mismatch leaves its own
-/// (failures/<name>_testImage.png), for CI's golden-failures-macos artifact.
+/// (`failures/<name>_testImage.png`), for CI's golden-failures-macos artifact.
 class _KeptNewGoldens extends GoldenFileComparator {
   _KeptNewGoldens(this._comparator);
 
