@@ -7,6 +7,7 @@ import 'package:anyps5_desktop/core/together/people.dart';
 import 'package:anyps5_desktop/core/together/posts.dart';
 import 'package:anyps5_desktop/ui/app_model.dart' hide Command, GameState;
 import 'package:anyps5_desktop/ui/launcher.dart';
+import 'package:anyps5_desktop/core/together/cloud_saves.dart' show StorageInfo;
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:anyps5_desktop/ui/together_model.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -93,6 +94,18 @@ void main() {
     expect(find.text('Captures'), findsWidgets);
     expect(find.text('Liked · 4'), findsOneWidget);
     await expectLater(find.byType(LauncherShell), matchesGoldenFile('goldens/captures_feed_en.png'));
+  });
+
+  testWidgets('a server that keeps no files says so on Captures', (tester) async {
+    fixture = makeFixture();
+    model = fixture.model;
+    signedInPreview(model);
+    model.saveSync.info = StorageInfo.disabled;
+    model.together.captures.failed = true;
+    model.open(Layer.captures);
+    await pumpLauncher(tester, model);
+    expect(find.text(T.text('capturesRefusedStorage')), findsOneWidget);
+    expect(find.text(T.text('capturesFailed')), findsNothing);
   });
 
   testWidgets('golden: a post\'s comments with a reply, in Turkish', (tester) async {
