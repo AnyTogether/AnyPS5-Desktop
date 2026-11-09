@@ -13,12 +13,26 @@ on:
         description: Remake the golden files and upload them as an artifact
         type: boolean
         default: false
+  # Called by nightly.yml for a nightly: the same checks and packages, of that commit, named
+  # after that version.
+  workflow_call:
+    inputs:
+      ref:
+        description: The commit to build
+        type: string
+        required: true
+      version:
+        description: The version the build calls itself (packaging/set-version.sh)
+        type: string
+        required: true
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  # A nightly is in a group of its own, so that it neither waits for main's pushes nor is
+  # replaced by the next one.
+  group: ci-${{ inputs.version || github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -38,6 +52,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.ref }}
           persist-credentials: false
       # The native hook builds the ATRAC9 decoder with the system compiler for flutter test too.
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends $LINUX_PACKAGES
@@ -71,6 +86,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.ref }}
           persist-credentials: false
       - uses: subosito/flutter-action@v2
         with:
@@ -108,6 +124,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.ref }}
           persist-credentials: false
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends $LINUX_PACKAGES $CLIP_PLAYER_PACKAGES
       - uses: subosito/flutter-action@v2
@@ -115,6 +132,12 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+      - name: Name the build after the nightly
+        if: ${{ inputs.version }}
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: bash packaging/set-version.sh "$VERSION"
       - run: flutter build linux --release
         env:
           # The bundle has to carry libmpv here: no patchelf or no libmpv fails the build.
@@ -162,12 +185,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.ref }}
           persist-credentials: false
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+      - name: Name the build after the nightly
+        if: ${{ inputs.version }}
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: bash packaging/set-version.sh "$VERSION"
       - run: flutter build windows --release
       # The clip player's libmpv and ANGLE (media_kit_libs_windows_video) beside the launcher: the
       # installer and the .zip take the whole folder.
