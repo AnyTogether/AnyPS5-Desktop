@@ -659,7 +659,7 @@ extension TogetherProfiles on TogetherModel {
           PanelRow(
             id: 'game-join-${game.sessionId}',
             title: T.format('gameJoin', [friend.person.displayName, gameName(game.titleId)]),
-            detail: T.format('gamePlayers', [game.players, game.capacity]),
+            detail: T.format(game.capacity == 1 ? 'gamePlayersOne' : 'gamePlayers', [game.players, game.capacity]),
             person: TogetherModel.card(friend.person, status: PersonStatus.playing),
             kind: ActionRow(
               () => unawaited(joinFriendGame(game.sessionId, titleId: game.titleId, host: friend.person.displayName)),
@@ -676,7 +676,12 @@ extension TogetherProfiles on TogetherModel {
           PanelRow(
             id: 'game-invite-title',
             title: T.format('gameInviteTitle', [gameName(session.titleId)]),
-            kind: InfoRow(T.format('gamePlayers', [session.players.length, session.capacity])),
+            kind: InfoRow(
+              T.format(session.capacity == 1 ? 'gamePlayersOne' : 'gamePlayers', [
+                session.players.length,
+                session.capacity,
+              ]),
+            ),
           ),
         );
         for (final friend in invitable) {

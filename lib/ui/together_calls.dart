@@ -95,9 +95,14 @@ extension TogetherCalls on TogetherModel {
     // Over a game: a desktop notice, and the keys that answer without leaving it.
     if (!app.launcherInFront) {
       final reader = talkWatch?.reader;
-      app.desktopNotify(
-        T.format('callIsCalling', [TogetherModel.shown(call.from).name]),
-        reader == null ? '@${call.from.handle}' : T.text('callKeys'),
+      // The card (the Mac's), the ring already sounding: no sound of its own.
+      unawaited(
+        app.noticeOverGame(
+          T.format('callIsCalling', [TogetherModel.shown(call.from).name]),
+          detail: reader == null ? '@${call.from.handle}' : T.text('callKeys'),
+          symbol: Icons.call_rounded,
+          sound: false,
+        ),
       );
       if (reader != null) {
         calls.keyTimer = Timer.periodic(const Duration(milliseconds: 40), (_) {
@@ -124,7 +129,7 @@ extension TogetherCalls on TogetherModel {
   void missedCall(Person from) {
     final text = T.format('callMissed', [TogetherModel.shown(from).name]);
     app.show(text);
-    if (!app.launcherInFront) app.desktopNotify(text, '@${from.handle}');
+    unawaited(app.noticeOverGame(text, detail: '@${from.handle}', symbol: Icons.call_missed_rounded));
   }
 
   /// Answered here: out of any other voice, into this call.

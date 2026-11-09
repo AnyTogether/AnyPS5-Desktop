@@ -84,4 +84,31 @@ void main() {
     expect(ScreenGrab.fit(const ScreenArea(0, 0, 801, 451), 1280, 720), (800, 450));
     expect(ScreenGrab.fit(null, 1281, 721), (1280, 720));
   });
+
+  test('the graphics card encoders are told a requested key frame must be an IDR frame', () {
+    expect(VideoEncoder.nvenc.keyRequestArguments, ['-force_key_frames', 'scd_metadata', '-forced-idr', '1']);
+    expect(VideoEncoder.qsv.keyRequestArguments, ['-force_key_frames', 'scd_metadata', '-forced_idr', '1']);
+    expect(VideoEncoder.amf.keyRequestArguments, ['-force_key_frames', 'scd_metadata', '-forced_idr', '1']);
+    expect(VideoEncoder.x264.keyRequestArguments, ['-force_key_frames', 'scd_metadata']);
+    expect(VideoEncoder.vaapi.keyRequestArguments, ['-force_key_frames', 'scd_metadata']);
+  });
+
+  test('whether key frames can be requested is asked once, and a refusal says no', () async {
+    var probes = 0;
+    final choice = EncoderChoice(
+      ffmpeg: 'ffmpeg',
+      system: HostSystem.windows,
+      run: (executable, arguments) async {
+        if (arguments.contains('scd_metadata')) {
+          probes++;
+          expect(arguments.join(' '), contains('${KeyRequest.filter},format=nv12'));
+          return ProcessResult(1, 1, '', '');
+        }
+        return ProcessResult(1, arguments.contains('h264_nvenc') ? 0 : 1, '', '');
+      },
+    );
+    expect(await choice.keyRequests, isFalse);
+    expect(await choice.keyRequests, isFalse);
+    expect(probes, 1);
+  });
 }

@@ -1,0 +1,1 @@
+- **Notices while you play are now a card over the game**, as on the Mac: captures, phone pairing, invites, calls and family time limits on Windows and X11. Wayland, where nothing can be placed over a game, keeps the system notice.

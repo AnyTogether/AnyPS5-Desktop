@@ -17,6 +17,30 @@ enum EncodeUse {
   replay,
 }
 
+/// Asking a running ffmpeg for a key frame, which is what the Mac's encoder does when a phone
+/// lost part of the picture.
+///
+/// ffmpeg has no control channel for its encoders: the one way in from outside is the command
+/// line it reads on its standard input ("c" sends a command to a filter). So a filter marks the
+/// frame: [filter] is ffmpeg's `metadata` filter, off until asked, adding the mark that
+/// `-force_key_frames scd_metadata` turns into a key frame. [command] switches it on for exactly
+/// one frame. ffmpeg looks at its standard input every 100 ms at best, and [globalArguments]
+/// keeps its main loop from waiting longer than that.
+abstract final class KeyRequest {
+  /// Goes first in the filter chain. Named `metadata` so that [command] finds it.
+  static const filter = 'metadata=mode=add:key=lavfi.scd.time:value=1:enable=0';
+
+  /// The line to write to ffmpeg's standard input. The filter evaluates `enable` twice for each
+  /// frame, so a plain "once" would be used up before the frame is marked: this expression
+  /// remembers the first frame it sees (t + 1, as variables start at 0) and is true only for it.
+  static const command = 'cmetadata -1 enable eq(if(ld(0),ld(0),st(0,t+1)),t+1)\n';
+
+  static const globalArguments = ['-stats_period', '0.05'];
+
+  /// What ffmpeg writes on its standard error for each [command], nothing to keep in the log.
+  static String withoutEcho(String text) => text.replaceAll(RegExp(r'(Enter command:|Command reply)[^\n]*\n?'), '');
+}
+
 /// The H.264 encoders the launcher tries, hardware first. All go through ffmpeg, which the
 /// replay buffer already needs: one tool for clips, Remote Play and broadcasting, with the
 /// graphics card's encoder where ffmpeg has one that works on this computer.
@@ -65,6 +89,19 @@ enum VideoEncoder {
     x264 => 'format=yuv420p',
     _ => 'format=nv12',
   };
+
+  /// The output arguments that make a [KeyRequest] produce a key frame. NVENC, Quick Sync and
+  /// AMF make a plain intra frame of a forced one unless told it must be an IDR frame, which is
+  /// the only kind a decoder that lost its reference frames can start from.
+  List<String> get keyRequestArguments => [
+    '-force_key_frames',
+    'scd_metadata',
+    ...switch (this) {
+      nvenc => const ['-forced-idr', '1'],
+      qsv || amf => const ['-forced_idr', '1'],
+      _ => const <String>[],
+    },
+  ];
 
   /// The encoder's arguments: [bitRate] in bit/s, a key frame every [keyEvery] frames.
   List<String> arguments({required EncodeUse use, required int bitRate, required int keyEvery}) {
@@ -141,11 +178,15 @@ enum VideoEncoder {
 
   /// A tiny encode that tells whether this encoder works here: ffmpeg lists NVENC and Quick
   /// Sync in builds for every computer, and they fail at once where the card is missing.
-  List<String> probeArguments() => [
+  ///
+  /// With [keyRequests], whether this ffmpeg takes the [KeyRequest] arguments too: an older one
+  /// that does not know `scd_metadata` stops at once.
+  List<String> probeArguments({bool keyRequests = false}) => [
     '-hide_banner',
     '-loglevel',
     'error',
     '-nostdin',
+    if (keyRequests) ...KeyRequest.globalArguments,
     ...deviceArguments,
     '-f',
     'lavfi',
@@ -155,8 +196,9 @@ enum VideoEncoder {
     '3',
     '-an',
     '-vf',
-    filterTail,
+    keyRequests ? '${KeyRequest.filter},$filterTail' : filterTail,
     ...arguments(use: EncodeUse.live, bitRate: 1000000, keyEvery: 30),
+    if (keyRequests) ...keyRequestArguments,
     '-f',
     'null',
     '-',
@@ -179,6 +221,23 @@ class EncoderChoice {
   final tried = <String>[];
 
   Future<VideoEncoder?> get encoder => _chosen ??= _choose();
+
+  /// Whether the encoder and this ffmpeg can make a key frame on request ([KeyRequest]).
+  Future<bool> get keyRequests => _keyRequests ??= _probeKeyRequests();
+  Future<bool>? _keyRequests;
+
+  Future<bool> _probeKeyRequests() async {
+    final chosen = await encoder;
+    if (chosen == null) return false;
+    try {
+      final result = await run(ffmpeg, chosen.probeArguments(keyRequests: true)).timeout(const Duration(seconds: 10));
+      tried.add('key frames on request: ${result.exitCode == 0 ? 'works' : 'exit ${result.exitCode}'}');
+      return result.exitCode == 0;
+    } on Object catch (error) {
+      tried.add('key frames on request: $error');
+      return false;
+    }
+  }
 
   Future<VideoEncoder?> _choose() async {
     for (final candidate in VideoEncoder.candidates(system)) {
