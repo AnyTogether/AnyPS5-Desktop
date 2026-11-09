@@ -3,6 +3,7 @@ import 'dart:async';
 import '../desktop/desktop.dart';
 import '../host.dart';
 import '../replay_buffer.dart' show ProcessRunner;
+import 'wayland_capture.dart' show WaylandFeed;
 
 /// What the picture is encoded for: each wants its own trade between delay and quality.
 enum EncodeUse {
@@ -90,7 +91,16 @@ enum VideoEncoder {
         '0',
         ...rate,
       ],
-      qsv => ['-c:v', codec, '-preset', 'veryfast', '-bf', '0', if (live) ...['-async_depth', '1'], ...rate],
+      qsv => [
+        '-c:v',
+        codec,
+        '-preset',
+        'veryfast',
+        '-bf',
+        '0',
+        if (live) ...['-async_depth', '1'],
+        ...rate,
+      ],
       amf => [
         '-c:v',
         codec,
@@ -155,11 +165,14 @@ enum VideoEncoder {
 
 /// The first encoder that works with this ffmpeg on this computer, asked once and kept.
 class EncoderChoice {
-  EncoderChoice({required this.ffmpeg, required this.system, required this.run});
+  EncoderChoice({required this.ffmpeg, required this.system, required this.run, this.onNone});
 
   final String ffmpeg;
   final HostSystem system;
   final ProcessRunner run;
+
+  /// Called once when no encoder at all works with this ffmpeg.
+  final void Function()? onNone;
   Future<VideoEncoder?>? _chosen;
 
   /// What was tried and how it went, for the game log.
@@ -177,13 +190,14 @@ class EncoderChoice {
         tried.add('${candidate.codec}: $error');
       }
     }
+    onNone?.call();
     return null;
   }
 }
 
 /// ffmpeg's screen input for the game's picture: gdigrab on Windows (the desktop's pixels in the
-/// game's area, the composited picture whatever draws it), x11grab on X11. Wayland lets no
-/// program read the screen without asking each time: not offered there.
+/// game's area, the composited picture whatever draws it), x11grab on X11. Wayland has no such
+/// input: its picture comes through [WaylandCapture] as a [WaylandFeed].
 abstract final class ScreenGrab {
   static bool supported(HostSystem system, Map<String, String> environment) {
     if (system == HostSystem.windows) return true;
@@ -199,7 +213,9 @@ abstract final class ScreenGrab {
     required Map<String, String> environment,
     required int framesPerSecond,
     ScreenArea? area,
+    WaylandFeed? wayland,
   }) {
+    if (wayland != null) return wayland.input;
     // Even sizes: the encoders take nothing else, and the filter keeps them so after scaling.
     final width = area == null ? null : area.width & ~1;
     final height = area == null ? null : area.height & ~1;
@@ -213,14 +229,7 @@ abstract final class ScreenGrab {
         '$framesPerSecond',
         '-draw_mouse',
         '0',
-        if (area != null) ...[
-          '-offset_x',
-          '${area.x}',
-          '-offset_y',
-          '${area.y}',
-          '-video_size',
-          '${width}x$height',
-        ],
+        if (area != null) ...['-offset_x', '${area.x}', '-offset_y', '${area.y}', '-video_size', '${width}x$height'],
         '-i',
         'desktop',
       ];

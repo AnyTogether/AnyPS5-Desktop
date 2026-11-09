@@ -138,7 +138,7 @@ void main() {
       final steps = <GitStep>[];
       final lines = <String>[];
       final result = await git.update(onStep: steps.add, onLine: lines.add);
-      expect(steps, GitStep.values);
+      expect(steps, [GitStep.checking, GitStep.pulling, GitStep.submodules, GitStep.building]);
       expect(commands.lines, [
         'git --version',
         'cmake --version',
@@ -177,11 +177,78 @@ void main() {
       expect(commands.lines, ['git --version', 'cmake --version']);
     });
 
-    test('no configured build folder: the guide sets one up, the launcher does not', () async {
+    test('no build folder: set up with CMake as the build guides do, then pulled and built', () async {
+      final bare = makeFakeCheckout(p.join(temp.path, 'Bare'), configured: false);
+      git = EngineGit(EngineCheckout.at(bare)!, runner: commands, environment: const {'PATH': '/usr/bin'});
+      commands.results['git rev-parse HEAD'] = const FakeResult(lines: ['aaaa']);
+      commands.results['cmake -S'] = FakeResult(
+        lines: const ['-- The CXX compiler identification is GNU 15.2.0', '-- Generating done'],
+        effect: () => configureFakeCheckout(bare),
+      );
+      commands.results['cmake --build'] = FakeResult(effect: () => buildFakeCheckout(bare));
+      final steps = <GitStep>[];
+      final lines = <String>[];
+      await git.update(onStep: steps.add, onLine: lines.add);
+      expect(steps, GitStep.values);
+      expect(commands.lines, [
+        'git --version',
+        'cmake --version',
+        'ninja --version',
+        'g++ --version',
+        'git status --porcelain --untracked-files=no',
+        'git rev-parse HEAD',
+        'git pull --ff-only',
+        'git submodule update --init --recursive',
+        'cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++',
+        'cmake --build ${p.join(bare, 'build')} --target relinker libs',
+        'git rev-parse HEAD',
+      ]);
+      expect(commands.calls.every((call) => call.workingDirectory == bare), isTrue);
+      expect(lines, contains('-- Generating done'));
+      expect(EngineCheckout.at(bare)!.buildFolder, p.join(bare, 'build'));
+    });
+
+    test('no build folder and no Ninja or no compiler: said before anything is pulled', () async {
       final bare = makeFakeCheckout(p.join(temp.path, 'Bare'), configured: false);
       git = EngineGit(EngineCheckout.at(bare)!, runner: commands);
-      expect((await failure()).kind, GitFailureKind.noBuild);
-      expect(commands.lines.where((line) => line.startsWith('git pull') || line.contains('--build')), isEmpty);
+      commands.results['ninja --version'] = const FakeResult(missing: true);
+      final noNinja = await failure();
+      expect(noNinja.kind, GitFailureKind.noNinja);
+      expect((noNinja.untouched, noNinja.guideHelps), (true, true));
+      commands
+        ..results.clear()
+        ..calls.clear()
+        ..results['g++ --version'] = const FakeResult(missing: true);
+      expect((await failure()).kind, GitFailureKind.noCompiler);
+      expect(commands.lines, ['git --version', 'cmake --version', 'ninja --version', 'g++ --version']);
+    });
+
+    test('a setup CMake cannot finish leaves no build folder to be taken for one', () async {
+      final bare = makeFakeCheckout(p.join(temp.path, 'Bare'), configured: false);
+      git = EngineGit(EngineCheckout.at(bare)!, runner: commands);
+      commands.results['cmake -S'] = FakeResult(
+        code: 1,
+        lines: const ['CMake Error at CMakeLists.txt:12 (find_package):', 'Could NOT find Python3'],
+        effect: () => configureFakeCheckout(bare),
+      );
+      final stopped = await failure();
+      expect(stopped.kind, GitFailureKind.configure);
+      expect(stopped.tail.last, 'Could NOT find Python3');
+      expect(stopped.guideHelps, isTrue);
+      expect(Directory(p.join(bare, 'build')).existsSync(), isFalse);
+      expect(EngineCheckout.at(bare)!.buildFolder, isNull);
+      expect(commands.lines.where((line) => line.contains('--build')), isEmpty);
+    });
+
+    test('the build guide follows the tree: upstream\'s for upstream\'s, AnyPS5-ARM\'s for its own', () {
+      final upstream = makeFakeCheckout(p.join(temp.path, 'Upstream'), configured: false);
+      final arm = makeFakeCheckout(p.join(temp.path, 'Arm'), configured: false, arm: true);
+      expect(EngineCheckout.at(upstream, system: HostSystem.windows)!.guide, EngineCheckout.upstreamWindowsGuide);
+      expect(EngineCheckout.at(upstream)!.guide, EngineCheckout.upstreamLinuxGuide);
+      expect(EngineCheckout.upstreamWindowsGuide.toString(), contains('boykopovar/AnyPS5'));
+      expect(EngineCheckout.at(arm, system: HostSystem.windows)!.guide, EngineCheckout.armGuide);
+      expect(EngineCheckout.at(arm)!.isArm, isTrue);
+      expect(EngineCheckout.at(upstream)!.isArm, isFalse);
     });
 
     test('a pull that cannot fast-forward stops with what git said', () async {

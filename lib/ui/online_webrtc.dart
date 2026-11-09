@@ -150,6 +150,14 @@ class _GameLink implements GameLink {
   set onState(void Function(String state) handler) => _onState = handler;
 
   @override
+  Future<List<GameLinkStat>> stats() async => [
+    for (final report in await pc.getStats())
+      GameLinkStat(report.id, report.type, {
+        for (final MapEntry(:key, :value) in report.values.entries) '$key': '$value',
+      }),
+  ];
+
+  @override
   Future<void> close() async {
     _onState = null;
     _onMessage = null;

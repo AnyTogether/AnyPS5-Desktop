@@ -12,10 +12,13 @@ import 'package:path/path.dart' as p;
 
 import '../core/audio/atrac9.dart';
 import '../core/capture/game_sound.dart';
+import '../core/capture/screen_cast_portal.dart';
 import '../core/capture/video_encoders.dart';
+import '../core/capture/wayland_capture.dart';
 import '../core/audio/audio_out.dart';
 import '../core/audio/interface_sounds.dart';
 import '../core/audio/theme_music.dart';
+import '../core/app_update.dart';
 import '../core/audio/tones.dart';
 import '../core/controllers/pad_info.dart';
 import '../core/controllers/troubleshooter.dart';
@@ -30,6 +33,7 @@ import '../core/desktop/window_backdrop.dart';
 import '../core/font_download.dart';
 import '../core/free_space.dart';
 import '../core/family/family_rules.dart' show TitleVerdict;
+import '../core/ffmpeg_download.dart' show FfmpegBuild;
 import '../core/gamepad/feel.dart';
 import '../core/gamepad/guide_switch.dart';
 import '../core/gamepad/pad_gate.dart';
@@ -41,6 +45,7 @@ import '../core/game_log.dart';
 import '../core/game_process.dart';
 import '../core/game_presets.dart';
 import '../core/game_settings.dart';
+import '../core/launch_resolution.dart';
 import '../core/gyro_aiming.dart';
 import '../core/host.dart';
 import '../core/installer.dart';
@@ -81,17 +86,20 @@ import '../core/update_channel.dart';
 import '../core/unreal/unreal_controls.dart';
 import 'browser_play.dart';
 import 'clip_player.dart';
+import 'voice_note_player.dart';
 import 'components.dart';
 import 'controllers_model.dart';
 import 'crash_model.dart';
 import 'discord_model.dart';
 import 'engine_model.dart';
+import 'ffmpeg_model.dart';
 import 'fonts_model.dart';
 import 'media_model.dart';
 import 'share_play_model.dart';
 import 'game_files_model.dart';
 import 'steam_model.dart';
 import 'glass.dart';
+import 'phone_art.dart';
 import 'power_model.dart';
 import 'profile_picture.dart';
 import 'save_sync_model.dart';
@@ -169,6 +177,7 @@ class Preferences {
     ..onlinePlay = json['onlinePlay'] == true
     ..onlinePlatformGroups = json['onlinePlatformGroups'] as bool? ?? true
     ..pushToTalk = json['pushToTalk'] as bool? ?? false
+    ..noiseSuppression = json['noiseSuppression'] as bool? ?? true
     ..talkKey = (json['talkKey'] as num?)?.toInt()
     ..sounds = json['sounds'] as bool? ?? true
     ..soundVolume = (json['soundVolume'] as num?)?.toInt()
@@ -213,6 +222,7 @@ class Preferences {
     ..hideWhilePlaying = json['hideWhilePlaying'] == true
     ..checkUpdates = json['checkUpdates'] as bool? ?? true
     ..replayBuffer = json['replayBuffer'] == true
+    ..waylandRestoreToken = json['waylandRestoreToken'] as String? ?? ''
     ..replaySeconds = switch (json['replaySeconds']) {
       final num seconds when ReplayBuffer.lengths.contains(seconds.toInt()) => seconds.toInt(),
       _ => ReplayBuffer.defaultLength,
@@ -307,6 +317,9 @@ class Preferences {
   /// In party voice: the talk key held to talk (else it turns the microphone on and off), and
   /// which key it is (a USB HID usage; null for the default).
   bool pushToTalk = false;
+
+  /// WebRTC's noise suppression on the microphone in calls; on unless turned off.
+  bool noiseSuppression = true;
   int? talkKey;
 
   /// Interface sounds, and their volume and the selected game's theme song's in percent; null
@@ -322,7 +335,8 @@ class Preferences {
   Map<String, String> retroLastDisc = {};
 
   /// Which engine the settings offer: 'upstream' (boykopovar/AnyPS5) or 'arm' (AnyPS5-ARM's,
-  /// with the phone controller, full screen and window size).
+  /// with the phone controller, full screen and window size). A first start chooses 'arm'
+  /// ([load]); choices saved without it (launchers from before there was a choice) read 'upstream'.
   String engineSource = 'upstream';
 
   /// Settings › About › Update Channel: null for Stable, 'nightly' for Nightly (UpdateChannel).
@@ -412,6 +426,9 @@ class Preferences {
   bool replayBuffer = false;
   int replaySeconds = ReplayBuffer.defaultLength;
 
+  /// Under Wayland: brings back the window shared last time without the desktop's dialog.
+  String waylandRestoreToken = '';
+
   /// Settings › Shortcuts.
   ShortcutMap shortcuts = ShortcutMap();
 
@@ -454,6 +471,7 @@ class Preferences {
     'onlinePlay': onlinePlay,
     if (!onlinePlatformGroups) 'onlinePlatformGroups': false,
     'pushToTalk': pushToTalk,
+    if (!noiseSuppression) 'noiseSuppression': false,
     'talkKey': talkKey,
     'sounds': sounds,
     'soundVolume': soundVolume,
@@ -488,6 +506,7 @@ class Preferences {
     if (hideWhilePlaying) 'hideWhilePlaying': true,
     if (!checkUpdates) 'checkUpdates': false,
     'replayBuffer': replayBuffer,
+    if (waylandRestoreToken.isNotEmpty) 'waylandRestoreToken': waylandRestoreToken,
     'replaySeconds': replaySeconds,
     if (!shortcuts.isDefault) 'shortcuts': shortcuts.toJson(),
     if (compatNever) 'compatNever': true,
@@ -511,7 +530,11 @@ class Preferences {
   /// the system gives, as Settings lists them.
   static Preferences load(String file, {List<String>? systemLocales}) {
     if (!File(file).existsSync()) {
-      return Preferences()..language = Language.forSystem(systemLocales ?? Preferences.systemLocales()).code;
+      // A first start gets AnyPS5-ARM's engine (the phone controller, full screen, window size).
+      // A launcher that saved its choices before keeps the engine it had: never switched silently.
+      return Preferences()
+        ..language = Language.forSystem(systemLocales ?? Preferences.systemLocales()).code
+        ..engineSource = 'arm';
     }
     try {
       final json = jsonDecode(File(file).readAsStringSync());
@@ -800,6 +823,10 @@ enum Layer {
   /// instead (the games folder on the dump's drive, Windows' Developer Mode), copying anyway.
   copyWarning,
 
+  /// A phone or a browser pad connected while the engine in use cannot read it (upstream's): why,
+  /// and Switch to the AnyPS5-ARM Engine in one press.
+  phoneEngine,
+
   /// Settings › Controllers › Test Buttons and Sticks.
   controllerTest,
 
@@ -880,11 +907,16 @@ class PanelRow {
     this.person,
     this.level,
     this.icon,
+    this.picture,
+    this.meter,
   });
 
   final String id;
   final String title;
   final String? detail;
+
+  /// A thin bar under the words: how much of something the row's two parts take up.
+  final PanelMeter? meter;
 
   /// A face button drawn after the title.
   final PadGlyph? glyph;
@@ -898,6 +930,9 @@ class PanelRow {
 
   /// A sign drawn before the title where no one's picture is (a challenge's notifications).
   final PanelIcon? icon;
+
+  /// A picture (a game's icon) drawn before the title in the sign's place.
+  final Uint8List? picture;
 
   bool get focusable => kind is! InfoRow;
 }
@@ -968,6 +1003,13 @@ class StepperRow extends RowKind {
     final steps = ((max - min) / step).ceil();
     return math.min(stride(repeats), math.max(1, steps ~/ 8));
   }
+}
+
+/// How much of a whole two parts take, each from 0 to 1 (Cloud Storage's saves and media).
+class PanelMeter {
+  const PanelMeter(this.first, this.second);
+  final double first;
+  final double second;
 }
 
 class ActionRow extends RowKind {
@@ -1056,6 +1098,7 @@ class LauncherServices {
     this.cable = true,
     this.openUrl,
     this.clipPlayback,
+    this.voicePlayback,
     this.copyText,
     this.environment,
     this.togetherStore,
@@ -1072,23 +1115,29 @@ class LauncherServices {
     this.audio,
     this.decodeSong,
     this.armEngineReleases,
+    this.ffmpegReleases,
+    this.ffmpegRun,
     this.pads,
     this.systemProbe,
     this.desktop,
     this.backdrop,
     this.renderTrophyCard,
+    this.renderLiveBadge,
     this.cjkFonts,
     this.fontClient,
     this.builtInFonts,
     this.saveFile,
     this.saveFileAs,
     this.pickFile,
+    this.pickFileAt,
     this.pickImage,
+    this.pickPictures,
     this.systemInfo,
     this.startDetached,
     this.quit,
     this.window,
     this.replay,
+    this.waylandCapture,
     this.folderSize,
     this.gameControls,
     this.commands,
@@ -1121,6 +1170,10 @@ class LauncherServices {
   /// default (null: none, or a desktop it cannot record).
   final ReplayBuffer? Function(int seconds)? replay;
 
+  /// Recording through the desktop's portal under Wayland; made for a real Wayland session by
+  /// default, and null elsewhere.
+  final WaylandCapture? waylandCapture;
+
   /// Starts a program that outlives the launcher (an update's installer, the new AppImage);
   /// Process.start detached by default.
   final Future<void> Function(String executable, List<String> arguments)? startDetached;
@@ -1130,6 +1183,10 @@ class LauncherServices {
 
   /// Asks the user for a picture (PNG or JPEG); null when they cancelled.
   final Future<String?> Function()? pickImage;
+
+  /// Asks the user for picture files to send in a chat (SealedPhoto.extensions, several at once);
+  /// null when they cancelled.
+  final Future<List<String>?> Function()? pickPictures;
 
   /// Asks the user where to save a file, [suggestedName] first; null when they cancelled.
   final Future<String?> Function(String suggestedName)? saveFile;
@@ -1141,6 +1198,9 @@ class LauncherServices {
   /// Asks the user for a file of [label]'s kind (one of [extensions]) to open; null when they
   /// cancelled.
   final Future<String?> Function(String label, List<String> extensions)? pickFile;
+
+  /// The same, opened in [folder] when one is given (a game's backups).
+  final Future<String?> Function(String label, List<String> extensions, String? folder)? pickFileAt;
 
   /// This computer for a crash report; read from the system when not given.
   final Future<SystemInfo> Function()? systemInfo;
@@ -1160,6 +1220,13 @@ class LauncherServices {
   /// a fake.
   final GitHubReleases? armEngineReleases;
 
+  /// Where the launcher's own ffmpeg comes from: this repository's releases, signed; null in
+  /// tests that have no GitHub, so nothing is offered.
+  final GitHubReleases? ffmpegReleases;
+
+  /// Tests: runs the downloaded ffmpeg to see that it starts; Process.run by default.
+  final ProcessRunner? ffmpegRun;
+
   /// Where controller input comes from (XInput and winmm on Windows, evdev on Linux); none when
   /// not given.
   final PadSource Function()? pads;
@@ -1177,6 +1244,9 @@ class LauncherServices {
 
   /// Draws the trophy card for the desktop's window; TrophyCard.render by default.
   final Future<RgbaImage> Function(Trophy trophy, double scale)? renderTrophyCard;
+
+  /// Draws the LIVE badge for the desktop's window; LiveBadge.render by default.
+  final Future<RgbaImage> Function(bool live, String time, double scale)? renderLiveBadge;
 
   /// The sound card for the interface sounds and theme songs; none (silence) when not given.
   final AudioOut Function()? audio;
@@ -1213,6 +1283,10 @@ class LauncherServices {
   /// Plays clips inside the launcher (the gallery's, Captures' and those in chats); libmpv
   /// through media_kit by default. None: a clip shows its picture, as in tests.
   final ClipPlayback Function()? clipPlayback;
+
+  /// Plays voice notes inside the launcher; libmpv in the app, a fake in tests. Null: they go to
+  /// the system's player.
+  final VoicePlayback Function()? voicePlayback;
 
   /// Puts a text on the clipboard.
   final void Function(String text)? copyText;
@@ -1669,6 +1743,9 @@ class AppModel extends ChangeNotifier {
     _applyPadPreferences();
     return navigator;
   }
+
+  /// The pictures sent to the phones, made small and kept.
+  final PhoneArt phoneArt = PhoneArt();
 
   /// The phones' pads (the Remote app's, browser pads) as controller events.
   late final PhonePadEvents _phonePads = PhonePadEvents(_phonePadEvent);
@@ -2622,11 +2699,58 @@ class AppModel extends ChangeNotifier {
   /// backups), read when its settings open rather than on every frame.
   final Map<String, ({bool resolution, List<String> backups})> _gameFacts = {};
 
+  /// The resolution [game] is unlocked with: the one chosen in its Game Settings, or one step
+  /// below it while a Battery & Heat profile asks for a lower resolution (the title's own when
+  /// none is chosen). On Windows and Linux the relinker writes it, so it lasts until the next
+  /// unlock.
+  String? _unlockResolution(Game game, Toolkit kit) {
+    final own = currentSettings(game).resolution;
+    if (!powerWatch.adjustment.lowerResolution) return own;
+    final patch = kit.patchFile(game.titleId);
+    if (patch == null) return own;
+    final String text;
+    try {
+      text = File(patch).readAsStringSync();
+    } on FileSystemException {
+      return own;
+    }
+    if (!ResolutionPatch.supports(text)) return own;
+    final current = own ?? ResolutionPatch.defaultOf(text);
+    if (current == null) return own;
+    return ResolutionPatch.lower(current, ResolutionPatch.choices) ?? own;
+  }
+
+  /// A game about to start: one step lower under a Battery & Heat profile that asks for it,
+  /// the resolution it was unlocked with otherwise, written into its executable as on the Mac
+  /// (LaunchResolution). A note for its log when that was done; a toolkit whose output cannot
+  /// take it keeps the unlock's resolution.
+  Future<String?> _setLaunchResolution(Game game, String folder) async {
+    final kit = toolkitFor(game);
+    final patch = kit?.patchFile(game.titleId);
+    if (kit == null || patch == null) return null;
+    try {
+      final text = File(patch).readAsStringSync();
+      final title = ResolutionPatch.defaultOf(text);
+      if (!ResolutionPatch.supports(text) || title == null) return null;
+      final unlocked = records[game.id]?.resolution ?? title;
+      final wanted = powerWatch.adjustment.lowerResolution ? (_unlockResolution(game, kit) ?? unlocked) : unlocked;
+      final result = await LaunchResolution.apply(
+        executable: p.join(Installer.installedFolder(game, folder), system.executableName),
+        patch: text,
+        wanted: wanted,
+        known: {title, unlocked, wanted, ...ResolutionPatch.choices},
+      );
+      return result == LaunchResolutionResult.written ? '[anyps5-launcher] resolution for this start: $wanted' : null;
+    } on Object {
+      return null;
+    }
+  }
+
   /// Whether the title's patch file lets Game Settings choose its resolution.
   bool supportsResolution(Game game) => _factsOf(game).resolution;
 
   ({bool resolution, List<String> backups}) _factsOf(Game game) => _gameFacts.putIfAbsent(game.id, () {
-    final patch = toolkit?.patchFile(game.titleId);
+    final patch = toolkitFor(game)?.patchFile(game.titleId);
     var resolution = false;
     try {
       resolution = patch != null && ResolutionPatch.supports(File(patch).readAsStringSync());
@@ -2668,6 +2792,7 @@ class AppModel extends ChangeNotifier {
     if (launcherProblem != null) offerLauncherReport();
     notifyListeners();
     _publishLibrary();
+    _publishActivity();
     _prepareWhenChanged();
   }
 
@@ -2925,6 +3050,11 @@ class AppModel extends ChangeNotifier {
     // An update dumped (or removed) since the unlock needs its executable relinked: unlocking
     // again applies it.
     if (record != null && record.update == game.update?.version) {
+      // A game with an engine of its own follows that one, whatever the default is.
+      if (currentSettings(game).engine != null) {
+        final own = toolkitFor(game)?.version;
+        return Installed(outdated: own != null && own != record.toolkit);
+      }
       final version = toolkitVersion;
       return Installed(outdated: (version != null && version != record.toolkit) || engine.updateAvailable);
     }
@@ -2937,9 +3067,32 @@ class AppModel extends ChangeNotifier {
 
   GameSettings settingsFor(Game game) => settingsStore.load(game.slug);
 
+  /// The engine that unlocks [game]: the one chosen for it in its Game Settings (null while that
+  /// one is not on this computer: [missingEngine]), else the default [toolkit].
+  Toolkit? toolkitFor(Game game) {
+    final pin = currentSettings(game).engine;
+    if (pin == null) return toolkit;
+    return engine.downloaded.where((kit) => p.basename(kit.root) == pin).firstOrNull;
+  }
+
+  /// The engine [game] is pinned to when that one is not on this computer, null otherwise.
+  String? missingEngine(Game game) {
+    final pin = currentSettings(game).engine;
+    return pin != null && !engine.downloaded.any((kit) => p.basename(kit.root) == pin) ? pin : null;
+  }
+
+  /// A game pinned to an engine that is not downloaded: says so, and the game's settings offer
+  /// the download (Game Settings › Engine).
+  void _tellEngineMissing(Game game, String pin) {
+    show(T.format('engineGameMissing', [EngineModel.nameOf(pin)]));
+    if (selectedGame == game && overlay == null) open(Layer.gameSettings);
+  }
+
   void saveSettings(Game game, GameSettings settings) {
     if (persist) settingsStore.save(game.slug, settings);
     _cachedSettings[game.slug] = settings;
+    // A game's own engine brings its own patch file.
+    _gameFacts.remove(game.id);
     _changed();
   }
 
@@ -3059,8 +3212,9 @@ class AppModel extends ChangeNotifier {
         cancelUnlock(game);
       case Unreadable():
         show(T.text('unreadableDump'));
+      // The game back in front, as on the Mac; Stop is in the game's menu and the quick menu.
       case Running():
-        unawaited(stopRunningGame());
+        if (running?.$2 case final RunningGame run) unawaited(_showGame(run));
       case Starting() || Stopping():
         break;
       case FamilyLocked():
@@ -3088,8 +3242,11 @@ class AppModel extends ChangeNotifier {
     if (game.retro != null) return;
     final folder = rootOf(game);
     if (folder == null) return;
-    final kit = toolkit;
-    if (kit == null) return show(T.text('noToolkit'));
+    final kit = toolkitFor(game);
+    if (kit == null) {
+      if (missingEngine(game) case final String pin) return _tellEngineMissing(game, pin);
+      return show(T.text('noToolkit'));
+    }
     // Asked for while it is being prepared: it becomes the user's own.
     if (prepare.active == game.id) return _promotePreparation(game);
     prepare.cancel(game.id);
@@ -3102,7 +3259,7 @@ class AppModel extends ChangeNotifier {
           folder,
           knownSize: sizes[game.id],
           toolkit: kit,
-          resolution: currentSettings(game).resolution,
+          resolution: _unlockResolution(game, kit),
         );
       } on FileSystemException {
         plan = null; // The install says what is wrong.
@@ -3132,7 +3289,8 @@ class AppModel extends ChangeNotifier {
   /// Unlocks the game again and plays it; with a newer engine out, downloads that first.
   void updateAndPlay(Game game) {
     _playAfterInstall = game.id;
-    if (engine.updateAvailable) {
+    // A game with its own engine is unlocked with that one: the default's update is not its.
+    if (currentSettings(game).engine == null && engine.updateAvailable) {
       unawaited(
         engine.download().then((done) {
           if (done) {
@@ -3166,11 +3324,19 @@ class AppModel extends ChangeNotifier {
   void _startNext() {
     // While the engine is built in place the unlocks wait for it (engineJobEnded goes on).
     if (engine.git.running) return;
-    final kit = toolkit;
-    if (_installer != null || queue.isEmpty || root == null || kit == null) return;
+    if (_installer != null || queue.isEmpty || root == null) return;
+    final next = games.where((game) => game.id == queue.first).firstOrNull;
+    final kit = next == null ? toolkit : toolkitFor(next);
+    if (next != null && kit == null && missingEngine(next) == null) return; // No engine yet: it waits.
     final id = queue.removeAt(0);
-    final game = games.where((game) => game.id == id).firstOrNull;
+    final game = next;
     if (game == null) return _startNext();
+    // Its engine was deleted while it waited: said, and the next game goes on.
+    if (kit == null) {
+      if (_playAfterInstall == id) _playAfterInstall = null;
+      _tellEngineMissing(game, missingEngine(game)!);
+      return _startNext();
+    }
     final folder = rootOf(game)!;
     _installer = _runUnlock(
       game,
@@ -3219,7 +3385,7 @@ class AppModel extends ChangeNotifier {
       game: game,
       toolkit: kit,
       root: folder,
-      resolution: currentSettings(game).resolution,
+      resolution: _unlockResolution(game, kit),
       freeSpace: freeSpace,
       onProgress: (step, fraction) {
         progress[id] = (step, fraction);
@@ -3348,8 +3514,8 @@ class AppModel extends ChangeNotifier {
               game,
               folder,
               knownSize: sizes[game.id],
-              toolkit: kit,
-              resolution: currentSettings(game).resolution,
+              toolkit: toolkitFor(game) ?? kit,
+              resolution: _unlockResolution(game, toolkitFor(game) ?? kit),
             );
             return plan.space?.shortage(free: freeSpace(folder), folder: folder);
           } on FileSystemException {
@@ -3550,6 +3716,30 @@ class AppModel extends ChangeNotifier {
     _changed();
   }
 
+  /// A backup the user picks takes the saves' place (the current ones backed up first), as on
+  /// the Mac; the game must not be running.
+  Future<void> restoreChosenSaves(Game game) async {
+    if (running?.$1 == game || starting == game) return show(T.text('closeGameFirst'));
+    final folder = rootOf(game);
+    if (folder == null) return;
+    final backups = backupFolder(game);
+    final title = T.text('restoreSaves');
+    final picked = services.pickFileAt != null
+        ? await services.pickFileAt!(title, const ['zip'], Directory(backups).existsSync() ? backups : null)
+        : await services.pickFile?.call(title, const ['zip']);
+    if (picked == null) return;
+    if (running?.$1 == game || starting == game) return show(T.text('closeGameFirst'));
+    try {
+      SaveBackup.restore(picked, Installer.installedFolder(game, folder), backups, DateTime.now());
+      _gameFacts.remove(game.id);
+      _loadTrophies(game);
+      show(T.text('savesRestored'));
+    } on Object catch (error) {
+      show('${T.text('backupFailed')}: $error');
+    }
+    _changed();
+  }
+
   void _appendLog(Game game, String line) {
     try {
       final file = File(paths.logFile(game.titleId));
@@ -3571,8 +3761,9 @@ class AppModel extends ChangeNotifier {
 
   // Playing.
 
-  /// Plays [game]; [trace] turns detailed logging on for this start only.
-  Future<void> play(Game game, {bool trace = false}) async {
+  /// Plays [game]; [trace] turns detailed logging on for this start only, and [once] adds to the
+  /// engine's environment for this start only (the crash report's PlayGo answer).
+  Future<void> play(Game game, {bool trace = false, Map<String, String> once = const {}}) async {
     if (game.retro case final RetroDisc disc) return _playRetro(game, disc);
     final folder = rootOf(game);
     if (folder == null || starting != null || running != null || saveSync.syncing != null) return;
@@ -3605,9 +3796,12 @@ class AppModel extends ChangeNotifier {
     }
     sounds.play(Cue.select);
     starting = game;
+    final turn = ++_startTurn;
     _phoneToldFor = null;
     // A game linked to its dump cannot start once the dump moved: said instead of a crash.
-    if (await Installer.brokenLink(Installer.installedFolder(game, folder)) != null) {
+    final broken = await Installer.brokenLink(Installer.installedFolder(game, folder));
+    if (turn != _startTurn) return;
+    if (broken != null) {
       starting = null;
       sounds.play(Cue.back);
       show(T.text('dumpMoved'));
@@ -3626,6 +3820,10 @@ class AppModel extends ChangeNotifier {
       // Settings › AnyTogether › Online play: the loopback bridge the engine connects to
       // (ANYPS5_ONLINE, ANYPS5_ONLINE_SECRET) and the title's observation log; nothing when off.
       final online = await together.onlineEnvironment(game);
+      if (turn != _startTurn) {
+        if (starting == null) unawaited(together.onlineGameEnded());
+        return;
+      }
       final environment = {
         ...settings.environment(
           launcherLanguage: T.language.consoleLanguage,
@@ -3645,8 +3843,10 @@ class AppModel extends ChangeNotifier {
         // Settings › Battery & Heat: the frame cap now, and the file it changes in while it runs.
         ...powerWatch.environment(),
         ...online,
+        ...once,
       };
       fonts.watch(game, logFile);
+      final resolutionNote = await _setLaunchResolution(game, folder);
       final run = await startGame(
         installed: Installer.installedFolder(game, folder),
         environment: environment,
@@ -3657,10 +3857,20 @@ class AppModel extends ChangeNotifier {
         notes: [
           for (final line in controllers.reportLines) '[anyps5-launcher] controllers: $line',
           if (phonesConnected) '[anyps5-launcher] phones: ${_phoneReachNote(game)}',
+          ?resolutionNote,
+          for (final MapEntry(:key, :value) in once.entries) '[anyps5-launcher] this start only: $key=$value',
         ],
       );
+      // Closed while it was starting: the process goes again.
+      if (turn != _startTurn) {
+        run.stop();
+        fonts.ended();
+        if (starting == null) unawaited(together.onlineGameEnded());
+        return;
+      }
       starting = null;
       running = (game, run);
+      _gameBegan = DateTime.now();
       _stopped = false;
       stopping = false;
       _checkPhoneReach(game);
@@ -3670,7 +3880,7 @@ class AppModel extends ChangeNotifier {
       final began = DateTime.now();
       // Upstream's engine does not read ANYPS5_FULLSCREEN or ANYPS5_WINDOW_SIZE: the launcher
       // sizes its window or presses its F11 once the window is open.
-      if (!engine.readsDisplaySettings) {
+      if (!engine.readsDisplaySettingsOf(game)) {
         unawaited(desktop.applyDisplay(run.pid, fullscreen: settings.fullscreen, windowSize: settings.windowSize));
       }
       // Settings › Behaviour › Hide the launcher while a game runs.
@@ -3692,6 +3902,7 @@ class AppModel extends ChangeNotifier {
       _stopTimer = null;
       unawaited(_stopReplay());
       media.gameEnded();
+      unawaited(waylandCapture?.end());
       sharePlay.gameEnded();
       // Minimized for the game: back in front now it has closed, as on the Mac.
       if (hiddenForGame) {
@@ -3704,11 +3915,25 @@ class AppModel extends ChangeNotifier {
       together.gameChanged();
       discord.update();
       crash.ended(game, code, stopped: _stopped);
+      // The phone could not reach the game on upstream's engine: the switch, once back over Home.
+      if (_phoneEngineAfterGame) {
+        _phoneEngineAfterGame = false;
+        askPhoneEngine(again: true);
+      }
       // The saves it made go to the other computers (or the cloud).
-      unawaited(saveSync.sync(game));
+      final saves = saveSync.sync(game);
       // "How did it run?", once the launcher is back over the home screen.
       together.askHowItRan(game, DateTime.now().difference(began));
       _changed();
+      // The phone asked for another game while this one played: it starts now this one has gone
+      // (and its saves have synced, which a start waits for), as on the Mac.
+      final next = _launchAfterExit;
+      _launchAfterExit = null;
+      if (next != null) {
+        _quitAfterGame = null;
+        unawaited(_startAfterExit(next, saves));
+        return;
+      }
       // Started from a Steam shortcut of the game: the launcher goes with it, so Steam sees
       // the game end. A crash keeps it open on its report.
       if (_quitAfterGame == game.id) {
@@ -3716,6 +3941,8 @@ class AppModel extends ChangeNotifier {
         if (code == 0 || _stopped) (services.quit ?? exit)(0);
       }
     } on Object catch (error) {
+      // A start given up meanwhile has nothing more to say.
+      if (turn != _startTurn) return;
       starting = null;
       fonts.ended();
       unawaited(together.onlineGameEnded());
@@ -3723,6 +3950,35 @@ class AppModel extends ChangeNotifier {
       show('${T.text('startFailed')}: $error');
       _changed();
     }
+  }
+
+  /// Counts the starts: a start given up ([cancelStart]) sees it has changed after each wait.
+  int _startTurn = 0;
+
+  /// The game the phone asked for while another played; it starts when that one has gone.
+  String? _launchAfterExit;
+
+  /// Gives up the game starting (Close on the phone while it starts), as on the Mac.
+  void cancelStart() {
+    if (starting == null) return;
+    _startTurn++;
+    sounds.play(Cue.back);
+    starting = null;
+    _changed();
+  }
+
+  /// The game the phone asked for, once the one before it has gone and its saves have synced.
+  Future<void> _startAfterExit(String id, Future<void> saves) async {
+    try {
+      await saves;
+    } on Object {
+      // The sync said why; the game the phone asked for still starts.
+    }
+    if (_disposed || running != null || starting != null) return;
+    final game = games.where((game) => game.id == id).firstOrNull;
+    if (game == null) return;
+    select(games.indexOf(game));
+    primaryAction(game);
   }
 
   @visibleForTesting
@@ -3763,17 +4019,25 @@ class AppModel extends ChangeNotifier {
         if (running case (final Game playing, final RunningGame run) when playing == game) {
           unawaited(celebrate(game, trophy, run.pid));
         }
-        remote?.publish(
-          RemoteTrophy(
-            name: trophy.name,
-            detail: trophy.detail,
-            grade: trophy.grade.name,
-            icon: trophy.icon == null ? null : base64.encode(trophy.icon!),
-          ),
-        );
+        unawaited(_tellTrophy(trophy));
       }
       _changed();
     });
+  }
+
+  /// A trophy earned, to the phones: its icon at most [PhoneArt.trophySide] a side, as on the Mac.
+  Future<void> _tellTrophy(Trophy trophy) async {
+    final icon = trophy.icon;
+    final small = icon == null ? null : await PhoneArt.smaller(icon, PhoneArt.trophySide);
+    if (_disposed) return;
+    remote?.publish(
+      RemoteTrophy(
+        name: trophy.name,
+        detail: trophy.detail,
+        grade: trophy.grade.name,
+        icon: small == null ? null : base64.encode(small),
+      ),
+    );
   }
 
   Future<void> _cards = Future.value();
@@ -3812,8 +4076,10 @@ class AppModel extends ChangeNotifier {
     }
   }
 
-  /// Saves the game's window as it is now as the picture of [trophy]; its path, or null.
+  /// Saves the game's window as it is now as the picture of [trophy]; its path, or null. With
+  /// the family's media setting off no picture is taken, as on the Mac.
   Future<String?> _trophyShot(Game game, Trophy trophy, int pid) async {
+    if (!together.family.mediaAllowed) return null;
     try {
       final frame = await desktop.captureGame(pid);
       if (frame == null) return null;
@@ -4211,7 +4477,12 @@ class AppModel extends ChangeNotifier {
             _changed();
           case Command.select:
             final trophy = trophies[selectedGame?.id]?.trophies.elementAtOrNull(trophyIndex);
-            if (trophyShots[trophy?.id] case final String shot) openGallery(shot: shot);
+            // The moment the focused trophy was earned, without one the game's leaderboard.
+            if (trophyShots[trophy?.id] case final String shot) {
+              openGallery(shot: shot);
+            } else if (together.signedIn) {
+              together.openLeaderboard(selectedGame);
+            }
           // △ (Triangle, Y, O) on a hidden trophy shows it, and hides it again.
           case Command.options when focusedTrophy != null && canReveal(focusedTrophy!):
             toggleReveal(trophyIndex);
@@ -4320,6 +4591,7 @@ class AppModel extends ChangeNotifier {
           Layer.gameFiles ||
           Layer.updateChoice ||
           Layer.updateRequired ||
+          Layer.phoneEngine ||
           Layer.friends ||
           Layer.friendOptions ||
           Layer.party ||
@@ -4590,7 +4862,8 @@ class AppModel extends ChangeNotifier {
   ReplayBuffer? _defaultReplay(int seconds, {VideoEncoder? encoder, GameSound? sound}) {
     final environment = services.environment ?? Platform.environment;
     final ffmpeg = replayFfmpeg;
-    if (ffmpeg == null || !ReplayBuffer.supported(system, environment)) return null;
+    final wayland = waylandCapture;
+    if (ffmpeg == null || (wayland == null && !ReplayBuffer.supported(system, environment))) return null;
     return ReplayBuffer(
       ffmpeg: ffmpeg,
       folder: p.join(Directory.systemTemp.path, 'anyps5-replay-$pid'),
@@ -4599,20 +4872,74 @@ class AppModel extends ChangeNotifier {
       environment: environment,
       encoder: encoder,
       sound: sound,
+      wayland: wayland,
     );
   }
 
-  /// ffmpeg for the replay buffer: beside the launcher or on the PATH.
-  late final String? replayFfmpeg = ReplayBuffer.locate(
-    system: system,
-    environment: services.environment ?? Platform.environment,
-    launcherFolder: p.dirname(Platform.resolvedExecutable),
-  );
+  /// Under Wayland, the desktop's portal and what it needs; null on every other desktop.
+  late final WaylandCapture? waylandCapture =
+      services.waylandCapture ??
+      (WaylandCapture.applies(system, services.environment ?? Platform.environment)
+          ? WaylandCapture(
+              portal: DbusScreenCastPortal(),
+              environment: services.environment ?? Platform.environment,
+              readToken: () => preferences.waylandRestoreToken,
+              saveToken: (token) {
+                preferences.waylandRestoreToken = token;
+                savePreferences();
+              },
+              beforeAsking: _gameWindowOpen,
+              log: (line) => addRecentLine('${DateTime.now().toIso8601String()} $line'),
+            )
+          : null);
 
-  /// Why the replay buffer cannot record here (no ffmpeg, Wayland), or null when it can.
+  DateTime? _gameBegan;
+
+  /// How long a game gets to open its window before the desktop is asked for it anyway: a
+  /// window drawn natively for Wayland cannot be seen from here.
+  static const _gameWindowWait = Duration(seconds: 8);
+
+  /// Returns once the game's window is open, as far as can be told: the desktop's dialog lists
+  /// open windows, and bringing a window back needs it there.
+  Future<void> _gameWindowOpen() async {
+    final deadline = (_gameBegan ?? DateTime.now()).add(_gameWindowWait);
+    while (DateTime.now().isBefore(deadline)) {
+      final playing = running;
+      if (playing == null) return;
+      final desktop = this.desktop;
+      if (desktop is GameAreas && (desktop as GameAreas).gameArea(playing.$2.pid) != null) return;
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+  }
+
+  /// Turns the replay buffer on under Wayland: says now what is missing, and asks the desktop
+  /// now when a game is open. Without a game there is no window to choose yet, so the user is
+  /// told the desktop will ask when one opens.
+  Future<void> _turnOnReplayUnderWayland(WaylandCapture capture) async {
+    final problem = await capture.check();
+    if (problem != null) return show(T.text(problem.textKey));
+    if (services.replay == null && await media.encoders?.encoder == null) return show(T.text('waylandNoEncoder'));
+    preferences.replayBuffer = true;
+    savePreferences();
+    if (running == null) {
+      unawaited(notice(T.text('waylandAskTitle'), detail: T.text('waylandAskDetail')));
+      return _changed();
+    }
+    await _startReplay();
+    _changed();
+  }
+
+  /// ffmpeg found on this computer, or the one downloaded for the launcher ([FfmpegModel]).
+  late final FfmpegModel ffmpegTool = FfmpegModel(this);
+
+  /// ffmpeg for the replay buffer and everything else that records or decodes.
+  String? get replayFfmpeg => ffmpegTool.path;
+
+  /// Why the replay buffer cannot record here (no ffmpeg, no desktop to record), or null when it
+  /// can. What the Wayland portal needs is checked when the buffer is turned on.
   String? get replayUnavailable {
     if (services.replay != null) return null;
-    if (!ReplayBuffer.supported(system, services.environment ?? Platform.environment)) {
+    if (waylandCapture == null && !ReplayBuffer.supported(system, services.environment ?? Platform.environment)) {
       return T.text('replayNoScreen');
     }
     return replayFfmpeg == null ? T.text('replayNoFfmpeg') : null;
@@ -4628,13 +4955,17 @@ class AppModel extends ChangeNotifier {
       final encoder = await media.encoders?.encoder;
       final playing = running;
       if (playing == null || !preferences.replayBuffer || _replay != null) return;
+      if (waylandCapture != null && encoder == null) return show(T.text('waylandNoEncoder'));
       buffer = _defaultReplay(preferences.replaySeconds, encoder: encoder, sound: media.soundOf(playing.$2.pid));
     }
     if (buffer == null) return;
     _replay = buffer;
     if (!await buffer.start()) {
+      // Stopped meanwhile (the game ended during the desktop's dialog): nothing to say.
+      if (_replay != buffer) return;
       _replay = null;
-      show(T.text('replayFailed'));
+      final problem = waylandCapture?.problem;
+      show(T.text(problem?.textKey ?? 'replayFailed'));
     }
     notifyListeners();
   }
@@ -4649,6 +4980,74 @@ class AppModel extends ChangeNotifier {
 
   /// Whether a phone or a browser pad is connected.
   bool get phonesConnected => (remote?.connectedDevices.isNotEmpty ?? false) || browserPlay.pads.isNotEmpty;
+
+  /// The engine in use cannot read the phones (upstream's release builds and nightlies).
+  bool get phoneEngineMissing => EngineModel.readsPhone(toolkitVersion) == false;
+
+  /// The switch was offered this run: a phone that comes again is not asked about again.
+  bool _phoneEngineAsked = false;
+
+  /// A game on upstream's engine ran with a phone connected: the switch is offered when it ends.
+  bool _phoneEngineAfterGame = false;
+
+  /// With a phone or a browser pad connected and upstream's engine in use: Switch to the
+  /// AnyPS5-ARM Engine over Home, once a run ([again] from the toast, any time). Never over a game
+  /// or another screen; the engine stays as it is until the press.
+  void askPhoneEngine({bool again = false}) {
+    if (!phoneEngineMissing || (_phoneEngineAsked && !again)) return;
+    if (running != null || starting != null) return;
+    if (overlay != null && overlay != Layer.phoneEngine) return;
+    _phoneEngineAsked = true;
+    // The download's size, once AnyPS5-ARM's releases answer.
+    if (!engine.armChecked) unawaited(engine.checkArm(quiet: true));
+    if (overlay != Layer.phoneEngine) open(Layer.phoneEngine);
+    _changed();
+  }
+
+  /// Switch to the AnyPS5-ARM Engine: downloads it when it is not on disk and uses it. Installed
+  /// games then offer Update and Play, which unlocks them again with it.
+  Future<void> switchToArmForPhone() async {
+    final done = await engine.switchToArm();
+    if (done && overlay == Layer.phoneEngine) closeOverlay();
+    _changed();
+  }
+
+  /// The rows of Switch to the AnyPS5-ARM Engine.
+  List<PanelRow> phoneEngineRows() {
+    final pending = engine.downloading;
+    final package = engine.armPackage;
+    final have = engine.downloaded.any((kit) => EngineModel.isArm(kit.version));
+    return [
+      PanelRow(
+        id: 'phoneEngineWhy',
+        title: T.text('phoneEngineWhy'),
+        detail: T.text('phoneEngineWhyDetail'),
+        kind: const InfoRow(''),
+      ),
+      if (pending != null)
+        PanelRow(
+          id: 'phoneEngineSwitch',
+          title: T.format('engineDownloading', [
+            EngineModel.packageName(pending),
+            ((engine.progress?.fraction ?? 0) * 100).floor(),
+          ]),
+          detail: '${engine.progressText()} · ${T.text('engineStop')}',
+          kind: ActionRow(engine.cancel),
+        )
+      else
+        PanelRow(
+          id: 'phoneEngineSwitch',
+          title: T.text('phoneEngineSwitch'),
+          detail: have
+              ? T.text('phoneEngineSwitchHave')
+              : package == null
+              ? T.text('phoneEngineSwitchDetail')
+              : T.format('phoneEngineSwitchSize', [byteText(package.size)]),
+          kind: ActionRow(() => unawaited(switchToArmForPhone())),
+        ),
+      PanelRow(id: 'phoneEngineLater', title: T.text('phoneEngineLater'), kind: ActionRow(closeOverlay)),
+    ];
+  }
 
   /// Whether [game]'s engine reads the phones, from the engine it was unlocked with (the unlock
   /// puts that engine's libraries in the game's folder): null when the launcher cannot tell.
@@ -4685,11 +5084,14 @@ class AppModel extends ChangeNotifier {
     });
   }
 
-  /// The toast, and over the game a desktop notice: the game's window hides the toast.
+  /// The toast, and over the game a desktop notice: the game's window hides the toast. On
+  /// upstream's engine a click on the toast (or the end of the game) offers the switch.
   void _phoneCannotReach(Game game, String text) {
     _phoneToldFor = game.id;
     _phoneAnswerTimer?.cancel();
-    show(text);
+    final upstream = phoneEngineMissing;
+    if (upstream) _phoneEngineAfterGame = true;
+    show(text, onTap: upstream ? () => askPhoneEngine(again: true) : null);
     if (launcherInFront) return;
     unawaited(() async {
       if (!await desktop.notify('AnyPS5', text)) desktopNotify('AnyPS5', text);
@@ -4706,6 +5108,11 @@ class AppModel extends ChangeNotifier {
   /// Said as a capture is ([_captureSaid]), with a second line in the desktop notice.
   Future<void> notice(String text, {String? detail}) async {
     show(detail == null ? text : '$text. $detail');
+    await noticeOverGame(text, detail: detail);
+  }
+
+  /// The desktop notice alone: with a game in front, a word the launcher's toast cannot give.
+  Future<void> noticeOverGame(String text, {String? detail}) async {
     if (launcherInFront) return;
     if (!await desktop.notify(text, detail ?? 'AnyPS5')) desktopNotify(text, detail ?? 'AnyPS5');
   }
@@ -4940,6 +5347,8 @@ class AppModel extends ChangeNotifier {
             rows: together.friendOptionRows(),
           ),
         ];
+      case Layer.phoneEngine:
+        return [PanelCategory(id: 'phoneEngine', title: T.text('phoneEngineTitle'), rows: phoneEngineRows())];
       case Layer.updateRequired when together.account.tooOld != null:
         return [
           PanelCategory(
@@ -5102,10 +5511,8 @@ class AppModel extends ChangeNotifier {
                 id: 'update',
                 title: T.text('updateAndPlay'),
                 detail: switch (engine.latestPackage) {
-                  final ToolkitPackage newest when engine.updateAvailable => T.format('engineUpdateAndPlayDetail', [
-                    'v${newest.version}',
-                    byteText(newest.size),
-                  ]),
+                  final ToolkitPackage newest when engine.updateAvailable && currentSettings(game).engine == null =>
+                    T.format('engineUpdateAndPlayDetail', ['v${newest.version}', byteText(newest.size)]),
                   _ => T.text('updateAndPlayDetail'),
                 },
                 kind: ActionRow(() {
@@ -5332,6 +5739,12 @@ class AppModel extends ChangeNotifier {
         rows: [
           ...folderRows(),
           PanelRow(id: 'addFolder', title: T.text('addFolder'), kind: ActionRow(() => unawaited(addGamesFolder()))),
+          PanelRow(
+            id: 'addGameFile',
+            title: T.text('addGameFile'),
+            detail: T.text('addGameFileDetail'),
+            kind: ActionRow(() => unawaited(files.addGameFile())),
+          ),
           PanelRow(id: 'rescan', title: T.text('rescan'), kind: ActionRow(rescan)),
           PanelRow(
             id: 'prepareNewGames',
@@ -5363,12 +5776,17 @@ class AppModel extends ChangeNotifier {
             }),
           ),
           // Upstream's engine has no phone input: said here before a game shows it.
-          if (preferences.phoneServer && EngineModel.readsPhone(toolkitVersion) == false)
+          if (preferences.phoneServer && phoneEngineMissing)
             PanelRow(
               id: 'phoneUpstream',
               title: T.text('phoneUpstream'),
-              detail: T.text('phoneUpstreamDetail'),
-              kind: const InfoRow(''),
+              detail: engine.downloading != null
+                  ? T.format('engineDownloading', [
+                      EngineModel.packageName(engine.downloading!),
+                      ((engine.progress?.fraction ?? 0) * 100).floor(),
+                    ])
+                  : T.text('phoneUpstreamSwitchDetail'),
+              kind: ActionRow(() => unawaited(engine.switchToArm())),
             ),
           if (preferences.phoneServer) ...browserPlay.settingsRows(),
           if (remote?.port case final int port)
@@ -5377,10 +5795,25 @@ class AppModel extends ChangeNotifier {
               title: T.text('phoneAddress'),
               kind: InfoRow('${services.computerName ?? Platform.localHostname} · $port'),
             ),
+          // The phones that are paired, which of them are connected now, as on the Mac.
+          if (remote case final RemoteServer server)
+            PanelRow(
+              id: 'phones',
+              title: T.text('phones'),
+              kind: InfoRow(
+                server.devices.all.isEmpty
+                    ? T.text('phonesNone')
+                    : server.connectedDeviceIds.isEmpty
+                    ? ''
+                    : T.format('phonesConnectedCount', [server.connectedDeviceIds.toSet().length]),
+              ),
+            ),
           for (final device in remote?.devices.all ?? const <PairedDevice>[])
             PanelRow(
               id: 'device-${device.id}',
-              title: device.name,
+              title: remote?.connectedDeviceIds.contains(device.id) ?? false
+                  ? '${device.name} · ${T.text('phoneOnline')}'
+                  : device.name,
               detail: T.text('phoneRemove'),
               kind: ActionRow(() {
                 remote?.devices.remove(device.id);
@@ -5530,6 +5963,7 @@ class AppModel extends ChangeNotifier {
         title: T.text('about'),
         rows: [
           PanelRow(id: 'about', title: 'AnyPS5', kind: InfoRow(T.text('aboutText'))),
+          PanelRow(id: 'aboutFfmpeg', title: 'ffmpeg', kind: InfoRow(T.format('aboutFfmpeg', [FfmpegBuild.version]))),
           PanelRow(
             id: 'toolkitVersion',
             title: T.text('toolkitVersion'),
@@ -5537,6 +5971,19 @@ class AppModel extends ChangeNotifier {
           ),
           ...updates.aboutRows(),
           updates.channelRow(),
+          PanelRow(id: 'author', title: T.text('madeBy'), kind: const InfoRow('Utku Halis')),
+          PanelRow(
+            id: 'github',
+            title: 'GitHub',
+            detail: 'github.com/${LauncherUpdates.repository}',
+            kind: ActionRow(() => services.openUrl?.call(Uri.https('github.com', LauncherUpdates.repository))),
+          ),
+          PanelRow(
+            id: 'upstream',
+            title: T.text('builtOn'),
+            detail: 'github.com/boykopovar/AnyPS5',
+            kind: ActionRow(() => services.openUrl?.call(Uri.https('github.com', 'boykopovar/AnyPS5'))),
+          ),
         ],
       ),
     ];
@@ -5555,11 +6002,13 @@ class AppModel extends ChangeNotifier {
         detail: unavailable ?? T.text('replayBufferDetail'),
         kind: ToggleRow(preferences.replayBuffer && unavailable == null, (value) {
           if (unavailable != null) return show(unavailable);
+          if (value && waylandCapture != null) return unawaited(_turnOnReplayUnderWayland(waylandCapture!));
           preferences.replayBuffer = value;
           savePreferences();
           unawaited(value ? _startReplay() : _stopReplay());
         }),
       ),
+      ...ffmpegTool.rows(),
       if (preferences.replayBuffer && unavailable == null)
         PanelRow(
           id: 'replayLength',
@@ -5979,7 +6428,7 @@ class AppModel extends ChangeNotifier {
         // AnyPS5-ARM's engine opens the game borderless full screen itself (SDL's desktop full
         // screen), and the line says what that is; upstream's ignores the choice: the launcher
         // presses F11 for it, and says so.
-        detail: engine.readsDisplaySettings ? T.text('displayBorderless') : T.text('displayUpstream'),
+        detail: engine.readsDisplaySettingsOf(game) ? T.text('displayBorderless') : T.text('displayUpstream'),
         // Default (Settings › Default Display), then the game's own choices.
         kind: ChoiceRow(
           [
@@ -5999,7 +6448,7 @@ class AppModel extends ChangeNotifier {
         PanelRow(
           id: 'windowSize',
           title: T.text('windowSize'),
-          detail: engine.readsDisplaySettings ? null : T.text('windowSizeUpstream'),
+          detail: engine.readsDisplaySettingsOf(game) ? null : T.text('windowSizeUpstream'),
           kind: StepperRow(
             value: display.windowSize,
             min: DisplayDefaults.minimumWindowSize,
@@ -6031,7 +6480,7 @@ class AppModel extends ChangeNotifier {
       PanelRow(
         id: 'upscaling',
         title: T.text('upscaling'),
-        detail: engine.readsDisplaySettings ? T.text('upscalingDetail') : T.text('upscalingUpstream'),
+        detail: engine.readsDisplaySettingsOf(game) ? T.text('upscalingDetail') : T.text('upscalingUpstream'),
         kind: ChoiceRow(
           [T.text('upscalingBilinear'), T.text('upscalingFsr1')],
           (settings.upscaler ?? Upscaler.bilinear).index,
@@ -6071,7 +6520,7 @@ class AppModel extends ChangeNotifier {
         id: 'frameGeneration',
         title: T.text('frameGeneration'),
         // Only AnyPS5-ARM's engine makes the frames: said for upstream's, as FSR 1 is.
-        detail: !engine.readsDisplaySettings
+        detail: !engine.readsDisplaySettingsOf(game)
             ? T.text('frameGenerationUpstream')
             // Settings › Battery & Heat holds it paused now.
             : settings.frameGeneration == true && powerWatch.adjustment.pauseFrameGeneration
@@ -6123,6 +6572,7 @@ class AppModel extends ChangeNotifier {
           (index) => change(settings.copyWith(language: index == 0 ? null : languages[index - 1].$1)),
         ),
       ),
+      ...engine.gameRows(game),
       PanelRow(
         id: 'controls',
         title: T.text('controls'),
@@ -6194,6 +6644,16 @@ class AppModel extends ChangeNotifier {
               kind: ActionRow(() => restoreLatestSaves(game)),
             ),
           ),
+        held(
+          'restoreChoose',
+          T.text('restoreSaves'),
+          () => PanelRow(
+            id: 'restoreChoose',
+            title: T.text('restoreSaves'),
+            detail: T.text('restoreSavesDetail'),
+            kind: ActionRow(() => unawaited(restoreChosenSaves(game))),
+          ),
+        ),
         held(
           'uninstall',
           T.text('uninstall'),
@@ -6851,9 +7311,11 @@ class AppModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// The toolkit step asks GitHub for the newest engine as it opens.
+  /// The toolkit step asks GitHub for the newest engine as it opens: AnyPS5-ARM's on a first
+  /// start (its phone controller, full screen and window size), upstream's for a launcher that
+  /// had it chosen before.
   void _enterToolkitStep() {
-    if (engine.latest == null && !engine.checking) unawaited(engine.check(quiet: true));
+    if (engine.offered == null) engine.lookQuietly();
   }
 
   /// The toolkit step's download card: downloads the newest engine (asked once more when
@@ -6861,9 +7323,9 @@ class AppModel extends ChangeNotifier {
   void onboardingDownload() {
     if (engine.downloading != null) return;
     final pending = engine.unverified;
-    final package = pending ?? engine.latestPackage;
+    final package = pending ?? engine.offered;
     if (package == null) {
-      unawaited(engine.check(quiet: true));
+      engine.lookQuietly();
       return;
     }
     unawaited(
@@ -6898,6 +7360,10 @@ class AppModel extends ChangeNotifier {
           pairing = request;
           sounds.play(Cue.select);
           _changed();
+          // A game in front keeps its focus: the phone asks through a notice over it instead.
+          unawaited(
+            noticeOverGame(T.text('phonePairingTitle'), detail: T.format('phoneOpenLauncher', [request.deviceName])),
+          );
         },
         connecting: (device) {
           phoneConnecting = device;
@@ -6908,13 +7374,20 @@ class AppModel extends ChangeNotifier {
           phoneConnecting = null;
           pairing = null;
           show(T.format('phoneConnected', [device]));
+          // A game in front hears of it through a notice over it.
+          unawaited(noticeOverGame(T.format('phoneConnected', [device]), detail: T.text('phoneConnectedDetail')));
           _toldLibrary = null;
           _changed();
           _publishLook();
+          // The new phone hears what the launcher is busy with, even if it is nothing.
+          _activityTold = false;
+          _publishActivity();
           // Its Go Live button shows what the launcher does now.
           if (media.phase.active) remote?.publish(const RemoteBroadcast(true));
           // A phone that comes while a game runs hears at once whether that game reads it.
           if (running case (final Game playing, _)) _checkPhoneReach(playing);
+          // Over Home: upstream's engine in use, the switch to AnyPS5-ARM's in one press.
+          askPhoneEngine();
         },
         disconnected: _changed,
         pad: _phonePads.packet,
@@ -6997,13 +7470,22 @@ class AppModel extends ChangeNotifier {
       case RemoteLaunch(:final id):
         final game = games.where((game) => game.id == id).firstOrNull;
         if (game == null) return;
+        // One game at a time: the one playing stops, and the new one starts when it has gone.
+        if (running != null && running!.$1 != game) {
+          _launchAfterExit = game.id;
+          stopGame();
+          return;
+        }
         select(games.indexOf(game));
         // Launch on the game playing is no Stop: the phone has Close for that.
         if (stateOf(game) is Running || stateOf(game) is Stopping) return;
-        if (running != null && running!.$1 != game) stopGame();
         primaryAction(game);
       case RemoteClose():
-        stopGame();
+        if (starting != null) {
+          cancelStart();
+        } else {
+          stopGame();
+        }
       case RemoteHome():
         handle(Command.home);
       case RemoteKeyFrame():
@@ -7028,6 +7510,8 @@ class AppModel extends ChangeNotifier {
           _ => null,
         };
         if (command == null) return;
+        // The launcher comes forward for its D-pad, as on the Mac.
+        if (!launcherInFront) unawaited(raiseLauncher());
         // The phone's pad moves the launcher as a controller does (the sections, edit mode).
         _usedInput(InputMode.pad);
         _viaPad = true;
@@ -7039,15 +7523,7 @@ class AppModel extends ChangeNotifier {
       case RemoteWantArt(:final id):
         final game = games.where((game) => game.id == id).firstOrNull;
         if (game == null) return;
-        String? encode(String? file) {
-          if (file == null) return null;
-          try {
-            return base64.encode(File(file).readAsBytesSync());
-          } on FileSystemException {
-            return null;
-          }
-        }
-        remote?.tell(RemoteArt(id: id, icon: encode(game.icon), background: encode(game.background)), deviceId);
+        unawaited(_tellArt(game, deviceId));
       case RemoteSaveLayout(:final id, :final layout):
         final game = games.where((game) => game.id == id).firstOrNull;
         if (game != null) saveSettings(game, currentSettings(game).copyWith(phoneLayout: layout));
@@ -7056,6 +7532,15 @@ class AppModel extends ChangeNotifier {
       default:
         break;
     }
+  }
+
+  /// A game's pictures, small enough for the control channel: 256 and 1280 pixels at most on the
+  /// longest side, as on the Mac.
+  Future<void> _tellArt(Game game, String deviceId) async {
+    final icon = await phoneArt.encoded(game.icon, PhoneArt.iconSide);
+    final background = await phoneArt.encoded(game.background, PhoneArt.backgroundSide);
+    if (_disposed) return;
+    remote?.tell(RemoteArt(id: game.id, icon: icon, background: background), deviceId);
   }
 
   void _publishLibrary() {
@@ -7086,7 +7571,7 @@ class AppModel extends ChangeNotifier {
           ),
       ],
       selected: selectedGame?.id,
-      running: running?.$1.id,
+      running: (running?.$1 ?? starting)?.id,
       language: T.language.code,
     );
     if (library == _toldLibrary) return;
@@ -7096,27 +7581,56 @@ class AppModel extends ChangeNotifier {
 
   RemoteActivity? _toldActivity;
 
-  void _publishActivity() {
-    final server = remote;
-    if (server == null) return;
-    RemoteActivity? now;
-    for (final entry in progress.entries) {
-      final (step, fraction) = entry.value;
-      now = RemoteActivity(
-        id: entry.key,
-        phase: switch (step) {
+  /// False before the phones heard anything, and when a new one connects.
+  bool _activityTold = false;
+
+  /// The game the launcher is busy with and since when, so the phone counts the whole of it:
+  /// waiting, updating and starting.
+  ({String id, DateTime since})? _activitySince;
+
+  /// The game starting, else the one installing, else the next one waiting, as on the Mac.
+  RemoteActivity? _activityForPhone() {
+    final game =
+        starting ??
+        games.where((game) => progress[game.id] != null).firstOrNull ??
+        games.where((game) => queue.contains(game.id)).firstOrNull;
+    if (game == null) {
+      _activitySince = null;
+      return null;
+    }
+    if (_activitySince?.id != game.id) _activitySince = (id: game.id, since: DateTime.now());
+    var phase = RemotePhase.queued;
+    double? fraction;
+    switch (stateOf(game)) {
+      case Starting():
+        phase = RemotePhase.starting;
+      case final Installing state:
+        phase = switch (state.step) {
           InstallStep.unwrap => RemotePhase.unwrap,
           InstallStep.relink => RemotePhase.relink,
           InstallStep.copy => RemotePhase.copy,
           InstallStep.layout => RemotePhase.bundle,
           InstallStep.finish => RemotePhase.finish,
-        },
-        updating: records.containsKey(entry.key),
-        fraction: InstallSpan.overall(step, fraction),
-        elapsed: 0,
-      );
+        };
+        fraction = state.overall;
+      default:
+        break;
     }
-    if (RemoteActivity.same(_toldActivity, now)) return;
+    return RemoteActivity(
+      id: game.id,
+      phase: phase,
+      updating: records.containsKey(game.id),
+      fraction: fraction,
+      elapsed: DateTime.now().difference(_activitySince!.since).inMilliseconds / 1000,
+    );
+  }
+
+  void _publishActivity() {
+    final server = remote;
+    if (server == null) return;
+    final now = _activityForPhone();
+    if (_activityTold && RemoteActivity.same(_toldActivity, now)) return;
+    _activityTold = true;
     _toldActivity = now;
     server.publish(RemoteActivityUpdate(now));
   }

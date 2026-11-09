@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:anyps5_desktop/core/game_library.dart';
 import 'package:anyps5_desktop/core/installer.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
+import 'package:anyps5_desktop/ui/engine_model.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -10,6 +11,7 @@ import 'package:path/path.dart' as p;
 import '../support/fake_elf.dart';
 import '../support/fake_github.dart';
 import '../support/fake_toolkit.dart';
+import '../support/self_builder.dart';
 import '../support/ui_support.dart';
 
 /// The AnyPS5 engine downloaded by the launcher itself: onboarding, settings, updates. (The
@@ -23,6 +25,146 @@ void main() {
     }
     expect(condition(), isTrue);
   }
+
+  group('a game\'s own engine', () {
+    late FakeGitHub github;
+    late Fixture fixture;
+    late AppModel model;
+
+    setUp(() async {
+      github = await FakeGitHub.start();
+      fixture = makeFixture(engine: github.api);
+      model = fixture.model;
+      for (final version in ['0.1.2', '0.1.3']) {
+        makeFakeToolkit(p.join(model.paths.toolkits, version), version: 'upstream-v$version');
+      }
+      model.engine.refresh();
+      // A dump the fake relinker takes.
+      final game = model.games.firstWhere((game) => game.titleId == 'PPSA02002');
+      File(p.join(game.folder, 'eboot.bin')).writeAsBytesSync(typicalSelf());
+    });
+
+    tearDown(() async {
+      model.dispose();
+      await github.close();
+      fixture.dispose();
+    });
+
+    Game neon() => model.games.firstWhere((game) => game.titleId == 'PPSA02002');
+    List<PanelRow> rows(Game game) => model.engine.gameRows(game);
+    PanelRow row(Game game, String id) => rows(game).firstWhere((row) => row.id == id);
+    void pin(Game game, String key) => model.saveSettings(game, model.currentSettings(game).copyWith(engine: key));
+
+    test('Game Settings lists the default and the downloaded engines, and says what unlocked it', () {
+      final kind = row(neon(), 'engine').kind as ChoiceRow;
+      expect(kind.options, [
+        'Default (${EngineModel.label(model.toolkit!)})',
+        ...model.engine.downloaded.map(EngineModel.label),
+      ]);
+      expect(kind.selected, 0);
+      expect(row(neon(), 'engine').detail, 'Used when you unlock it');
+      model.open(Layer.gameSettings);
+      final inPanel = model.panelCategories().expand((category) => category.rows).map((row) => row.id);
+      expect(inPanel, contains('engine'));
+      kind.set(1);
+      expect(model.currentSettings(neon()).engine, p.basename(model.engine.downloaded.first.root));
+      expect((row(neon(), 'engine').kind as ChoiceRow).selected, 1);
+      (row(neon(), 'engine').kind as ChoiceRow).set(0);
+      expect(model.currentSettings(neon()).engine, isNull);
+    });
+
+    test('a chosen engine unlocks the game whatever the default is, and the default stays', () async {
+      final game = neon();
+      final pinned = model.engine.downloaded.last;
+      expect(pinned.version, isNot(model.toolkitVersion));
+      pin(game, p.basename(pinned.root));
+      final before = model.preferences.toolkitFolder;
+      model.unlock(game);
+      await until(() => !model.unlocking && model.records.containsKey(game.id));
+      expect(model.records[game.id]!.toolkit, pinned.version);
+      expect(model.preferences.toolkitFolder, before);
+      expect(model.stateOf(game), isA<Installed>().having((state) => state.outdated, 'outdated', isFalse));
+      expect(row(game, 'engine').detail, 'Unlocked with ${EngineModel.nameOf(pinned.version)}');
+    });
+
+    test('the default changing leaves a game with its own engine as it is, and other games are told', () async {
+      final game = neon();
+      final ownKit = model.engine.downloaded.first;
+      pin(game, p.basename(ownKit.root));
+      model.unlock(game);
+      await until(() => !model.unlocking && model.records.containsKey(game.id));
+      // The default becomes the other downloaded engine, of a new version the game was not made with.
+      final other = model.engine.downloaded.last;
+      model.engine.use(other);
+      expect(model.stateOf(game), isA<Installed>().having((state) => state.outdated, 'outdated', isFalse));
+      expect(model.engine.gamesFromOtherEngines(), 1, reason: 'Orbit Runner, not the game with its own engine');
+    });
+
+    test('a pinned engine that is not on disk says so and offers the download; the default stays', () async {
+      final game = neon();
+      github.releases.add(upstreamRelease('0.1.9'));
+      pin(game, '0.1.9');
+      expect(model.missingEngine(game), '0.1.9');
+      expect(row(game, 'engine').detail, 'v0.1.9 is not on this computer. Download it to unlock this game.');
+      final before = model.preferences.toolkitFolder;
+      // Play says it and opens the row, instead of doing nothing.
+      model.select(model.games.indexOf(game));
+      model.unlock(game);
+      expect(model.toast, contains('v0.1.9'));
+      expect(model.overlay, Layer.gameSettings);
+      expect(model.queue, isEmpty);
+      model.closeOverlay();
+      final download = row(game, 'engineGameDownload');
+      expect(download.title, 'Download v0.1.9');
+      (download.kind as ActionRow).run();
+      await until(() => model.missingEngine(game) == null && model.engine.downloading == null);
+      expect(model.preferences.toolkitFolder, before, reason: 'the default stays what it was');
+      expect(model.engine.downloaded.map((kit) => p.basename(kit.root)), contains('0.1.9'));
+      expect(model.toolkitFor(game)?.version, 'upstream-v0.1.9', reason: 'what unlocks it now');
+    });
+
+    test('an engine GitHub no longer lists: said, nothing happens to the default', () async {
+      final game = neon();
+      pin(game, '0.0.1');
+      (row(game, 'engineGameDownload').kind as ActionRow).run();
+      await until(() => model.toast == 'v0.0.1 can no longer be downloaded.');
+      expect(model.missingEngine(game), '0.0.1');
+    });
+
+    test('an AnyPS5-ARM engine chosen for one game names the source on the row', () {
+      final game = neon();
+      makeFakeToolkit(p.join(model.paths.toolkits, 'arm-5ca076a87'), version: 'arm-5ca076a87');
+      model.engine.refresh();
+      final kind = row(game, 'engine').kind as ChoiceRow;
+      expect(kind.options, contains('AnyPS5-ARM 5ca076a87'));
+      pin(game, 'arm-5ca076a87');
+      expect(model.toolkitFor(game)?.version, 'arm-5ca076a87');
+      expect(model.engine.readsDisplaySettingsOf(game), isTrue, reason: 'the game, not the default upstream engine');
+      expect(model.engine.readsDisplaySettings, isFalse);
+    });
+
+    test('deleting: one version at a time, never the one in use, and a game\'s own stays', () {
+      model.open(Layer.settings);
+      List<PanelRow> engineRows() => model.panelCategories().firstWhere((category) => category.id == 'engine').rows;
+      PanelRow delete(String id) => engineRows().firstWhere((row) => row.id == 'engineDelete-$id');
+      final key = p.basename(model.engine.downloaded.last.root);
+      expect(delete(key).title, 'Delete ${EngineModel.label(model.engine.downloaded.last)}');
+      expect((delete(key).kind as ActionRow).destructive, isTrue);
+      // Chosen by a game: in use.
+      pin(neon(), key);
+      expect(delete(key).detail, T.text('engineInUse'));
+      expect((delete(key).kind as ActionRow).destructive, isFalse);
+      (delete(key).kind as ActionRow).run();
+      expect(model.toast, T.text('engineInUseNoDelete'));
+      model.engine.deleteOthers();
+      expect(model.engine.downloaded.map((kit) => p.basename(kit.root)), contains(key), reason: 'a game chose it');
+      // No game chooses it any more: it goes.
+      model.saveSettings(neon(), model.currentSettings(neon()).copyWith(engine: null));
+      (delete(key).kind as ActionRow).run();
+      expect(model.toast, 'Deleted ${EngineModel.nameOf(key)}');
+      expect(model.engine.downloaded.map((kit) => p.basename(kit.root)), isNot(contains(key)));
+    });
+  });
 
   group('model', () {
     late FakeGitHub github;

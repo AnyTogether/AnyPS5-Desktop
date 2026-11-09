@@ -240,6 +240,11 @@ void main() {
     expect(bridge, 3);
     expect(sent[13], 3, reason: 'the pad the host gave');
     expect(router.receive(padPacket(), 'b'), isFalse);
+    // Assist: the packet says it helps player 1 instead of its pad.
+    router.assist.add('a');
+    expect(router.receive(padPacket(), 'a'), isTrue);
+    expect(bridges.sent.last.$2[13], 1);
+    router.assist.remove('a');
     expect(router.receive(Uint8List(80), 'a'), isFalse, reason: 'not a pad packet');
     router.update({});
     final letGo = bridges.sent.last.$2;

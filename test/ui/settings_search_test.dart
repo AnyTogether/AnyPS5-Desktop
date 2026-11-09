@@ -4,7 +4,7 @@ import 'package:anyps5_desktop/ui/launcher.dart';
 import 'package:anyps5_desktop/ui/panels.dart' show SettingsSearchField;
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart' show EditableText, ValueKey;
+import 'package:flutter/widgets.dart' show EditableText, Semantics, ValueKey;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/ui_support.dart';
@@ -107,6 +107,16 @@ void main() {
     pads.press(PadButton.dpadDown);
     expect(model.settingsSearchFocused, isFalse);
     expect(model.panelCategories().length, greaterThan(5));
+  });
+
+  testWidgets('the search field has a screen-reader label', (tester) async {
+    await pumpLauncher(tester, model);
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is Semantics && widget.properties.label == T.text('settingsSearchPrompt'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Ctrl+F puts the cursor in the field; typing filters; × empties it', (tester) async {

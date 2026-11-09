@@ -23,6 +23,9 @@ class Friends with Notifier {
   void Function(Person asked)? onRequest;
   void Function(Person accepted)? onAccepted;
 
+  /// A friend went up a trophy level (the list has it already).
+  void Function(Friend friend, LevelBadge level)? onLevelUp;
+
   List<Friend> friends = const [];
   List<Person> incoming = const [];
   List<Person> outgoing = const [];
@@ -127,6 +130,7 @@ class Friends with Notifier {
         if (known < 0 || level == null) return;
         friends = [...friends]..[known] = friends[known].copyWith(level: level);
         notifyListeners();
+        onLevelUp?.call(friends[known], level);
     }
   }
 

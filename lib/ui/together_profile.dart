@@ -40,6 +40,7 @@ extension TogetherProfiles on TogetherModel {
     profileFailed = false;
     app.open(Layer.profile);
     profileIndex = 0;
+    unawaited(_loadProfileGallery(handle));
     try {
       final page = await hub.profiles.page(handle, card: card);
       if (app.overlay != Layer.profile) return;
@@ -57,6 +58,7 @@ extension TogetherProfiles on TogetherModel {
   void closeProfile() {
     final back = profileReturn;
     profile = null;
+    profileGallery = null;
     showcasePins = null;
     themeChoices = null;
     app.returnTo(back);
@@ -132,7 +134,30 @@ extension TogetherProfiles on TogetherModel {
     }
   }
 
+  /// The profile's pinned gallery, as on the Mac: read beside the page, where the server keeps
+  /// files.
+  Future<void> _loadProfileGallery(String handle) async {
+    final seq = ++_profileGallerySeq;
+    profileGallery = null;
+    if (!capturesOffered) return;
+    final gallery = await mediaFiles.gallery(handle);
+    if (seq != _profileGallerySeq || app.overlay != Layer.profile) return;
+    profileGallery = gallery;
+    app.refresh();
+  }
+
+  /// A pinned photo or clip over the whole screen.
+  void viewProfileMedia(MediaItem media) {
+    captures.viewing = media;
+    app.sounds.play(Cue.select);
+    app.refresh();
+  }
+
   void profileCommand(Command command) {
+    if (captures.viewing != null) {
+      if (command == Command.back || command == Command.select || command == Command.options) closeViewer();
+      return;
+    }
     switch (command) {
       case Command.up || Command.down:
         final next = (profileIndex + (command == Command.down ? 1 : -1)).clamp(
@@ -507,7 +532,6 @@ extension TogetherProfiles on TogetherModel {
     if (running != null) {
       if (!app.preferences.friendsJoin || games.session != null || openingSession) return;
       final game = running.$1;
-      if (!SyncTitle.valid(game.titleId)) return;
       openingSession = true;
       unawaited(() async {
         try {
@@ -670,9 +694,4 @@ extension TogetherProfiles on TogetherModel {
     }
     return rows;
   }
-}
-
-/// The title IDs AnyTogether takes.
-abstract final class SyncTitle {
-  static bool valid(String titleId) => TogetherSync.titleIdPattern.hasMatch(titleId);
 }

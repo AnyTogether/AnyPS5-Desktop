@@ -490,6 +490,7 @@ extension LauncherThemes on AppModel {
               : (file == null ? T.text('themeNoFile') : p.basename(file)),
           kind: ActionRow(() => unawaited(chooseBackdrop(preferences.backdrop))),
         ),
+      if (video && replayFfmpeg == null) ...ffmpegTool.rows(),
       PanelRow(
         id: 'menuMusic',
         title: T.text('themeMusic'),

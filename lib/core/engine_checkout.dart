@@ -81,6 +81,54 @@ class EngineCheckout {
   /// Whether the folder is a git checkout (.git is a folder, or a file in a worktree).
   bool get isGit => FileSystemEntity.typeSync(p.join(root, '.git')) != FileSystemEntityType.notFound;
 
+  /// Whether it is AnyPS5-ARM's tree (it packages AnyPS5-ARM's engine), not upstream's.
+  bool get isArm {
+    try {
+      return File(p.join(root, 'tools', 'package_arm_toolkit.py')).existsSync();
+    } on FileSystemException {
+      return false;
+    }
+  }
+
+  /// The guide to building this tree on this system: AnyPS5-ARM's Windows and Linux engine guide
+  /// for its tree, upstream's build guide (its Windows or its Linux part) for upstream's.
+  Uri get guide {
+    if (isArm) return armGuide;
+    return system == HostSystem.windows ? upstreamWindowsGuide : upstreamLinuxGuide;
+  }
+
+  static final armGuide = Uri.parse(
+    'https://github.com/AnyTogether/AnyPS5-ARM/blob/main/docs/dev/WINDOWS_LINUX_ENGINE.md',
+  );
+  static final upstreamWindowsGuide = Uri.parse(
+    'https://github.com/boykopovar/AnyPS5/blob/main/docs/dev/BUILD.md#windows-setup-and-troubleshooting',
+  );
+  static final upstreamLinuxGuide = Uri.parse(
+    'https://github.com/boykopovar/AnyPS5/blob/main/docs/dev/BUILD.md#requirements',
+  );
+
+  /// The build folder Update from Git sets up when there is none, as both guides name it.
+  String get newBuildFolder => p.join(root, 'build');
+
+  /// The C and C++ compilers the guides configure with: MinGW-w64's on Windows, the system's GCC
+  /// on Linux, found on PATH.
+  static const cCompiler = 'gcc';
+  static const cxxCompiler = 'g++';
+
+  /// `cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc
+  /// -DCMAKE_CXX_COMPILER=g++`: the configure both guides run once.
+  static const configureArguments = [
+    '-S',
+    '.',
+    '-B',
+    'build',
+    '-G',
+    'Ninja',
+    '-DCMAKE_BUILD_TYPE=Release',
+    '-DCMAKE_C_COMPILER=$cCompiler',
+    '-DCMAKE_CXX_COMPILER=$cxxCompiler',
+  ];
+
   /// The build folder's CMakeCache.txt entries (NAME:TYPE=value), read once.
   late final Map<String, String> cache = () {
     final folder = buildFolder;
@@ -224,8 +272,8 @@ class SystemCommands extends CommandRunner {
   }
 }
 
-/// The steps of an update from git.
-enum GitStep { checking, pulling, submodules, building }
+/// The steps of an update from git; [configuring] only for a checkout without a build folder.
+enum GitStep { checking, pulling, submodules, configuring, building }
 
 /// Why an update from git stopped.
 enum GitFailureKind {
@@ -235,14 +283,23 @@ enum GitFailureKind {
   /// CMake is not installed (or not on PATH).
   noCmake,
 
+  /// Ninja is not installed (or not on PATH): setting up a build folder needs it.
+  noNinja,
+
+  /// No C++ compiler (g++) on PATH: setting up a build folder needs it.
+  noCompiler,
+
   /// The folder is not a git checkout.
   notGit,
 
   /// The tree has changes not committed: nothing was pulled.
   dirty,
 
-  /// CMake never configured a build folder: the build guide does that once.
+  /// CMake never configured a build folder (no longer said: the update sets one up).
   noBuild,
+
+  /// CMake could not set up the build folder (a library or tool it looks for is missing).
+  configure,
 
   /// git pull --ff-only failed (the branch went another way, no upstream, offline).
   pull,
@@ -268,6 +325,15 @@ class GitUpdateFailure implements Exception {
   /// Whether nothing was changed: the tree and the build are as they were.
   bool get untouched => kind != GitFailureKind.submodules && kind != GitFailureKind.build;
 
+  /// Whether the build guide says how to put it right (a tool to install, CMake's setup).
+  bool get guideHelps => const {
+    GitFailureKind.noGit,
+    GitFailureKind.noCmake,
+    GitFailureKind.noNinja,
+    GitFailureKind.noCompiler,
+    GitFailureKind.configure,
+  }.contains(kind);
+
   @override
   String toString() => 'GitUpdateFailure(${kind.name}${tail.isEmpty ? '' : ': ${tail.last}'})';
 }
@@ -282,8 +348,9 @@ class GitUpdateResult {
 
 /// Pulls an engine checkout and builds its relinker and libraries:
 /// `git pull --ff-only`, `git submodule update --init --recursive`,
-/// `cmake --build <build> --target relinker libs`. Refuses a tree with changes not committed,
-/// and never configures a build folder itself.
+/// `cmake --build <build> --target relinker libs`. Refuses a tree with changes not committed.
+/// A checkout without a build folder gets one first, as the build guides set it up
+/// ([EngineCheckout.configureArguments]), once Ninja and a C++ compiler are found.
 class EngineGit {
   EngineGit(this.checkout, {this.runner = const SystemCommands(), Map<String, String>? environment})
     : _environment = environment ?? Platform.environment;
@@ -311,7 +378,9 @@ class EngineGit {
   };
 
   /// The build's environment: the compiler's folder first on PATH (its DLLs on Windows).
-  Map<String, String> get buildEnvironment {
+  Map<String, String> get buildEnvironment => _buildEnvironment(checkout);
+
+  Map<String, String> _buildEnvironment(EngineCheckout checkout) {
     final folders = checkout.pathFolders;
     if (folders.isEmpty) return const {};
     final windows = checkout.system == HostSystem.windows;
@@ -416,8 +485,17 @@ class EngineGit {
     );
     if (cmakeCode != 0) throw GitUpdateFailure(GitFailureKind.noCmake, _tail(cmakeLines));
     if (!checkout.isGit) throw const GitUpdateFailure(GitFailureKind.notGit);
-    final build = checkout.buildFolder;
-    if (build == null) throw const GitUpdateFailure(GitFailureKind.noBuild);
+    final configure = checkout.buildFolder == null;
+    if (configure) {
+      // What the build folder's setup needs beside CMake, looked for before anything is pulled.
+      for (final (tool, missing) in [
+        ('ninja', GitFailureKind.noNinja),
+        (EngineCheckout.cxxCompiler, GitFailureKind.noCompiler),
+      ]) {
+        final (code, lines) = await _run(tool, ['--version'], missing: missing, cancel: cancel, quiet: true);
+        if (code != 0) throw GitUpdateFailure(missing, _tail(lines));
+      }
+    }
     final (statusCode, changes) = await _run(
       'git',
       ['status', '--porcelain', '--untracked-files=no'],
@@ -453,17 +531,55 @@ class EngineGit {
     );
     if (subCode != 0) throw GitUpdateFailure(GitFailureKind.submodules, _tail(subLines));
 
+    var configured = checkout;
+    if (configure) {
+      onStep?.call(GitStep.configuring);
+      final folder = checkout.newBuildFolder;
+      final existed = Directory(folder).existsSync();
+      try {
+        final (configureCode, configureLines) = await _run(
+          cmake,
+          EngineCheckout.configureArguments,
+          missing: GitFailureKind.noCmake,
+          onLine: onLine,
+          cancel: cancel,
+        );
+        if (configureCode != 0) throw GitUpdateFailure(GitFailureKind.configure, _tail(configureLines));
+      } on GitUpdateFailure {
+        // A setup that stopped half way leaves no cache behind to be taken for a build folder.
+        _forgetSetup(folder, existed: existed);
+        rethrow;
+      }
+      // The new build folder's cache names the compiler, whose folder the build puts on PATH.
+      configured = EngineCheckout.at(checkout.root, system: checkout.system) ?? checkout;
+    }
+    final build = configured.buildFolder ?? checkout.newBuildFolder;
+
     onStep?.call(GitStep.building);
     final (buildCode, buildLines) = await _run(
       cmake,
       ['--build', build, '--target', 'relinker', 'libs'],
       missing: GitFailureKind.noCmake,
-      environment: buildEnvironment,
+      environment: _buildEnvironment(configured),
       onLine: onLine,
       cancel: cancel,
     );
     if (buildCode != 0) throw GitUpdateFailure(GitFailureKind.build, _tail(buildLines));
     return GitUpdateResult(before, await _head(cancel));
+  }
+
+  static void _forgetSetup(String folder, {required bool existed}) {
+    try {
+      if (!existed) {
+        final made = Directory(folder);
+        if (made.existsSync()) made.deleteSync(recursive: true);
+        return;
+      }
+      final cache = File(p.join(folder, 'CMakeCache.txt'));
+      if (cache.existsSync()) cache.deleteSync();
+    } on FileSystemException {
+      // What CMake left stays; the next update sets it up again or says why it cannot.
+    }
   }
 
   /// Whether the remote has commits the checkout lacks (git fetch, then HEAD..@{u}), or the

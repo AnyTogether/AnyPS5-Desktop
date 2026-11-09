@@ -114,8 +114,43 @@ class PartyChatPane extends StatelessWidget {
                       accent: accent,
                       onCancel: together.cancelPartyComposerNote,
                     ),
+                  // Quick replies a controller can send, as in Messages and on the Mac.
+                  SizedBox(
+                    height: 46 * scale,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        for (var index = 0; index < TogetherMessages.quickReplies.length; index++)
+                          Padding(
+                            padding: EdgeInsetsDirectional.only(end: 10 * scale),
+                            child: Center(
+                              child: KeepVisible(
+                                active: keys.focused && focused == null && menu == null && keys.place == index,
+                                child: _Chip(
+                                  label: TogetherMessages.quickReplies[index],
+                                  focused:
+                                      keys.focused &&
+                                      focused == null &&
+                                      menu == null &&
+                                      model.editingRow == null &&
+                                      keys.place == index,
+                                  onTap: () =>
+                                      unawaited(together.sendPartyMessage(TogetherMessages.quickReplies[index])),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 8 * scale),
                   FocusRing(
-                    focused: keys.focused && focused == null && menu == null && model.editingRow == null,
+                    focused:
+                        keys.focused &&
+                        focused == null &&
+                        menu == null &&
+                        model.editingRow == null &&
+                        keys.place == TogetherMessages.composer,
                     radius: 12 * scale,
                     child: RowTextField(
                       model: model,

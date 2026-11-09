@@ -486,6 +486,19 @@ void main() {
       await expectLater(find.byType(LauncherShell), matchesGoldenFile('goldens/together_party_chat_en.png'));
     });
 
+    testWidgets('the Party tile has a dot for what others wrote, gone while the party screen is open', (tester) async {
+      fixture = makeFixture();
+      model = fixture.model;
+      signedInPreview(model);
+      partyWithChat(const []);
+      model.together.hub.partyChat.unread = 2;
+      await pumpLauncher(tester, model);
+      expect(find.byKey(const ValueKey('home-dot-4')), findsOneWidget);
+      model.open(Layer.party);
+      await tester.pump();
+      expect(model.together.partyChatUnread, 0);
+    });
+
     testWidgets('golden: the chat empty, in Turkish, in a narrower window', (tester) async {
       fixture = makeFixture(language: Language.byCode('tr'));
       model = fixture.model;

@@ -138,18 +138,22 @@ void main() {
     test('time left: days past two, then hours, then minutes; coming, over and called off', () {
       fixture = makeFixture();
       final now = DateTime.utc(2026, 11, 6, 12);
-      Challenge at(String state, {Duration starts = const Duration(hours: -1), Duration ends = Duration.zero, bool isFinal = false}) =>
-          Challenge.fromJson({
-            'id': 'x',
-            'title': 'x',
-            'game': {'titleId': 'PPSA02002'},
-            'metric': 'points',
-            'audience': 'friends',
-            'state': state,
-            'final': isFinal,
-            'startsAt': now.add(starts).toIso8601String(),
-            'endsAt': now.add(ends).toIso8601String(),
-          })!;
+      Challenge at(
+        String state, {
+        Duration starts = const Duration(hours: -1),
+        Duration ends = Duration.zero,
+        bool isFinal = false,
+      }) => Challenge.fromJson({
+        'id': 'x',
+        'title': 'x',
+        'game': {'titleId': 'PPSA02002'},
+        'metric': 'points',
+        'audience': 'friends',
+        'state': state,
+        'final': isFinal,
+        'startsAt': now.add(starts).toIso8601String(),
+        'endsAt': now.add(ends).toIso8601String(),
+      })!;
       String when(Challenge challenge) => TogetherChallenges.when(challenge, now: now);
       expect(when(at('active', ends: const Duration(days: 2, hours: 10))), 'Ends in 2 days');
       expect(when(at('active', ends: const Duration(hours: 47))), 'Ends in 47 h');
@@ -180,7 +184,9 @@ void main() {
       ];
       expect(codes, hasLength(28));
       final english = languageFile('en');
-      final keys = english.keys.where((key) => key.startsWith('challenge') || key.startsWith('notifChallenge')).toList();
+      final keys = english.keys
+          .where((key) => key.startsWith('challenge') || key.startsWith('notifChallenge'))
+          .toList();
       expect(keys.length, greaterThan(30));
       for (final code in codes) {
         final texts = languageFile(code);
@@ -226,9 +232,7 @@ void main() {
           'total': 3,
         })
         ..boardChallenges = [
-          Challenge.fromJson(
-            view('ch-1', joined: true, myStanding: {'rank': 4, 'value': 135}, entrants: 6),
-          )!,
+          Challenge.fromJson(view('ch-1', joined: true, myStanding: {'rank': 4, 'value': 135}, entrants: 6))!,
           Challenge.fromJson(
             view(
               'ch-2',
@@ -241,7 +245,9 @@ void main() {
               entrants: 14,
             )..['leader'] = null,
           )!,
-          Challenge.fromJson(view('ch-3', title: 'Trophy hunt', metric: 'trophies', audience: 'public', entrants: 212))!,
+          Challenge.fromJson(
+            view('ch-3', title: 'Trophy hunt', metric: 'trophies', audience: 'public', entrants: 212),
+          )!,
         ]
         ..boardOnChallenges = true
         ..boardChallenge = 0;
@@ -249,7 +255,14 @@ void main() {
       await pumpLauncher(tester, model);
       expect(find.byType(ChallengeStrip), findsOneWidget);
       expect(find.text('Weekend race'), findsOneWidget);
-      expect(find.text(T.format('challengeEndsIn', [T.format('challengeDays', [2])])), findsWidgets);
+      expect(
+        find.text(
+          T.format('challengeEndsIn', [
+            T.format('challengeDays', [2]),
+          ]),
+        ),
+        findsWidgets,
+      );
       await expectLater(find.byType(LauncherShell), matchesGoldenFile('goldens/challenges_board_en.png'));
     });
 
@@ -268,6 +281,8 @@ void main() {
       expect(find.byType(ChallengeDetailView), findsOneWidget);
       expect(find.text(T.text('challengeHidden')), findsOneWidget);
       expect(find.text(T.text('challengeLeave')), findsWidgets);
+      // The current leader shows on the page too, before it is final.
+      expect(find.text(T.upper(T.text('challengeLeading'))), findsOneWidget);
       await expectLater(find.byType(LauncherShell), matchesGoldenFile('goldens/challenge_detail_tr.png'));
     });
 
@@ -469,6 +484,36 @@ void main() {
       expect(together.screens.boardIndex, 0);
     });
 
+    testWidgets('the page: no one ahead yet, an unknown metric, and a challenge that is gone', (tester) async {
+      fixture = makeFixture();
+      model = fixture.model;
+      signedIn();
+      final together = model.together;
+      // No score yet: said where the leader is.
+      together.screens
+        ..challengeId = 'ch-1'
+        ..challenge = ChallengeDetail.fromJson(detail({...view('ch-1'), 'leader': null}, standings()));
+      model.open(Layer.challenge);
+      await pumpLauncher(tester, model);
+      expect(find.text(T.text('challengeNoLeader')), findsOneWidget);
+
+      // A metric this launcher does not know: a plain number under its own name.
+      expect(ChallengeMetric.named('kills'), ChallengeMetric.other);
+      expect(TogetherChallenges.metricName(ChallengeMetric.other), T.text('challengeMetricOther'));
+      expect(TogetherChallenges.value(7, ChallengeMetric.other), T.number(7));
+      expect(TogetherChallenges.value(1, ChallengeMetric.trophies), T.format('challengeTrophyValue', [1]));
+      expect(TogetherChallenges.value(4, ChallengeMetric.trophies), T.format('challengeTrophiesValue', [4]));
+
+      // Deleted: gone, not a failure.
+      together.screens
+        ..challenge = null
+        ..challengeGone = true;
+      model.refresh();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text(T.text('challengeGone')), findsOneWidget);
+      expect(find.text(T.text('challengeFailed')), findsNothing);
+    });
+
     test('a server without challenges (404) shows none; the overall board reads the user\'s own', () async {
       fixture = makeFixture(together: server.base);
       model = fixture.model;
@@ -484,7 +529,12 @@ void main() {
       model.handle(Command.up);
       expect(together.screens.boardOnChallenges, isFalse, reason: 'nothing up there');
 
-      server.answers['me/challenges'] = (200, {'challenges': [view('ch-1')]});
+      server.answers['me/challenges'] = (
+        200,
+        {
+          'challenges': [view('ch-1')],
+        },
+      );
       await together.loadBoardChallenges();
       expect(together.screens.boardChallenges.single.id, 'ch-1');
       server.answers['me/challenges'] = (502, {'code': 'bad_gateway', 'title': 'Bad gateway'});
@@ -536,6 +586,13 @@ void main() {
       await together.toggleChallenge();
       expect(model.toast, T.text('challengeFull'));
 
+      // A 409 means it changed under the screen: it is read again at once.
+      final reads = server.callsTo('challenges/ch-1').length;
+      server.answers['POST challenges/ch-1/join'] = FakeTogether.problem(409, 'conflict');
+      await together.toggleChallenge();
+      expect(model.toast, T.text('challengeOverAlready'));
+      expect(server.callsTo('challenges/ch-1').length, reads + 1);
+
       // The website, only when chosen.
       expect(fixture.opened, isEmpty);
       model.handle(Command.down);
@@ -550,6 +607,16 @@ void main() {
       together.openChallenge('ch-8');
       await together.loadChallenge();
       expect(together.challengeActions, [ChallengeAction.website]);
+
+      // Deleted meanwhile: gone, not a failure; opening another starts anew.
+      server.answers['challenges/ch-5'] = FakeTogether.problem(404, 'not_found');
+      together.openChallenge('ch-5');
+      await together.loadChallenge();
+      expect(together.screens.challengeGone, isTrue);
+      expect(together.screens.challengeFailed, isFalse);
+      together.openChallenge('ch-8');
+      expect(together.screens.challengeGone, isFalse);
+      await together.loadChallenge();
     });
   });
 }

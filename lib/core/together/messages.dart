@@ -102,6 +102,7 @@ class MediaLink {
     this.gone = false,
     this.width,
     this.height,
+    this.durationMs,
   });
 
   static MediaLink? fromJson(Object? json) {
@@ -115,6 +116,7 @@ class MediaLink {
       gone: json['removed'] == true || json['blocked'] == true,
       width: (json['width'] as num?)?.toInt(),
       height: (json['height'] as num?)?.toInt(),
+      durationMs: (json['durationMs'] as num?)?.toInt(),
     );
   }
 
@@ -133,6 +135,9 @@ class MediaLink {
   final bool gone;
   final int? width;
   final int? height;
+
+  /// A clip's or voice note's length, when the server says.
+  final int? durationMs;
 }
 
 /// One message in a conversation; a deleted (unsent or removed) one keeps its place with no text
@@ -705,43 +710,6 @@ class Messages with Notifier {
 
   /// The lock of [conversationId] as last worked out.
   ConversationLock? lockOf(String? conversationId) => e2ee?.lockOf(conversationId);
-
-  /// A photo (re-encoded already, so it carries no location or camera data), sealed, uploaded
-  /// and sent with an optional [caption] to the open conversation, which must be end-to-end
-  /// encrypted.
-  Future<void> sendPhoto(
-    Uint8List photo, {
-    required String type,
-    required int width,
-    required int height,
-    String? caption,
-  }) async {
-    final id = openId;
-    final conversation = byId(id);
-    final e2ee = this.e2ee;
-    if (id == null || conversation == null || e2ee == null) return;
-    final message = ChatMessage(
-      id: uuidv7(),
-      conversationId: id,
-      seq: 0,
-      authorId: _me,
-      text: caption,
-      createdAt: DateTime.now(),
-      pending: true,
-      kind: 'image',
-      caption: caption,
-    );
-    thread = [...thread, message];
-    notifyListeners();
-    try {
-      if ((await checkLock(conversation))?.state != EncryptionState.on) throw const E2eeUnavailable();
-      final attachment = await e2ee.uploadSealed(file: photo, kind: 'image', type: type, width: width, height: height);
-      await _deliver(message, attachment: attachment);
-    } on Object catch (error) {
-      onSendFailed?.call(error);
-      _replace(message.copyWith(seq: 0, pending: false, failed: true));
-    }
-  }
 
   /// A screenshot or clip from the gallery into [conversationId] (open or not), as the Mac's Send
   /// to a chat: sealed where the conversation is end-to-end encrypted ([sealed] uploads it so),

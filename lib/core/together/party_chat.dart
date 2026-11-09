@@ -56,6 +56,9 @@ class PartyChat with Notifier {
   /// Read up to here, on the server too.
   int readSeq = 0;
 
+  /// Others' messages that came while the chat was not on screen.
+  int unread = 0;
+
   /// Everyone seen in this party while the launcher runs, by id: a message from someone who left
   /// still says who wrote it.
   final Map<String, Person> _seen = {};
@@ -97,6 +100,7 @@ class PartyChat with Notifier {
     loading = false;
     loaded = false;
     readSeq = 0;
+    unread = 0;
     _typing.clear();
     if (chat != null) {
       messages?.elsewhere.add(chat);
@@ -109,6 +113,10 @@ class PartyChat with Notifier {
   Future<void> show() async {
     final chat = id;
     if (chat == null) return;
+    if (unread > 0) {
+      unread = 0;
+      notifyListeners();
+    }
     if (!loaded && !loading) {
       loading = true;
       notifyListeners();
@@ -303,14 +311,25 @@ class PartyChat with Notifier {
         final message = ChatMessage.fromJson(data);
         // A message ends its author's typing.
         _typing.remove(message.authorId);
+        final isNew = !thread.any((m) => m.id == message.id);
         _arrived(message);
+        if (isNew) _count(message);
         if (message.authorId != _me && shown() && loaded) unawaited(_readAll().catchError((Object _) {}));
       case 'message.updated':
         final message = ChatMessage.fromJson(data);
         if (thread.any((m) => m.id == message.id)) _replace(message);
       case 'message.deleted':
         final message = ChatMessage.fromJson(data);
-        if (thread.any((m) => m.id == message.id)) _replace(message.removed());
+        final kept = thread.where((m) => m.id == message.id).firstOrNull;
+        if (kept != null) _replace(message.removed());
+        // Unsent before it was read.
+        if ((kept == null ? !loaded : !kept.deleted) &&
+            message.authorId != _me &&
+            message.seq > readSeq &&
+            unread > 0) {
+          unread--;
+          notifyListeners();
+        }
       case 'message.reactions':
         final seq = data['seq'];
         if (seq is num) _reactions(seq.toInt(), ReactionCount.list(data['reactions']));
@@ -320,7 +339,17 @@ class PartyChat with Notifier {
     }
   }
 
-  /// After a reconnect, what came while the socket was away.
+  /// Someone else's message that came while the chat was not on screen.
+  void _count(ChatMessage message) {
+    if (message.authorId == _me || message.deleted || shown() || message.seq <= readSeq) return;
+    unread++;
+    notifyListeners();
+  }
+
+  /// How many pages a reconnect reads at most, as on the Mac.
+  static const catchUpPages = 10;
+
+  /// After a reconnect, what came while the socket was away, a page at a time.
   Future<void> _catchUp() async {
     final chat = id;
     final last = thread.where((m) => m.seq > 0).lastOrNull;
@@ -330,10 +359,21 @@ class PartyChat with Notifier {
       if (shown()) await show();
       return;
     }
-    final page = await account.call('GET', 'conversations/$chat/messages?limit=100&after=${last.seq}');
-    if (id != chat) return;
-    thread = _merge(_page(page), thread);
-    notifyListeners();
+    var after = last.seq;
+    for (var turn = 0; turn < catchUpPages; turn++) {
+      final page = await account.call('GET', 'conversations/$chat/messages?limit=$pageSize&after=$after');
+      if (id != chat) return;
+      final fresh = _page(page);
+      final known = {for (final message in thread) message.id};
+      thread = _merge(fresh, thread);
+      for (final message in fresh) {
+        if (!known.contains(message.id)) _count(message);
+      }
+      notifyListeners();
+      final newest = fresh.where((message) => message.seq > 0).lastOrNull?.seq;
+      if (page['more'] != true || newest == null || newest <= after) break;
+      after = newest;
+    }
     if (shown()) await _readAll();
   }
 
@@ -364,6 +404,7 @@ class PartyChat with Notifier {
     loading = false;
     loaded = false;
     readSeq = 0;
+    unread = 0;
     _typing.clear();
     _seen.clear();
     _partyId = null;

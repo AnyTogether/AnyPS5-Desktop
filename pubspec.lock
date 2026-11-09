@@ -178,10 +178,18 @@ packages:
     source: hosted
     version: "1.8.2"
   dbus:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: dbus
       sha256: f7db8504e715b835f5ebe5fe74604ccd961d504c73389a5d8e81bafc2e2f3612
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.8.0"
+  desktop_drop:
+    dependency: "direct main"
+    description:
+      name: desktop_drop
+      sha256: "8b07a8b4db47e0768c2a3a9433eb29160478be5f80905643fc0f79a4ae188e1e"
       url: "https://pub.dev"
     source: hosted
     version: "0.8.0"
