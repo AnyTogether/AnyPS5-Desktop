@@ -10,6 +10,8 @@ import 'package:anyps5_desktop/ui/feed_view.dart';
 import 'package:anyps5_desktop/ui/home.dart';
 import 'package:anyps5_desktop/ui/launcher.dart';
 import 'package:anyps5_desktop/ui/leaderboard_view.dart';
+import 'package:anyps5_desktop/ui/panels.dart' show PersonAvatar;
+import 'package:anyps5_desktop/ui/profile_view.dart' show ProfileView;
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:anyps5_desktop/ui/together_model.dart';
 import 'package:flutter/gestures.dart';
@@ -75,6 +77,7 @@ void main() {
             'tr': {'name': 'Büyük Tur'},
           },
           'rarity': 0.03,
+          'rarityLabel': 'ultra_rare',
         },
       ],
       'reactions': {
@@ -101,6 +104,7 @@ void main() {
             'tr': {'name': 'Gece Kuşu'},
           },
           'rarity': 0.12,
+          'rarityLabel': 'very_rare',
         },
         {
           'trophyId': 3,
@@ -285,6 +289,7 @@ void main() {
       await pumpLauncher(tester, model);
       expect(find.text('#18'), findsOneWidget);
       expect(find.text(T.format('socialBoardOf', [240])), findsOneWidget);
+      expect(find.text(T.format('socialBoardPlayers', [240])), findsOneWidget);
       expect(
         find.descendant(of: find.byType(LeaderboardView), matching: find.byIcon(Icons.more_horiz_rounded)),
         findsOneWidget,
@@ -367,6 +372,132 @@ void main() {
       model.handle(Command.back);
       expect(model.overlay, Layer.profile);
       expect(together.profile?.profile.handle, 'ana');
+    });
+
+    testWidgets('the feed\'s pictures, rarities and hidden trophies, and reactions where someone chose them', (
+      tester,
+    ) async {
+      fixture = makeFixture();
+      model = fixture.model;
+      signedIn();
+      ProfileView.pictureFor = (_) => MemoryImage(png(4, 4, (x, y) => 0xE8505BFF));
+      addTearDown(() => ProfileView.pictureFor = NetworkImage.new);
+      Map<String, dynamic> item(String id, String kind, Map<String, Object?> extra) => {
+        'id': id,
+        'kind': kind,
+        'createdAt': ago(const Duration(hours: 1)),
+        'actor': card('u-ana', 'Ana'),
+        'reactions': {'counts': <String, int>{}, 'mine': null},
+        ...extra,
+      };
+      model.together.hub.social.feed.load([
+        ...feed(),
+        Activity.fromJson(item('a4', 'friendship', {'friend': card('u-cem', 'Cem Yılmaz')}))!,
+        Activity.fromJson(
+          item('a3', 'milestone', {
+            'milestone': {'kind': 'hours', 'value': 500},
+          }),
+        )!,
+        Activity.fromJson(
+          item('a2', 'trophy', {
+            'game': {
+              'titleId': 'ZZZZ00001',
+              'names': {'en': 'Far Away'},
+              'iconUrl': 'https://together.test/far-away.png',
+            },
+          }),
+        )!,
+        Activity.fromJson(
+          item('a1', 'trophy', {
+            'game': {
+              'titleId': 'PPSA02002',
+              'names': {'en': 'Neon Alley'},
+            },
+            'trophies': [
+              {'trophyId': 9, 'grade': 'gold', 'hidden': true, 'rarity': 0.043, 'rarityLabel': 'very_rare'},
+            ],
+          }),
+        )!,
+      ], null);
+      model.open(Layer.feed);
+      await pumpLauncher(tester, model);
+      Finder inItem(String id, Finder inside) =>
+          find.descendant(of: find.byKey(ValueKey('activity-$id')), matching: inside);
+      // The first item has the focus: all four, whether or not anyone chose them.
+      expect(inItem('a4', find.text(Reaction.fire.emoji)), findsOneWidget);
+      expect(inItem('a4', find.text(Reaction.heart.emoji)), findsOneWidget);
+      // Elsewhere only those someone chose.
+      expect(inItem('04', find.text(Reaction.heart.emoji)), findsOneWidget);
+      expect(inItem('04', find.text(Reaction.fire.emoji)), findsNothing);
+      // The new friend's picture, the milestone's sign, the game's picture from the server.
+      expect(
+        find.descendant(of: find.byKey(const ValueKey('activity-a4')), matching: find.byType(PersonAvatar)),
+        findsNWidgets(2),
+        reason: 'the one who did it, and the new friend',
+      );
+      expect(inItem('a3', find.byIcon(Icons.schedule_rounded)), findsOneWidget);
+      expect(inItem('a2', find.byType(Image)), findsWidgets);
+      // A hidden trophy is labelled, with its rarity.
+      expect(inItem('a1', find.text(T.text('trophyHidden'))), findsOneWidget);
+      expect(inItem('a1', find.text(T.percent(T.decimal(4.3, 1)))), findsOneWidget);
+    });
+
+    test('a new item coming in above leaves the focus on the item it is on', () {
+      fixture = makeFixture();
+      model = fixture.model;
+      final together = model.together;
+      final social = together.hub.social;
+      social.feed.load(feed(), null);
+      together.screens.feedIndex = 1;
+      final on = social.feed.items[1].id;
+      Activity newer(String id) => Activity.fromJson({
+        'id': id,
+        'kind': 'platinum',
+        'createdAt': ago(const Duration(seconds: 5)),
+        'actor': card('u-bora', 'Bora'),
+      })!;
+      together.keepFeedFocus(() => social.feed.upsert(newer('09')));
+      expect(together.screens.feedIndex, 2, reason: 'one more above');
+      expect(social.feed.items[together.screens.feedIndex].id, on);
+      // An item that lands below moves nothing.
+      together.keepFeedFocus(() => social.feed.upsert(newer('00')));
+      expect(social.feed.items[together.screens.feedIndex].id, on);
+      // Nothing focused yet: nothing to hold.
+      social.feed.load(const [], null);
+      together.screens.feedIndex = 0;
+      together.keepFeedFocus(() => social.feed.upsert(newer('10')));
+      expect(together.screens.feedIndex, 0);
+    });
+
+    testWidgets('a game\'s trophies reach its leaderboard: Enter without a picture, and the chip', (tester) async {
+      fixture = makeFixture();
+      model = fixture.model;
+      signedIn();
+      final orbit = model.games.indexWhere((game) => game.titleId == 'PPSA01001');
+      model.select(orbit);
+      model.open(Layer.trophies);
+      await pumpLauncher(tester, model);
+      expect(find.byKey(const ValueKey('trophy-leaderboard')), findsOneWidget);
+      model.handle(Command.select);
+      expect(model.overlay, Layer.leaderboard);
+      expect(model.together.screens.boardTitleId, 'PPSA01001');
+      await tester.pump(const Duration(milliseconds: 400));
+      model.handle(Command.back);
+      expect(model.overlay, Layer.trophies);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('trophy-leaderboard')));
+      await tester.pump();
+      expect(model.overlay, Layer.leaderboard);
+      await tester.pump(const Duration(milliseconds: 400));
+      model.handle(Command.back);
+
+      // Signed out: neither the chip nor Enter goes there.
+      model.together.account.user = null;
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('trophy-leaderboard')), findsNothing);
+      model.handle(Command.select);
+      expect(model.overlay, Layer.trophies);
+      await tester.pump(const Duration(milliseconds: 400));
     });
 
     testWidgets('a game\'s name in the feed opens its hub when clicked', (tester) async {

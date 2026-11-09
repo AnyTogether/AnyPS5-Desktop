@@ -38,6 +38,9 @@ class SocialScreens {
   String? challengeId;
   ChallengeDetail? challenge;
   bool challengeFailed = false;
+
+  /// The challenge is no longer there (a 404): said instead of the failure.
+  bool challengeGone = false;
   int challengeIndex = 0;
   bool challengeOnActions = false;
   int challengeAction = 0;
@@ -71,6 +74,7 @@ class SocialScreens {
     challengeId = null;
     challenge = null;
     challengeFailed = false;
+    challengeGone = false;
     challengeBusy = false;
     noticesFailed = false;
     compat.clear();
@@ -231,6 +235,16 @@ extension TogetherSocial on TogetherModel {
       default:
         break;
     }
+  }
+
+  /// [change] with the focus held on the item it is on: a new item coming in above it does not
+  /// move what the keys are on.
+  void keepFeedFocus(void Function() change) {
+    final focused = social.feed.items.elementAtOrNull(screens.feedIndex)?.id;
+    change();
+    if (focused == null) return;
+    final at = social.feed.items.indexWhere((item) => item.id == focused);
+    if (at >= 0) screens.feedIndex = at;
   }
 
   /// A click on an item: the keys go there.

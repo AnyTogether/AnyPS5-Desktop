@@ -8,6 +8,16 @@ release when it is made.
 - **A game in one .ffpfsc file installs like a zip**, as on the Mac: drop it in a games folder or
   use Add game file in Settings. AnyPS5 unpacks it into a normal game folder with its name, title
   ID and icon, and says so plainly when a file is compressed or of a kind it cannot unpack.
+- **The activity feed reads as on the Mac**: game icons from the server, a new friend's picture
+  and milestone signs when a game isn't in your library, the rarity on trophies, hidden trophies
+  labelled instead of left out, and the four reactions as emoji, shown on the focused item and
+  where someone chose them. A new item coming in no longer moves the focus.
+- **Captures says when this server keeps no files** instead of a read failure.
+- **Leaderboards**: the number of players next to the board, and Enter (or the new chip) on a
+  game's trophies opens its board.
+- **Challenges**: the page shows who is leading before it is final, says "Score" and a plain
+  number for a metric this launcher doesn't know, says when a challenge was deleted, and reads
+  it again after a conflict on Join or Leave.
 - **Play Together player rows say how each player is reached** (Direct or Relay, with the round
   trip in ms), as on the Mac. Where the system cannot say, the row stays at Connected.
 - **A Play Together offer or a game invite is said over the game** in a desktop notice, as on the
