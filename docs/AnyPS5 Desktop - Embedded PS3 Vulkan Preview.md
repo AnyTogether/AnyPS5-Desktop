@@ -132,6 +132,9 @@ teardown for all three consoles.
 
 ## Stock core comparison
 
+RetroArch served as an independent frontend for the stock-core boot test.
+AnyPS5 loads RPCS3 directly through Libretro and needs no RetroArch installation.
+
 The Windows Buildbot DLL with SHA-256
 `27ad0dccc2b9c464b7fa78c60cc4ce1717e2c31ca31836f337e2981bb9efe64b`
 booted the same LittleBigPlanet disc in a separate RetroArch control. It
