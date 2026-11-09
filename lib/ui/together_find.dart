@@ -775,7 +775,7 @@ extension TogetherFind on TogetherModel {
         PanelRow(
           id: 'hub-count',
           title: T.format('discoverPlayingNow', [read.playingTotal]),
-          kind: InfoRow(T.format('discoverPlayers', [read.players])),
+          kind: InfoRow(T.format(read.players == 1 ? 'discoverPlayersOne' : 'discoverPlayers', [read.players])),
         ),
         for (final player in read.playing)
           PanelRow(

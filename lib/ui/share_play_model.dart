@@ -583,11 +583,15 @@ class SharePlayModel {
           ),
         );
       }
-      rows.add(
-        PanelRow(
-          id: 'share-remove-${viewer.user.id}',
-          title: T.format('sharePlayRemove', [name]),
-          kind: ActionRow(() => remove(viewer), destructive: true),
+      // Asked first, as on the Mac: the viewer needs a new invite to watch again.
+      rows.addAll(
+        app.together.askingFirst(
+          PanelRow(
+            id: 'share-remove-${viewer.user.id}',
+            title: T.format('sharePlayRemove', [name]),
+            kind: ActionRow(() => remove(viewer), destructive: true),
+          ),
+          T.format('askRemoveViewer', [name]),
         ),
       );
     }
@@ -642,11 +646,15 @@ class SharePlayModel {
         ),
       );
     }
-    rows.add(
-      PanelRow(
-        id: 'share-stop',
-        title: T.text('sharePlayStop'),
-        kind: ActionRow(() => unawaited(stop()), destructive: true),
+    // Asked first, as on the Mac: stopping lets everyone watching go.
+    rows.addAll(
+      app.together.askingFirst(
+        PanelRow(
+          id: 'share-stop',
+          title: T.text('sharePlayStop'),
+          kind: ActionRow(() => unawaited(stop()), destructive: true),
+        ),
+        T.text('askStopShare'),
       ),
     );
     return rows;

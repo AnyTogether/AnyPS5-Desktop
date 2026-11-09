@@ -274,6 +274,45 @@ void main() {
       expect(identical(model.together.profile, before), isTrue);
     });
 
+    test('one player reads in the singular, and the count stays plural from two up', () {
+      fixture = makeFixture();
+      model = fixture.model;
+      expect(T.format('socialBoardPlayers', [2]), '2 players');
+      expect(T.format('socialBoardPlayersOne', [1]), '1 player');
+      expect(T.format('discoverPlayersOne', [1]), '1 player on AnyTogether');
+      expect(T.format('gamePlayersOne', [1, 1]), '1 of 1 player');
+    });
+
+    testWidgets('a board of one player says one player, not one players', (tester) async {
+      fixture = makeFixture();
+      model = fixture.model;
+      signedIn();
+      final neon = model.games.firstWhere((game) => game.titleId == 'PPSA02002');
+      model.together.screens
+        ..boardTitleId = neon.titleId
+        ..boardName = neon.name
+        ..boardScope = BoardScope.global
+        ..board = Leaderboard.fromJson({
+          'board': 'points',
+          'scope': 'global',
+          'total': 1,
+          'game': {
+            'titleId': 'PPSA02002',
+            'names': {'en': 'Neon Alley'},
+          },
+          'entries': [
+            {'rank': 1, 'user': card('u-ana', 'Ana'), 'value': 4210},
+          ],
+          'me': {'rank': null, 'value': 0, 'listed': false},
+          'around': <Object>[],
+        })
+        ..boardIndex = 0;
+      model.open(Layer.leaderboard);
+      await pumpLauncher(tester, model);
+      expect(find.text('1 player'), findsOneWidget);
+      expect(find.text('1 players'), findsNothing);
+    });
+
     testWidgets('golden: a game\'s leaderboard with the gap and the user\'s place (tr)', (tester) async {
       fixture = makeFixture(language: Language.byCode('tr'));
       model = fixture.model;
@@ -563,7 +602,10 @@ void main() {
       expect(text('family_request', {'kind': 'more_time', 'minutes': 15}), 'Bora asks for 15 more minutes');
       expect(text('family_request', {'kind': 'play_game', 'gameName': 'Neon Alley'}), 'Bora asks to play Neon Alley');
       expect(text('family_request', {'kind': 'friend'}), 'Bora asks to add a friend');
-      expect(text('family_answer', {'kind': 'more_time', 'approved': true, 'minutes': 15}), 'A parent gave you 15 more minutes');
+      expect(
+        text('family_answer', {'kind': 'more_time', 'approved': true, 'minutes': 15}),
+        'A parent gave you 15 more minutes',
+      );
       expect(text('family_answer', {'kind': 'play_game', 'approved': true}), 'A parent said yes: the game is open');
       expect(text('family_answer', {'kind': 'friend', 'approved': true}), 'A parent said yes to your new friend');
       expect(text('family_answer', {'approved': false}), 'A parent said no this time');

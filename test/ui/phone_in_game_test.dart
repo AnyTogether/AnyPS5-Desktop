@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:anyps5_desktop/core/desktop/desktop.dart';
 import 'package:anyps5_desktop/core/game_library.dart';
 import 'package:anyps5_desktop/core/installer.dart';
 import 'package:anyps5_desktop/core/remote/remote_protocol.dart';
@@ -30,7 +32,13 @@ void main() {
 
   setUp(() async {
     desktop = FakeDesktop();
-    fixture = makeFixture(desktop: desktop);
+    fixture = makeFixture(
+      desktop: desktop,
+      renderNoticeCard: (title, detail, symbol, scale) async {
+        desktop.noticeCards.add((title, detail));
+        return RgbaImage(1, 1, Uint8List.fromList([1, 2, 3, 4]));
+      },
+    );
     model = fixture.model;
     await model.startPhoneServer();
   });
@@ -103,7 +111,7 @@ void main() {
     desktop.focused = false;
     final playing = (await play()).done;
     expect(model.toast, T.text('phoneUpstreamGame'));
-    await until(() => desktop.calls.contains('notify ${T.text('phoneUpstreamGame')}'));
+    await until(() => desktop.noticeCards.contains((T.text('phoneUpstreamGame'), null)));
     expect(gameLog(), contains("[anyps5-launcher] phones: 1 phone(s), 0 browser pad(s), upstream's engine"));
     await stop(playing);
     await phone.close();
