@@ -15,6 +15,14 @@ release when it is made.
 - **Challenges**: the page shows who is leading before it is final, says "Score" and a plain
   number for a metric this launcher doesn't know, says when a challenge was deleted, and reads
   it again after a conflict on Join or Leave.
+- **Join with a code works for watching a share play too**, as on the Mac: Party › Join with a
+  code looks a code up as you type it (a party's or a share play's), even while you're in a party,
+  and asks to join or to watch. A yes shows up as an invite.
+- **A share play guest can help player 1** instead of playing their own, as on the Mac: Assist
+  Player 1 in the share play's quick menu rows.
+- **A friend's trophy level and the party's lead now say so**, as on the Mac: a word when a friend
+  levels up (not while you're in a game), when you lead the party, and when you hand it over or
+  remove someone.
 - **Send a picture in any chat**, as on the Mac: a conversation's options (△) have Send a photo, for
   several files at once, in conversations that aren't encrypted too. Each one is drawn again here,
   so no location or camera data goes along.
