@@ -25,6 +25,12 @@ class FakeDesktop implements DesktopWindows {
   bool cardsWork = true;
 
   @override
+  Future<bool> showBadge(RgbaImage? badge, {int? pid}) async {
+    calls.add(badge == null ? 'badge-off' : 'badge');
+    return true;
+  }
+
+  @override
   Future<bool> raiseLauncher() async {
     calls.add('raise');
     return true;

@@ -169,7 +169,16 @@ final class _Xlib {
     flush = x11.lookupFunction<Int32 Function(Pointer<Void>), int Function(Pointer<Void>)>('XFlush');
     translateCoordinates = x11
         .lookupFunction<
-          Int32 Function(Pointer<Void>, UnsignedLong, UnsignedLong, Int32, Int32, Pointer<Int32>, Pointer<Int32>, Pointer<UnsignedLong>),
+          Int32 Function(
+            Pointer<Void>,
+            UnsignedLong,
+            UnsignedLong,
+            Int32,
+            Int32,
+            Pointer<Int32>,
+            Pointer<Int32>,
+            Pointer<UnsignedLong>,
+          ),
           int Function(Pointer<Void>, int, int, int, int, Pointer<Int32>, Pointer<Int32>, Pointer<UnsignedLong>)
         >('XTranslateCoordinates');
     getSelectionOwner = x11
@@ -554,6 +563,10 @@ class LinuxDesktop implements DesktopWindows, GameAreas {
   }
 
   bool _showing = false;
+
+  // X11's grab records what is on the screen, this badge too: none, as the rows say.
+  @override
+  Future<bool> showBadge(RgbaImage? badge, {int? pid}) async => false;
 
   @override
   Future<bool> showCard(RgbaImage card, {int? pid}) async {

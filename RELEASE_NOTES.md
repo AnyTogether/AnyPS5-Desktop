@@ -13,6 +13,14 @@ release when it is made.
 - **A friend's trophy level and the party's lead now say so**, as on the Mac: a word when a friend
   levels up (not while you're in a game), when you lead the party, and when you hand it over or
   remove someone.
+- **Send a picture in any chat**, as on the Mac: a conversation's options (△) have Send a photo, for
+  several files at once, in conversations that aren't encrypted too. Each one is drawn again here,
+  so no location or camera data goes along.
+- **Drop pictures on an open chat** to send them, as on the Mac.
+- **Voice notes play inside the launcher**, as on the Mac: play and pause in the bubble, bars and
+  the time as it goes, one at a time. One the launcher cannot open goes to the system's player,
+  as before.
+- **The typing line names everyone who is typing** in a group, as on the Mac.
 - **Update from Git sets up the build folder itself**, as on the Mac. An engine folder that is a
   git checkout without a build folder no longer stops at "no build folder yet". With Git, CMake,
   Ninja and a C++ compiler (g++) on PATH, the launcher runs the CMake setup the build guide
@@ -128,6 +136,27 @@ release when it is made.
 - **Deafen in party voice**, as on the Mac: hear nobody, with your microphone off, and the others
   see you deafened. Turning it off puts your microphone back as it was, and turning the
   microphone on hears everyone again.
+- **Each game can have its own engine**, as on the Mac: Game Settings › Engine picks the default
+  or any downloaded engine, of either source, with what unlocked the game under it. A game whose
+  chosen engine is not on this computer says so before unlocking and offers the download.
+- **Delete one engine version**: a row for each downloaded version in Settings › AnyPS5 Engine,
+  as on the Mac. An engine a game or the default is using stays.
+- **Battery & heat can lower the resolution**, the row the Mac already had: a game with a
+  resolution option is installed one step lower while the profile holds. On Windows and Linux the
+  resolution is written when a game is installed, so it takes effect at the next install.
+- **About has What's new, Made by, GitHub and the upstream project**, as on the Mac. What's new
+  shows while an update is on offer and opens that release's page.
+- **Settings › Fonts lists Latin Italic**, the row the Mac has, beside Latin.
+- **Settings › Phones says which paired phone is connected now**: the count at the top and
+  Connected beside the phone's name, as on the Mac.
+- **Broadcasting has a microphone**, as on the Mac: Settings › Broadcasting mixes your commentary
+  over the game's sound at the level you set, and it can be switched while you are live. Windows
+  shows a small LIVE badge over the game that viewers do not see. Linux has no badge, because
+  anything drawn over the game would be recorded too.
+- **Cloud storage lists your photos, clips and voice notes**, as on the Mac: delete one with a
+  second press, and a bar shows how much saves and media take.
+- **Restore saves… restores the backup you choose**, as on the Mac. The latest backup can still
+  be restored in one press.
 
 ## 0.1.20
 

@@ -298,6 +298,10 @@ class LauncherUpdateModel {
     _cancel?.cancel();
   }
 
+  /// The page of [release] on GitHub, where its notes are.
+  static Uri _page(UpstreamRelease release) =>
+      Uri.https('github.com', '${LauncherUpdates.repository}/releases/tag/${release.tag}');
+
   /// The About rows: the version, the update where it stands (at most one row that acts) and
   /// the check.
   List<PanelRow> aboutRows() {
@@ -344,6 +348,14 @@ class LauncherUpdateModel {
         ),
         _ => null,
       },
+      // What the release brings, on its page, while an update is on offer (as on the Mac).
+      if (release != null && available)
+        PanelRow(
+          id: 'whatsNew',
+          title: T.text('whatsNew'),
+          detail: 'github.com/${LauncherUpdates.repository}/releases/tag/${release.tag}',
+          kind: ActionRow(() => app.services.openUrl?.call(_page(release))),
+        ),
       PanelRow(
         id: 'desktopUpdateCheck',
         title: T.text('checkForUpdatesNow'),

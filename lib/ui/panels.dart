@@ -856,6 +856,10 @@ class _RowView extends StatelessWidget {
                   style: AppText.display(13 * scale, color: detailColor),
                 ),
               ],
+              if (row.meter case final PanelMeter meter) ...[
+                SizedBox(height: 10 * scale),
+                _MeterBar(meter: meter, color: model.accentChoice.color, scale: scale),
+              ],
             ],
           ),
         ),
@@ -2263,6 +2267,40 @@ class _ClipTile extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The thin bar a row can carry: two parts of the width, the second fainter, over a dim track.
+class _MeterBar extends StatelessWidget {
+  const _MeterBar({required this.meter, required this.color, required this.scale});
+
+  final PanelMeter meter;
+  final Color color;
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) {
+    final height = 6 * scale;
+    final radius = BorderRadius.circular(height);
+    return ClipRRect(
+      borderRadius: radius,
+      child: SizedBox(
+        height: height,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            Widget part(double fraction, Color tint) => SizedBox(
+              width: (fraction.clamp(0.0, 1.0)) * width,
+              child: ColoredBox(color: tint),
+            );
+            return ColoredBox(
+              color: Colors.white.withValues(alpha: 0.1),
+              child: Row(children: [part(meter.first, color), part(meter.second, color.withValues(alpha: 0.45))]),
+            );
+          },
+        ),
+      ),
     );
   }
 }

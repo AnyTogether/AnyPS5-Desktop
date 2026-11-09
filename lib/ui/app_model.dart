@@ -16,6 +16,7 @@ import '../core/capture/video_encoders.dart';
 import '../core/audio/audio_out.dart';
 import '../core/audio/interface_sounds.dart';
 import '../core/audio/theme_music.dart';
+import '../core/app_update.dart';
 import '../core/audio/tones.dart';
 import '../core/controllers/pad_info.dart';
 import '../core/controllers/troubleshooter.dart';
@@ -80,6 +81,7 @@ import '../core/update_channel.dart';
 import '../core/unreal/unreal_controls.dart';
 import 'browser_play.dart';
 import 'clip_player.dart';
+import 'voice_note_player.dart';
 import 'components.dart';
 import 'controllers_model.dart';
 import 'crash_model.dart';
@@ -849,11 +851,15 @@ class PanelRow {
     this.person,
     this.level,
     this.icon,
+    this.meter,
   });
 
   final String id;
   final String title;
   final String? detail;
+
+  /// A thin bar under the words: how much of something the row's two parts take up.
+  final PanelMeter? meter;
 
   /// A face button drawn after the title.
   final PadGlyph? glyph;
@@ -937,6 +943,13 @@ class StepperRow extends RowKind {
     final steps = ((max - min) / step).ceil();
     return math.min(stride(repeats), math.max(1, steps ~/ 8));
   }
+}
+
+/// How much of a whole two parts take, each from 0 to 1 (Cloud Storage's saves and media).
+class PanelMeter {
+  const PanelMeter(this.first, this.second);
+  final double first;
+  final double second;
 }
 
 class ActionRow extends RowKind {
@@ -1025,6 +1038,7 @@ class LauncherServices {
     this.cable = true,
     this.openUrl,
     this.clipPlayback,
+    this.voicePlayback,
     this.copyText,
     this.environment,
     this.togetherStore,
@@ -1046,13 +1060,16 @@ class LauncherServices {
     this.desktop,
     this.backdrop,
     this.renderTrophyCard,
+    this.renderLiveBadge,
     this.cjkFonts,
     this.fontClient,
     this.builtInFonts,
     this.saveFile,
     this.saveFileAs,
     this.pickFile,
+    this.pickFileAt,
     this.pickImage,
+    this.pickPictures,
     this.systemInfo,
     this.startDetached,
     this.quit,
@@ -1100,6 +1117,10 @@ class LauncherServices {
   /// Asks the user for a picture (PNG or JPEG); null when they cancelled.
   final Future<String?> Function()? pickImage;
 
+  /// Asks the user for picture files to send in a chat (SealedPhoto.extensions, several at once);
+  /// null when they cancelled.
+  final Future<List<String>?> Function()? pickPictures;
+
   /// Asks the user where to save a file, [suggestedName] first; null when they cancelled.
   final Future<String?> Function(String suggestedName)? saveFile;
 
@@ -1110,6 +1131,9 @@ class LauncherServices {
   /// Asks the user for a file of [label]'s kind (one of [extensions]) to open; null when they
   /// cancelled.
   final Future<String?> Function(String label, List<String> extensions)? pickFile;
+
+  /// The same, opened in [folder] when one is given (a game's backups).
+  final Future<String?> Function(String label, List<String> extensions, String? folder)? pickFileAt;
 
   /// This computer for a crash report; read from the system when not given.
   final Future<SystemInfo> Function()? systemInfo;
@@ -1147,6 +1171,9 @@ class LauncherServices {
   /// Draws the trophy card for the desktop's window; TrophyCard.render by default.
   final Future<RgbaImage> Function(Trophy trophy, double scale)? renderTrophyCard;
 
+  /// Draws the LIVE badge for the desktop's window; LiveBadge.render by default.
+  final Future<RgbaImage> Function(bool live, String time, double scale)? renderLiveBadge;
+
   /// The sound card for the interface sounds and theme songs; none (silence) when not given.
   final AudioOut Function()? audio;
 
@@ -1182,6 +1209,10 @@ class LauncherServices {
   /// Plays clips inside the launcher (the gallery's, Captures' and those in chats); libmpv
   /// through media_kit by default. None: a clip shows its picture, as in tests.
   final ClipPlayback Function()? clipPlayback;
+
+  /// Plays voice notes inside the launcher; libmpv in the app, a fake in tests. Null: they go to
+  /// the system's player.
+  final VoicePlayback Function()? voicePlayback;
 
   /// Puts a text on the clipboard.
   final void Function(String text)? copyText;
@@ -2583,11 +2614,32 @@ class AppModel extends ChangeNotifier {
   /// backups), read when its settings open rather than on every frame.
   final Map<String, ({bool resolution, List<String> backups})> _gameFacts = {};
 
+  /// The resolution [game] is unlocked with: the one chosen in its Game Settings, or one step
+  /// below it while a Battery & Heat profile asks for a lower resolution (the title's own when
+  /// none is chosen). On Windows and Linux the relinker writes it, so it lasts until the next
+  /// unlock.
+  String? _unlockResolution(Game game, Toolkit kit) {
+    final own = currentSettings(game).resolution;
+    if (!powerWatch.adjustment.lowerResolution) return own;
+    final patch = kit.patchFile(game.titleId);
+    if (patch == null) return own;
+    final String text;
+    try {
+      text = File(patch).readAsStringSync();
+    } on FileSystemException {
+      return own;
+    }
+    if (!ResolutionPatch.supports(text)) return own;
+    final current = own ?? ResolutionPatch.defaultOf(text);
+    if (current == null) return own;
+    return ResolutionPatch.lower(current, ResolutionPatch.choices) ?? own;
+  }
+
   /// Whether the title's patch file lets Game Settings choose its resolution.
   bool supportsResolution(Game game) => _factsOf(game).resolution;
 
   ({bool resolution, List<String> backups}) _factsOf(Game game) => _gameFacts.putIfAbsent(game.id, () {
-    final patch = toolkit?.patchFile(game.titleId);
+    final patch = toolkitFor(game)?.patchFile(game.titleId);
     var resolution = false;
     try {
       resolution = patch != null && ResolutionPatch.supports(File(patch).readAsStringSync());
@@ -2868,6 +2920,11 @@ class AppModel extends ChangeNotifier {
     // An update dumped (or removed) since the unlock needs its executable relinked: unlocking
     // again applies it.
     if (record != null && record.update == game.update?.version) {
+      // A game with an engine of its own follows that one, whatever the default is.
+      if (currentSettings(game).engine != null) {
+        final own = toolkitFor(game)?.version;
+        return Installed(outdated: own != null && own != record.toolkit);
+      }
       final version = toolkitVersion;
       return Installed(outdated: (version != null && version != record.toolkit) || engine.updateAvailable);
     }
@@ -2880,9 +2937,32 @@ class AppModel extends ChangeNotifier {
 
   GameSettings settingsFor(Game game) => settingsStore.load(game.slug);
 
+  /// The engine that unlocks [game]: the one chosen for it in its Game Settings (null while that
+  /// one is not on this computer: [missingEngine]), else the default [toolkit].
+  Toolkit? toolkitFor(Game game) {
+    final pin = currentSettings(game).engine;
+    if (pin == null) return toolkit;
+    return engine.downloaded.where((kit) => p.basename(kit.root) == pin).firstOrNull;
+  }
+
+  /// The engine [game] is pinned to when that one is not on this computer, null otherwise.
+  String? missingEngine(Game game) {
+    final pin = currentSettings(game).engine;
+    return pin != null && !engine.downloaded.any((kit) => p.basename(kit.root) == pin) ? pin : null;
+  }
+
+  /// A game pinned to an engine that is not downloaded: says so, and the game's settings offer
+  /// the download (Game Settings › Engine).
+  void _tellEngineMissing(Game game, String pin) {
+    show(T.format('engineGameMissing', [EngineModel.nameOf(pin)]));
+    if (selectedGame == game && overlay == null) open(Layer.gameSettings);
+  }
+
   void saveSettings(Game game, GameSettings settings) {
     if (persist) settingsStore.save(game.slug, settings);
     _cachedSettings[game.slug] = settings;
+    // A game's own engine brings its own patch file.
+    _gameFacts.remove(game.id);
     _changed();
   }
 
@@ -3026,8 +3106,11 @@ class AppModel extends ChangeNotifier {
   void unlock(Game game, {bool copy = false}) {
     final folder = rootOf(game);
     if (folder == null) return;
-    final kit = toolkit;
-    if (kit == null) return show(T.text('noToolkit'));
+    final kit = toolkitFor(game);
+    if (kit == null) {
+      if (missingEngine(game) case final String pin) return _tellEngineMissing(game, pin);
+      return show(T.text('noToolkit'));
+    }
     // Asked for while it is being prepared: it becomes the user's own.
     if (prepare.active == game.id) return _promotePreparation(game);
     prepare.cancel(game.id);
@@ -3040,7 +3123,7 @@ class AppModel extends ChangeNotifier {
           folder,
           knownSize: sizes[game.id],
           toolkit: kit,
-          resolution: currentSettings(game).resolution,
+          resolution: _unlockResolution(game, kit),
         );
       } on FileSystemException {
         plan = null; // The install says what is wrong.
@@ -3070,7 +3153,8 @@ class AppModel extends ChangeNotifier {
   /// Unlocks the game again and plays it; with a newer engine out, downloads that first.
   void updateAndPlay(Game game) {
     _playAfterInstall = game.id;
-    if (engine.updateAvailable) {
+    // A game with its own engine is unlocked with that one: the default's update is not its.
+    if (currentSettings(game).engine == null && engine.updateAvailable) {
       unawaited(
         engine.download().then((done) {
           if (done) {
@@ -3104,11 +3188,19 @@ class AppModel extends ChangeNotifier {
   void _startNext() {
     // While the engine is built in place the unlocks wait for it (engineJobEnded goes on).
     if (engine.git.running) return;
-    final kit = toolkit;
-    if (_installer != null || queue.isEmpty || root == null || kit == null) return;
+    if (_installer != null || queue.isEmpty || root == null) return;
+    final next = games.where((game) => game.id == queue.first).firstOrNull;
+    final kit = next == null ? toolkit : toolkitFor(next);
+    if (next != null && kit == null && missingEngine(next) == null) return; // No engine yet: it waits.
     final id = queue.removeAt(0);
-    final game = games.where((game) => game.id == id).firstOrNull;
+    final game = next;
     if (game == null) return _startNext();
+    // Its engine was deleted while it waited: said, and the next game goes on.
+    if (kit == null) {
+      if (_playAfterInstall == id) _playAfterInstall = null;
+      _tellEngineMissing(game, missingEngine(game)!);
+      return _startNext();
+    }
     final folder = rootOf(game)!;
     _installer = _runUnlock(
       game,
@@ -3157,7 +3249,7 @@ class AppModel extends ChangeNotifier {
       game: game,
       toolkit: kit,
       root: folder,
-      resolution: currentSettings(game).resolution,
+      resolution: _unlockResolution(game, kit),
       freeSpace: freeSpace,
       onProgress: (step, fraction) {
         progress[id] = (step, fraction);
@@ -3286,8 +3378,8 @@ class AppModel extends ChangeNotifier {
               game,
               folder,
               knownSize: sizes[game.id],
-              toolkit: kit,
-              resolution: currentSettings(game).resolution,
+              toolkit: toolkitFor(game) ?? kit,
+              resolution: _unlockResolution(game, toolkitFor(game) ?? kit),
             );
             return plan.space?.shortage(free: freeSpace(folder), folder: folder);
           } on FileSystemException {
@@ -3488,6 +3580,30 @@ class AppModel extends ChangeNotifier {
     _changed();
   }
 
+  /// A backup the user picks takes the saves' place (the current ones backed up first), as on
+  /// the Mac; the game must not be running.
+  Future<void> restoreChosenSaves(Game game) async {
+    if (running?.$1 == game || starting == game) return show(T.text('closeGameFirst'));
+    final folder = rootOf(game);
+    if (folder == null) return;
+    final backups = backupFolder(game);
+    final title = T.text('restoreSaves');
+    final picked = services.pickFileAt != null
+        ? await services.pickFileAt!(title, const ['zip'], Directory(backups).existsSync() ? backups : null)
+        : await services.pickFile?.call(title, const ['zip']);
+    if (picked == null) return;
+    if (running?.$1 == game || starting == game) return show(T.text('closeGameFirst'));
+    try {
+      SaveBackup.restore(picked, Installer.installedFolder(game, folder), backups, DateTime.now());
+      _gameFacts.remove(game.id);
+      _loadTrophies(game);
+      show(T.text('savesRestored'));
+    } on Object catch (error) {
+      show('${T.text('backupFailed')}: $error');
+    }
+    _changed();
+  }
+
   void _appendLog(Game game, String line) {
     try {
       final file = File(paths.logFile(game.titleId));
@@ -3610,7 +3726,7 @@ class AppModel extends ChangeNotifier {
       final began = DateTime.now();
       // Upstream's engine does not read ANYPS5_FULLSCREEN or ANYPS5_WINDOW_SIZE: the launcher
       // sizes its window or presses its F11 once the window is open.
-      if (!engine.readsDisplaySettings) {
+      if (!engine.readsDisplaySettingsOf(game)) {
         unawaited(desktop.applyDisplay(run.pid, fullscreen: settings.fullscreen, windowSize: settings.windowSize));
       }
       // Settings › Behaviour › Hide the launcher while a game runs.
@@ -5017,10 +5133,8 @@ class AppModel extends ChangeNotifier {
                 id: 'update',
                 title: T.text('updateAndPlay'),
                 detail: switch (engine.latestPackage) {
-                  final ToolkitPackage newest when engine.updateAvailable => T.format('engineUpdateAndPlayDetail', [
-                    'v${newest.version}',
-                    byteText(newest.size),
-                  ]),
+                  final ToolkitPackage newest when engine.updateAvailable && currentSettings(game).engine == null =>
+                    T.format('engineUpdateAndPlayDetail', ['v${newest.version}', byteText(newest.size)]),
                   _ => T.text('updateAndPlayDetail'),
                 },
                 kind: ActionRow(() {
@@ -5297,10 +5411,25 @@ class AppModel extends ChangeNotifier {
               title: T.text('phoneAddress'),
               kind: InfoRow('${services.computerName ?? Platform.localHostname} · $port'),
             ),
+          // The phones that are paired, which of them are connected now, as on the Mac.
+          if (remote case final RemoteServer server)
+            PanelRow(
+              id: 'phones',
+              title: T.text('phones'),
+              kind: InfoRow(
+                server.devices.all.isEmpty
+                    ? T.text('phonesNone')
+                    : server.connectedDeviceIds.isEmpty
+                    ? ''
+                    : T.format('phonesConnectedCount', [server.connectedDeviceIds.toSet().length]),
+              ),
+            ),
           for (final device in remote?.devices.all ?? const <PairedDevice>[])
             PanelRow(
               id: 'device-${device.id}',
-              title: device.name,
+              title: remote?.connectedDeviceIds.contains(device.id) ?? false
+                  ? '${device.name} · ${T.text('phoneOnline')}'
+                  : device.name,
               detail: T.text('phoneRemove'),
               kind: ActionRow(() {
                 remote?.devices.remove(device.id);
@@ -5456,6 +5585,19 @@ class AppModel extends ChangeNotifier {
           ),
           ...updates.aboutRows(),
           updates.channelRow(),
+          PanelRow(id: 'author', title: T.text('madeBy'), kind: const InfoRow('Utku Halis')),
+          PanelRow(
+            id: 'github',
+            title: 'GitHub',
+            detail: 'github.com/${LauncherUpdates.repository}',
+            kind: ActionRow(() => services.openUrl?.call(Uri.https('github.com', LauncherUpdates.repository))),
+          ),
+          PanelRow(
+            id: 'upstream',
+            title: T.text('builtOn'),
+            detail: 'github.com/boykopovar/AnyPS5',
+            kind: ActionRow(() => services.openUrl?.call(Uri.https('github.com', 'boykopovar/AnyPS5'))),
+          ),
         ],
       ),
     ];
@@ -5885,7 +6027,7 @@ class AppModel extends ChangeNotifier {
         // AnyPS5-ARM's engine opens the game borderless full screen itself (SDL's desktop full
         // screen), and the line says what that is; upstream's ignores the choice: the launcher
         // presses F11 for it, and says so.
-        detail: engine.readsDisplaySettings ? T.text('displayBorderless') : T.text('displayUpstream'),
+        detail: engine.readsDisplaySettingsOf(game) ? T.text('displayBorderless') : T.text('displayUpstream'),
         // Default (Settings › Default Display), then the game's own choices.
         kind: ChoiceRow(
           [
@@ -5905,7 +6047,7 @@ class AppModel extends ChangeNotifier {
         PanelRow(
           id: 'windowSize',
           title: T.text('windowSize'),
-          detail: engine.readsDisplaySettings ? null : T.text('windowSizeUpstream'),
+          detail: engine.readsDisplaySettingsOf(game) ? null : T.text('windowSizeUpstream'),
           kind: StepperRow(
             value: display.windowSize,
             min: DisplayDefaults.minimumWindowSize,
@@ -5937,7 +6079,7 @@ class AppModel extends ChangeNotifier {
       PanelRow(
         id: 'upscaling',
         title: T.text('upscaling'),
-        detail: engine.readsDisplaySettings ? T.text('upscalingDetail') : T.text('upscalingUpstream'),
+        detail: engine.readsDisplaySettingsOf(game) ? T.text('upscalingDetail') : T.text('upscalingUpstream'),
         kind: ChoiceRow(
           [T.text('upscalingBilinear'), T.text('upscalingFsr1')],
           (settings.upscaler ?? Upscaler.bilinear).index,
@@ -5977,7 +6119,7 @@ class AppModel extends ChangeNotifier {
         id: 'frameGeneration',
         title: T.text('frameGeneration'),
         // Only AnyPS5-ARM's engine makes the frames: said for upstream's, as FSR 1 is.
-        detail: !engine.readsDisplaySettings
+        detail: !engine.readsDisplaySettingsOf(game)
             ? T.text('frameGenerationUpstream')
             // Settings › Battery & Heat holds it paused now.
             : settings.frameGeneration == true && powerWatch.adjustment.pauseFrameGeneration
@@ -6029,6 +6171,7 @@ class AppModel extends ChangeNotifier {
           (index) => change(settings.copyWith(language: index == 0 ? null : languages[index - 1].$1)),
         ),
       ),
+      ...engine.gameRows(game),
       PanelRow(
         id: 'controls',
         title: T.text('controls'),
@@ -6100,6 +6243,16 @@ class AppModel extends ChangeNotifier {
               kind: ActionRow(() => restoreLatestSaves(game)),
             ),
           ),
+        held(
+          'restoreChoose',
+          T.text('restoreSaves'),
+          () => PanelRow(
+            id: 'restoreChoose',
+            title: T.text('restoreSaves'),
+            detail: T.text('restoreSavesDetail'),
+            kind: ActionRow(() => unawaited(restoreChosenSaves(game))),
+          ),
+        ),
         held(
           'uninstall',
           T.text('uninstall'),

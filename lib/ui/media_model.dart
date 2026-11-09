@@ -10,9 +10,11 @@ import '../core/capture/game_sound.dart';
 import '../core/capture/remote_play.dart';
 import '../core/capture/video_encoders.dart';
 import '../core/desktop/desktop.dart';
+import '../core/host.dart';
 import '../core/remote/remote_protocol.dart';
-import '../core/replay_buffer.dart' show ProcessStarter;
+import '../core/replay_buffer.dart' show ProcessRunner, ProcessStarter;
 import 'app_model.dart';
+import 'live_badge.dart';
 import 'strings.dart';
 
 /// What sends the game's picture and sound somewhere: Remote Play to the phones that ask, and
@@ -34,6 +36,10 @@ class MediaModel {
   ScreenArea? Function(int pid)? areaOverride;
   GameSound Function(int pid)? soundOverride;
   ProcessStarter? startOverride;
+  ProcessRunner? runOverride;
+
+  /// Tests: whether the LIVE badge shows, whatever the system.
+  bool? badgeOverride;
 
   /// Whether this desktop can be recorded at all (Windows, X11).
   bool get screenRecordable => ScreenGrab.supported(app.system, _environment) || areaOverride != null;
@@ -49,7 +55,11 @@ class MediaModel {
     if (encodersOverride != null) return encodersOverride;
     final tool = ffmpeg;
     if (tool == null) return null;
-    return _encoders ??= EncoderChoice(ffmpeg: tool, system: app.system, run: (executable, arguments) => Process.run(executable, arguments));
+    return _encoders ??= EncoderChoice(
+      ffmpeg: tool,
+      system: app.system,
+      run: (executable, arguments) => Process.run(executable, arguments),
+    );
   }
 
   ScreenArea? areaOf(int pid) {
@@ -140,7 +150,8 @@ class MediaModel {
 
   String get key => keys.keyFor(settings.service);
 
-  String get serviceName => settings.service == BroadcastService.custom ? T.text('broadcastServiceCustom') : settings.service.brand;
+  String get serviceName =>
+      settings.service == BroadcastService.custom ? T.text('broadcastServiceCustom') : settings.service.brand;
 
   void _saveSettings() {
     settings.save(Broadcaster.settingsFile(app.paths.config));
@@ -182,6 +193,9 @@ class MediaModel {
       soundOf: soundOf,
       changed: _broadcastChanged,
       start: startOverride,
+      run: runOverride,
+      microphoneLevel: () => settings.microphone ? settings.microphoneLevel : 0,
+      noMicrophone: () => unawaited(app.notice(T.text('broadcastMicrophone'), detail: T.text('broadcastNoMicrophone'))),
       log: _log,
     );
   }
@@ -230,11 +244,60 @@ class MediaModel {
       }
       if (now.active != before.active) app.remote?.publish(RemoteBroadcast(now.active));
     }
+    unawaited(_updateBadge());
     app.refresh();
   }
 
-  static String failureText(String reason) =>
-      reason == Broadcaster.noEncoder ? T.text('broadcastNoEncoder') : reason;
+  // The LIVE badge over the game, on Windows only: on Linux, anything drawn over the game would
+  // be in the broadcast too, since it is recorded from the screen.
+
+  bool get _badgeShown =>
+      (badgeOverride ?? app.system == HostSystem.windows) &&
+      settings.liveBadge &&
+      (phase is BroadcastLive || phase is BroadcastReconnecting);
+
+  String? _badgeState;
+  bool _badgeBusy = false;
+  bool _badgeAgain = false;
+
+  /// Keeps the badge's window as the broadcast now is, one drawing at a time.
+  Future<void> _updateBadge() async {
+    if (_badgeBusy) {
+      _badgeAgain = true;
+      return;
+    }
+    _badgeBusy = true;
+    try {
+      do {
+        _badgeAgain = false;
+        await _drawBadge();
+      } while (_badgeAgain);
+    } finally {
+      _badgeBusy = false;
+    }
+  }
+
+  Future<void> _drawBadge() async {
+    final running = _broadcaster?.pid;
+    if (!_badgeShown || running == null) {
+      if (_badgeState != null) {
+        _badgeState = null;
+        await app.desktop.showBadge(null);
+      }
+      return;
+    }
+    final live = phase is BroadcastLive;
+    final time = clock(_broadcaster?.stats.duration ?? Duration.zero);
+    final state = '$live $time';
+    if (state == _badgeState) return;
+    final render = app.services.renderLiveBadge ?? LiveBadge.render;
+    final image = await render(live, time, app.desktop.cardScale(running));
+    if (!_badgeShown) return _drawBadge();
+    _badgeState = state;
+    await app.desktop.showBadge(image, pid: running);
+  }
+
+  static String failureText(String reason) => reason == Broadcaster.noEncoder ? T.text('broadcastNoEncoder') : reason;
 
   /// The phone's Go Live and End Broadcast: what it asks for, then what the launcher does now,
   /// in case it showed the wrong one.
@@ -307,7 +370,9 @@ class MediaModel {
         }
         return rows;
       case BroadcastStarting():
-        rows.add(PanelRow(id: 'broadcast-state', title: T.format('broadcastStarting', [serviceName]), kind: const InfoRow('')));
+        rows.add(
+          PanelRow(id: 'broadcast-state', title: T.format('broadcastStarting', [serviceName]), kind: const InfoRow('')),
+        );
       case BroadcastReconnecting(:final delay):
         rows.add(
           PanelRow(
@@ -339,8 +404,29 @@ class MediaModel {
         ),
       );
     }
-    rows.add(PanelRow(id: 'broadcast-stop', title: T.text('broadcastStop'), kind: ActionRow(toggleBroadcast, destructive: true)));
+    rows.add(
+      PanelRow(
+        id: 'broadcast-live-mic',
+        title: T.text('broadcastMicrophone'),
+        detail: T.text('broadcastMicrophoneDetail'),
+        kind: ToggleRow(settings.microphone, _setMicrophone),
+      ),
+    );
+    rows.add(
+      PanelRow(
+        id: 'broadcast-stop',
+        title: T.text('broadcastStop'),
+        kind: ActionRow(toggleBroadcast, destructive: true),
+      ),
+    );
     return rows;
+  }
+
+  void _setMicrophone(bool on) {
+    settings.microphone = on;
+    _saveSettings();
+    _broadcaster?.microphoneChanged();
+    app.refresh();
   }
 
   /// Settings › Broadcasting.
@@ -352,12 +438,16 @@ class MediaModel {
       if (unavailable case final reason?)
         PanelRow(id: 'broadcast-unavailable', title: T.text('broadcastTitle'), kind: InfoRow(reason))
       else
-        ...gameRows(),
+        // The microphone has its own row below.
+        ...gameRows().where((row) => row.id != 'broadcast-live-mic'),
       PanelRow(
         id: 'broadcast-service',
         title: T.text('broadcastService'),
         kind: ChoiceRow(
-          [for (final service in services) service == BroadcastService.custom ? T.text('broadcastServiceCustom') : service.brand],
+          [
+            for (final service in services)
+              service == BroadcastService.custom ? T.text('broadcastServiceCustom') : service.brand,
+          ],
           services.indexOf(settings.service),
           (index) {
             settings.service = services[index];
@@ -379,7 +469,12 @@ class MediaModel {
         id: 'broadcast-key',
         title: T.text('broadcastKey'),
         detail: T.text('broadcastKeyDetail'),
-        kind: TextRow('', setKey, hint: current.isEmpty ? T.text('broadcastKeyNone') : BroadcastKeys.masked(current), obscure: true),
+        kind: TextRow(
+          '',
+          setKey,
+          hint: current.isEmpty ? T.text('broadcastKeyNone') : BroadcastKeys.masked(current),
+          obscure: true,
+        ),
       ),
       PanelRow(id: 'broadcast-paste', title: T.text('broadcastKeyPaste'), kind: ActionRow(() => unawaited(pasteKey()))),
       if (settings.service.keyPage case final page?)
@@ -399,6 +494,44 @@ class MediaModel {
         }),
       ),
       PanelRow(
+        id: 'broadcast-mic',
+        title: T.text('broadcastMicrophone'),
+        detail: T.text('broadcastMicrophoneDetail'),
+        kind: ToggleRow(settings.microphone, _setMicrophone),
+      ),
+      if (settings.microphone)
+        PanelRow(
+          id: 'broadcast-mic-level',
+          title: T.text('broadcastMicrophoneLevel'),
+          kind: StepperRow(
+            value: settings.microphoneLevel,
+            min: 10,
+            max: 100,
+            step: 10,
+            format: T.percent,
+            set: (value) {
+              settings.microphoneLevel = value;
+              _saveSettings();
+              _broadcaster?.microphoneChanged();
+              app.refresh();
+            },
+          ),
+        ),
+      if (badgeOverride ?? app.system == HostSystem.windows)
+        PanelRow(
+          id: 'broadcast-badge',
+          title: T.text('broadcastBadge'),
+          detail: T.text('broadcastBadgeDetail'),
+          kind: ToggleRow(settings.liveBadge, (on) {
+            settings.liveBadge = on;
+            _saveSettings();
+            unawaited(_updateBadge());
+            app.refresh();
+          }),
+        )
+      else
+        PanelRow(id: 'broadcast-badge', title: T.text('broadcastBadge'), kind: InfoRow(T.text('broadcastBadgeLinux'))),
+      PanelRow(
         id: 'broadcast-link',
         title: T.text('broadcastViewerLink'),
         detail: T.text('broadcastViewerLinkDetail'),
@@ -407,7 +540,11 @@ class MediaModel {
           _saveSettings();
         }, hint: 'twitch.tv/…'),
       ),
-      PanelRow(id: 'broadcast-private', title: T.text('broadcastKeysTitle'), kind: InfoRow(T.text('broadcastKeptPrivately'))),
+      PanelRow(
+        id: 'broadcast-private',
+        title: T.text('broadcastKeysTitle'),
+        kind: InfoRow(T.text('broadcastKeptPrivately')),
+      ),
     ];
   }
 
