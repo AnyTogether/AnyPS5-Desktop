@@ -166,7 +166,7 @@ class TestFfpfsc {
 
   static String _base(String path) => path.contains('/') ? path.substring(path.lastIndexOf('/') + 1) : path;
 
-  static ({List<int> bytes, List<_Node> nodes}) _pfs(List<FfpfscItem> items, bool pfscFile) {
+  static ({Uint8List bytes, List<_Node> nodes}) _pfs(List<FfpfscItem> items, bool pfscFile) {
     const bs = blockSize;
     final sorted = [...items]
       ..sort((a, b) {
