@@ -385,7 +385,9 @@ extension TogetherPlay on TogetherModel {
     final text = T.format('togetherOffer', [offer.hostName, gameName(offer.titleId)]);
     app.show(text);
     // A game in front hears of it over the game, unless the user asked not to be disturbed.
-    if (!doNotDisturb) unawaited(app.noticeOverGame(text, detail: T.text('togetherOfferDetail')));
+    if (!doNotDisturb) {
+      unawaited(app.noticeOverGame(text, detail: T.text('togetherOfferDetail'), symbol: Icons.group_rounded));
+    }
     unawaited(hub.parties.refresh().catchError((Object _) {}));
   }
 

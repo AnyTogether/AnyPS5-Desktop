@@ -1082,6 +1082,7 @@ class LauncherServices {
     this.desktop,
     this.backdrop,
     this.renderTrophyCard,
+    this.renderNoticeCard,
     this.renderLiveBadge,
     this.cjkFonts,
     this.fontClient,
@@ -1204,6 +1205,9 @@ class LauncherServices {
 
   /// Draws the trophy card for the desktop's window; TrophyCard.render by default.
   final Future<RgbaImage> Function(Trophy trophy, double scale)? renderTrophyCard;
+
+  /// Draws a short message's card over the game; TrophyCard.renderNotice by default.
+  final Future<RgbaImage> Function(String title, String? detail, IconData symbol, double scale)? renderNoticeCard;
 
   /// Draws the LIVE badge for the desktop's window; LiveBadge.render by default.
   final Future<RgbaImage> Function(bool live, String time, double scale)? renderLiveBadge;
@@ -3965,28 +3969,64 @@ class AppModel extends ChangeNotifier {
       if (overlay == Layer.trophies || overlay == Layer.gallery) _loadShots();
       notifyListeners();
     }
+    await _cardTurn(() async {
+      try {
+        final scale = desktop.cardScale(pid);
+        final render =
+            services.renderTrophyCard ??
+            (trophy, scale) => TrophyCard.render(trophy, scale: scale, glass: look == LookStyle.glass);
+        final card = await render(trophy, scale);
+        if (!await desktop.showCard(card, pid: pid)) {
+          await desktop.notify(
+            T.text('trophyEarned'),
+            trophy.name.isEmpty ? T.text('trophyHidden') : trophy.name,
+            icon: shot,
+          );
+        }
+      } on Object {
+        // The toast in the launcher and the phone still say it.
+      }
+    });
+  }
+
+  /// A card over the game takes its turn: one window at a time, one after another as on the Mac.
+  Future<R> _cardTurn<R>(Future<R> Function() body) async {
     final previous = _cards;
     final done = Completer<void>();
     _cards = done.future;
     await previous;
     try {
-      final scale = desktop.cardScale(pid);
-      final render =
-          services.renderTrophyCard ??
-          (trophy, scale) => TrophyCard.render(trophy, scale: scale, glass: look == LookStyle.glass);
-      final card = await render(trophy, scale);
-      if (!await desktop.showCard(card, pid: pid)) {
-        await desktop.notify(
-          T.text('trophyEarned'),
-          trophy.name.isEmpty ? T.text('trophyHidden') : trophy.name,
-          icon: shot,
-        );
-      }
-    } on Object {
-      // The toast in the launcher and the phone still say it.
+      return await body();
     } finally {
       done.complete();
     }
+  }
+
+  /// A short message as the card over the game the Mac shows (its TrophyBanner notices), with
+  /// the game playing and a desktop that can draw one. False when it could not be: the desktop
+  /// notice instead.
+  Future<bool> _noticeCard(String title, String? detail, IconData symbol, {bool sound = true}) {
+    final pid = running?.$2.pid;
+    if (pid == null || !desktop.canShowCard) return Future.value(false);
+    return _cardTurn(() async {
+      try {
+        final scale = desktop.cardScale(pid);
+        final render =
+            services.renderNoticeCard ??
+            (title, detail, symbol, scale) => TrophyCard.renderNotice(
+              title,
+              detail: detail,
+              symbol: symbol,
+              scale: scale,
+              glass: look == LookStyle.glass,
+            );
+        final card = await render(title, detail, symbol, scale);
+        if (sound) sounds.play(Cue.unlocked, overGame: true);
+        return await desktop.showCard(card, pid: pid);
+      } on Object {
+        return false;
+      }
+    });
   }
 
   /// Saves the game's window as it is now as the picture of [trophy]; its path, or null. With
@@ -4936,26 +4976,36 @@ class AppModel extends ChangeNotifier {
     show(text, onTap: upstream ? () => askPhoneEngine(again: true) : null);
     if (launcherInFront) return;
     unawaited(() async {
+      if (await _noticeCard(text, null, Icons.smartphone_rounded)) return;
       if (!await desktop.notify('AnyPS5', text)) desktopNotify('AnyPS5', text);
     }());
   }
 
   /// A capture said: the toast, and over the game a desktop notice.
-  Future<void> _captureSaid(String text) async {
+  Future<void> _captureSaid(String text, {required IconData symbol, bool sound = false}) async {
     show(text);
     if (launcherInFront) return;
+    if (await _noticeCard(text, null, symbol, sound: sound)) return;
     if (!await desktop.notify('AnyPS5', text)) desktopNotify('AnyPS5', text);
   }
 
-  /// Said as a capture is ([_captureSaid]), with a second line in the desktop notice.
-  Future<void> notice(String text, {String? detail}) async {
+  /// Said as a capture is ([_captureSaid]), with a second line under it, and [symbol] on the card.
+  Future<void> notice(String text, {String? detail, IconData symbol = Icons.notifications_rounded}) async {
     show(detail == null ? text : '$text. $detail');
-    await noticeOverGame(text, detail: detail);
+    await noticeOverGame(text, detail: detail, symbol: symbol);
   }
 
-  /// The desktop notice alone: with a game in front, a word the launcher's toast cannot give.
-  Future<void> noticeOverGame(String text, {String? detail}) async {
+  /// With a game in front, a word the launcher's toast cannot give: the card over the game as on
+  /// the Mac, a desktop notice where a card cannot be drawn. [sound] is the card's own cue; a
+  /// ring or a shutter already heard stays quiet.
+  Future<void> noticeOverGame(
+    String text, {
+    String? detail,
+    IconData symbol = Icons.notifications_rounded,
+    bool sound = true,
+  }) async {
     if (launcherInFront) return;
+    if (await _noticeCard(text, detail, symbol, sound: sound)) return;
     if (!await desktop.notify(text, detail ?? 'AnyPS5')) desktopNotify(text, detail ?? 'AnyPS5');
   }
 
@@ -4966,7 +5016,7 @@ class AppModel extends ChangeNotifier {
     final (game, run) = playing;
     final frame = await desktop.captureGame(run.pid);
     if (frame == null) {
-      unawaited(_captureSaid(T.text('screenshotFailed')));
+      unawaited(_captureSaid(T.text('screenshotFailed'), symbol: Icons.error_outline_rounded, sound: true));
       return null;
     }
     final path = Screenshots.shotPath(picturesFolder, game, DateTime.now());
@@ -4977,11 +5027,11 @@ class AppModel extends ChangeNotifier {
           ..writeAsBytesSync(PngEncoder.rgba(frame.width, frame.height, frame.pixels));
       });
     } on Object {
-      unawaited(_captureSaid(T.text('screenshotFailed')));
+      unawaited(_captureSaid(T.text('screenshotFailed'), symbol: Icons.error_outline_rounded, sound: true));
       return null;
     }
     sounds.play(Cue.unlocked);
-    unawaited(_captureSaid(T.text('screenshotSaved')));
+    unawaited(_captureSaid(T.text('screenshotSaved'), symbol: Icons.photo_camera_rounded));
     return path;
   }
 
@@ -4995,7 +5045,11 @@ class AppModel extends ChangeNotifier {
     final saved = await buffer.save(Screenshots.clipPath(picturesFolder, playing.$1, DateTime.now()));
     if (saved != null) sounds.play(Cue.unlocked);
     unawaited(
-      _captureSaid(saved == null ? T.text('clipFailed') : T.format('clipSaved', [replayLengthText(buffer.seconds)])),
+      _captureSaid(
+        saved == null ? T.text('clipFailed') : T.format('clipSaved', [replayLengthText(buffer.seconds)]),
+        symbol: saved == null ? Icons.error_outline_rounded : Icons.movie_rounded,
+        sound: saved == null,
+      ),
     );
     return saved;
   }
@@ -7167,7 +7221,11 @@ class AppModel extends ChangeNotifier {
           _changed();
           // A game in front keeps its focus: the phone asks through a notice over it instead.
           unawaited(
-            noticeOverGame(T.text('phonePairingTitle'), detail: T.format('phoneOpenLauncher', [request.deviceName])),
+            noticeOverGame(
+              T.text('phonePairingTitle'),
+              detail: T.format('phoneOpenLauncher', [request.deviceName]),
+              symbol: Icons.smartphone_rounded,
+            ),
           );
         },
         connecting: (device) {
@@ -7180,7 +7238,13 @@ class AppModel extends ChangeNotifier {
           pairing = null;
           show(T.format('phoneConnected', [device]));
           // A game in front hears of it through a notice over it.
-          unawaited(noticeOverGame(T.format('phoneConnected', [device]), detail: T.text('phoneConnectedDetail')));
+          unawaited(
+            noticeOverGame(
+              T.format('phoneConnected', [device]),
+              detail: T.text('phoneConnectedDetail'),
+              symbol: Icons.smartphone_rounded,
+            ),
+          );
           _toldLibrary = null;
           _changed();
           _publishLook();
