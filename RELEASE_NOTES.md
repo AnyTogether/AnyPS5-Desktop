@@ -5,6 +5,9 @@ release when it is made.
 
 ## Next release
 
+- **A game in one .ffpfsc file installs like a zip**, as on the Mac: drop it in a games folder or
+  use Add game file in Settings. AnyPS5 unpacks it into a normal game folder with its name, title
+  ID and icon, and says so plainly when a file is compressed or of a kind it cannot unpack.
 - **Play Together player rows say how each player is reached** (Direct or Relay, with the round
   trip in ms), as on the Mac. Where the system cannot say, the row stays at Connected.
 - **A Play Together offer or a game invite is said over the game** in a desktop notice, as on the
