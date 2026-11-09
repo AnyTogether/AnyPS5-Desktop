@@ -102,6 +102,9 @@ jobs:
       # language's code and no Turkish words outside the files.
       - name: Check the language files in assets/l10n and the texts in lib
         run: dart run tool/check_translations.dart
+      # One bullet per file in release-notes/next (packaging/release-notes.sh).
+      - name: Check the next release's notes
+        run: bash packaging/release-notes.sh > /dev/null
 
   test:
     name: flutter test (Linux, shard ${{ matrix.shard }} of 2)
