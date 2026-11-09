@@ -24,6 +24,13 @@ class FakeDesktop implements DesktopWindows {
   final List<RgbaImage> cards = [];
   bool cardsWork = true;
 
+  /// What each notice card was drawn with, and whether this desktop can draw one.
+  final List<(String, String?)> noticeCards = [];
+  bool canShow = true;
+
+  @override
+  bool get canShowCard => canShow;
+
   @override
   Future<bool> showBadge(RgbaImage? badge, {int? pid}) async {
     calls.add(badge == null ? 'badge-off' : 'badge');
@@ -434,6 +441,10 @@ void main() {
       fixture = makeFixture(
         desktop: desktop,
         renderTrophyCard: (trophy, scale) async => RgbaImage(1, 1, Uint8List.fromList([1, 2, 3, 4])),
+        renderNoticeCard: (title, detail, symbol, scale) async {
+          desktop.noticeCards.add((title, detail));
+          return RgbaImage(1, 1, Uint8List.fromList([1, 2, 3, 4]));
+        },
       );
       model = fixture.model;
     });
@@ -476,6 +487,47 @@ void main() {
       model.stopGame();
       await playing;
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
+
+    test('a notice while the game is in front is a card, and a notification where no card can be drawn', () async {
+      final orbit = model.games.firstWhere((game) => game.titleId == 'PPSA01001');
+      final installed = Installer.installedFolder(orbit, model.root!);
+      File(p.join(installed, 'app.elf')).writeAsStringSync('#!/bin/sh\nsleep 6\n');
+      if (!Platform.isWindows) Process.runSync('chmod', ['755', p.join(installed, 'app.elf')]);
+      final playing = model.play(orbit);
+      await until(() => model.running != null);
+      List<String> notices() => desktop.calls.where((call) => call == 'card' || call.startsWith('notify')).toList();
+      desktop.focused = false;
+      desktop.calls.clear();
+      await model.noticeOverGame('Ana sent an invite', detail: 'Friends');
+      expect(desktop.noticeCards.single, ('Ana sent an invite', 'Friends'));
+      expect(notices(), ['card'], reason: 'the card, and no desktop notice as well');
+      // No window can go over the game here (Wayland): the desktop notice says it.
+      desktop.canShow = false;
+      desktop.calls.clear();
+      await model.noticeOverGame('Ana sent an invite', detail: 'Friends');
+      expect(notices(), ['notify Friends']);
+      // A card that could not be shown after all falls back too.
+      desktop
+        ..canShow = true
+        ..cardsWork = false;
+      desktop.calls.clear();
+      await model.noticeOverGame('Ana sent an invite');
+      expect(notices(), ['card', 'notify AnyPS5']);
+      // The launcher in front: its toast is enough.
+      desktop.focused = true;
+      desktop.calls.clear();
+      await model.noticeOverGame('Ana sent an invite');
+      expect(notices(), isEmpty);
+      model.stopGame();
+      await playing;
+    }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
+
+    test('with no game playing, no card: a notification over whatever is in front', () async {
+      desktop.focused = false;
+      await model.noticeOverGame('Ana sent an invite', detail: 'Friends');
+      expect(desktop.noticeCards, isEmpty);
+      expect(desktop.calls.last, 'notify Friends');
+    });
 
     test('where no card can be shown, a notification says it', () async {
       desktop.cardsWork = false;

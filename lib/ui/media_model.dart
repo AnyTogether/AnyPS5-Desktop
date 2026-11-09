@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/material.dart' show Icons;
 import 'package:flutter/services.dart';
 
 import '../core/audio/tones.dart';
@@ -227,7 +228,13 @@ class MediaModel {
       run: runOverride,
       microphoneLevel: () => settings.microphone ? settings.microphoneLevel : 0,
       microphoneDevice: () => settings.microphoneDevice,
-      noMicrophone: () => unawaited(app.notice(T.text('broadcastMicrophone'), detail: T.text('broadcastNoMicrophone'))),
+      noMicrophone: () => unawaited(
+        app.notice(
+          T.text('broadcastMicrophone'),
+          detail: T.text('broadcastNoMicrophone'),
+          symbol: Icons.mic_off_rounded,
+        ),
+      ),
       log: _log,
     );
   }
@@ -244,7 +251,13 @@ class MediaModel {
     }
     final (target, problem) = endpoint();
     if (target == null) {
-      unawaited(app.notice(T.text('broadcastSetUpFirst'), detail: problem == null ? null : problemText(problem)));
+      unawaited(
+        app.notice(
+          T.text('broadcastSetUpFirst'),
+          detail: problem == null ? null : problemText(problem),
+          symbol: Icons.podcasts_rounded,
+        ),
+      );
       return;
     }
     final made = _broadcaster ??= _makeBroadcaster();
@@ -268,13 +281,15 @@ class MediaModel {
       _toldPhase = now;
       switch (now) {
         case BroadcastLive() when before is! BroadcastLive:
-          unawaited(app.notice(T.format('broadcastStartedNotice', [serviceName])));
+          unawaited(app.notice(T.format('broadcastStartedNotice', [serviceName]), symbol: Icons.podcasts_rounded));
         case BroadcastReconnecting():
-          unawaited(app.notice(T.text('broadcastReconnectingNotice')));
+          unawaited(app.notice(T.text('broadcastReconnectingNotice'), symbol: Icons.podcasts_rounded));
         case BroadcastFailed(:final reason):
-          unawaited(app.notice(T.format('broadcastFailedNotice', [failureText(reason)])));
+          unawaited(
+            app.notice(T.format('broadcastFailedNotice', [failureText(reason)]), symbol: Icons.podcasts_rounded),
+          );
         case BroadcastOff() when before.active:
-          unawaited(app.notice(T.text('broadcastEndedNotice')));
+          unawaited(app.notice(T.text('broadcastEndedNotice'), symbol: Icons.podcasts_rounded));
         default:
           break;
       }
