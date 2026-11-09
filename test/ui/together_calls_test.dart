@@ -79,7 +79,7 @@ void main() {
     await until(() => model.toast == 'In a call with Ana');
 
     model.open(Layer.friends);
-    expect(rowIds().take(4), ['call-u-ana', 'voice-mic', 'voice-deafen', 'voice-ptt']);
+    expect(rowIds().take(5), ['call-u-ana', 'voice-mic', 'voice-noise', 'voice-deafen', 'voice-ptt']);
     expect(row('call-u-ana').title, 'In a call with Ana');
     expect(row('voice-leave').title, 'Hang up');
     expect(rowIds(), isNot(contains('friend-call-u-ana')), reason: 'in a call with her already');

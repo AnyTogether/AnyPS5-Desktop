@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:path/path.dart' as p;
 
 import '../core/audio/tones.dart';
+import '../core/game_library.dart';
 import '../core/glibc.dart';
 import '../core/host.dart';
 import '../core/release_signing.dart';
@@ -96,11 +97,16 @@ class EngineModel {
   }
 
   /// A toolkit's name for people: v0.1.3 for a downloaded one, its version.txt otherwise.
-  static String label(Toolkit kit) {
-    if (isArm(kit.version)) return 'AnyPS5-ARM ${kit.version.substring(4)}';
-    if (UpstreamNightlyPackage.commitOf(kit.version) case final String commit) return 'Upstream main $commit';
-    final upstream = ToolkitStore.upstreamVersion(kit.version);
-    return upstream == null ? kit.version : 'v$upstream';
+  static String label(Toolkit kit) => nameOf(kit.version);
+
+  /// An engine's name for people from its version.txt, or its folder name in the engines folder
+  /// (0.1.3, arm-5ca076a87, upstream-main-bf80054e7).
+  static String nameOf(String version) {
+    if (isArm(version)) return 'AnyPS5-ARM ${version.substring(4)}';
+    if (UpstreamNightlyPackage.commitOf(version) case final String commit) return 'Upstream main $commit';
+    final upstream = ToolkitStore.upstreamVersion(version);
+    if (upstream != null) return 'v$upstream';
+    return RegExp(r'^\d').hasMatch(version) ? 'v$version' : version;
   }
 
   // The AnyPS5-ARM engine, from AnyPS5-ARM's signed releases.
@@ -130,10 +136,17 @@ class EngineModel {
   /// Whether a toolkit's version.txt names an upstream nightly (`upstream-main-<commit>`).
   static bool isUpstreamNightly(String? version) => UpstreamNightlyPackage.isVersion(version);
 
-  /// Asks AnyPS5-ARM's releases for its newest engine.
-  Future<void> checkArm({bool quiet = false}) async {
+  Future<void>? _armCheck;
+
+  /// Asks AnyPS5-ARM's releases for its newest engine; a second call while one runs waits for it.
+  Future<void> checkArm({bool quiet = false}) {
+    if (armChecking) return _armCheck ?? Future.value();
+    return _armCheck = _checkArm(quiet);
+  }
+
+  Future<void> _checkArm(bool quiet) async {
     final source = _armSource;
-    if (source == null || armChecking) return;
+    if (source == null) return;
     armChecking = true;
     armError = null;
     app.refresh();
@@ -211,6 +224,47 @@ class EngineModel {
     if (arm && !armChecked) unawaited(checkArm(quiet: true));
     if (!arm && latest == null) unawaited(check(quiet: true));
   }
+
+  /// One press from the phone's notice or a crash report: AnyPS5-ARM's engine is chosen, used at
+  /// once when one is downloaded, else downloaded from AnyPS5-ARM's signed releases. True when it
+  /// is the engine in use. Installed games then offer Update and Play (unlocked again with it).
+  Future<bool> switchToArm() async {
+    if (!armSelected) {
+      app.preferences.engineSource = 'arm';
+      app.savePreferences();
+    }
+    if (isArm(app.toolkitVersion)) return true;
+    final kit = downloaded.where((kit) => isArm(kit.version)).firstOrNull;
+    if (kit != null) {
+      use(kit);
+      return true;
+    }
+    if (downloading != null) return false;
+    if (!armChecked) await checkArm(quiet: true);
+    return download();
+  }
+
+  /// The newest engine of the source chosen, for the first start's download card.
+  ToolkitPackage? get offered => armSelected ? armPackage : latestPackage;
+
+  /// Whether GitHub is being asked for the source chosen.
+  bool get looking => armSelected ? armChecking : checking;
+
+  /// Why GitHub could not be asked for the source chosen.
+  String? get lookError => armSelected ? armError : checkError;
+
+  /// Asks GitHub for the source chosen, quietly.
+  void lookQuietly() {
+    if (armSelected) {
+      if (!armChecking) unawaited(checkArm(quiet: true));
+    } else if (!checking) {
+      unawaited(check(quiet: true));
+    }
+  }
+
+  /// A package as the download card names it: v0.1.4, or AnyPS5-ARM 5ca076a87.
+  static String offeredName(ToolkitPackage package) =>
+      package is ArmToolkitPackage ? 'AnyPS5-ARM ${package.commit}' : packageName(package);
 
   List<PanelRow> _armRows(Toolkit? current) {
     final package = armPackage;
@@ -294,6 +348,24 @@ class EngineModel {
   /// Whether the engine in use reads ANYPS5_FULLSCREEN and ANYPS5_WINDOW_SIZE itself (AnyPS5-ARM's
   /// does; upstream's opens a window at 60% of the screen and goes full screen on F11).
   bool get readsDisplaySettings => isArm(app.toolkitVersion);
+
+  /// The same for [game]: its own engine when it has one, else the default's.
+  bool readsDisplaySettingsOf(Game game) {
+    if (app.currentSettings(game).engine == null) return readsDisplaySettings;
+    return isArm(app.toolkitFor(game)?.version ?? app.records[game.id]?.toolkit);
+  }
+
+  /// The folders of the downloaded engines chosen for a game of their own.
+  Set<String> get pinnedKeys => {for (final game in app.games) ?app.currentSettings(game).engine};
+
+  /// Whether a game has [kit] chosen for itself (it stays, whatever else is deleted).
+  bool isPinned(Toolkit kit) => pinnedKeys.contains(p.basename(kit.root));
+
+  /// Whether [kit] is the default or chosen by a game: the Mac's "engines in use".
+  bool inUse(Toolkit kit) {
+    final current = app.toolkit;
+    return (current != null && p.equals(kit.root, current.root)) || isPinned(kit);
+  }
 
   bool isDownloaded(Toolkit kit) => p.equals(p.dirname(kit.root), store.root);
 
@@ -391,6 +463,8 @@ class EngineModel {
     }
     final cancel = DownloadCancel();
     _cancel = cancel;
+    final keepDefault = _keepDefault;
+    _keepDefault = false;
     downloading = package;
     progress = ToolkitProgress(ToolkitPhase.download, 0, package.size);
     error = null;
@@ -414,10 +488,15 @@ class EngineModel {
       unverified = null;
       unsigned = null;
       refresh();
+      app.sounds.play(Cue.unlocked);
+      if (keepDefault) {
+        // For one game: what it unlocks next, the default stays as it is.
+        app.show(glibcWarning(kit) ?? T.format('engineReady', [label(kit)]));
+        return true;
+      }
       app.preferences.toolkitFolder = kit.root;
       app.savePreferences();
       removeUnused();
-      app.sounds.play(Cue.unlocked);
       app.show(glibcWarning(kit) ?? switched(kit, 'engineReady'));
       return true;
     } on ToolkitFailure catch (failure) {
@@ -466,29 +545,61 @@ class EngineModel {
   /// The installed games unlocked with another engine than the one in use now.
   int gamesFromOtherEngines() {
     final version = app.toolkitVersion;
-    return version == null ? 0 : app.records.values.where((record) => record.toolkit != version).length;
+    if (version == null) return 0;
+    // A game with an engine of its own does not move with the default.
+    final own = {
+      for (final game in app.games)
+        if (app.currentSettings(game).engine != null) game.id,
+    };
+    return app.records.entries.where((entry) => entry.value.toolkit != version && !own.contains(entry.key)).length;
   }
 
-  /// Keeps the toolkit in use, the newest two and those installed games were made with.
+  /// Keeps the toolkit in use, the newest two, those installed games were made with and those
+  /// chosen for a game of their own.
   void removeUnused() {
     final current = app.toolkit;
+    final pinned = pinnedKeys;
     store.removeUnused(
-      keep: {?current?.version, ?current?.root, for (final record in app.records.values) record.toolkit},
+      keep: {
+        ?current?.version,
+        ?current?.root,
+        for (final record in app.records.values) record.toolkit,
+        for (final kit in downloaded)
+          if (pinned.contains(p.basename(kit.root))) kit.root,
+      },
     );
     refresh();
   }
 
-  /// Deletes every downloaded version but the one in use.
+  /// Deletes every downloaded version but the one in use and those games use.
   void deleteOthers() {
-    final current = app.toolkit;
     for (final kit in downloaded) {
-      if (current != null && p.equals(kit.root, current.root)) continue;
-      store.remove(p.basename(kit.root));
+      if (!inUse(kit)) store.remove(p.basename(kit.root));
     }
     store.clearDownloads();
     refresh();
     app.show(T.text('engineDeleted'));
   }
+
+  /// Deletes one downloaded version; one still in use is refused, as on the Mac.
+  void deleteVersion(Toolkit kit) {
+    if (inUse(kit)) return app.show(T.text('engineInUseNoDelete'));
+    store.remove(p.basename(kit.root));
+    refresh();
+    app.show(T.format('engineDeletedOne', [label(kit)]));
+  }
+
+  /// A row to delete each downloaded version that is not the one in use.
+  List<PanelRow> _deleteRows(Toolkit? current) => [
+    for (final kit in downloaded)
+      if (current == null || !p.equals(kit.root, current.root))
+        PanelRow(
+          id: 'engineDelete-${p.basename(kit.root)}',
+          title: T.format('engineDeleteOne', [label(kit)]),
+          detail: inUse(kit) ? T.text('engineInUse') : T.text('engineDeleteHint'),
+          kind: ActionRow(() => deleteVersion(kit), destructive: !inUse(kit)),
+        ),
+  ];
 
   /// The settings' AnyPS5 Engine rows.
   List<PanelRow> settingsRows() {
@@ -512,6 +623,7 @@ class EngineModel {
           kind: InfoRow(current == null ? T.text('toolkitMissing') : label(current)),
         ),
         ..._armRows(current),
+        ..._deleteRows(current),
         _ownRow(current),
         ...git.rows(),
       ];
@@ -609,6 +721,7 @@ class EngineModel {
         );
       }
     }
+    rows.addAll(_deleteRows(current));
     rows.add(_ownRow(current));
     rows.addAll(git.rows());
     final others = downloaded.where((kit) => current == null || !p.equals(kit.root, current.root)).length;
@@ -624,6 +737,88 @@ class EngineModel {
     }
     return rows;
   }
+
+  /// Game Settings › Engine: this game's engine (the default, or one of the downloaded ones) and
+  /// what unlocked it; a chosen engine that is not on this computer says so, and offers the
+  /// download.
+  List<PanelRow> gameRows(Game game) {
+    final settings = app.currentSettings(game);
+    final current = app.toolkit;
+    final kits = downloaded;
+    final missing = app.missingEngine(game);
+    final record = app.records[game.id];
+    final names = [
+      T.format('engineFollow', [current == null ? '—' : label(current)]),
+      for (final kit in kits) label(kit),
+      if (missing != null) nameOf(missing),
+    ];
+    final selected = missing != null
+        ? kits.length + 1
+        : settings.engine == null
+        ? 0
+        : kits.indexWhere((kit) => p.basename(kit.root) == settings.engine) + 1;
+    final detail = missing != null
+        ? T.format('engineGameMissing', [nameOf(missing)])
+        : record != null
+        ? T.format('engineUnlockedWith', [nameOf(record.toolkit)])
+        : T.text('engineNotUnlocked');
+    return [
+      PanelRow(
+        id: 'engine',
+        title: T.text('gameEngine'),
+        detail: detail,
+        kind: ChoiceRow(names, selected, (index) {
+          if (missing != null && index == names.length - 1) return;
+          final choice = index == 0 ? null : p.basename(kits[index - 1].root);
+          app.saveSettings(game, settings.copyWith(engine: choice));
+        }),
+      ),
+      if (missing != null)
+        PanelRow(
+          id: 'engineGameDownload',
+          title: T.format('engineDownloadVersion', [nameOf(missing)]),
+          detail: downloading == null
+              ? null
+              : T.format('engineDownloading', [packageName(downloading!), ((progress?.fraction ?? 0) * 100).floor()]),
+          kind: ActionRow(() => unawaited(downloadForGame(game))),
+        ),
+    ];
+  }
+
+  /// Downloads the engine a game asks for and is missing, asking GitHub first when it was not
+  /// asked yet; the default engine stays what it is.
+  Future<void> downloadForGame(Game game) async {
+    final key = app.missingEngine(game);
+    if (key == null || downloading != null) return;
+    var package = _packageNamed(key);
+    if (package == null) {
+      await check(quiet: true);
+      await checkArm(quiet: true);
+      package = _packageNamed(key);
+    }
+    if (package == null) return app.show(T.format('engineGameNoPackage', [nameOf(key)]));
+    _keepDefault = true;
+    await download(package);
+  }
+
+  /// The package of the engine with folder name [key], from what GitHub listed for each source.
+  ToolkitPackage? _packageNamed(String key) {
+    for (final release in releases) {
+      if (release.packageFor(app.system) case final ToolkitPackage package when package.version == key) return package;
+    }
+    if (armPackage case final ArmToolkitPackage package when package.version == key) return package;
+    if (upstreamNightly case final UpstreamNightlyPackage package when package.version == key) return package;
+    for (final release in armReleases) {
+      if (ArmToolkitPackage.find([release], app.system) case final ArmToolkitPackage package
+          when package.version == key) {
+        return package;
+      }
+    }
+    return null;
+  }
+
+  /// Set for one download that must leave the default engine alone (a game's own, missing one).
+  bool _keepDefault = false;
 
   /// The newest upstream nightly, on Nightly: "Upstream main · bf80054e7 · 2026-11-06 (untested)",
   /// to download, to use once downloaded, or in use; null when there is none to offer.

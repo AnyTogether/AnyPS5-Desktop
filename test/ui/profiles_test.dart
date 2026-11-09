@@ -522,6 +522,33 @@ void main() {
     });
   });
 
+  group('for a screen reader', () {
+    testWidgets('the picker, Add profile and the home menu are named', (tester) async {
+      final semantics = tester.ensureSemantics();
+      fixture = makeFixture();
+      final model = fixture.model;
+      model.profiles.add(name: 'Mira', mode: ProfileMode.offline);
+      model.openProfilePicker(atLaunch: true);
+      await pumpLauncher(tester, model);
+      expect(find.bySemanticsLabel('Mira'), findsOneWidget);
+      expect(find.bySemanticsLabel(T.text('profileAdd')), findsOneWidget);
+
+      model.openAddProfile();
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsLabel('${T.text('profileOfflineTitle')}. ${T.text('profileOfflineLead')}'),
+        findsOneWidget,
+      );
+
+      model.closeOverlay();
+      model.open(Layer.homeMenu);
+      await tester.pumpAndSettle();
+      final rows = model.panelCategories().single.rows;
+      expect(find.bySemanticsLabel(rows.first.title), findsOneWidget);
+      semantics.dispose();
+    });
+  });
+
   group('golden', () {
     testWidgets("who's playing", (tester) async {
       fixture = makeFixture();

@@ -5,22 +5,26 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../core/together/voice_mesh.dart';
 
 /// Voice with flutter_webrtc on Windows and Linux: the microphone with WebRTC's echo
-/// cancellation, noise suppression and gain, the others on the default output, and one
-/// RTCPeerConnection per member.
+/// cancellation, gain and (unless turned off) noise suppression, the others on the default
+/// output, and one RTCPeerConnection per member.
 class WebRtcVoice implements VoiceEngine {
   MediaStream? _stream;
+  final List<_Link> _links = [];
+  bool _talking = true;
+
+  static Future<MediaStream> _microphone(bool noiseSuppression) => navigator.mediaDevices.getUserMedia({
+    'audio': voiceAudioConstraints(noiseSuppression: noiseSuppression),
+    'video': false,
+  });
 
   /// The connections made, for deafening: the others' sound is turned off on each.
   final List<RTCPeerConnection> _connections = [];
   bool _hearing = true;
 
   @override
-  Future<void> start() async {
+  Future<void> start({bool noiseSuppression = true}) async {
     try {
-      _stream = await navigator.mediaDevices.getUserMedia({
-        'audio': {'echoCancellation': true, 'noiseSuppression': true, 'autoGainControl': true},
-        'video': false,
-      });
+      _stream = await _microphone(noiseSuppression);
     } on Object {
       throw const VoiceDenied();
     }
@@ -44,11 +48,14 @@ class WebRtcVoice implements VoiceEngine {
         await pc.addTrack(track, stream);
       }
     }
-    return _Link(pc);
+    final link = _Link(pc, _links.remove);
+    _links.add(link);
+    return link;
   }
 
   @override
   void setTalking(bool on) {
+    _talking = on;
     for (final track in _stream?.getAudioTracks() ?? const <MediaStreamTrack>[]) {
       track.enabled = on;
     }
@@ -74,11 +81,37 @@ class WebRtcVoice implements VoiceEngine {
     }
   }
 
+  /// The audio processing is the source's, set when the microphone opens: a new microphone
+  /// stream with the other setting, its track put on every sender in place of the old one.
+  @override
+  Future<void> setNoiseSuppression(bool on) async {
+    final old = _stream;
+    if (old == null) return;
+    final fresh = await _microphone(on);
+    final tracks = fresh.getAudioTracks();
+    if (tracks.isEmpty) {
+      await fresh.dispose();
+      return;
+    }
+    final track = tracks.first..enabled = _talking;
+    for (final link in _links) {
+      for (final sender in await link.pc.getSenders()) {
+        if (sender.track?.kind == 'audio') await sender.replaceTrack(track);
+      }
+    }
+    _stream = fresh;
+    for (final previous in old.getTracks()) {
+      await previous.stop();
+    }
+    await old.dispose();
+  }
+
   @override
   Future<void> stop() async {
     _connections.clear();
     final stream = _stream;
     _stream = null;
+    _links.clear();
     if (stream != null) {
       for (final track in stream.getTracks()) {
         await track.stop();
@@ -89,11 +122,14 @@ class WebRtcVoice implements VoiceEngine {
 }
 
 class _Link implements VoiceLink {
-  _Link(this.pc) {
+  _Link(this.pc, this._closed) {
     pc.onConnectionState = (_) => _onState?.call();
   }
 
   final RTCPeerConnection pc;
+
+  /// Tells the engine this connection is gone, so a new microphone track skips it.
+  final bool Function(_Link) _closed;
   void Function()? _onState;
 
   /// Kept here, not read from the plugin, which hears of changes a moment late.
@@ -189,6 +225,7 @@ class _Link implements VoiceLink {
   @override
   Future<void> close() async {
     _onState = null;
+    _closed(this);
     await pc.close();
   }
 }

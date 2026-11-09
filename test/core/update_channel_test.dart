@@ -99,6 +99,30 @@ void main() {
     expect(on(UpdateChannel.nightly)!.commit, 'aaaaaaaaa');
   });
 
+  test("AnyPS5 Desktop's own nightly tags sort in the same order", () {
+    final order = [
+      'v0.1.20',
+      'v0.1.21-nightly.20261109.1',
+      'v0.1.21-nightly.20261109.2',
+      'v0.1.21-nightly.20261109.10',
+      'v0.1.21-nightly.20261110.1',
+      'v0.1.21',
+    ];
+    for (var index = 1; index < order.length; index++) {
+      expect(ChannelReleases.isNewer(order[index], order[index - 1]), isTrue, reason: order[index]);
+      expect(ChannelReleases.isNewer(order[index - 1], order[index]), isFalse, reason: order[index]);
+    }
+    // The version the build calls itself is the tag without its v.
+    expect(ChannelReleases.isNewer('v0.1.21-nightly.20261109.1', '0.1.21-nightly.20261109.1'), isFalse);
+    expect(ReleaseVersion.parse('0.1.21-nightly.20261109.1')!.isNightly, isTrue);
+  });
+
+  test('a nightly in use on Stable stays until a newer release comes out', () {
+    expect(ChannelReleases.stays(UpdateChannel.stable, '0.1.21-nightly.20261109.1'), isTrue);
+    expect(ChannelReleases.stays(UpdateChannel.nightly, '0.1.21-nightly.20261109.1'), isFalse);
+    expect(ChannelReleases.stays(UpdateChannel.stable, '0.1.20'), isFalse);
+  });
+
   test('the channel is kept as nothing for Stable, "nightly" for Nightly', () {
     expect(UpdateChannel.of(null), UpdateChannel.stable);
     expect(UpdateChannel.of('beta'), UpdateChannel.stable);

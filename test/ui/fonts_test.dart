@@ -216,6 +216,7 @@ void main() {
       model.fonts.refresh();
       expect(row('fontsFolder').detail, chosen);
       expect(info('fontLatin'), 'SST · Your folder');
+      expect(info('fontItalic'), 'Noto Sans · Built in', reason: 'the folder has no italic: the launcher\'s fills in');
       expect(info('fontThai'), 'Noto Sans Thai · Built in');
       row('fontsFolderForget');
       model.fonts.forgetFolder();

@@ -305,42 +305,48 @@ class _PickerTile extends StatelessWidget {
     final scale = LayoutScale.of(context);
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 23 * scale),
-      child: GestureDetector(
+      child: Semantics(
+        button: true,
+        label: name,
+        excludeSemantics: true,
         onTap: onTap,
-        child: AnimatedOpacity(
-          opacity: focused ? 1 : 0.78,
-          duration: Motion.focus,
-          curve: Motion.settle,
-          child: AnimatedScale(
-            scale: focused ? 1.06 : 0.96,
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedOpacity(
+            opacity: focused ? 1 : 0.78,
             duration: Motion.focus,
             curve: Motion.settle,
-            child: SizedBox(
-              width: 190 * scale,
-              child: Column(
-                children: [
-                  avatar,
-                  SizedBox(height: 18 * scale),
-                  // The light bar of the profile's controller.
-                  AnimatedContainer(
-                    duration: Motion.focus,
-                    curve: Motion.settle,
-                    width: (focused ? 54 : 30) * scale,
-                    height: 4 * scale,
-                    decoration: BoxDecoration(
-                      color: strip.withValues(alpha: focused ? 1 : 0.55),
-                      borderRadius: BorderRadius.circular(2 * scale),
+            child: AnimatedScale(
+              scale: focused ? 1.06 : 0.96,
+              duration: Motion.focus,
+              curve: Motion.settle,
+              child: SizedBox(
+                width: 190 * scale,
+                child: Column(
+                  children: [
+                    avatar,
+                    SizedBox(height: 18 * scale),
+                    // The light bar of the profile's controller.
+                    AnimatedContainer(
+                      duration: Motion.focus,
+                      curve: Motion.settle,
+                      width: (focused ? 54 : 30) * scale,
+                      height: 4 * scale,
+                      decoration: BoxDecoration(
+                        color: strip.withValues(alpha: focused ? 1 : 0.55),
+                        borderRadius: BorderRadius.circular(2 * scale),
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 18 * scale),
-                  Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppText.display(23 * scale, weight: focused ? FontWeight.w600 : FontWeight.w400),
-                  ),
-                  if (line != null) ...[SizedBox(height: 6 * scale), line!],
-                ],
+                    SizedBox(height: 18 * scale),
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.display(23 * scale, weight: focused ? FontWeight.w600 : FontWeight.w400),
+                    ),
+                    if (line != null) ...[SizedBox(height: 6 * scale), line!],
+                  ],
+                ),
               ),
             ),
           ),
@@ -449,88 +455,96 @@ class _ModeCard extends StatelessWidget {
     final focused = model.profileFlow.modeChoice == index;
     final ink = focused ? Colors.black : Colors.white;
     final chip = focused ? Colors.black.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.1);
-    return GestureDetector(
-      onTap: () {
-        model.profileFlow.modeChoice = index;
-        model.modeChoiceCommand(Command.select);
-      },
-      child: AnimatedScale(
-        scale: focused ? 1.03 : 0.98,
-        duration: Motion.focus,
-        curve: Motion.settle,
-        child: AnimatedOpacity(
-          opacity: focused ? 1 : 0.8,
+    void choose() {
+      model.profileFlow.modeChoice = index;
+      model.modeChoiceCommand(Command.select);
+    }
+
+    return Semantics(
+      button: true,
+      label: '$title. $lead',
+      excludeSemantics: true,
+      onTap: choose,
+      child: GestureDetector(
+        onTap: choose,
+        child: AnimatedScale(
+          scale: focused ? 1.03 : 0.98,
           duration: Motion.focus,
           curve: Motion.settle,
-          child: FocusRing(
-            focused: focused,
-            radius: 26 * scale,
-            child: AnimatedContainer(
-              duration: Motion.focus,
-              curve: Motion.settle,
-              width: 430 * scale,
-              height: 380 * scale,
-              padding: EdgeInsets.all(30 * scale),
-              decoration: BoxDecoration(
-                color: focused ? Colors.white : Colors.white.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(26 * scale),
-                border: Border.all(color: Colors.white.withValues(alpha: focused ? 0 : 0.14)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 58 * scale,
-                        height: 58 * scale,
-                        decoration: BoxDecoration(shape: BoxShape.circle, color: chip),
-                        child: Icon(icon, size: 26 * scale, color: ink),
-                      ),
-                      const Spacer(),
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 5 * scale),
-                        decoration: BoxDecoration(color: chip, borderRadius: BorderRadius.circular(20 * scale)),
-                        child: Text(
-                          T.upper(tag),
-                          style: AppText.display(
-                            11 * scale,
-                            weight: FontWeight.w700,
-                            color: ink,
-                          ).copyWith(letterSpacing: 1.4 * scale),
+          child: AnimatedOpacity(
+            opacity: focused ? 1 : 0.8,
+            duration: Motion.focus,
+            curve: Motion.settle,
+            child: FocusRing(
+              focused: focused,
+              radius: 26 * scale,
+              child: AnimatedContainer(
+                duration: Motion.focus,
+                curve: Motion.settle,
+                width: 430 * scale,
+                height: 380 * scale,
+                padding: EdgeInsets.all(30 * scale),
+                decoration: BoxDecoration(
+                  color: focused ? Colors.white : Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(26 * scale),
+                  border: Border.all(color: Colors.white.withValues(alpha: focused ? 0 : 0.14)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 58 * scale,
+                          height: 58 * scale,
+                          decoration: BoxDecoration(shape: BoxShape.circle, color: chip),
+                          child: Icon(icon, size: 26 * scale, color: ink),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 5 * scale),
+                          decoration: BoxDecoration(color: chip, borderRadius: BorderRadius.circular(20 * scale)),
+                          child: Text(
+                            T.upper(tag),
+                            style: AppText.display(
+                              11 * scale,
+                              weight: FontWeight.w700,
+                              color: ink,
+                            ).copyWith(letterSpacing: 1.4 * scale),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 26 * scale),
+                    Text(
+                      title,
+                      style: AppText.display(34 * scale, weight: FontWeight.w600, color: ink),
+                    ),
+                    SizedBox(height: 6 * scale),
+                    Text(lead, style: AppText.display(16 * scale, color: ink.withValues(alpha: 0.72), height: 1.3)),
+                    SizedBox(height: 24 * scale),
+                    for (final fact in facts)
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 11 * scale),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: EdgeInsets.only(top: 2 * scale),
+                              child: Icon(Icons.check_rounded, size: 15 * scale, color: ink.withValues(alpha: 0.7)),
+                            ),
+                            SizedBox(width: 10 * scale),
+                            Expanded(
+                              child: Text(
+                                fact,
+                                style: AppText.display(15 * scale, weight: FontWeight.w500, color: ink, height: 1.3),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                  SizedBox(height: 26 * scale),
-                  Text(
-                    title,
-                    style: AppText.display(34 * scale, weight: FontWeight.w600, color: ink),
-                  ),
-                  SizedBox(height: 6 * scale),
-                  Text(lead, style: AppText.display(16 * scale, color: ink.withValues(alpha: 0.72), height: 1.3)),
-                  SizedBox(height: 24 * scale),
-                  for (final fact in facts)
-                    Padding(
-                      padding: EdgeInsets.only(bottom: 11 * scale),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: EdgeInsets.only(top: 2 * scale),
-                            child: Icon(Icons.check_rounded, size: 15 * scale, color: ink.withValues(alpha: 0.7)),
-                          ),
-                          SizedBox(width: 10 * scale),
-                          Expanded(
-                            child: Text(
-                              fact,
-                              style: AppText.display(15 * scale, weight: FontWeight.w500, color: ink, height: 1.3),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

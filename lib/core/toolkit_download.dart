@@ -40,6 +40,9 @@ enum ToolkitFailureKind {
 
   /// The user stopped the download.
   cancelled,
+
+  /// The release is not out (or not signed) yet: nothing is wrong, it just cannot be had.
+  notAvailable,
 }
 
 class ToolkitFailure implements Exception {
@@ -380,6 +383,14 @@ class GitHubReleases {
     return UpstreamRelease.fromJson(json, signingKeys: signingKeys);
   }
 
+  /// The release with [tag], null when GitHub has none by that name.
+  Future<UpstreamRelease?> byTag(String tag) async {
+    final json = await _get('repos/$repository/releases/tags/$tag', absentIsNull: true);
+    if (json == null) return null;
+    if (json is! Map<String, dynamic>) throw ToolkitFailure(ToolkitFailureKind.network, 'GitHub sent no release');
+    return UpstreamRelease.fromJson(json, signingKeys: signingKeys);
+  }
+
   /// Every recent release, newest first, without drafts. As many as GitHub gives at once (100):
   /// AnyPS5-ARM publishes nightlies and upstream nightlies beside its releases, and the newest
   /// release has to stay in the list.
@@ -394,7 +405,7 @@ class GitHubReleases {
     return releases;
   }
 
-  Future<Object?> _get(String path) async {
+  Future<Object?> _get(String path, {bool absentIsNull = false}) async {
     final client = _client()..connectionTimeout = const Duration(seconds: 20);
     try {
       final base = api.toString().endsWith('/') ? api : Uri.parse('$api/');
@@ -405,6 +416,7 @@ class GitHubReleases {
         ..set('X-GitHub-Api-Version', '2022-11-28');
       final response = await request.close().timeout(const Duration(seconds: 30));
       final body = await response.transform(utf8.decoder).join();
+      if (absentIsNull && response.statusCode == HttpStatus.notFound) return null;
       if (response.statusCode != HttpStatus.ok) {
         throw ToolkitFailure(ToolkitFailureKind.network, 'GitHub answered ${response.statusCode}');
       }

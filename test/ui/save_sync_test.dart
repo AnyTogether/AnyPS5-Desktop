@@ -8,6 +8,7 @@ import 'package:anyps5_desktop/core/save_backup.dart';
 import 'package:anyps5_desktop/core/save_sync.dart';
 import 'package:anyps5_desktop/core/together/token_store.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
+import 'package:anyps5_desktop/ui/save_sync_model.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -229,6 +230,43 @@ void main() {
       await syncing;
       expect(read(installed(model)), 'desk level 2');
       expect(cloud.slots.single.versions, hasLength(2));
+    });
+
+    test('Cloud Storage lists the media with its usage, and a press twice deletes one', () async {
+      cloud.media.addAll([
+        {'id': 'm1', 'kind': 'clip', 'size': 4000, 'createdAt': '2026-11-08T20:14:00Z', 'gallery': 0},
+        {'id': 'm2', 'kind': 'image', 'size': 2500},
+        {'id': 'm3', 'kind': 'voice', 'size': 900},
+      ]);
+      openBehaviour(model);
+      (rowIn(model, 'cloudStorage')!.kind as ActionRow).run();
+      await until(() => model.saveSync.overview != null);
+      expect(rowIn(model, 'cloud-media')!.title, T.text('cloudStorageMediaTitle'));
+      expect(rowIn(model, 'cloud-nomedia'), isNull);
+      expect(rowIn(model, 'media-m1')!.title, 'Clip');
+      expect(rowIn(model, 'media-m1')!.detail, contains('In your gallery'));
+      expect(rowIn(model, 'media-m2')!.title, 'Photo');
+      expect(rowIn(model, 'media-m3')!.title, 'Voice note');
+      final usage = rowIn(model, 'cloud-usage')!;
+      expect(
+        usage.detail,
+        'Saves ${SaveSyncModel.size(cloud.usage['saves'] as int)}, media ${SaveSyncModel.size(cloud.usage['media'] as int)}, free ${SaveSyncModel.size((cloud.usage['limit'] as int) - (cloud.usage['used'] as int))}',
+      );
+      expect(usage.meter, isNotNull);
+      (rowIn(model, 'media-m2')!.kind as ActionRow).run();
+      expect(rowIn(model, 'media-m2')!.detail, T.text('cloudStoragePressAgain'));
+      expect(cloud.media, hasLength(3), reason: 'asked first');
+      (rowIn(model, 'media-m2')!.kind as ActionRow).run();
+      await until(() => cloud.media.length == 2);
+      await until(() => rowIn(model, 'media-m2') == null, reason: 'the list is read again');
+      expect(model.toast, T.text('cloudStorageDeleted'));
+    });
+
+    test('Cloud Storage without media says so', () async {
+      openBehaviour(model);
+      (rowIn(model, 'cloudStorage')!.kind as ActionRow).run();
+      await until(() => model.saveSync.overview != null);
+      expect(rowIn(model, 'cloud-nomedia')!.title, T.text('cloudStorageNoMedia'));
     });
 
     test('Cloud Storage lists the saves; Restore brings an older one down; Delete asks twice', () async {

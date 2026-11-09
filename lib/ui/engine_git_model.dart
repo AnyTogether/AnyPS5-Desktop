@@ -10,18 +10,18 @@ import 'strings.dart';
 
 /// Settings › AnyPS5 Engine › Update from Git: an engine folder that is a git checkout of the
 /// engine's source, pulled and built in place (git pull --ff-only, the submodules, cmake --build
-/// for the relinker and the libraries). The build changes the folder's fingerprint, so installed
-/// games then offer Update and Play. Every command runs as its own process, never on the
-/// interface's thread.
+/// for the relinker and the libraries). A checkout without a build folder gets one set up first,
+/// as its build guide does it. The build changes the folder's fingerprint, so installed games
+/// then offer Update and Play. Every command runs as its own process, never on the interface's
+/// thread.
 class EngineGitModel {
   EngineGitModel(this.app);
 
   final AppModel app;
 
-  /// The build guide: configuring a build folder once is the player's (CMake, a compiler).
-  static final guide = Uri.parse(
-    'https://github.com/AnyTogether/AnyPS5-ARM/blob/main/docs/dev/WINDOWS_LINUX_ENGINE.md',
-  );
+  /// The build guide of the checkout in use: upstream's for upstream's tree, AnyPS5-ARM's for its
+  /// own. It says what to install when a tool is missing.
+  Uri get guide => checkout?.guide ?? EngineCheckout.armGuide;
 
   CommandRunner get _runner => app.services.commands ?? const SystemCommands();
 
@@ -161,6 +161,9 @@ class EngineGitModel {
   static String reason(GitFailureKind kind) => T.text(switch (kind) {
     GitFailureKind.noGit => 'engineGitNoGit',
     GitFailureKind.noCmake => 'engineGitNoCmake',
+    GitFailureKind.noNinja => 'engineGitNoNinja',
+    GitFailureKind.noCompiler => 'engineGitNoCompiler',
+    GitFailureKind.configure => 'engineGitConfigureFailed',
     GitFailureKind.notGit => 'engineGitNotGit',
     GitFailureKind.dirty => 'engineGitDirty',
     GitFailureKind.noBuild => 'engineGitNoBuildReason',
@@ -174,6 +177,7 @@ class EngineGitModel {
     GitStep.checking => 'engineGitStepChecking',
     GitStep.pulling => 'engineGitStepPulling',
     GitStep.submodules => 'engineGitStepSubmodules',
+    GitStep.configuring => 'engineGitStepConfiguring',
     GitStep.building => 'engineGitStepBuilding',
   });
 
@@ -296,8 +300,8 @@ class EngineGitModel {
         PanelRow(
           id: 'engineGitUpdate',
           title: T.text('engineGitUpdate'),
-          detail: T.text('engineGitNoBuild'),
-          kind: ActionRow(() => app.services.openUrl?.call(guide)),
+          detail: T.text('engineGitSetUpDetail'),
+          kind: ActionRow(() => unawaited(update())),
         )
       else
         PanelRow(
@@ -319,6 +323,14 @@ class EngineGitModel {
             T.text('engineGitCopy'),
           ].join(' · '),
           kind: ActionRow(copyFailure),
+        ),
+      // A tool to install, or CMake's setup: the guide of this tree says how.
+      if (now == null && stopped != null && stopped.guideHelps)
+        PanelRow(
+          id: 'engineGitGuide',
+          title: T.text(checkout.isArm ? 'engineGitGuideArm' : 'engineGitGuideUpstream'),
+          detail: '${guide.host}${guide.path}',
+          kind: ActionRow(() => app.services.openUrl?.call(guide)),
         ),
       if (outdated > 0)
         PanelRow(

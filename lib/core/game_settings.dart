@@ -101,6 +101,7 @@ class GameSettings {
     this.upscaler,
     this.fsrSharpness,
     this.language,
+    this.engine,
     this.controls,
     this.tuning,
     this.shaderCache,
@@ -150,6 +151,7 @@ class GameSettings {
       upscaler: named(Upscaler.values, json['upscaler']),
       fsrSharpness: json['fsrSharpness'] is num ? (json['fsrSharpness'] as num).toDouble() : null,
       language: (json['language'] as num?)?.toInt(),
+      engine: json['engine'] as String?,
       controls: controls is Map<String, dynamic>
           ? {
               for (final entry in controls.entries)
@@ -219,6 +221,10 @@ class GameSettings {
   /// The console language number (ANYPS5_LANGUAGE), null to follow the launcher's language.
   final int? language;
 
+  /// The engine that unlocks this game instead of the default: the downloaded toolkit's folder
+  /// name in the launcher's engines folder, null to follow Settings › AnyPS5 Engine.
+  final String? engine;
+
   /// Keys moved from the launcher's layout (Controls), by pad action.
   final Map<String, List<String>>? controls;
 
@@ -249,6 +255,7 @@ class GameSettings {
     if (upscaler != null) 'upscaler': upscaler!.name,
     if (fsrSharpness != null) 'fsrSharpness': fsrSharpness,
     if (language != null) 'language': language,
+    if (engine != null) 'engine': engine,
     if (controls != null) 'controls': controls,
     if (tuning != null) 'tuning': tuning!.toJson(),
     if (shaderCache != null) 'shaderCache': shaderCache,
@@ -271,6 +278,7 @@ class GameSettings {
     Object? upscaler = _keep,
     Object? fsrSharpness = _keep,
     Object? language = _keep,
+    Object? engine = _keep,
     Object? controls = _keep,
     Object? tuning = _keep,
     Object? shaderCache = _keep,
@@ -288,6 +296,7 @@ class GameSettings {
     upscaler: identical(upscaler, _keep) ? this.upscaler : upscaler as Upscaler?,
     fsrSharpness: identical(fsrSharpness, _keep) ? this.fsrSharpness : fsrSharpness as double?,
     language: identical(language, _keep) ? this.language : language as int?,
+    engine: identical(engine, _keep) ? this.engine : engine as String?,
     controls: identical(controls, _keep) ? this.controls : controls as Map<String, List<String>>?,
     tuning: identical(tuning, _keep) ? this.tuning : tuning as InputTuning?,
     shaderCache: identical(shaderCache, _keep) ? this.shaderCache : shaderCache as bool?,
@@ -405,8 +414,28 @@ abstract final class ConsoleLanguage {
   ];
 
   static const _tags = [
-    'ja-JP', 'en-US', 'fr-FR', 'es-ES', 'de-DE', 'it-IT', 'nl-NL', 'pt-PT', 'ru-RU', 'ko-KR', 'zh-Hant', //
-    'zh-Hans', 'fi-FI', 'sv-SE', 'da-DK', 'no-NO', 'pl-PL', 'pt-BR', 'en-GB', 'tr-TR', 'es-419', 'ar-AE',
+    'ja-JP',
+    'en-US',
+    'fr-FR',
+    'es-ES',
+    'de-DE',
+    'it-IT',
+    'nl-NL',
+    'pt-PT',
+    'ru-RU',
+    'ko-KR',
+    'zh-Hant', //
+    'zh-Hans',
+    'fi-FI',
+    'sv-SE',
+    'da-DK',
+    'no-NO',
+    'pl-PL',
+    'pt-BR',
+    'en-GB',
+    'tr-TR',
+    'es-419',
+    'ar-AE',
   ];
 
   /// The locale tag of a console language number, as the engine's trophy library maps them.
@@ -414,8 +443,22 @@ abstract final class ConsoleLanguage {
 
   /// Locale codes the console has its own language for, beyond the languages in [_tags].
   static const _aliases = {
-    'en': 1, 'es': 3, 'pt': 7, 'zh': 11, 'zh-tw': 10, 'zh-hk': 10, 'zh-mo': 10, 'zh-cn': 11, //
-    'zh-sg': 11, 'no': 15, 'nb': 15, 'nn': 15, 'es-mx': 20, 'es-ar': 20, 'es-co': 20, 'es-cl': 20,
+    'en': 1,
+    'es': 3,
+    'pt': 7,
+    'zh': 11,
+    'zh-tw': 10,
+    'zh-hk': 10,
+    'zh-mo': 10,
+    'zh-cn': 11, //
+    'zh-sg': 11,
+    'no': 15,
+    'nb': 15,
+    'nn': 15,
+    'es-mx': 20,
+    'es-ar': 20,
+    'es-co': 20,
+    'es-cl': 20,
   };
 
   /// The console language a launcher language starts games in, by its file's locale code (de,
@@ -456,6 +499,67 @@ abstract final class ResolutionPatch {
 
   /// Whether the patch file has the entries a resolution needs.
   static bool supports(String toml) => _entryNamed(toml, 'width') != null && _entryNamed(toml, 'height') != null;
+
+  /// The WIDTHxHEIGHT the patch file itself sets (the title's own), null when it has no such
+  /// entries or their values are not numbers.
+  static String? defaultOf(String toml) {
+    int? valueOf(String name) {
+      final range = _entryNamed(toml, name);
+      if (range == null) return null;
+      for (final line in toml.split('\n').sublist(range.$1, range.$2)) {
+        final match = RegExp(r'^\s*value\s*=\s*([^#\s]+)').firstMatch(line);
+        if (match != null) return int.tryParse(match.group(1)!);
+      }
+      return null;
+    }
+
+    final width = valueOf('width');
+    final height = valueOf('height');
+    return width == null || height == null ? null : '${width}x$height';
+  }
+
+  /// The largest of [choices] with fewer pixels than [current], null when there is none; a battery
+  /// or heat profile unlocks a game one step lower, as on the Mac (PowerResolution).
+  static String? lower(String current, List<String> choices) {
+    int? pixels(String text) {
+      final size = parse(text);
+      return size == null ? null : size.$1 * size.$2;
+    }
+
+    final limit = pixels(current);
+    if (limit == null) return null;
+    String? best;
+    var most = 0;
+    for (final choice in choices) {
+      final count = pixels(choice);
+      if (count != null && count < limit && count > most) {
+        best = choice;
+        most = count;
+      }
+    }
+    return best;
+  }
+
+  /// The guest address of the width or height entry [name], for a 4-byte value in the main
+  /// executable; null without one.
+  static int? addressOf(String toml, String name) {
+    final range = _entryNamed(toml, name);
+    if (range == null) return null;
+    String? field(String key) {
+      for (final line in toml.split('\n').sublist(range.$1, range.$2)) {
+        final match = RegExp('^\\s*$key\\s*=\\s*([^#\\s]+)').firstMatch(line);
+        if (match != null) return match.group(1)!.replaceAll('"', '');
+      }
+      return null;
+    }
+
+    final type = field('type');
+    if (type != 'u32' && type != 'i32') return null;
+    final target = field('target');
+    if (target != null && target != 'eboot.bin') return null;
+    final address = field('va');
+    return address == null ? null : int.tryParse(address);
+  }
 
   /// The patch file with the width and height entries' `value` set to [resolution]; the file as
   /// it is when it has no such entries or the text is not a resolution.

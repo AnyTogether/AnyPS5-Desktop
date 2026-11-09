@@ -38,6 +38,9 @@ class SocialScreens {
   String? challengeId;
   ChallengeDetail? challenge;
   bool challengeFailed = false;
+
+  /// The challenge is no longer there (a 404): said instead of the failure.
+  bool challengeGone = false;
   int challengeIndex = 0;
   bool challengeOnActions = false;
   int challengeAction = 0;
@@ -71,6 +74,7 @@ class SocialScreens {
     challengeId = null;
     challenge = null;
     challengeFailed = false;
+    challengeGone = false;
     challengeBusy = false;
     noticesFailed = false;
     compat.clear();
@@ -141,6 +145,14 @@ extension TogetherSocial on TogetherModel {
           detail: T.text('discoverFindForDetail'),
           kind: ActionRow(() => openLfgPost(game.titleId, game.nameFor([T.language.code]))),
         ),
+      PanelRow(
+        id: 'game-hub',
+        title: T.format('discoverHubOf', [
+          game.nameFor([T.language.code]),
+        ]),
+        detail: T.text('discoverHubDetail'),
+        kind: ActionRow(() => openGameHub(game.titleId, game.nameFor([T.language.code]))),
+      ),
     ];
   }
 
@@ -223,6 +235,16 @@ extension TogetherSocial on TogetherModel {
       default:
         break;
     }
+  }
+
+  /// [change] with the focus held on the item it is on: a new item coming in above it does not
+  /// move what the keys are on.
+  void keepFeedFocus(void Function() change) {
+    final focused = social.feed.items.elementAtOrNull(screens.feedIndex)?.id;
+    change();
+    if (focused == null) return;
+    final at = social.feed.items.indexWhere((item) => item.id == focused);
+    if (at >= 0) screens.feedIndex = at;
   }
 
   /// A click on an item: the keys go there.
@@ -561,8 +583,43 @@ extension TogetherSocial on TogetherModel {
       NoticeKind.challengeStarted => T.format('notifChallengeStarted', [TogetherChallenges.noticeTitle(note)]),
       NoticeKind.challengeEnded => TogetherChallenges.endedText(note),
       NoticeKind.warning => T.text('socialNotifWarning'),
-      NoticeKind.other => T.text('socialNotifOther'),
+      NoticeKind.other => familyNoticeText(note) ?? T.text('socialNotifOther'),
     };
+  }
+
+  /// What a family notification says (the Mac's familyNotificationText); null for any other kind.
+  String? familyNoticeText(Notice note) {
+    final name = note.actor == null ? '' : TogetherModel.shown(note.actor!).name;
+    final data = note.data;
+    final minutes = (data['minutes'] as num?)?.toInt() ?? 0;
+    final gameTitle = data['gameName'] as String? ?? (note.titleId == null ? '' : gameName(note.titleId!));
+    switch (note.kindName) {
+      case 'family_request':
+        return switch (data['kind']) {
+          'more_time' => T.format('familyNotifAsksTime', [name, minutes]),
+          'play_game' => T.format('familyNotifAsksGame', [name, gameTitle]),
+          _ => T.format('familyNotifAsksFriend', [name]),
+        };
+      case 'family_answer':
+        if (data['approved'] != true) return T.text('familyNotifSaidNo');
+        return switch (data['kind']) {
+          'more_time' => T.format('familyNotifGaveTime', [minutes]),
+          'play_game' => T.text('familyNotifGameYes'),
+          _ => T.text('familyNotifFriendYes'),
+        };
+      case 'family_alert':
+        return switch (data['event']) {
+          'limit_reached' => T.format('familyNotifReachedLimit', [name]),
+          'child_declined' => T.format('familyNotifDeclinedFamily', [name]),
+          _ => T.format('familyNotifJoinedFamily', [name]),
+        };
+      case 'family_invite':
+        return T.format('familyNotifFamilyInvite', [name, data['familyName'] as String? ?? '']);
+      case 'family_summary':
+        return T.text('familyNotifSummary');
+      default:
+        return null;
+    }
   }
 
   /// The game a looking-for-group notification is about, as this library or the server names it.

@@ -33,6 +33,9 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Golden comparisons a test run left behind (CI uploads them).
+/test/**/failures/
+
 # Symbolication related
 app.*.symbols
 

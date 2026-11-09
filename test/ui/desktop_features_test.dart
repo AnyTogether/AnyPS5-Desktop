@@ -25,6 +25,12 @@ class FakeDesktop implements DesktopWindows {
   bool cardsWork = true;
 
   @override
+  Future<bool> showBadge(RgbaImage? badge, {int? pid}) async {
+    calls.add(badge == null ? 'badge-off' : 'badge');
+    return true;
+  }
+
+  @override
   Future<bool> raiseLauncher() async {
     calls.add('raise');
     return true;
@@ -452,6 +458,21 @@ void main() {
       expect(p.basename(shots.single), startsWith('PPSA01001-trophy0_3-'));
       expect(File(shots.single).readAsBytesSync().sublist(1, 4), 'PNG'.codeUnits);
       expect(model.trophyShots['0/3'], shots.single);
+      model.stopGame();
+      await playing;
+    }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
+
+    test('a game playing: the main button brings it to the front', () async {
+      final orbit = model.games.firstWhere((game) => game.titleId == 'PPSA01001');
+      final installed = Installer.installedFolder(orbit, model.root!);
+      File(p.join(installed, 'app.elf')).writeAsStringSync('#!/bin/sh\nsleep 6\n');
+      if (!Platform.isWindows) Process.runSync('chmod', ['755', p.join(installed, 'app.elf')]);
+      final playing = model.play(orbit);
+      await until(() => model.running != null);
+      desktop.calls.clear();
+      model.primaryAction(orbit);
+      await until(() => desktop.calls.contains('focus'));
+      expect(model.stopping, isFalse);
       model.stopGame();
       await playing;
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);

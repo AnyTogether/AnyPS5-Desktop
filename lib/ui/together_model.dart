@@ -61,6 +61,7 @@ import 'livekit_room.dart';
 import 'online_webrtc.dart';
 import 'sealed_photo.dart';
 import 'strings.dart';
+import 'voice_note_player.dart';
 import 'voice_webrtc.dart';
 
 part 'together_messages.dart';
@@ -108,7 +109,9 @@ class TogetherModel {
     hub.games.onInvite = (invite) {
       _noticeSound();
       app.vibrate(HapticCue.ring);
-      app.show(T.format('gameInvitedYou', [invite.from?.displayName ?? '', gameName(invite.titleId)]));
+      final text = T.format('gameInvitedYou', [invite.from?.displayName ?? '', gameName(invite.titleId)]);
+      app.show(text);
+      if (!doNotDisturb) unawaited(app.noticeOverGame(text, detail: T.text('friendsTitle')));
     };
     hub.games.onEnded = (host) => app.show(
       T.format(hub.games.ended?.together == true ? 'togetherEnded' : 'sessionEnded', [host?.displayName ?? '']),
@@ -123,6 +126,8 @@ class TogetherModel {
         via == 'code' ? T.format('partyAsksCode', [person.displayName]) : T.format('partyAsks', [person.displayName]),
       );
     };
+    // Handed the lead, as the Mac says it.
+    hub.parties.onBecameLeader = () => app.show(T.text('partyYouLead'));
     hub.parties.onRequestAnswered = (accepted) {
       // A yes is an invite, which says so itself.
       if (!accepted) app.show(T.text('partyRequestDeclined'));
@@ -134,6 +139,7 @@ class TogetherModel {
     hub.social
       ..onNotice = noticeArrived
       ..onActivity = profileActivityChanged
+      ..holdFeedFocus = keepFeedFocus
       ..onFamilyNotice = (_) => unawaited(family.refresh());
     // The friends-only names and pictures the friends list brought, for every card shown.
     identities = hub.friends.identities;
@@ -142,6 +148,12 @@ class TogetherModel {
       app.show(T.format('friendsAsked', [person.displayName]));
     };
     hub.friends.onAccepted = (person) => app.show(T.format('friendsNowFriends', [person.displayName]));
+    // A friend went up a trophy level: only while the launcher is in front and no game runs, as
+    // on the Mac.
+    hub.friends.onLevelUp = (friend, level) {
+      if (!app.active || app.running != null) return;
+      app.show(T.format('friendLevelUp', [TogetherModel.shown(friend.person).name, level.level]));
+    };
     // A trophy level reached: the trophy's sound (heard over a game too) and the toast with the
     // badge.
     hub.self.onLevelUp = (level) {
@@ -176,6 +188,7 @@ class TogetherModel {
       ..onSendFailed = partySendFailed;
     hub.voice
       ..pushToTalk = app.preferences.pushToTalk
+      ..noiseSuppression = app.preferences.noiseSuppression
       ..onMoved = (client) {
         app.show(T.text(client == 'phone' ? 'voiceMovedPhone' : 'voiceMovedAway'));
       }
@@ -209,6 +222,16 @@ class TogetherModel {
 
   /// Family limits: the kept status, play time, age ratings, asking a parent.
   late final FamilyGate family = FamilyGate(this);
+
+  /// Files are being dragged over the open conversation: it says what letting go does.
+  bool chatDropping = false;
+
+  /// The voice notes in chats.
+  late final VoiceNotes voiceNotes = VoiceNotes(
+    create: app.services.voicePlayback,
+    onSystemPlayer: _voiceInSystemPlayer,
+    onFailed: (_) => app.show(T.text('messagesAttachmentFailed')),
+  );
   late final StreamSubscription<TogetherEvent> _ready;
   Timer? _flush;
 
@@ -233,11 +256,15 @@ class TogetherModel {
   /// Party: whether a party started now is open to friends.
   bool partyStartsOpen = false;
 
-  /// Party: a join code being typed, what the code looked up opens, and the Discord link being
-  /// typed (null while it is not).
-  String joinCodeDraft = '';
-  JoinPreview? codePreview;
+  /// Party: Join with a code as it stands, and the Discord link being typed (null while it is
+  /// not).
+  JoinEntry joinEntry = JoinEntry();
+  Timer? _joinLookup;
   String? discordDraft;
+
+  /// The open profile's pinned gallery; null until read or where the server keeps no files.
+  Section<List<MediaItem>>? profileGallery;
+  int _profileGallerySeq = 0;
 
   /// Party: its chat's keys and field (together_party_chat.dart).
   final PartyChatKeys partyChatKeys = PartyChatKeys();
@@ -420,8 +447,8 @@ class TogetherModel {
       friendHandle = '';
       chosen = null;
       draft = '';
-      joinCodeDraft = '';
-      codePreview = null;
+      _joinLookup?.cancel();
+      joinEntry = JoinEntry();
       discordDraft = null;
       messagesIndex = 0;
       messagesSelectedKey = null;
@@ -589,6 +616,13 @@ class TogetherModel {
   /// What this user chose to show friends.
   PresenceStatus get myStatus => hub.self.status;
 
+  /// The user's own Do Not Disturb: no word over a game for what comes in.
+  bool get doNotDisturb => myStatus == PresenceStatus.dnd;
+
+  /// How each other player in the Play Together session is reached ([TogetherPlay.linkText]).
+  Map<String, PeerPath> togetherLinks = const {};
+  Timer? _linkPoll;
+
   /// The dot for a status this user chose; null for online, which needs none on their own rows.
   static PersonStatus? ownDot(PresenceStatus status) => switch (status) {
     PresenceStatus.online => null,
@@ -629,6 +663,20 @@ class TogetherModel {
 
   /// Read receipts on or off: shown at once, turned back with a word when the server cannot; the
   /// others' receipts change with it, so the conversations are read again.
+  Future<void> setPublicProfile(bool on) async {
+    if (on == hub.self.publicProfile) return;
+    try {
+      await hub.self.setPublicProfile(on);
+    } on Object catch (error) {
+      app.show(
+        error is TogetherProblem && error.code == 'restricted_by_family'
+            ? T.text('publicProfileFamily')
+            : message(error),
+      );
+    }
+    app.refresh();
+  }
+
   Future<void> setReadReceipts(bool on) async {
     if (on == hub.self.readReceipts) return;
     try {
@@ -1129,6 +1177,15 @@ class TogetherModel {
         ),
         ...profileEditRows(),
         ...privateIdentityRows(),
+        if (hub.self.loaded)
+          PanelRow(
+            id: 'together-public-profile',
+            title: T.text('publicProfile'),
+            detail: hub.self.publicProfile
+                ? T.text('publicProfileHint')
+                : '${T.text('publicProfileHint')} ${T.text('publicProfileOffNote')}',
+            kind: ToggleRow(hub.self.publicProfile, (value) => unawaited(setPublicProfile(value))),
+          ),
         ...privacyRows(),
         ...discoveryRows(),
         PanelRow(
@@ -1606,9 +1663,13 @@ class TogetherModel {
   }
 
   void dispose() {
+    _linkPoll?.cancel();
+    _linkPoll = null;
     stopRinging();
     calls.noAnswer?.cancel();
+    unawaited(voiceNotes.dispose());
     unawaited(online.stop());
+    _joinLookup?.cancel();
     family.dispose();
     talkWatch?.stop();
     talkWatch?.reader.close();

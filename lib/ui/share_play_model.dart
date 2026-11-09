@@ -8,6 +8,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart' show RTCVideoView, RTCVideoV
 import '../core/capture/game_sound.dart';
 import '../core/capture/stream_packet.dart';
 import '../core/capture/video_encoders.dart';
+import '../core/capture/wayland_capture.dart';
 import '../core/controllers/pad_info.dart';
 import '../core/desktop/desktop.dart';
 import '../core/remote/remote_server.dart';
@@ -97,7 +98,11 @@ class SharePlayModel {
     if (!app.together.signedIn) return T.text('sharePlaySignInFirst');
     if (!(app.together.family.rules?.sharePlay ?? true)) return T.text('familyNoSharePlay');
     if (engineOverride == null && !ScreenGrab.supported(app.system, app.services.environment ?? Platform.environment)) {
-      return T.text('replayNoScreen');
+      return T.text(
+        WaylandCapture.applies(app.system, app.services.environment ?? Platform.environment)
+            ? 'sharePlayNoWayland'
+            : 'replayNoScreen',
+      );
     }
     return null;
   }
@@ -566,6 +571,7 @@ class SharePlayModel {
             kind: ActionRow(() => stopPlaying(viewer)),
           ),
         );
+        if (assistRow(viewer.user.id, name) case final row?) rows.add(row);
       } else {
         rows.add(
           PanelRow(
@@ -912,6 +918,21 @@ class SharePlayModel {
     if (command == Command.home || (command == Command.back && (watchSlot == null || noPad))) {
       unawaited(leaveWatching());
     }
+  }
+
+  /// A share play guest with a pad: help player 1 rather than play their own, as on the Mac.
+  PanelRow? assistRow(String userId, String name) {
+    final router = _session?.router;
+    if (router == null) return null;
+    return PanelRow(
+      id: 'share-assist-$userId',
+      title: T.text('assistShare'),
+      detail: T.format('assistShareDetail', [name]),
+      kind: ToggleRow(router.assist.contains(userId), (on) {
+        on ? router.assist.add(userId) : router.assist.remove(userId);
+        app.refresh();
+      }),
+    );
   }
 
   /// The Friends panel's rows: invites to watch (and to decline), and friends sharing who let

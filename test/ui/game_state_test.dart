@@ -48,7 +48,7 @@ void main() {
       (const WaitingForEngine(job, forThisGame: true), 'Updating engine…', ActionTone.busy),
       (const WaitingForEngine(job), 'Waiting for engine', ActionTone.busy),
       (const Starting(), 'Starting…', ActionTone.busy),
-      (const Running(4242), 'Stop', ActionTone.danger),
+      (const Running(4242), 'Playing', ActionTone.normal),
       (const Stopping(4242), 'Stopping…', ActionTone.danger),
       (const Failed('relinker failed'), 'Try again', ActionTone.normal),
     ];
@@ -71,7 +71,7 @@ void main() {
 
     test('Turkish', () {
       T.language = Language.byCode('tr');
-      expect(GameAction.of(const Running(1)).title, 'Durdur');
+      expect(GameAction.of(const Running(1)).title, 'Oynanıyor');
       expect(GameAction.of(const Installing(InstallStep.copy, 0.5, updating: true)).title, 'Güncelleniyor… %75');
       expect(GameAction.of(const WaitingForEngine(job)).title, 'Motor bekleniyor');
     });
@@ -98,28 +98,35 @@ void main() {
       fixture.dispose();
     });
 
-    test('Play: starting, running with its process, Stop asks it to close, then ready', () async {
-      expect(model.stateOf(orbit), isA<Installed>());
-      model.primaryAction(orbit);
-      expect(model.stateOf(orbit), isA<Starting>());
-      await until(() => model.running != null);
-      expect(model.stateOf(orbit), isA<Running>().having((state) => state.pid, 'pid', 4242));
-      expect(GameAction.of(model.stateOf(orbit)).title, 'Stop');
-      model.primaryAction(orbit);
-      expect(model.stateOf(orbit), isA<Stopping>());
-      await until(() => model.running == null);
-      expect(starts.last.signals, [ProcessSignal.sigterm], reason: 'asked to close as its window would');
-      expect(model.stateOf(orbit), isA<Installed>());
-      await Future<void>.delayed(const Duration(milliseconds: 150));
-      expect(starts.last.signals, [ProcessSignal.sigterm], reason: 'nothing is ended after it closed');
-    });
+    test(
+      'Play: starting, running with its process, the main button keeps it, Stop asks it to close, then ready',
+      () async {
+        expect(model.stateOf(orbit), isA<Installed>());
+        model.primaryAction(orbit);
+        expect(model.stateOf(orbit), isA<Starting>());
+        await until(() => model.running != null);
+        expect(model.stateOf(orbit), isA<Running>().having((state) => state.pid, 'pid', 4242));
+        expect(GameAction.of(model.stateOf(orbit)).title, 'Playing');
+        model.primaryAction(orbit);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        expect(model.stateOf(orbit), isA<Running>(), reason: 'the press brings it to the front, it does not stop it');
+        expect(starts.last.signals, isEmpty);
+        unawaited(model.stopRunningGame());
+        expect(model.stateOf(orbit), isA<Stopping>());
+        await until(() => model.running == null);
+        expect(starts.last.signals, [ProcessSignal.sigterm], reason: 'asked to close as its window would');
+        expect(model.stateOf(orbit), isA<Installed>());
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        expect(starts.last.signals, [ProcessSignal.sigterm], reason: 'nothing is ended after it closed');
+      },
+    );
 
     test('a game that does not close when asked is ended after the grace', () async {
       starts = FakeGameStarts(() => FakeGameProcess(ignoresTerm: true));
       model.startGame = starts.call;
       model.primaryAction(orbit);
       await until(() => model.running != null);
-      model.primaryAction(orbit);
+      unawaited(model.stopRunningGame());
       await Future<void>.delayed(const Duration(milliseconds: 20));
       expect(model.stateOf(orbit), isA<Stopping>(), reason: 'still closing within the grace');
       model.primaryAction(orbit);
@@ -318,15 +325,18 @@ void main() {
       expect(find.text('Engine build · Building the relinker and libraries'), findsNothing);
     });
 
-    testWidgets('a game playing: the button is a red Stop that asks it to close', (tester) async {
+    testWidgets('a game playing: the button says Playing, the game\'s menu asks it to close', (tester) async {
       final process = FakeGameProcess(ignoresTerm: true);
       model.stopGrace = const Duration(seconds: 30);
       model.running = (orbit, runningFor(process));
       await pumpLauncher(tester, model);
       final button = tester.widget<ConsoleButton>(find.byKey(const ValueKey('primary-action')));
-      expect(button.title, 'Stop');
-      expect(button.stop, isTrue);
+      expect(button.title, 'Playing');
+      expect(button.stop, isFalse);
       await tester.tap(find.byKey(const ValueKey('primary-action')));
+      await settle(tester);
+      expect(process.signals, isEmpty, reason: 'the press brings it to the front');
+      unawaited(model.stopRunningGame());
       await settle(tester);
       expect(process.signals, [ProcessSignal.sigterm]);
       expect(find.text('Stopping…'), findsOneWidget);

@@ -62,6 +62,7 @@ extension LauncherProfiles on AppModel {
     'discordJoin',
     'onlinePlay',
     'pushToTalk',
+    'noiseSuppression',
     'talkKey',
     'profileName',
     'showHiddenTrophies',
@@ -252,7 +253,9 @@ extension LauncherProfiles on AppModel {
     T.language = Language.byCode(preferences.language);
     Motion.reduced = preferences.reducedMotion || powerWatch.dimmed;
     haptics.enabled = preferences.controllerVibration;
-    together.hub.voice.pushToTalk = preferences.pushToTalk;
+    together.hub.voice
+      ..pushToTalk = preferences.pushToTalk
+      ..noiseSuppression = preferences.noiseSuppression;
     _applySound();
     savePreferences();
   }
