@@ -105,7 +105,7 @@
   "screenshotsTitle": "Tangkapan skrin",
   "screenshotsDetail": "Tekan F12 semasa dalam permainan; gambar juga akan diambil setiap kali anda memperoleh trofi.",
   "screenshotsNone": "Belum ada gambar: tekan F12 semasa dalam permainan, atau peroleh trofi.",
-  "trophyShot": "Detik anda memperolehnya: Tekan Enter untuk membuka",
+  "trophyShot": "Detik anda memperolehnya: Enter untuk membuka",
   "displayUpstream": "Enjin asal (upstream) mengabaikan perkara ini: pelancar (launcher) akan menekan kekunci F11 sebaik sahaja permainan dibuka. Enjin AnyPS5-ARM pula menguruskannya secara automatik.",
   "displayBorderless": "Skrin penuh tanpa sempadan: permainan memenuhi seluruh skrin tanpa mengubah resolusinya.",
   "windowSizeUpstream": "Enjin asal (upstream) dibuka pada saiz 60%: pelancar akan melaraskan semula saiz tetingkapnya. Enjin AnyPS5-ARM dibuka pada saiz ini.",
