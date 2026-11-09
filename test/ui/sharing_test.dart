@@ -86,31 +86,34 @@ void main() {
       openGame(orbit());
       (row('advanced').kind as ActionRow).run();
       expect(model.overlay, Layer.advanced);
-      expect(model.panelCategories().single.rows.map((row) => row.id), [
-        'sticksSection',
-        'leftDeadzone',
-        'rightDeadzone',
-        'mouseSection',
-        'sensitivity',
-        'vertical',
-        'curve',
-        'offset',
-        'maxSpeed',
-        'smoothing',
-        'decay',
-        'keyboardSection',
-        'modifier',
-        'keyboardRamp',
-        'triggerRamp',
-        'graphicsSection',
-        'shaderCache',
-        'relinkerSection',
-        'relinker---trace-imports',
-        'shareSection',
-        'export',
-        'import',
-        'resetAdvanced',
-      ]);
+      expect(
+        model.panelCategories().single.rows.map((row) => row.id),
+        [
+          'sticksSection',
+          'leftDeadzone',
+          'rightDeadzone',
+          'mouseSection',
+          'sensitivity',
+          'vertical',
+          'curve',
+          'offset',
+          'maxSpeed',
+          'smoothing',
+          'decay',
+          'keyboardSection',
+          'modifier',
+          'keyboardRamp',
+          'triggerRamp',
+          'graphicsSection',
+          'shaderCache',
+          'relinkerSection',
+          'relinker---trace-imports',
+          'shareSection',
+          'export',
+          'import',
+          'resetAdvanced',
+        ],
+      );
       StepperRow stepper(String id) => row(id).kind as StepperRow;
       expect([stepper('leftDeadzone').min, stepper('leftDeadzone').max, stepper('leftDeadzone').step], [0, 90, 2]);
       expect(stepper('sensitivity').format(10), '${T.decimal(1, 1)}×');
@@ -168,10 +171,7 @@ void main() {
       savedTo = folder.path;
       model.saveSettings(orbit(), const GameSettings(frameGeneration: true, overlay: OverlayCorner.topLeft));
       openGame(orbit());
-      expect(
-        model.panelCategories().expand((category) => category.rows).map((row) => row.id),
-        isNot(contains('export')),
-      );
+      expect(model.panelCategories().expand((category) => category.rows).map((row) => row.id), isNot(contains('export')));
       // On the Advanced page, as on the Mac.
       (row('advanced').kind as ActionRow).run();
       expect(model.overlay, Layer.advanced);
