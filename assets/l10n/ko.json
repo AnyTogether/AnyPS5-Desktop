@@ -494,6 +494,8 @@
   "askEndTogether": "모두에 대해 '함께 플레이(Play Together)'를 종료하시겠습니까? 다른 사용자들은 각자 게임을 계속 플레이하게 됩니다.",
   "askLeaveTogether": "게임을 나가시겠습니까? 다른 사용자들은 제외된 상태로 게임이 계속 진행됩니다.",
   "askRemoveFriend": "%@ 님을 친구 목록에서 삭제하시겠습니까? 다시 친구가 되려면 새로운 친구 요청이 필요합니다.",
+  "askRemoveViewer": "%@ 님을 내보내시겠습니까? 다시 시청하려면 새 초대가 필요합니다.",
+  "askStopShare": "셰어 플레이를 중단하시겠습니까? 시청 중인 모든 사람이 나가게 됩니다.",
   "requiredTitle": "업데이트 필요",
   "requiredTooOld": "이 AnyPS5 버전은 AnyTogether에서 사용하기에는 너무 오래되었습니다.",
   "requiredTooOldVersion": "AnyPS5 %@ 버전은 AnyTogether에서 사용하기에는 너무 오래되었습니다.",

@@ -494,6 +494,8 @@
   "askEndTogether": "Închei sesiunea „Play Together” pentru toată lumea? Ceilalți vor rămâne în jocul lor, singuri.",
   "askLeaveTogether": "Părăsești jocul? Jocul tău va continua, fără ceilalți.",
   "askRemoveFriend": "Îl elimini pe %@ din lista de prieteni? Va fi nevoie de o nouă cerere de prietenie pentru a redeveni prieteni.",
+  "askRemoveViewer": "Elimini pe %@? Are nevoie de o nouă invitație pentru a urmări din nou.",
+  "askStopShare": "Oprești share play? Toți cei care urmăresc sunt deconectați.",
   "requiredTitle": "Este necesară o actualizare",
   "requiredTooOld": "Această versiune AnyPS5 este prea veche pentru AnyTogether",
   "requiredTooOldVersion": "AnyPS5 %@ este prea veche pentru AnyTogether",

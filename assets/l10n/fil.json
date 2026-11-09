@@ -494,6 +494,8 @@
   "askEndTogether": "Tapusin ang Paglalaro nang Sama-sama para sa lahat? Ang iba ay nananatili sa kanilang laro, nag-iisa.",
   "askLeaveTogether": "Iiwan ang laro? Patuloy na tumatakbo ang iyong laro, nang wala ang iba.",
   "askRemoveFriend": "Alisin ang %@ mula sa iyong mga kaibigan? Kailangan mo ng bagong kahilingan para maging magkaibigan muli.",
+  "askRemoveViewer": "Alisin si %@? Kakailanganin niya ng bagong imbitasyon para makapanood muli.",
+  "askStopShare": "Ihinto ang share play? Aalisin ang lahat ng nanonood.",
   "requiredTitle": "Kinakailangan ang Update",
   "requiredTooOld": "Masyadong luma na ang AnyPS5 na ito para sa AnyTogether",
   "requiredTooOldVersion": "Masyadong luma na ang AnyPS5 %@ para sa AnyTogether",

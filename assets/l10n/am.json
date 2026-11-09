@@ -494,6 +494,8 @@
   "askEndTogether": "ለሁሉም ሰው የሚሆን 'አብሮ መጫወት' (Play Together) ይቋረጥ? ሌሎች በጨዋታቸው ውስጥ ብቻቸውን ይቀጥላሉ።",
   "askLeaveTogether": "ጨዋታውን ይልቀቁ? ጨዋታዎ ያለ ሌሎች ሰዎች መቀጠሉን ይቀጥላል።",
   "askRemoveFriend": "%@ን ከጓደኞችዎ ዝርዝር ያስወግዱት? እንደገና ጓደኛ ለመሆን አዲስ ጥያቄ ያስፈልጋል።",
+  "askRemoveViewer": "%@ን ያስወጡ? እንደገና ለመመልከት አዲስ ግብዣ ያስፈልጋቸዋል።",
+  "askStopShare": "ማጋራትን ያቁሙ? የሚመለከቱ ሁሉ ይለቀቃሉ።",
   "requiredTitle": "ማሻሻያ (Update) ያስፈልጋል",
   "requiredTooOld": "ይህ AnyPS5 ለ AnyTogether በጣም ያረጀ ነው",
   "requiredTooOldVersion": "AnyPS5 %@ ለ AnyTogether በጣም ያረጀ ነው",
