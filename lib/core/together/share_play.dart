@@ -476,6 +476,10 @@ class SharePadRouter {
   final _last = <String, Uint8List>{};
   var _pads = <String, int>{};
 
+  /// The viewers with a pad who help player 1 rather than play their own (assist): their packets
+  /// say so instead of their pad.
+  final assist = <String>{};
+
   /// The pads as the share play has them now (user ID → pad 2-4).
   void update(Map<String, int> pads) {
     _pads = Map.of(pads);
@@ -501,7 +505,8 @@ class SharePadRouter {
     final bridge = _held[userId];
     final pad = _pads[userId];
     if (session == null || session == 0 || bridge == null || pad == null) return false;
-    final packet = Uint8List.fromList(data)..[RemotePacket.seatByte] = pad;
+    final packet = Uint8List.fromList(data)
+      ..[RemotePacket.seatByte] = assist.contains(userId) ? RemotePacket.assistSeat : pad;
     _last[userId] = packet;
     bridges.sendPad(packet, bridge);
     return true;

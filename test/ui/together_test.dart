@@ -509,7 +509,7 @@ void main() {
     test('a party: start it, invite from a friend\'s options, join its voice, choose the talk key', () async {
       final together = model.together;
       model.open(Layer.party);
-      expect(rowIds(), ['party-start', 'party-open', 'party-code-enter', 'party-code-look', 'party-find']);
+      expect(rowIds(), ['party-start', 'party-open', 'party-find', 'party-code-enter']);
       await together.startParty();
       expect(rowIds(), [
         'voice-join',
@@ -523,6 +523,7 @@ void main() {
         'party-invite-title',
         'party-invite-u-ana',
         'party-invite-u-bora',
+        'party-code-enter',
         'party-leave',
       ]);
 
@@ -688,6 +689,7 @@ void main() {
         'party-code-link',
         'party-code-new',
         'party-code-stop',
+        'party-code-enter',
       ]);
       expect(row('party-code-new').title, 'New code');
 
@@ -769,7 +771,10 @@ void main() {
         }),
       );
       await until(() => together.hub.parties.party!.leaderId == 'u-ana');
-      expect(rowIds().where((id) => id.startsWith('party-request') || id.startsWith('party-code')), isEmpty);
+      // Joining someone else's with a code is still there, as on the Mac.
+      expect(rowIds().where((id) => id.startsWith('party-request') || id.startsWith('party-code')), [
+        'party-code-enter',
+      ]);
       expect(together.partyBadge, 0);
 
       // Asking with a code and being turned down.
@@ -831,37 +836,38 @@ void main() {
       };
       model.open(Layer.party);
 
-      // Not a code at all: said so without asking.
-      (row('party-code-enter').kind as TextRow).set('hello');
-      run('party-code-look');
-      expect(model.toast, "That code doesn't work");
+      PanelRow enter() => row('party-code-enter');
+
+      // Not a code at all: said so, without asking.
+      (enter().kind as TextRow).set('hello');
+      expect(enter().detail, 'Type or paste a code or its link.');
       expect(server.callsTo('join/HELLO'), isEmpty);
+      (enter().kind as TextRow).set('NOPE-NOPE');
+      expect(enter().detail, 'A code is 8 letters and numbers');
+      expect(server.callsTo('join/NOPENOPE'), isEmpty);
 
-      // A code that works nowhere.
-      (row('party-code-enter').kind as TextRow).set('ABCD-EFGH');
-      run('party-code-look');
+      // A code that works nowhere: looked up a moment after typing stops.
+      (enter().kind as TextRow).set('ABCD-EFGH');
+      expect(enter().detail, 'Looking it up…');
       await until(() => server.callsTo('join/ABCDEFGH').isNotEmpty);
-      await until(() => model.toast == "That code doesn't work");
+      await until(() => enter().detail == 'No such code, or it no longer works');
 
-      final field = row('party-code-enter').kind as TextRow;
+      final field = enter().kind as TextRow;
       expect(field.hint, 'XXXX-XXXX');
       field.set('k7qm-3xpa');
       field.submit!();
-      await until(() => together.codePreview != null);
-      expect(rowIds().take(3), ['party-code-preview', 'party-code-ask', 'party-code-cancel']);
+      await until(() => together.joinEntry.info != null);
+      expect(rowIds(), containsAllInOrder(['party-code-enter', 'party-code-preview', 'party-code-ask']));
       expect(row('party-code-preview').title, "Cem's party");
-      expect(row('party-code-preview').detail, '3 of 8 in it · Orbit Runner');
+      expect(row('party-code-preview').detail, 'Orbit Runner · 3 of 8 in it');
 
       run('party-code-ask');
       await until(() => server.callsTo('join/K7QM3XPA', method: 'POST').isNotEmpty);
-      await until(() => model.toast == "Asked to join Cem's party");
-      expect(rowIds().take(3), ['party-code-preview', 'party-code-asked', 'party-code-cancel']);
+      await until(() => model.toast == "Asked. You'll hear when the leader answers");
+      expect(rowIds(), containsAllInOrder(['party-code-preview', 'party-code-asked']));
+      expect(rowIds(), isNot(contains('party-code-ask')));
 
-      run('party-code-cancel');
-      expect(together.codePreview, isNull);
-      expect(rowIds(), contains('party-code-enter'));
-
-      // A Share Play code opens elsewhere.
+      // A Share Play code asks to watch too, as on the Mac: it comes back as an invite to watch.
       server.joinPreviews['H8NZ4WRB'] = {
         'code': 'H8NZ4WRB',
         'kind': 'share_play',
@@ -872,11 +878,46 @@ void main() {
         'max': 4,
         'state': 'none',
       };
-      (row('party-code-enter').kind as TextRow).set('https://anytogether.net/join/H8NZ4WRB');
-      run('party-code-look');
-      await until(() => together.codePreview != null);
+      (enter().kind as TextRow).set('https://anytogether.net/join/H8NZ4WRB');
+      await until(() => together.joinEntry.info?.kind == 'share_play');
+      expect(row('party-code-preview').title, 'Cem is sharing');
+      expect(row('party-code-preview').detail, '1 of 4 in it');
+      run('party-code-ask');
+      await until(() => server.callsTo('join/H8NZ4WRB', method: 'POST').isNotEmpty);
+      await until(() => model.toast == "Asked. You'll hear when the host answers");
+
+      // A code for a share play that is full says so.
+      server.joinPreviews['H8NZ5WRB'] = {
+        ...server.joinPreviews['H8NZ4WRB'] as Map<String, dynamic>,
+        'code': 'H8NZ5WRB',
+        'size': 4,
+        'state': 'none',
+      };
+      (enter().kind as TextRow).set('H8NZ-5WRB');
+      await until(() => together.joinEntry.info?.code == 'H8NZ5WRB');
+      expect(row('party-code-state').title, 'Every slot is taken');
       expect(rowIds(), isNot(contains('party-code-ask')));
-      expect(row('party-code-preview').detail, "That's a Share Play code; here you can join parties");
+    });
+
+    test('the leader is told when they lead, and that someone was made leader or removed', () async {
+      final together = model.together;
+      model.open(Layer.party);
+      await together.startParty();
+      const ana = Person(id: 'u-ana', handle: 'ana', displayName: 'Ana');
+      (server.party!['members'] as List<Map<String, dynamic>>).add(FakeTogether.card('u-ana', 'ana', 'Ana'));
+      await together.hub.parties.refresh();
+      await together.makeLeader(ana);
+      expect(model.toast, 'Ana leads the party now');
+      await until(() => !together.hub.parties.party!.leads('u-me'));
+
+      // The lead handed back: it says so once.
+      server.push('party.updated', partyView({'leaderId': 'u-me'}));
+      await until(() => model.toast == 'You lead the party now');
+      expect(together.hub.parties.party!.leads('u-me'), isTrue);
+
+      // Removing someone says who.
+      await together.kick(ana);
+      expect(model.toast, 'Ana was removed from the party');
     });
 
     test('an invite shows, can be accepted; a full party says so', () async {
