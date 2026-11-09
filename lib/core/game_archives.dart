@@ -7,6 +7,10 @@ import 'dart:typed_data';
 import 'package:archive/archive_io.dart';
 import 'package:path/path.dart' as p;
 
+import 'ffpfsc.dart';
+
+export 'ffpfsc.dart' show ArchiveProblem, Ffpfsc;
+
 /// A zip a game was dropped into the games folder as, and the folder beside it that it unpacks
 /// into: PPSA01234.zip becomes PPSA01234/, and PPSA01234-UPDATE.zip an update the game finds.
 class GameArchive {
@@ -25,6 +29,9 @@ class GameArchive {
   /// Where it unpacks first: a hidden folder the library does not read, renamed to [folder] once
   /// every file is in it, so no half-unpacked dump shows as a game.
   String get partial => p.join(p.dirname(path), '.${p.basenameWithoutExtension(path)}.unpacking');
+
+  /// A game packed in one .ffpfsc file rather than a zip.
+  bool get isFfpfsc => Ffpfsc.matches(path);
 
   @override
   bool operator ==(Object other) => other is GameArchive && other.path == path;
@@ -46,6 +53,9 @@ class ArchivePlan {
     required this.refused,
     this.titleId,
     this.version,
+    this.problem,
+    this.titleName,
+    this.icon,
   });
 
   /// The files it unpacks (folders and links left out).
@@ -69,6 +79,13 @@ class ArchivePlan {
   /// reads: what tells an update for a game in the library from a game of its own.
   final String? titleId;
   final String? version;
+
+  /// A .ffpfsc that reads but will not be unpacked, and why (the panel says so). Null for a zip.
+  final ArchiveProblem? problem;
+
+  /// A .ffpfsc's game name and icon0.png from its files, null when they cannot be read.
+  final String? titleName;
+  final Uint8List? icon;
 }
 
 /// Unpacking stopped on purpose; what was written is gone.
@@ -98,7 +115,7 @@ class UnpackCancel {
 }
 
 abstract final class GameArchives {
-  static const extensions = {'.zip'};
+  static const extensions = {'.zip', '.ffpfsc'};
 
   /// How far below a games folder an archive is looked for: in it, and in its folders.
   static const depth = 1;
@@ -196,6 +213,7 @@ abstract final class GameArchives {
 
   /// What the zip at [path] holds. Throws when it is not a zip.
   static ArchivePlan plan(String path) {
+    if (Ffpfsc.matches(path)) return Ffpfsc.plan(path);
     final input = InputFileStream(path);
     try {
       return _plan(ZipDecoder().decodeStream(input));
@@ -269,6 +287,7 @@ abstract final class GameArchives {
     void Function(int done, int total)? progress,
     bool Function()? cancelled,
   }) {
+    if (Ffpfsc.matches(path)) return Ffpfsc.unpackSync(path, into, progress: progress, cancelled: cancelled);
     final input = InputFileStream(path);
     try {
       final archive = ZipDecoder().decodeStream(input);

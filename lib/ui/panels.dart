@@ -807,7 +807,20 @@ class _RowView extends StatelessWidget {
     final info = kind is InfoRow && kind.text.isNotEmpty ? kind.text : null;
     Widget content() => Row(
       children: [
-        if (row.person != null) ...[
+        if (row.picture != null) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8 * scale),
+            child: Image.memory(
+              row.picture!,
+              width: 44 * scale,
+              height: 44 * scale,
+              fit: BoxFit.cover,
+              cacheWidth: 132,
+              errorBuilder: (_, _, _) => SizedBox(width: 44 * scale, height: 44 * scale),
+            ),
+          ),
+          SizedBox(width: 16 * scale),
+        ] else if (row.person != null) ...[
           PersonAvatar(person: row.person!, size: 44 * scale, focused: focused),
           SizedBox(width: 16 * scale),
         ] else if (row.icon != null) ...[
