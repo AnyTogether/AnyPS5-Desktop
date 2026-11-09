@@ -15,6 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 import '../support/fake_process.dart';
+import '../support/fake_toolkit.dart';
 import '../support/ui_support.dart';
 
 /// Game settings' Frame generation, Export and Import settings and Copy link, anyps5:// links
@@ -85,32 +86,31 @@ void main() {
       openGame(orbit());
       (row('advanced').kind as ActionRow).run();
       expect(model.overlay, Layer.advanced);
-      expect(
-        model.panelCategories().single.rows.map((row) => row.id),
-        [
-          'sticksSection',
-          'leftDeadzone',
-          'rightDeadzone',
-          'mouseSection',
-          'sensitivity',
-          'vertical',
-          'curve',
-          'offset',
-          'maxSpeed',
-          'smoothing',
-          'decay',
-          'keyboardSection',
-          'modifier',
-          'keyboardRamp',
-          'triggerRamp',
-          'graphicsSection',
-          'shaderCache',
-          'shareSection',
-          'export',
-          'import',
-          'resetAdvanced',
-        ],
-      );
+      expect(model.panelCategories().single.rows.map((row) => row.id), [
+        'sticksSection',
+        'leftDeadzone',
+        'rightDeadzone',
+        'mouseSection',
+        'sensitivity',
+        'vertical',
+        'curve',
+        'offset',
+        'maxSpeed',
+        'smoothing',
+        'decay',
+        'keyboardSection',
+        'modifier',
+        'keyboardRamp',
+        'triggerRamp',
+        'graphicsSection',
+        'shaderCache',
+        'relinkerSection',
+        'relinker---trace-imports',
+        'shareSection',
+        'export',
+        'import',
+        'resetAdvanced',
+      ]);
       StepperRow stepper(String id) => row(id).kind as StepperRow;
       expect([stepper('leftDeadzone').min, stepper('leftDeadzone').max, stepper('leftDeadzone').step], [0, 90, 2]);
       expect(stepper('sensitivity').format(10), '${T.decimal(1, 1)}×');
@@ -140,6 +140,26 @@ void main() {
       expect(model.overlay, Layer.gameSettings);
       expect(model.panelCategories().single.rows[model.panelRow].id, 'advanced');
     });
+
+    test('a relinker option: why not on an engine without it, a switch for the next rebuild on one with it', () {
+      openGame(orbit());
+      (row('advanced').kind as ActionRow).run();
+      final lacking = row('relinker---trace-imports');
+      expect(lacking.kind, isA<InfoRow>());
+      expect((lacking.kind as InfoRow).text, T.text('relinkerFlagUnavailable'));
+      expect(lacking.detail, T.text('relinkerFlagUnavailableDetail'));
+
+      makeFakeToolkit(fixture.toolkit, traceImports: true);
+      final option = row('relinker---trace-imports');
+      expect(option.title, 'Trace system library calls');
+      expect(option.detail, contains('next rebuild'));
+      (option.kind as ToggleRow).set(true);
+      expect(model.currentSettings(orbit()).relinkerFlags, ['--trace-imports']);
+      expect((row('relinker---trace-imports').kind as ToggleRow).value, isTrue);
+      expect(model.stateOf(orbit()), isNot(isA<Installing>()), reason: 'a choice does not rebuild by itself');
+      (row('resetAdvanced').kind as ActionRow).run();
+      expect(model.currentSettings(orbit()).relinkerFlags, isNull);
+    });
   });
 
   group('settings files', () {
@@ -148,7 +168,10 @@ void main() {
       savedTo = folder.path;
       model.saveSettings(orbit(), const GameSettings(frameGeneration: true, overlay: OverlayCorner.topLeft));
       openGame(orbit());
-      expect(model.panelCategories().expand((category) => category.rows).map((row) => row.id), isNot(contains('export')));
+      expect(
+        model.panelCategories().expand((category) => category.rows).map((row) => row.id),
+        isNot(contains('export')),
+      );
       // On the Advanced page, as on the Mac.
       (row('advanced').kind as ActionRow).run();
       expect(model.overlay, Layer.advanced);

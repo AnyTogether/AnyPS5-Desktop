@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'controls.dart';
 import 'game_log.dart';
 import 'gyro_aiming.dart';
+import 'relinker_flags.dart';
 
 /// Where the performance overlay sits.
 enum OverlayCorner {
@@ -108,6 +109,7 @@ class GameSettings {
     this.phoneLayout,
     this.trace,
     this.gyro,
+    this.relinkerFlags,
   }) : ownFullscreen = fullscreen,
        ownWindowSize = windowSize,
        ownVsync = vsync;
@@ -164,6 +166,9 @@ class GameSettings {
       phoneLayout: json['phoneLayout'] as String?,
       trace: json['trace'] as bool?,
       gyro: json['gyro'] is Map<String, dynamic> ? GyroAiming.fromJson(json['gyro'] as Map<String, dynamic>) : null,
+      relinkerFlags: json['relinkerFlags'] is List<dynamic>
+          ? (json['relinkerFlags'] as List<dynamic>).whereType<String>().toList()
+          : null,
     );
   }
 
@@ -243,6 +248,26 @@ class GameSettings {
   /// Gyro aiming (Controls › Gyro Aiming, ANYPS5_GYRO_AIM); null is off.
   final GyroAiming? gyro;
 
+  /// Relinker options for this game's next rebuild ([RelinkerFlag]), as the relinker spells them;
+  /// null is none. Read through [chosenRelinkerFlags]: only those the launcher knows are used.
+  final List<String>? relinkerFlags;
+
+  /// The relinker options chosen for this game that the launcher knows, in the list's order.
+  List<RelinkerFlag> get chosenRelinkerFlags => [
+    for (final flag in RelinkerFlag.values)
+      if (relinkerFlags?.contains(flag.option) ?? false) flag,
+  ];
+
+  /// These settings with [flag] switched [on] or off.
+  GameSettings withRelinkerFlag(RelinkerFlag flag, bool on) {
+    final current = chosenRelinkerFlags;
+    final chosen = [
+      for (final candidate in RelinkerFlag.values)
+        if (candidate == flag ? on : current.contains(candidate)) candidate.option,
+    ];
+    return copyWith(relinkerFlags: chosen.isEmpty ? null : chosen);
+  }
+
   Map<String, Object?> toJson() => {
     'settingsVersion': version,
     if (ownFullscreen != null) 'fullscreen': ownFullscreen,
@@ -262,6 +287,7 @@ class GameSettings {
     if (phoneLayout != null) 'phoneLayout': phoneLayout,
     if (trace != null) 'trace': trace,
     if (gyro != null) 'gyro': gyro!.toJson(),
+    if (relinkerFlags != null) 'relinkerFlags': relinkerFlags,
   };
 
   static const _keep = Object();
@@ -285,6 +311,7 @@ class GameSettings {
     Object? phoneLayout = _keep,
     Object? trace = _keep,
     Object? gyro = _keep,
+    Object? relinkerFlags = _keep,
   }) => GameSettings(
     resolution: identical(resolution, _keep) ? this.resolution : resolution as String?,
     fullscreen: identical(fullscreen, _keep) ? ownFullscreen : fullscreen as bool?,
@@ -303,6 +330,7 @@ class GameSettings {
     phoneLayout: identical(phoneLayout, _keep) ? this.phoneLayout : phoneLayout as String?,
     trace: identical(trace, _keep) ? this.trace : trace as bool?,
     gyro: identical(gyro, _keep) ? this.gyro : gyro as GyroAiming?,
+    relinkerFlags: identical(relinkerFlags, _keep) ? this.relinkerFlags : relinkerFlags as List<String>?,
   );
 
   /// The game reads the controllers (through SDL2) only while its window is in front: with the

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:anyps5_desktop/core/file_links.dart';
 import 'package:anyps5_desktop/core/host.dart';
 import 'package:anyps5_desktop/core/installer.dart';
+import 'package:anyps5_desktop/core/relinker_flags.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:anyps5_desktop/core/save_backup.dart';
@@ -53,6 +54,17 @@ void main() {
     model.primaryAction(game);
     await until(() => model.stateOf(game) is Installed);
     expect(model.records[game.id]!.toolkit, 'toolkit-1');
+  });
+
+  test('a relinker option chosen for a game reaches its rebuild and its record', () async {
+    makeFakeToolkit(fixture.toolkit, traceImports: true);
+    final game = model.games[indexOf('PPSA02002')];
+    File(p.join(game.folder, 'eboot.bin')).writeAsBytesSync(typicalSelf());
+    model.saveSettings(game, model.currentSettings(game).withRelinkerFlag(RelinkerFlag.traceImports, true));
+    model.primaryAction(game);
+    await until(() => model.stateOf(game) is Installed);
+    expect(fakeRelinkerRuns(fixture.toolkit).single, startsWith('--trace-imports'));
+    expect(model.records[game.id]!.relinkerFlags, ['--trace-imports']);
   });
 
   test('a second game waits its turn and can leave the queue', () async {

@@ -51,6 +51,7 @@ import '../core/installer.dart';
 import '../core/library_watch.dart';
 import '../core/power.dart';
 import '../core/prepare_queue.dart';
+import '../core/relinker_flags.dart';
 import '../core/remote/adb_tunnel.dart';
 import '../core/remote/assist.dart';
 import '../core/remote/mdns.dart';
@@ -3193,6 +3194,7 @@ class AppModel extends ChangeNotifier {
           knownSize: sizes[game.id],
           toolkit: kit,
           resolution: _unlockResolution(game, kit),
+          relinkerFlags: currentSettings(game).chosenRelinkerFlags,
         );
       } on FileSystemException {
         plan = null; // The install says what is wrong.
@@ -3319,6 +3321,7 @@ class AppModel extends ChangeNotifier {
       toolkit: kit,
       root: folder,
       resolution: _unlockResolution(game, kit),
+      relinkerFlags: currentSettings(game).chosenRelinkerFlags,
       freeSpace: freeSpace,
       onProgress: (step, fraction) {
         progress[id] = (step, fraction);
@@ -3449,6 +3452,7 @@ class AppModel extends ChangeNotifier {
               knownSize: sizes[game.id],
               toolkit: toolkitFor(game) ?? kit,
               resolution: _unlockResolution(game, toolkitFor(game) ?? kit),
+              relinkerFlags: currentSettings(game).chosenRelinkerFlags,
             );
             return plan.space?.shortage(free: freeSpace(folder), folder: folder);
           } on FileSystemException {
@@ -6229,6 +6233,8 @@ class AppModel extends ChangeNotifier {
           (value) => change(settings.copyWith(shaderCache: value ? null : false)),
         ),
       ),
+      section('relinkerSection', 'sectionRelinker'),
+      ..._relinkerRows(game, settings, change),
       section('shareSection', 'sectionShare'),
       PanelRow(
         id: 'export',
@@ -6245,10 +6251,41 @@ class AppModel extends ChangeNotifier {
       PanelRow(
         id: 'resetAdvanced',
         title: T.text('resetAdvanced'),
-        kind: ActionRow(() => change(settings.copyWith(tuning: null, shaderCache: null))),
+        kind: ActionRow(() => change(settings.copyWith(tuning: null, shaderCache: null, relinkerFlags: null))),
       ),
     ];
   }
+
+  /// The relinker options a player can choose for this game, used by its next rebuild. An engine
+  /// that lacks one shows why instead of the switch; the rebuild leaves it out either way
+  /// (Installer).
+  List<PanelRow> _relinkerRows(Game game, GameSettings settings, void Function(GameSettings) change) {
+    final kit = toolkitFor(game);
+    return [
+      for (final flag in RelinkerFlag.values)
+        if (kit != null && !kit.supports(flag))
+          PanelRow(
+            id: 'relinker-${flag.option}',
+            title: T.text(_relinkerFlagText(flag).title),
+            detail: T.text('relinkerFlagUnavailableDetail'),
+            kind: InfoRow(T.text('relinkerFlagUnavailable')),
+          )
+        else
+          PanelRow(
+            id: 'relinker-${flag.option}',
+            title: T.text(_relinkerFlagText(flag).title),
+            detail: T.text(_relinkerFlagText(flag).detail),
+            kind: ToggleRow(
+              settings.chosenRelinkerFlags.contains(flag),
+              (value) => change(settings.withRelinkerFlag(flag, value)),
+            ),
+          ),
+    ];
+  }
+
+  static ({String title, String detail}) _relinkerFlagText(RelinkerFlag flag) => switch (flag) {
+    RelinkerFlag.traceImports => (title: 'relinkerTraceImports', detail: 'relinkerTraceImportsDetail'),
+  };
 
   List<PanelRow> _gameRows(Game game) {
     final settings = currentSettings(game);
