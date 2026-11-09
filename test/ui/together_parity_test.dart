@@ -37,14 +37,12 @@ void main() {
     model.together.code = '123456';
     await model.together.verify();
     await until(() => model.together.hub.parties.loaded && model.together.hub.messages.loaded);
+    addTearDown(() async {
+      model.dispose();
+      await server.close();
+      fixture.dispose();
+    });
   }
-
-  tearDown(() async {
-    model.dispose();
-    await server.close();
-    T.language = Language.english;
-    fixture.dispose();
-  });
 
   Future<void> offerArrives() async {
     server.inParty([ana], leader: 'u-ana');
@@ -100,6 +98,7 @@ void main() {
     expect(TogetherPlay.linkWords(const PeerPath(PeerRoute.relay)), 'Relay');
     expect(TogetherPlay.linkWords(const PeerPath(PeerRoute.connected)), 'Connected');
     expect(TogetherPlay.linkWords(null), 'Connected');
+    addTearDown(() => T.language = Language.english);
     T.language = Language.byCode('tr');
     expect(TogetherPlay.linkWords(const PeerPath(PeerRoute.direct, 23)), 'Doğrudan · 23 ms');
   });
