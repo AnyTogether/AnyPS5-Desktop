@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:anyps5_desktop/core/discord_presence.dart';
+import 'package:anyps5_desktop/core/ffmpeg_download.dart';
 import 'package:anyps5_desktop/core/engine_checkout.dart';
 import 'package:anyps5_desktop/core/audio/atrac9.dart';
 import 'package:anyps5_desktop/core/audio/audio_out.dart';
@@ -152,6 +153,9 @@ Fixture makeFixture({
   Uri? engine,
   Uri? armEngine,
   List<ReleaseKey>? armKeys,
+  Uri? ffmpegApi,
+  List<ReleaseKey>? ffmpegKeys,
+  ProcessRunner? ffmpegRun,
   DesktopWindows? desktop,
   WindowBackdrop? backdrop,
   PadSource Function()? pads,
@@ -249,6 +253,10 @@ Fixture makeFixture({
       armEngineReleases: armEngine == null
           ? null
           : GitHubReleases(api: armEngine, repository: ArmToolkitPackage.repository, signingKeys: armKeys),
+      ffmpegReleases: ffmpegApi == null
+          ? null
+          : GitHubReleases(api: ffmpegApi, repository: FfmpegBuild.repository, signingKeys: ffmpegKeys),
+      ffmpegRun: ffmpegRun,
       desktop: desktop,
       backdrop: backdrop,
       pads: pads,
