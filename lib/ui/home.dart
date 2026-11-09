@@ -1389,18 +1389,22 @@ class _CommunityCard extends StatelessWidget {
             decoration: BoxDecoration(color: _dot(status), shape: BoxShape.circle),
           ),
           SizedBox(width: 8 * scale),
-          Text(
-            status == null ? summary.statusName : TogetherSocial.compatName(status),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppText.display(16 * scale, weight: FontWeight.w600),
+          Flexible(
+            child: Text(
+              status == null ? summary.statusName : TogetherSocial.compatName(status),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppText.display(16 * scale, weight: FontWeight.w600),
+            ),
           ),
           SizedBox(width: 8 * scale),
-          Text(
-            summary.version,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppText.display(13 * scale, weight: FontWeight.w500, color: Colors.white.withValues(alpha: 0.5)),
+          Flexible(
+            child: Text(
+              summary.version,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppText.display(13 * scale, weight: FontWeight.w500, color: Colors.white.withValues(alpha: 0.5)),
+            ),
           ),
         ],
       ),

@@ -93,7 +93,8 @@ void main() {
     together.screens.compat['PPSA01001'] = const CompatSummary(statusName: 'playable', version: '0.1.17', reports: 7);
     together.screens.compatAsked['PPSA01001'] = DateTime.now();
     await pumpLauncher(tester, model);
-    expect(find.text('Community'), findsOneWidget);
+    // InfoCard writes its title in capitals.
+    expect(find.text(T.upper(T.text('socialCompatCommunity'))), findsOneWidget);
     expect(find.text('Playable'), findsOneWidget);
     expect(find.text('0.1.17'), findsOneWidget);
     await expectLater(find.byType(LauncherShell), matchesGoldenFile('goldens/home_community_en.png'));
@@ -106,6 +107,6 @@ void main() {
     model.selected = model.games.indexWhere((game) => game.titleId == 'PPSA01001');
     model.together.screens.compatAsked['PPSA01001'] = DateTime.now();
     await pumpLauncher(tester, model);
-    expect(find.text('Community'), findsNothing);
+    expect(find.text(T.upper(T.text('socialCompatCommunity'))), findsNothing);
   });
 }
