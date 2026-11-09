@@ -153,7 +153,7 @@ void main() {
     github.releases.add(signed(_ffmpegRelease(), [key]));
     final error = await failure(store(run: works(1, "version `GLIBC_2.34' not found")).install(await pinned()));
     expect(error.kind, ToolkitFailureKind.badLayout);
-    expect(error.message, contains("GLIBC_2.34"));
+    expect(error.message, contains('GLIBC_2.34'));
     expect(store().installed(), isNull);
   });
 
@@ -169,7 +169,7 @@ void main() {
   });
 
   test('neither update channel takes the ffmpeg tag for a launcher version', () {
-    final ffmpeg = UpstreamRelease(tag: FfmpegBuild.tag, assets: const [], prerelease: true);
+    const ffmpeg = UpstreamRelease(tag: FfmpegBuild.tag, assets: [], prerelease: true);
     expect(ChannelReleases.offered([ffmpeg], UpdateChannel.stable), isEmpty);
     expect(ChannelReleases.offered([ffmpeg], UpdateChannel.nightly), isEmpty);
     expect(ChannelReleases.newest([ffmpeg], UpdateChannel.nightly), isNull);
