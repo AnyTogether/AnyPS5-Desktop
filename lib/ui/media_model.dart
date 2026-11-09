@@ -245,6 +245,8 @@ class MediaModel {
 
   /// The game ended: so does its broadcast.
   void gameEnded() {
+    // Under Wayland each game is asked for its own window, so each may have its own reason.
+    if (wayland != null) _toldNoTool = false;
     _broadcaster?.stop();
     unawaited(updateRemotePlay());
   }
