@@ -8,8 +8,11 @@ import 'package:anyps5_desktop/core/host.dart';
 import 'package:anyps5_desktop/core/managed_retro.dart';
 import 'package:anyps5_desktop/core/toolkit_download.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
+import 'package:anyps5_desktop/ui/background.dart';
+import 'package:anyps5_desktop/ui/components.dart';
 import 'package:anyps5_desktop/ui/embedded_retro_game.dart';
 import 'package:archive/archive.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -18,6 +21,96 @@ import '../support/ui_support.dart';
 import 'desktop_features_test.dart' show FakePads;
 
 void main() {
+  testWidgets('embedded launch uses one progress bar and keeps the same wallpaper', (tester) async {
+    final fixture = makeFixture();
+    final model = fixture.model;
+    addTearDown(() {
+      model.dispose();
+      fixture.dispose();
+    });
+    final managed = ManagedRetro(fixture.temp.path, EmbeddedCoreHost.current!);
+    const platform = RetroPlatform.ps3;
+    File(managed.libraryPath(platform)).createSync();
+    final cover = File(p.join(fixture.temp.path, 'cover.png'))..writeAsBytesSync(iconArt(0x123456, 0x345678));
+    final wallpaper = File(p.join(fixture.temp.path, 'wallpaper.png'))..writeAsBytesSync(iconArt(0x654321, 0x876543));
+    final game = Game(
+      folder: fixture.temp.path,
+      titleId: 'PS3-TEST12345',
+      name: 'Embedded startup fixture',
+      names: const {'en-US': 'Embedded startup fixture'},
+      defaultLanguage: 'en-US',
+      version: '',
+      executable: ExecutableKind.disc,
+      retro: (platform: platform, path: p.join(fixture.temp.path, 'PS3_DISC.SFB')),
+      icon: cover.path,
+      background: wallpaper.path,
+    );
+    model
+      ..games = [game]
+      ..starting = game;
+    await pumpLauncher(tester, model);
+    final artwork = find.byWidgetPredicate((widget) => widget is GameArtwork && widget.path == wallpaper.path);
+    final coverImage = find.byWidgetPredicate((widget) => widget is ArtworkImage && widget.path == cover.path);
+    expect(find.byType(IndeterminateLine), findsOneWidget);
+    expect(coverImage, findsOneWidget);
+    final artworkState = tester.state(artwork);
+    final coverRect = tester.getRect(coverImage);
+
+    const channel = MethodChannel('anyps5/retro_core');
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    var status = <String, Object?>{'presented': true, 'progressPercent': 67, 'progressLabel': 'Compiling'};
+    messenger.setMockMethodCallHandler(
+      channel,
+      (call) async => switch (call.method) {
+        'start' => 21,
+        'status' => status,
+        _ => null,
+      },
+    );
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+    final run = await EmbeddedRetroGame.start(
+      managed,
+      game.retro!,
+      internalResolution: null,
+      graphics: const {},
+      onResolutionSelected: (_) {},
+      onGraphicsSelected: (_, _) {},
+      readPad: () => PadState.idle,
+      changed: model.refresh,
+    );
+    model.running = (game, run);
+    addTearDown(() => model.running = null);
+    await tester.pump(const Duration(milliseconds: 150));
+    final bar = find.byType(LinearProgressIndicator);
+    expect(bar, findsOneWidget);
+    expect(tester.widget<LinearProgressIndicator>(bar).value, 0.67);
+    expect(find.text('67%'), findsOneWidget);
+    expect(find.byType(IndeterminateLine), findsNothing);
+    expect(tester.state(artwork), same(artworkState));
+    expect(tester.getRect(coverImage), coverRect);
+    final texture = find.byType(Texture);
+    final mountedTexture = tester.element(texture);
+
+    model
+      ..starting = null
+      ..refresh();
+    await tester.pump();
+    expect(bar, findsOneWidget);
+    expect(tester.state(artwork), same(artworkState));
+    expect(tester.element(texture), same(mountedTexture));
+    status = {'presented': true};
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump();
+    expect(artwork, findsNothing);
+    expect(coverImage, findsNothing);
+    expect(bar, findsNothing);
+    expect(tester.element(texture), same(mountedTexture));
+    status = {'ended': true};
+    await tester.pump(const Duration(milliseconds: 150));
+    await run.exitCode;
+    model.running = null;
+  });
+
   test('PS3 settings categories work with the controller and section shortcuts', () {
     final pads = FakePads();
     final host = EmbeddedCoreHost.current!;

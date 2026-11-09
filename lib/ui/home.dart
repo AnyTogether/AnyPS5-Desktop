@@ -27,16 +27,17 @@ import 'together_model.dart';
 
 /// The theme animation and the selected game's artwork over it.
 class Backdrop extends StatelessWidget {
-  const Backdrop({super.key, required this.model, this.time});
+  const Backdrop({super.key, required this.model, this.time, this.game});
 
   final AppModel model;
+  final Game? game;
 
   /// A fixed moment of the theme animation, for previews and tests.
   final double? time;
 
   @override
   Widget build(BuildContext context) {
-    final game = model.homePreviewGame;
+    final game = this.game ?? model.homePreviewGame;
     final background = game?.background;
     final backgroundKey = ValueKey(game?.id);
     final artwork =

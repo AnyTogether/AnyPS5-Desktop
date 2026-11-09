@@ -120,6 +120,12 @@ cover trophy parsing without the reviewer's game files.
 The [session contract tests](../test/ui/embedded_ps3_session_test.dart) cover
 local PUP staging, compile progress, section navigation, live setting
 persistence and release.
+The [launcher's startup presentation](../lib/ui/launcher.dart) shows one
+progress bar from Play through core preparation. It keeps the selected
+game's [artwork](../lib/ui/home.dart) behind the loading card while the
+native texture starts below it. The same texture remains mounted when
+the card clears. The test checks that the cover and wallpaper stay in
+place while the bar switches from indeterminate to a reported percentage.
 
 The [shared Vulkan adapter](../native/retro/retro_vulkan_video.cpp)
 and [factory](../native/retro/retro_vulkan_video.h) negotiate the device and
