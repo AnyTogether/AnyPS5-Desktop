@@ -950,7 +950,7 @@ class _RowView extends StatelessWidget {
     if (!_labelledMenus.contains(model.overlay) || !(kind is ActionRow || kind is ToggleRow || kind is InfoRow)) {
       return view;
     }
-    final parts = [row.title, if (row.detail case final detail?) detail];
+    final parts = [row.title, ?row.detail];
     return Semantics(
       button: kind is ActionRow,
       toggled: kind is ToggleRow ? kind.value : null,
