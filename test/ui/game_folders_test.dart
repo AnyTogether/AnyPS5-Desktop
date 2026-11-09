@@ -168,7 +168,7 @@ void main() {
     test('a row per folder with its games, then Add folder', () {
       final second = addSecond();
       final rows = libraryRows();
-      expect(rowIds(), ['folder-0', 'folder-1', 'addFolder', 'rescan', 'prepareNewGames']);
+      expect(rowIds(), ['folder-0', 'folder-1', 'addFolder', 'addGameFile', 'rescan', 'prepareNewGames']);
       expect(rows[0].title, model.root);
       expect(rows[0].detail, '4 games · ${T.text('folderRemove')}');
       expect(rows[1].title, second);
@@ -225,7 +225,7 @@ void main() {
       expect(model.preferences.gamesFolders, isEmpty);
       expect(model.root, isNull);
       expect(model.games, isEmpty);
-      expect(rowIds(), ['addFolder', 'rescan', 'prepareNewGames']);
+      expect(rowIds(), ['addFolder', 'addGameFile', 'rescan', 'prepareNewGames']);
     });
   });
 

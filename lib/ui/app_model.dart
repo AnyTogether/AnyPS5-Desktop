@@ -867,6 +867,7 @@ class PanelRow {
     this.person,
     this.level,
     this.icon,
+    this.picture,
     this.meter,
   });
 
@@ -889,6 +890,9 @@ class PanelRow {
 
   /// A sign drawn before the title where no one's picture is (a challenge's notifications).
   final PanelIcon? icon;
+
+  /// A picture (a game's icon) drawn before the title in the sign's place.
+  final Uint8List? picture;
 
   bool get focusable => kind is! InfoRow;
 }
@@ -5559,6 +5563,12 @@ class AppModel extends ChangeNotifier {
         rows: [
           ...folderRows(),
           PanelRow(id: 'addFolder', title: T.text('addFolder'), kind: ActionRow(() => unawaited(addGamesFolder()))),
+          PanelRow(
+            id: 'addGameFile',
+            title: T.text('addGameFile'),
+            detail: T.text('addGameFileDetail'),
+            kind: ActionRow(() => unawaited(files.addGameFile())),
+          ),
           PanelRow(id: 'rescan', title: T.text('rescan'), kind: ActionRow(rescan)),
           PanelRow(
             id: 'prepareNewGames',
