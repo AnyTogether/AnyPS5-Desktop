@@ -10,6 +10,7 @@ import 'components.dart';
 import 'glass.dart';
 import 'level_badge.dart';
 import 'panels.dart';
+import 'profile_view.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'together_model.dart';
@@ -470,7 +471,13 @@ class ActivityPicture extends StatelessWidget {
       child: local != null
           ? ArtworkImage(path: local, cacheWidth: (size * 3).round())
           : game.iconUrl != null
-          ? Image.network(game.iconUrl!, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, _, _) => sign)
+          ? Image(
+              image: ProfileView.pictureFor(game.iconUrl!),
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => sign,
+            )
           : sign,
     );
   }

@@ -11,6 +11,7 @@ import 'package:anyps5_desktop/ui/home.dart';
 import 'package:anyps5_desktop/ui/launcher.dart';
 import 'package:anyps5_desktop/ui/leaderboard_view.dart';
 import 'package:anyps5_desktop/ui/panels.dart' show PersonAvatar;
+import 'package:anyps5_desktop/ui/profile_view.dart' show ProfileView;
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:anyps5_desktop/ui/together_model.dart';
 import 'package:flutter/gestures.dart';
@@ -379,6 +380,8 @@ void main() {
       fixture = makeFixture();
       model = fixture.model;
       signedIn();
+      ProfileView.pictureFor = (_) => MemoryImage(png(4, 4, (x, y) => 0xE8505BFF));
+      addTearDown(() => ProfileView.pictureFor = NetworkImage.new);
       Map<String, dynamic> item(String id, String kind, Map<String, Object?> extra) => {
         'id': id,
         'kind': kind,
