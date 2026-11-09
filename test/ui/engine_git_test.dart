@@ -248,6 +248,7 @@ void main() {
       final neon = model.games.firstWhere((game) => game.titleId == 'PPSA02002');
       final neonFolder = Installer.installedFolder(neon, model.root!);
       Directory(neonFolder).createSync(recursive: true);
+      File(p.join(neonFolder, 'app.elf')).writeAsStringSync('#!/bin/sh\n');
       File(p.join(neonFolder, Installer.recordName)).writeAsStringSync(
         '{"date":"2026-10-24T12:00:00Z","source":"${neon.folder}","system":"linux","titleID":"PPSA02002",'
         '"toolkit":"${model.toolkitVersion}"}',

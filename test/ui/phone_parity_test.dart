@@ -61,6 +61,7 @@ void main() {
   void installed(Game game) {
     final folder = Installer.installedFolder(game, model.root!);
     Directory(folder).createSync(recursive: true);
+    File(p.join(folder, 'app.elf')).writeAsStringSync('#!/bin/sh\n');
     File(p.join(folder, Installer.recordName)).writeAsStringSync(
       '{"date":"2026-10-24T12:00:00Z","source":${jsonEncode(game.folder)},"system":"linux",'
       '"titleID":"${game.titleId}","toolkit":"${model.toolkitVersion}"}',
