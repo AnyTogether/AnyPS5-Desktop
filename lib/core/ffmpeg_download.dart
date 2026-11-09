@@ -27,7 +27,7 @@ abstract final class FfmpegBuild {
   static String executableName(HostSystem system) => system == HostSystem.windows ? 'ffmpeg.exe' : 'ffmpeg';
 
   /// About what the download weighs, measured on the pinned build; said before it starts.
-  static int approximateBytes(HostSystem system) => system == HostSystem.windows ? 75 * 1024 * 1024 : 62 * 1024 * 1024;
+  static int approximateBytes(HostSystem system) => system == HostSystem.windows ? 61 * 1024 * 1024 : 65 * 1024 * 1024;
 }
 
 /// The ffmpeg the launcher downloaded, next to the toolkits:
