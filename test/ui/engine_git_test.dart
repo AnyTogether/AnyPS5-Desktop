@@ -10,6 +10,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 import '../support/fake_commands.dart';
+import '../support/fake_process.dart';
+import '../support/phone/fake_phone.dart' show FakePhone;
+import '../support/phone/messages.dart' show Launch, Pairing, Welcome;
 import '../support/ui_support.dart';
 
 /// Settings › AnyPS5 engine › Update from Git, for an engine folder that is a git checkout.
@@ -236,6 +239,45 @@ void main() {
         reason: 'unlocked again with the new build, to play after',
       );
       model.cancelUnlock(orbit());
+    });
+
+    test('a phone switching games: the check runs for the new one once the first has gone', () async {
+      final starts = FakeGameStarts();
+      model.startGame = starts.call;
+      commands.results['git fetch'] = const FakeResult(code: 128, lines: ['fatal: unable to access']);
+      final neon = model.games.firstWhere((game) => game.titleId == 'PPSA02002');
+      final neonFolder = Installer.installedFolder(neon, model.root!);
+      Directory(neonFolder).createSync(recursive: true);
+      File(p.join(neonFolder, 'app.elf')).writeAsStringSync('#!/bin/sh\n');
+      File(p.join(neonFolder, Installer.recordName)).writeAsStringSync(
+        '{"date":"2026-10-24T12:00:00Z","source":"${neon.folder}","system":"linux","titleID":"PPSA02002",'
+        '"toolkit":"${model.toolkitVersion}"}',
+      );
+      model.rescan();
+      await model.startPhoneServer();
+      addTearDown(model.stopPhoneServer);
+      final phone = await FakePhone.connect(model.remote!.port!);
+      phone.hello('phone-1', 'Pixel');
+      await phone.next<Pairing>();
+      await until(() => model.pairing != null);
+      model.answerPairing(true);
+      await phone.next<Welcome>();
+      await until(() => model.remote!.connectedDevices.isNotEmpty);
+      phone.send(Launch(orbit().id));
+      await until(() => model.running?.$1 == orbit());
+      final fetches = commands.lines.where((line) => line.startsWith('git fetch')).length;
+      phone.send(Launch(neon.id));
+      await until(() => model.running?.$1 == neon);
+      expect(starts.started, hasLength(2));
+      expect(starts.processes.first.ended, isTrue);
+      expect(
+        commands.lines.where((line) => line.startsWith('git fetch')).length,
+        greaterThan(fetches),
+        reason: 'the new game goes through Update from Git Before Playing',
+      );
+      await phone.close();
+      model.stopGame();
+      await until(() => model.running == null);
     });
 
     test('offline: nothing is said and the game starts', () async {
