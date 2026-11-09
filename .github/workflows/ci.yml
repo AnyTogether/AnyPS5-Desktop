@@ -256,6 +256,13 @@ jobs:
     name: flutter build windows
     runs-on: windows-latest
     timeout-minutes: 45
+    env:
+      # What the Windows build downloads into its build folder from GitHub releases: libmpv and
+      # ANGLE (media_kit_libs_windows_video's CMake) and SDL2 (windows/CMakeLists.txt).
+      WINDOWS_ARCHIVES: |
+        build/windows/x64/mpv-dev-*.7z
+        build/windows/x64/ANGLE.7z
+        build/windows/x64/SDL2-*-win32-x64.zip
     steps:
       - uses: actions/checkout@v7
         with:
@@ -272,7 +279,41 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: bash packaging/set-version.sh "$VERSION"
+      # The versions that fix what those archives are. The scripts that use them still check each
+      # one against its own hash, and fetch it again if it does not match.
+      - name: Name the downloaded archives' cache
+        id: archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          media_kit=$(tr -d '\r' < pubspec.lock | awk '$1 == "media_kit_libs_windows_video:" { found = 1 } found && $1 == "version:" { gsub(/"/, "", $2); print $2; exit }')
+          sdl2=$(tr -d '\r' < windows/CMakeLists.txt | sed -n 's/^set(SDL2_VERSION "\(.*\)")$/\1/p')
+          [ -n "$media_kit" ] && [ -n "$sdl2" ] || { echo "::error::no version for the archives' cache"; exit 1; }
+          echo "key=windows-archives-media_kit-$media_kit-sdl2-$sdl2" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v5
+        id: archives-restore
+        with:
+          key: ${{ steps.archives.outputs.key }}
+          path: ${{ env.WINDOWS_ARCHIVES }}
       - run: flutter build windows --release
+      # SDL2 failing to download is only a warning to the build, so keep the archives only when
+      # all of them arrived: a cache without one would stay that way until the versions change.
+      - name: See whether every archive arrived
+        id: archives-whole
+        if: steps.archives-restore.outputs.cache-hit != 'true'
+        shell: bash
+        working-directory: build/windows/x64
+        run: |
+          if ls mpv-dev-*.7z ANGLE.7z SDL2-*-win32-x64.zip SDL2-*/SDL2.dll; then
+            echo "whole=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::An archive did not arrive: not caching them"
+          fi
+      - uses: actions/cache/save@v5
+        if: steps.archives-whole.outputs.whole == 'true'
+        with:
+          key: ${{ steps.archives.outputs.key }}
+          path: ${{ env.WINDOWS_ARCHIVES }}
       # The clip player's libmpv and ANGLE (media_kit_libs_windows_video) beside the launcher: the
       # installer and the .zip take the whole folder.
       - name: Check the clip player's libraries are beside the launcher
