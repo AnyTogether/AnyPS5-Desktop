@@ -453,8 +453,10 @@ Font License 1.1 (`assets/system-fonts/OFL.txt`; the CJK licence is saved beside
 under the zlib license (`third_party/SDL2/LICENSE.txt`, shipped as `SDL2-LICENSE.txt`). Clips
 play through [media_kit](https://github.com/media-kit/media-kit) (MIT) and
 [libmpv](https://mpv.io) with FFmpeg (mpv is GPL-2.0-or-later, LGPL-2.1-or-later when built
-for it); the Linux bundle carries the Ubuntu packages' copyright files for the libraries it
-copies, in `lib/licenses/`. The optional ffmpeg the launcher offers to download is FFmpeg
+for it); the Windows package carries its libmpv's licence as `libmpv-LICENSE.txt`
+(`third_party/libmpv/`; that build is under the LGPL version 3 or later) and ANGLE's as
+`ANGLE-LICENSE.txt`; the Linux bundle carries the Ubuntu packages' copyright files for the
+libraries it copies, in `lib/licenses/`. The optional ffmpeg the launcher offers to download is FFmpeg
 built by [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds) under the GPL version 3,
 not shipped with the launcher; what it downloads carries the licence and a link to the exact
 source (`packaging/ffmpeg/pinned.env`, `.github/workflows/ffmpeg-release.yml`). The

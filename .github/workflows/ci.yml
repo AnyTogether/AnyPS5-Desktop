@@ -221,6 +221,8 @@ jobs:
           du -sh build/linux/x64/release/bundle build/linux/x64/release/bundle/lib
           ls build/linux/x64/release/bundle/lib | grep -c . | xargs echo "files in lib/:"
           ls build/linux/x64/release/bundle/lib/libmpv.so.*
+          ls build/linux/x64/release/bundle/lib/licenses/ | grep -c . | xargs echo "licence files in lib/licenses/:"
+          ls build/linux/x64/release/bundle/lib/licenses/libmpv*.txt
       # Ubuntu 24.04 has libmpv.so.2, not the 22.04 build machine's libmpv.so.1: the clip player's
       # plugin and the libmpv it carries have to find everything they link in lib/ or in what a
       # GTK desktop has.
@@ -322,6 +324,9 @@ jobs:
           $release = "build\windows\x64\runner\Release"
           foreach ($dll in "libmpv-2.dll", "libEGL.dll", "libGLESv2.dll", "media_kit_video_plugin.dll") {
             if (-not (Test-Path (Join-Path $release $dll))) { Write-Error "no $dll in $release"; exit 1 }
+          }
+          foreach ($licence in "libmpv-LICENSE.txt", "ANGLE-LICENSE.txt") {
+            if (-not (Test-Path (Join-Path $release $licence))) { Write-Error "no $licence in $release"; exit 1 }
           }
           Get-ChildItem $release -Filter *.dll | Sort-Object Length -Descending | Select-Object -First 8 Name, @{n = "MiB"; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize
       - name: Package the installer (Inno Setup 6)
