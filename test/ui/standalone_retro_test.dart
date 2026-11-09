@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:anyps5_desktop/core/game_library.dart';
+import 'package:anyps5_desktop/core/game_process.dart';
 import 'package:anyps5_desktop/core/host.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/retro_folder_tile.dart';
@@ -102,6 +104,43 @@ void main() {
       expect(launches, 1);
     });
   }
+
+  test('canceling a retro launch stops the late process before releasing the launch slot', () async {
+    final fixture = makeFixture(withToolkit: false);
+    final model = fixture.model;
+    addTearDown(() {
+      model.dispose();
+      fixture.dispose();
+    });
+    final folder = Directory(p.join(model.root!, 'Retro game'))..createSync();
+    File(p.join(folder.path, 'game.iso')).createSync();
+    File(p.join(folder.path, 'retro.json'))
+        .writeAsStringSync('{"platform":"ps2","titleId":"TEST12345","name":"Retro game","disc":"game.iso"}');
+    model.rescan();
+    final game = model.games.singleWhere((game) => game.retro != null);
+    model.preferences.retroEmulators['ps2'] = (File(p.join(fixture.temp.path, 'emulator'))..createSync()).path;
+    final process = FakeGameProcess();
+    addTearDown(process.quit);
+    final pending = Completer<RunningGame>();
+    var launches = 0;
+    model.startRetroGame = ({required installed, required program, required arguments, required logFile}) {
+      launches++;
+      return pending.future;
+    };
+
+    final play = model.play(game);
+    await pumpEventQueue();
+    expect(model.starting, game);
+    model.cancelStart();
+    await model.play(game);
+    expect(launches, 1);
+    pending.complete(runningFor(process));
+    await play;
+    expect(process.ended, isTrue);
+    expect(model.running, isNull);
+    expect(model.starting, isNull);
+    expect(model.preferences.lastPlayed[game.id], isNull);
+  });
 
   test('a failed native file picker leaves emulator preferences alone', () async {
     final fixture = makeFixture(pickFile: (_, _) async => throw PlatformException(code: 'picker-unavailable'));

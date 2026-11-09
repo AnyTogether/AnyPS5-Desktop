@@ -98,6 +98,7 @@ extension StandaloneEmulators on AppModel {
       return;
     }
     sounds.play(Cue.select);
+    final turn = ++_startTurn;
     starting = game;
     _changed();
     final RunningGame run;
@@ -116,6 +117,10 @@ extension StandaloneEmulators on AppModel {
     } on Object catch (error) {
       if (_disposed) return;
       starting = null;
+      if (turn != _startTurn) {
+        _changed();
+        return;
+      }
       _padLog?.call('Could not start ${disc.platform.emulator}: $error');
       show(
         managed == null
@@ -126,8 +131,13 @@ extension StandaloneEmulators on AppModel {
       return;
     }
 
-    if (_disposed) {
-      run.stop();
+    if (_disposed || turn != _startTurn) {
+      if (!run.stop()) run.kill();
+      await run.exitCode;
+      if (!_disposed) {
+        starting = null;
+        _changed();
+      }
       return;
     }
     if (run is! EmbeddedRetroGame) starting = null;
@@ -143,11 +153,11 @@ extension StandaloneEmulators on AppModel {
           : await run.ready.then<bool?>((ready) => ready).timeout(const Duration(minutes: 3), onTimeout: () => null);
       if (_disposed) return;
       starting = null;
-      if (ready == null && !stopping) {
+      if (ready == null && !stopping && turn == _startTurn) {
         show(T.text('retroEmbeddedStartupTimedOut'));
         unawaited(stopRunningGame());
       }
-      if (ready == true && !stopping) {
+      if (ready == true && !stopping && turn == _startTurn) {
         preferences.lastPlayed[game.id] = run.started.toIso8601String();
         savePreferences();
       } else {
@@ -182,5 +192,11 @@ extension StandaloneEmulators on AppModel {
       }
     }
     _changed();
+    final next = _launchAfterExit;
+    _launchAfterExit = null;
+    if (next != null) {
+      _quitAfterGame = null;
+      unawaited(_startAfterExit(next, Future<void>.value()));
+    }
   }
 }
