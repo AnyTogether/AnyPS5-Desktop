@@ -605,6 +605,7 @@
   "padAssistOff": "끄기",
   "padAssistControllers": "기타 컨트롤러",
   "padAssistOn": "%@가 플레이어 1을 보조합니다.",
+  "assistShare": "플레이어 1 보조",
   "gyroSection": "자이로 조준",
   "gyro": "자이로를 이용한 조준",
   "gyroDetail": "컨트롤러나 휴대폰을 움직여 오른쪽 스틱을 조작합니다.",

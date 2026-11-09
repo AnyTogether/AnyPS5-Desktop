@@ -571,6 +571,7 @@ class SharePlayModel {
             kind: ActionRow(() => stopPlaying(viewer)),
           ),
         );
+        if (assistRow(viewer.user.id, name) case final row?) rows.add(row);
       } else {
         rows.add(
           PanelRow(
@@ -917,6 +918,21 @@ class SharePlayModel {
     if (command == Command.home || (command == Command.back && (watchSlot == null || noPad))) {
       unawaited(leaveWatching());
     }
+  }
+
+  /// A share play guest with a pad: help player 1 rather than play their own, as on the Mac.
+  PanelRow? assistRow(String userId, String name) {
+    final router = _session?.router;
+    if (router == null) return null;
+    return PanelRow(
+      id: 'share-assist-$userId',
+      title: T.text('assistShare'),
+      detail: T.format('assistShareDetail', [name]),
+      kind: ToggleRow(router.assist.contains(userId), (on) {
+        on ? router.assist.add(userId) : router.assist.remove(userId);
+        app.refresh();
+      }),
+    );
   }
 
   /// The Friends panel's rows: invites to watch (and to decline), and friends sharing who let
