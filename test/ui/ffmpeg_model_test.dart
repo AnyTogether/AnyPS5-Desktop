@@ -31,7 +31,7 @@ void main() {
       ffmpegKeys: [key.key],
       ffmpegRun: run ?? runner(),
     );
-    return fixture!.model;
+    return fixture!.model..open(Layer.settings);
   }
 
   FakeRelease release({bool signedOk = true, TestReleaseKey? by}) {
@@ -205,6 +205,7 @@ void main() {
 
   test('without a release source nothing is offered, whatever is missing', () {
     fixture = makeFixture(environment: const {});
+    fixture!.model.open(Layer.settings);
     expect(fixture!.model.ffmpegTool.offered, isFalse);
     expect(offerIn(captures(fixture!.model)), isNull);
   });

@@ -80,7 +80,9 @@ void main() {
     expect(File(p.join(p.dirname(path), 'SOURCE.txt')).existsSync(), isTrue);
     if (!Platform.isWindows) expect(File(path).statSync().mode & 0x40, isNonZero);
     expect(ffmpeg.installed(), path);
-    expect(ran.single, [path, '-hide_banner', '-version']);
+    // It is tried while still being laid out, before it can be found by anything.
+    expect(p.basename(ran.single.first), 'ffmpeg');
+    expect(ran.single.skip(1), ['-hide_banner', '-version']);
     expect(progress.last.phase, ToolkitPhase.finish);
     expect(
       File(p.join(temp.path, 'FFmpeg', '.downloads', FfmpegBuild.assetName(HostSystem.linux))).existsSync(),
