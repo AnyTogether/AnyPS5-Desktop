@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "Verificar atualizações",
   "updateChannel": "Canal de atualização",
   "updateChannelStableDetail": "Versões que foram testadas antes de serem lançadas.",
-  "updateChannelNightlyDetail": "A versão mais recente do mecanismo do main, oferecida no seletor de mecanismo. Novidades primeiro, e bugs novos também.",
   "channelStable": "Estável",
   "channelNightly": "Nightly (pré-lançamento)",
   "checkUpdates": "Verificar atualizações",

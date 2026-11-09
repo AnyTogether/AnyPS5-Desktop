@@ -24,6 +24,15 @@ abstract final class LauncherUpdates {
   /// (a nightly before the release it leads to).
   static bool isNewer(UpstreamRelease release, String current) => ChannelReleases.isNewer(release.tag, current);
 
+  /// The release the Nightly channel offers: the newest with a signature and a file for this
+  /// system, as on the Mac, whose Nightly offers a build once it is complete. A nightly CI
+  /// published is unsigned until the release Mac signs it (it could not be downloaded), and the
+  /// signed build before it stays on offer meanwhile.
+  static UpstreamRelease? newestNightly(List<UpstreamRelease> releases, HostSystem system, {bool appImage = false}) =>
+      ChannelReleases.offered(releases, UpdateChannel.nightly)
+          .where((release) => release.signatureFiles != null && assetFor(release, system, appImage: appImage) != null)
+          .firstOrNull;
+
   /// The file of [release] for this system: the installer on Windows; on Linux the AppImage when
   /// the launcher runs from one ([appImage]), the archive otherwise.
   static ReleaseAsset? assetFor(UpstreamRelease release, HostSystem system, {bool appImage = false}) {
@@ -89,7 +98,7 @@ abstract final class LauncherUpdates {
       final file = json['file'];
       final digest = json['sha256'];
       if (version is! String || file is! String || digest is! String) return null;
-      if (compareVersions(version, current) <= 0 || !File(file).existsSync()) return null;
+      if (!ChannelReleases.isNewer(version, current) || !File(file).existsSync()) return null;
       if (sha256.convert(File(file).readAsBytesSync()).toString() != digest) return null;
       return file;
     } on Object {

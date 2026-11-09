@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "Frissítések keresése",
   "updateChannel": "Frissítési csatorna",
   "updateChannelStableDetail": "Kiadások, amelyeket megjelenésük előtt kipróbáltak.",
-  "updateChannelNightlyDetail": "A main legújabb motorbuild-je, a motorválasztóban kínálva. Az újdonságok elsőként, az új hibák is.",
   "channelStable": "Stabil",
   "channelNightly": "Nightly (előzetes kiadás)",
   "checkUpdates": "Frissítések keresése",

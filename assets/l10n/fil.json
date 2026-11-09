@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "Tingnan ang mga Update",
   "updateChannel": "Channel ng update",
   "updateChannelStableDetail": "Mga release na sinubukan bago inilabas.",
-  "updateChannelNightlyDetail": "Ang pinakabagong engine build ng main, iniaalok sa engine picker. Mauuna ang mga bagong feature, at mga bagong bug din.",
   "channelStable": "Stable",
   "channelNightly": "Nightly (pre-release)",
   "checkUpdates": "Tingnan ang mga update",

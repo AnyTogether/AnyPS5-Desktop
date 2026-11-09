@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "Periksa Pembaruan",
   "updateChannel": "Kanal pembaruan",
   "updateChannelStableDetail": "Rilis yang dicoba sebelum diterbitkan.",
-  "updateChannelNightlyDetail": "Build mesin terbaru dari main, ditawarkan di pemilih mesin. Hal baru lebih dulu, bug baru juga.",
   "channelStable": "Stabil",
   "channelNightly": "Nightly (pra-rilis)",
   "checkUpdates": "Periksa pembaruan",

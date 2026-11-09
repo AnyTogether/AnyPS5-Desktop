@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "Se etter oppdateringer",
   "updateChannel": "Oppdateringskanal",
   "updateChannelStableDetail": "Utgivelser som ble testet før de kom ut.",
-  "updateChannelNightlyDetail": "Den nyeste motorversjonen av main, tilbudt i motorvelgeren. Nye ting kommer først, og nye feil også.",
   "channelStable": "Stabil",
   "channelNightly": "Nightly (forhåndsutgivelse)",
   "checkUpdates": "Se etter oppdateringer",

@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "Caută actualizări",
   "updateChannel": "Canal de actualizare",
   "updateChannelStableDetail": "Versiuni care au fost testate înainte de lansare.",
-  "updateChannelNightlyDetail": "Cea mai nouă versiune de motor din main, oferită în selectorul de motor. Funcțiile noi vin primele, dar și erorile noi.",
   "channelStable": "Stabil",
   "channelNightly": "Nightly (pre-lansare)",
   "checkUpdates": "Caută actualizări",

@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "Vyhledat aktualizace",
   "updateChannel": "Kanál aktualizací",
   "updateChannelStableDetail": "Vydání, která se zkoušejí ještě před zveřejněním.",
-  "updateChannelNightlyDetail": "Nejnovější sestavení enginu z větve main, nabízené ve výběru enginu. Nové věci jako první, ale i nové chyby.",
   "channelStable": "Stabilní",
   "channelNightly": "Nightly (předběžná verze)",
   "checkUpdates": "Vyhledat aktualizace",

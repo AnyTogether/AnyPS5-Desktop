@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "Nach Updates suchen",
   "updateChannel": "Update-Kanal",
   "updateChannelStableDetail": "Releases, die vor der Veröffentlichung getestet wurden.",
-  "updateChannelNightlyDetail": "Der neueste Engine-Build von main, in der Engine-Auswahl angeboten. Neues kommt zuerst, aber auch neue Fehler.",
   "channelStable": "Stabil",
   "channelNightly": "Nightly (Vorabversion)",
   "checkUpdates": "Nach Updates suchen",

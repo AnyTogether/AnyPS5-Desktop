@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "ពិនិត្យរកមើល ការអាប់ដេត",
   "updateChannel": "ឆានែលធ្វើបច្ចុប្បន្នភាព",
   "updateChannelStableDetail": "កំណែផ្សព្វផ្សាយដែលត្រូវបានសាកល្បងមុនពេលចេញផ្សាយ។",
-  "updateChannelNightlyDetail": "កំណែម៉ាស៊ីនហ្គេមថ្មីបំផុតនៃ main ដែលផ្តល់ជូននៅក្នុងឧបករណ៍ជ្រើសរើសម៉ាស៊ីន។ មានអ្វីថ្មីមុនគេ ហើយក៏មានកំហុសថ្មីដែរ។",
   "channelStable": "ស្ថេរភាព",
   "channelNightly": "Nightly (មុនការចេញផ្សាយ)",
   "checkUpdates": "ពិនិត្យមើលការអាប់ដេត",

@@ -1053,7 +1053,6 @@
   "checkForUpdatesNow": "Проверить наличие обновлений",
   "updateChannel": "Канал обновлений",
   "updateChannelStableDetail": "Релизы, проверенные до выхода.",
-  "updateChannelNightlyDetail": "Самая новая сборка движка из main, доступная в выборе движка. Новинки раньше, но и новые ошибки тоже.",
   "channelStable": "Стабильный",
   "channelNightly": "Nightly (предварительная версия)",
   "checkUpdates": "Проверить наличие обновлений",
