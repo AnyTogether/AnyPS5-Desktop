@@ -10,6 +10,7 @@ import 'components.dart';
 import 'glass.dart';
 import 'level_badge.dart';
 import 'panels.dart';
+import 'profile_view.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'together_model.dart';
@@ -22,21 +23,6 @@ class FeedView extends StatelessWidget {
   const FeedView({super.key, required this.model});
 
   final AppModel model;
-
-  /// The reactions as the launcher draws them (the server's 🔥 👏 😮 ❤️), with their colours.
-  static IconData icon(Reaction reaction) => switch (reaction) {
-    Reaction.fire => Icons.local_fire_department_rounded,
-    Reaction.clap => Icons.celebration_rounded,
-    Reaction.wow => Icons.auto_awesome_rounded,
-    Reaction.heart => Icons.favorite_rounded,
-  };
-
-  static Color color(Reaction reaction) => switch (reaction) {
-    Reaction.fire => const Color(0xFFFF8A4C),
-    Reaction.clap => const Color(0xFFF2C14E),
-    Reaction.wow => const Color(0xFFB79CFF),
-    Reaction.heart => const Color(0xFFFF5C8A),
-  };
 
   @override
   Widget build(BuildContext context) {
@@ -75,11 +61,11 @@ class FeedView extends StatelessWidget {
                     style: AppText.display(15 * scale, color: Colors.white.withValues(alpha: 0.7), height: 1.4),
                   ),
                   SizedBox(height: 26 * scale),
-                  // The reactions, each with what it stands for.
+                  // The reactions, as the items show them.
                   Row(
                     children: [
                       for (final reaction in Reaction.values) ...[
-                        Icon(icon(reaction), size: 22 * scale, color: color(reaction)),
+                        Text(reaction.emoji, style: AppText.display(22 * scale)),
                         SizedBox(width: 14 * scale),
                       ],
                     ],
@@ -190,11 +176,9 @@ class _ActivityCard extends StatelessWidget {
     final scale = LayoutScale.of(context);
     final together = model.together;
     final ink = focused ? LookScope.focusedInk(context) : Colors.white;
-    final local = item.game == null
-        ? null
-        : model.games.where((game) => game.titleId == item.game!.titleId).firstOrNull;
     final name = TogetherModel.shown(item.actor).name;
-    final trophies = item.trophies.where((trophy) => trophy.name(T.language.code) != null).take(3).toList();
+    // Hidden ones are shown too, labelled so.
+    final trophies = item.trophies.take(3).toList();
     final more = (item.trophyCount ?? item.trophies.length) - trophies.length;
     final highlight = switch (item.highlight) {
       'platinum' => (T.text('gradePlatinum'), TrophyView.gradeColor(TrophyGrade.platinum)),
@@ -257,7 +241,7 @@ class _ActivityCard extends StatelessWidget {
                       runSpacing: 6 * scale,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        for (final trophy in trophies) _TrophyChip(trophy: trophy, ink: ink),
+                        for (final trophy in trophies) _TrophyChip(trophy: trophy, ink: ink, focused: focused),
                         if (more > 0)
                           Text(
                             T.format('socialFeedAndMore', [more]),
@@ -271,35 +255,34 @@ class _ActivityCard extends StatelessWidget {
                     ),
                   ],
                   SizedBox(height: 12 * scale),
-                  Row(
-                    children: [
-                      for (final choice in Reaction.values) ...[
-                        _ReactionPill(
-                          reaction: choice,
-                          count: item.reactions.count(choice),
-                          mine: item.reactions.mine == choice,
-                          // The keys' choice shows on the focused item only.
-                          chosen: focused && reaction == choice.index,
-                          focused: focused,
-                          onTap: () => unawaited(together.react(item, choice)),
-                        ),
-                        SizedBox(width: 8 * scale),
+                  // As tall on every item, so moving the focus moves nothing.
+                  SizedBox(
+                    height: 32 * scale,
+                    child: Row(
+                      children: [
+                        // All four on the focused item; elsewhere only the ones someone chose.
+                        for (final choice in Reaction.values)
+                          if (focused || item.reactions.count(choice) > 0) ...[
+                            _ReactionPill(
+                              reaction: choice,
+                              count: item.reactions.count(choice),
+                              mine: item.reactions.mine == choice,
+                              // The keys' choice shows on the focused item only.
+                              chosen: focused && reaction == choice.index,
+                              focused: focused,
+                              accent: model.accentChoice.color,
+                              onTap: () => unawaited(together.react(item, choice)),
+                            ),
+                            SizedBox(width: 8 * scale),
+                          ],
                       ],
-                    ],
+                    ),
                   ),
                 ],
               ),
             ),
-            if (local?.icon != null) ...[
-              SizedBox(width: 16 * scale),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12 * scale),
-                child: SizedBox.square(
-                  dimension: 64 * scale,
-                  child: ArtworkImage(path: local!.icon!, cacheWidth: 192),
-                ),
-              ),
-            ],
+            SizedBox(width: 16 * scale),
+            ActivityPicture(model: model, item: item, size: 64 * scale),
           ],
         ),
       ),
@@ -334,10 +317,25 @@ class _Chip extends StatelessWidget {
 }
 
 class _TrophyChip extends StatelessWidget {
-  const _TrophyChip({required this.trophy, required this.ink});
+  const _TrophyChip({required this.trophy, required this.ink, required this.focused});
 
   final ActivityTrophy trophy;
   final Color ink;
+  final bool focused;
+
+  /// A share of players as the rarer trophies' colours show it: "3.1%", or "%3,1" in Turkish.
+  static String _percent(double share) => T.percent(T.decimal(share * 100, 1));
+
+  /// The colour of a rarity, darkened on the white focused card.
+  static Color _rarityColor(String label, Color ink, bool focused) {
+    final color = switch (label) {
+      'ultra_rare' => const Color(0xFFFF9EE6),
+      'very_rare' => const Color(0xFFAD99FF),
+      'rare' => const Color(0xFF7AC7FF),
+      _ => ink.withValues(alpha: 0.7),
+    };
+    return focused ? Color.lerp(color, Colors.black, 0.45)! : color;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -354,20 +352,29 @@ class _TrophyChip extends StatelessWidget {
           ConstrainedBox(
             constraints: BoxConstraints(maxWidth: 240 * scale),
             child: Text(
-              trophy.name(T.language.code) ?? '',
+              trophy.name(T.language.code) ?? T.text('trophyHidden'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: AppText.display(13 * scale, weight: FontWeight.w500, color: ink.withValues(alpha: 0.85)),
             ),
           ),
+          // Its share of players, on all but the common ones, as the Mac has it.
+          if (trophy.rarityLabel case final label? when label != 'common')
+            if (trophy.rarity case final share?) ...[
+              SizedBox(width: 6 * scale),
+              Text(
+                _percent(share),
+                style: AppText.display(13 * scale, weight: FontWeight.w600, color: _rarityColor(label, ink, focused)),
+              ),
+            ],
         ],
       ),
     );
   }
 }
 
-/// One of the four reactions under an item: its mark, how many gave it, the user's own filled,
-/// the keys' choice ringed.
+/// One of the four reactions under an item: its emoji, how many gave it, the user's own filled
+/// in the accent, the keys' choice ringed, as the Mac draws them.
 class _ReactionPill extends StatelessWidget {
   const _ReactionPill({
     required this.reaction,
@@ -375,6 +382,7 @@ class _ReactionPill extends StatelessWidget {
     required this.mine,
     required this.chosen,
     required this.focused,
+    required this.accent,
     required this.onTap,
   });
 
@@ -383,12 +391,12 @@ class _ReactionPill extends StatelessWidget {
   final bool mine;
   final bool chosen;
   final bool focused;
+  final Color accent;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final scale = LayoutScale.of(context);
-    final color = FeedView.color(reaction);
     final ink = focused ? LookScope.focusedInk(context) : Colors.white;
     return Pressable(
       onTap: onTap,
@@ -399,22 +407,15 @@ class _ReactionPill extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 11 * scale),
         decoration: BoxDecoration(
           color: mine
-              ? color.withValues(alpha: focused ? 0.32 : 0.22)
+              ? accent.withValues(alpha: focused ? 0.55 : 0.45)
               : ink.withValues(alpha: hovering ? 0.14 : (focused ? 0.06 : 0.08)),
           borderRadius: BorderRadius.circular(16 * scale),
-          border: Border.all(
-            color: chosen ? ink : (mine ? color.withValues(alpha: 0.7) : Colors.transparent),
-            width: chosen ? 2 * scale : 1 * scale,
-          ),
+          border: Border.all(color: chosen ? ink : Colors.transparent, width: chosen ? 2 * scale : 1 * scale),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              FeedView.icon(reaction),
-              size: 17 * scale,
-              color: focused && !mine ? Color.lerp(color, Colors.black, 0.2) : color,
-            ),
+            Text(reaction.emoji, style: AppText.display(17 * scale, color: ink)),
             if (count > 0) ...[
               SizedBox(width: 6 * scale),
               Text(
@@ -425,6 +426,74 @@ class _ReactionPill extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// What an activity item is about, as the Mac shows it: the game's icon (this library's own, else
+/// the server's picture, else a sign), the new friend's picture, or the milestone's sign.
+class ActivityPicture extends StatelessWidget {
+  const ActivityPicture({super.key, required this.model, required this.item, required this.size});
+
+  final AppModel model;
+  final Activity item;
+  final double size;
+
+  IconData get _milestoneIcon => switch (item.milestoneKind) {
+    'platinums' => Icons.military_tech_rounded,
+    'games' => Icons.sports_esports_rounded,
+    'hours' => Icons.schedule_rounded,
+    _ => Icons.emoji_events_rounded,
+  };
+
+  Widget _sign(IconData icon, Color color) => DecoratedBox(
+    decoration: BoxDecoration(color: color.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(size * 0.2)),
+    child: Center(
+      child: Icon(icon, size: size * 0.38, color: color),
+    ),
+  );
+
+  Widget _gameIcon(SocialGame game) {
+    final local = model.games.where((known) => known.titleId == game.titleId).firstOrNull?.icon;
+    final platinum = item.kind == ActivityKind.platinum;
+    final sign = ColoredBox(
+      color: Colors.white.withValues(alpha: 0.07),
+      child: Center(
+        child: Icon(
+          platinum ? Icons.emoji_events_rounded : Icons.sports_esports_rounded,
+          size: size * 0.34,
+          color: platinum ? TrophyView.gradeColor(TrophyGrade.platinum) : Colors.white.withValues(alpha: 0.4),
+        ),
+      ),
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size * 0.2),
+      child: local != null
+          ? ArtworkImage(path: local, cacheWidth: (size * 3).round())
+          : game.iconUrl != null
+          ? Image(
+              image: ProfileView.pictureFor(game.iconUrl!),
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => sign,
+            )
+          : sign,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = model.accentChoice.color;
+    final friend = item.friend;
+    return SizedBox.square(
+      dimension: size,
+      child: switch (item.kind) {
+        ActivityKind.friendship when friend != null => PersonAvatar(person: TogetherModel.card(friend), size: size),
+        ActivityKind.milestone => _sign(_milestoneIcon, accent),
+        _ when item.game != null => _gameIcon(item.game!),
+        _ => _sign(Icons.auto_awesome_rounded, accent),
+      },
     );
   }
 }
@@ -520,10 +589,10 @@ class ProfileActivityRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final scale = LayoutScale.of(context);
     final ink = focused ? LookScope.focusedInk(context) : Colors.white;
-    final local = item.game == null
-        ? null
-        : model.games.where((game) => game.titleId == item.game!.titleId).firstOrNull;
-    final reactions = [for (final reaction in Reaction.values) if (item.reactions.count(reaction) > 0) reaction];
+    final reactions = [
+      for (final reaction in Reaction.values)
+        if (item.reactions.count(reaction) > 0) '${reaction.emoji} ${T.number(item.reactions.count(reaction))}',
+    ].join('  ');
     return PaneRow(
       focused: focused,
       radius: 14 * scale,
@@ -551,12 +620,10 @@ class ProfileActivityRow extends StatelessWidget {
                       TogetherSocial.ago(item.createdAt),
                       style: AppText.display(12 * scale, weight: FontWeight.w500, color: ink.withValues(alpha: 0.55)),
                     ),
-                    for (final reaction in reactions) ...[
+                    if (reactions.isNotEmpty) ...[
                       SizedBox(width: 12 * scale),
-                      Icon(FeedView.icon(reaction), size: 14 * scale, color: FeedView.color(reaction)),
-                      SizedBox(width: 4 * scale),
                       Text(
-                        T.number(item.reactions.count(reaction)),
+                        reactions,
                         style: AppText.display(12 * scale, weight: FontWeight.w600, color: ink.withValues(alpha: 0.7)),
                       ),
                     ],
@@ -565,13 +632,8 @@ class ProfileActivityRow extends StatelessWidget {
               ],
             ),
           ),
-          if (local?.icon != null) ...[
-            SizedBox(width: 14 * scale),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10 * scale),
-              child: SizedBox.square(dimension: 48 * scale, child: ArtworkImage(path: local!.icon!, cacheWidth: 144)),
-            ),
-          ],
+          SizedBox(width: 14 * scale),
+          ActivityPicture(model: model, item: item, size: 48 * scale),
         ],
       ),
     );

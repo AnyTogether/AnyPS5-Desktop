@@ -5,6 +5,16 @@ release when it is made.
 
 ## Next release
 
+- **The activity feed reads as on the Mac**: game icons from the server, a new friend's picture
+  and milestone signs when a game isn't in your library, the rarity on trophies, hidden trophies
+  labelled instead of left out, and the four reactions as emoji, shown on the focused item and
+  where someone chose them. A new item coming in no longer moves the focus.
+- **Captures says when this server keeps no files** instead of a read failure.
+- **Leaderboards**: the number of players next to the board, and Enter (or the new chip) on a
+  game's trophies opens its board.
+- **Challenges**: the page shows who is leading before it is final, says "Score" and a plain
+  number for a metric this launcher doesn't know, says when a challenge was deleted, and reads
+  it again after a conflict on Join or Leave.
 - **Play Together player rows say how each player is reached** (Direct or Relay, with the round
   trip in ms), as on the Mac. Where the system cannot say, the row stays at Connected.
 - **A Play Together offer or a game invite is said over the game** in a desktop notice, as on the

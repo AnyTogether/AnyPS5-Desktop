@@ -14,9 +14,10 @@ import 'together_model.dart';
 
 /// The sign of what counts: a star for trophy points, a cup for trophies, a clock for play time.
 IconData _metricIcon(ChallengeMetric metric) => switch (metric) {
+  ChallengeMetric.points => Icons.star_rounded,
   ChallengeMetric.trophies => Icons.emoji_events_rounded,
   ChallengeMetric.time => Icons.schedule_rounded,
-  _ => Icons.star_rounded,
+  ChallengeMetric.other => Icons.flag_rounded,
 };
 
 /// The state's colour: running green, coming the accent, over and called off grey.
@@ -85,7 +86,11 @@ class ChallengeStrip extends StatelessWidget {
             SizedBox(width: 6 * scale),
             Text(
               T.upper(T.text('challengeTitle')),
-              style: AppText.display(12 * scale, weight: FontWeight.w700, color: accent).copyWith(letterSpacing: 1.4 * scale),
+              style: AppText.display(
+                12 * scale,
+                weight: FontWeight.w700,
+                color: accent,
+              ).copyWith(letterSpacing: 1.4 * scale),
             ),
             SizedBox(width: 8 * scale),
             Text(
@@ -156,9 +161,7 @@ class _ChallengeCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: focused ? Colors.white : Colors.white.withValues(alpha: hovering ? 0.11 : 0.06),
           borderRadius: BorderRadius.circular(18 * scale),
-          border: Border.all(
-            color: challenge.joined && !focused ? accent.withValues(alpha: 0.45) : Colors.transparent,
-          ),
+          border: Border.all(color: challenge.joined && !focused ? accent.withValues(alpha: 0.45) : Colors.transparent),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -203,7 +206,11 @@ class _ChallengeCard extends StatelessWidget {
                           TogetherChallenges.when(challenge),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppText.display(13 * scale, weight: FontWeight.w600, color: ink.withValues(alpha: 0.85)),
+                          style: AppText.display(
+                            13 * scale,
+                            weight: FontWeight.w600,
+                            color: ink.withValues(alpha: 0.85),
+                          ),
                         ),
                       ),
                       SizedBox(width: 10 * scale),
@@ -221,7 +228,11 @@ class _ChallengeCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           leader == null
-                              ? T.text(challenge.state == ChallengeState.upcoming ? 'challengeNotStarted' : 'challengeNoLeader')
+                              ? T.text(
+                                  challenge.state == ChallengeState.upcoming
+                                      ? 'challengeNotStarted'
+                                      : 'challengeNoLeader',
+                                )
                               : '${T.text(challenge.state == ChallengeState.ended ? 'challengeWinner' : 'challengeLeading')}: '
                                     '${TogetherChallenges.standingName(leader)} · '
                                     '${TogetherChallenges.value(leader.value, challenge.metric)}',
@@ -389,7 +400,9 @@ class ChallengeDetailView extends StatelessWidget {
                                 keys: 'O',
                                 glyph: PadGlyph.triangle,
                                 label: T.text(
-                                  together.challengeActions.first == ChallengeAction.leave ? 'challengeLeave' : 'challengeJoin',
+                                  together.challengeActions.first == ChallengeAction.leave
+                                      ? 'challengeLeave'
+                                      : 'challengeJoin',
                                 ),
                                 action: HintAction.options,
                               ),
@@ -430,7 +443,13 @@ class _Standings extends StatelessWidget {
     final challenge = detail?.challenge;
     final lines = together.challengeLines;
     final note = detail == null
-        ? T.text(screens.challengeFailed ? 'challengeFailed' : 'challengeLoading')
+        ? T.text(
+            screens.challengeGone
+                ? 'challengeGone'
+                : screens.challengeFailed
+                ? 'challengeFailed'
+                : 'challengeLoading',
+          )
         : lines.isEmpty
         ? T.text(challenge!.state == ChallengeState.upcoming ? 'challengeNotStarted' : 'challengeNoLeader')
         : null;
@@ -453,7 +472,10 @@ class _Standings extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (note != null)
-                  Text(note, style: AppText.display(17 * scale, color: Colors.white.withValues(alpha: 0.6), height: 1.4)),
+                  Text(
+                    note,
+                    style: AppText.display(17 * scale, color: Colors.white.withValues(alpha: 0.6), height: 1.4),
+                  ),
                 for (var index = 0; index < lines.length; index++)
                   KeepVisible(
                     active: screens.challengeIndex == index && !screens.challengeOnActions,
@@ -550,10 +572,7 @@ class _StandingRow extends StatelessWidget {
               Container(
                 width: 40 * scale,
                 height: 40 * scale,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: ink.withValues(alpha: 0.1),
-                ),
+                decoration: BoxDecoration(shape: BoxShape.circle, color: ink.withValues(alpha: 0.1)),
                 child: Icon(Icons.visibility_off_rounded, size: 18 * scale, color: ink.withValues(alpha: 0.5)),
               )
             else
@@ -623,7 +642,10 @@ class _WindowCard extends StatelessWidget {
     final accent = model.accentChoice.color;
     final color = _stateColor(challenge, accent);
     final place = challenge.joined ? challenge.myStanding : null;
-    final winner = challenge.state == ChallengeState.ended && challenge.isFinal ? challenge.leader : null;
+    // Who is ahead while it runs, the winner once over and final.
+    final decided = challenge.state == ChallengeState.ended && challenge.isFinal;
+    final leader = challenge.leader;
+    final leaderColor = decided ? LeaderboardView.medal(1) : null;
     final label = AppText.display(
       12 * scale,
       weight: FontWeight.w700,
@@ -660,7 +682,11 @@ class _WindowCard extends StatelessWidget {
               SizedBox(width: 5 * scale),
               Text(
                 T.format('challengeEntrants', [T.number(challenge.entrants)]),
-                style: AppText.display(13 * scale, weight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.75)),
+                style: AppText.display(
+                  13 * scale,
+                  weight: FontWeight.w600,
+                  color: Colors.white.withValues(alpha: 0.75),
+                ),
               ),
             ],
           ),
@@ -690,32 +716,39 @@ class _WindowCard extends StatelessWidget {
               ),
             ],
           ),
-          if (winner != null) ...[
-            SizedBox(height: 18 * scale),
-            Text(T.upper(T.text('challengeWinner')), style: label.copyWith(color: LeaderboardView.medal(1))),
-            SizedBox(height: 8 * scale),
+          SizedBox(height: 18 * scale),
+          Text(
+            T.upper(T.text(decided ? 'challengeWinner' : 'challengeLeading')),
+            style: leaderColor == null ? label : label.copyWith(color: leaderColor),
+          ),
+          SizedBox(height: 8 * scale),
+          if (leader == null)
+            Text(
+              T.text('challengeNoLeader'),
+              style: AppText.display(14 * scale, color: Colors.white.withValues(alpha: 0.6)),
+            )
+          else
             Row(
               children: [
-                if (winner.user case final user?)
+                if (leader.user case final user?)
                   PersonAvatar(person: TogetherModel.card(user), size: 34 * scale)
                 else
                   Icon(Icons.emoji_events_rounded, size: 30 * scale, color: LeaderboardView.medal(1)),
                 SizedBox(width: 10 * scale),
                 Expanded(
                   child: Text(
-                    TogetherChallenges.standingName(winner),
+                    TogetherChallenges.standingName(leader),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppText.display(18 * scale, weight: FontWeight.w600),
                   ),
                 ),
                 Text(
-                  TogetherChallenges.value(winner.value, challenge.metric),
-                  style: AppText.display(16 * scale, weight: FontWeight.w600, color: LeaderboardView.medal(1)),
+                  TogetherChallenges.value(leader.value, challenge.metric),
+                  style: AppText.display(16 * scale, weight: FontWeight.w600, color: leaderColor ?? Colors.white),
                 ),
               ],
             ),
-          ],
           if (place != null) ...[
             SizedBox(height: 18 * scale),
             Text(T.upper(T.text('challengeYourPlace')), style: label),
@@ -837,7 +870,11 @@ class _ActionButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: (website ? 16 : 19) * scale, color: ink.withValues(alpha: busy ? 0.4 : 1)),
+            Icon(
+              icon,
+              size: (website ? 16 : 19) * scale,
+              color: ink.withValues(alpha: busy ? 0.4 : 1),
+            ),
             SizedBox(width: 8 * scale),
             Flexible(
               child: Text(

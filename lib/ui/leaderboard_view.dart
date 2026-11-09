@@ -129,6 +129,17 @@ class LeaderboardView extends StatelessWidget {
                               ],
                             const Spacer(),
                             _ScopeSwitch(model: model),
+                            if (board != null && board.total > 0) ...[
+                              SizedBox(width: 14 * scale),
+                              Text(
+                                T.format('socialBoardPlayers', [board.total]),
+                                style: AppText.display(
+                                  14 * scale,
+                                  weight: FontWeight.w500,
+                                  color: Colors.white.withValues(alpha: 0.5),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                         SizedBox(height: 18 * scale),

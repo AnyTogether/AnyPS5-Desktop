@@ -139,6 +139,7 @@ class TogetherModel {
     hub.social
       ..onNotice = noticeArrived
       ..onActivity = profileActivityChanged
+      ..holdFeedFocus = keepFeedFocus
       ..onFamilyNotice = (_) => unawaited(family.refresh());
     // The friends-only names and pictures the friends list brought, for every card shown.
     identities = hub.friends.identities;

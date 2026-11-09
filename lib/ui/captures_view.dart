@@ -133,7 +133,13 @@ class _PostList extends StatelessWidget {
     final captures = together.captures;
     final feed = captures.feed;
     final note = !feed.loaded
-        ? T.text(captures.failed ? 'capturesFailed' : 'capturesLoading')
+        ? T.text(
+            !captures.failed
+                ? 'capturesLoading'
+                : model.saveSync.info?.enabled == false
+                ? 'capturesRefusedStorage'
+                : 'capturesFailed',
+          )
         : feed.items.isEmpty
         ? T.text('capturesEmpty')
         : null;
