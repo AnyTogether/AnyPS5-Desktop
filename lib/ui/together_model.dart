@@ -1063,7 +1063,7 @@ class TogetherModel {
         PanelRow(
           id: 'friend-game',
           title: T.format('gameJoin', [friend.person.displayName, gameName(game.titleId)]),
-          detail: T.format('gamePlayers', [game.players, game.capacity]),
+          detail: T.format(game.capacity == 1 ? 'gamePlayersOne' : 'gamePlayers', [game.players, game.capacity]),
           kind: ActionRow(
             () => unawaited(joinFriendGame(game.sessionId, titleId: game.titleId, host: friend.person.displayName)),
           ),

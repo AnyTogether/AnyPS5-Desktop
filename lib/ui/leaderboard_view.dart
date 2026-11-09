@@ -132,7 +132,9 @@ class LeaderboardView extends StatelessWidget {
                             if (board != null && board.total > 0) ...[
                               SizedBox(width: 14 * scale),
                               Text(
-                                T.format('socialBoardPlayers', [board.total]),
+                                T.format(board.total == 1 ? 'socialBoardPlayersOne' : 'socialBoardPlayers', [
+                                  board.total,
+                                ]),
                                 style: AppText.display(
                                   14 * scale,
                                   weight: FontWeight.w500,

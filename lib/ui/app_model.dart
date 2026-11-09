@@ -4441,7 +4441,8 @@ class AppModel extends ChangeNotifier {
         // Taken above; here only for the switch's sake.
         return sharePlay.watchCommand(command);
       case Layer.quickMenu || Layer.closeGame when command == Command.back || command == Command.options:
-        resumeGame();
+        // A share play question asked in place (together_ask.dart) is answered Cancel first.
+        if (!together.cancelAsk()) resumeGame();
         return;
       case Layer.profilePicker:
         pickerCommand(command);

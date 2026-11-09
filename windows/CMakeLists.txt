@@ -113,24 +113,32 @@ set(SDL2_VERSION "2.32.10")
 set(SDL2_ZIP "${CMAKE_BINARY_DIR}/SDL2-${SDL2_VERSION}-win32-x64.zip")
 set(SDL2_DIR "${CMAKE_BINARY_DIR}/SDL2-${SDL2_VERSION}")
 if(NOT EXISTS "${SDL2_DIR}/SDL2.dll")
-  file(DOWNLOAD
-    "https://github.com/libsdl-org/SDL/releases/download/release-${SDL2_VERSION}/SDL2-${SDL2_VERSION}-win32-x64.zip"
-    "${SDL2_ZIP}"
-    EXPECTED_HASH SHA256=6cf9706eefd0a4a06dc764007934d428afaf029fabdd408a9e646048c91e18fb
-    TLS_VERIFY ON
-    STATUS SDL2_DOWNLOAD)
-  list(GET SDL2_DOWNLOAD 0 SDL2_DOWNLOAD_CODE)
-  if(SDL2_DOWNLOAD_CODE EQUAL 0)
-    file(ARCHIVE_EXTRACT INPUT "${SDL2_ZIP}" DESTINATION "${SDL2_DIR}" PATTERNS SDL2.dll README-SDL.txt)
-  else()
-    message(WARNING "SDL2 could not be downloaded (${SDL2_DOWNLOAD}): controllers fall back to XInput and winmm")
+  # GitHub sometimes fails a download: three tries before the build stops.
+  foreach(SDL2_TRY RANGE 1 3)
+    file(DOWNLOAD
+      "https://github.com/libsdl-org/SDL/releases/download/release-${SDL2_VERSION}/SDL2-${SDL2_VERSION}-win32-x64.zip"
+      "${SDL2_ZIP}"
+      EXPECTED_HASH SHA256=6cf9706eefd0a4a06dc764007934d428afaf029fabdd408a9e646048c91e18fb
+      TLS_VERIFY ON
+      STATUS SDL2_DOWNLOAD)
+    list(GET SDL2_DOWNLOAD 0 SDL2_DOWNLOAD_CODE)
+    if(SDL2_DOWNLOAD_CODE EQUAL 0)
+      break()
+    endif()
+    file(REMOVE "${SDL2_ZIP}")
+    message(STATUS "SDL2 download, try ${SDL2_TRY} of 3: ${SDL2_DOWNLOAD}")
+  endforeach()
+  if(NOT SDL2_DOWNLOAD_CODE EQUAL 0)
+    message(FATAL_ERROR "SDL2 could not be downloaded (${SDL2_DOWNLOAD}): the build stops so that no package goes out without SDL2.dll")
   endif()
+  file(ARCHIVE_EXTRACT INPUT "${SDL2_ZIP}" DESTINATION "${SDL2_DIR}" PATTERNS SDL2.dll README-SDL.txt)
 endif()
-if(EXISTS "${SDL2_DIR}/SDL2.dll")
-  install(FILES "${SDL2_DIR}/SDL2.dll" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
-  install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/SDL2/LICENSE.txt" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
-    RENAME "SDL2-LICENSE.txt" COMPONENT Runtime)
+if(NOT EXISTS "${SDL2_DIR}/SDL2.dll")
+  message(FATAL_ERROR "No SDL2.dll in ${SDL2_DIR} after extracting ${SDL2_ZIP}")
 endif()
+install(FILES "${SDL2_DIR}/SDL2.dll" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/SDL2/LICENSE.txt" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+  RENAME "SDL2-LICENSE.txt" COMPONENT Runtime)
 
 # The clip player's libraries, which media_kit_libs_windows_video downloads, with their licences
 # (third_party/libmpv/README.md).
