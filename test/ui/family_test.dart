@@ -7,6 +7,7 @@ import 'package:anyps5_desktop/core/together/account.dart';
 import 'package:anyps5_desktop/ui/app_model.dart' hide Command, GameState;
 import 'package:anyps5_desktop/ui/family_gate.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
+import 'package:anyps5_desktop/ui/together_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 

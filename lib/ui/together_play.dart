@@ -235,7 +235,7 @@ extension TogetherPlay on TogetherModel {
     }
     final transport = online.running?.transport;
     if (transport is! OnlinePeerMesh) return;
-    final links = await transport.links();
+    final links = await transport.paths();
     if (_linkPoll == null) return;
     togetherLinks = links;
     if (app.overlay == Layer.party) app.refresh();

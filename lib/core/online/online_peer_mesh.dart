@@ -169,7 +169,7 @@ class OnlinePeerMesh implements OnlinePeerTransport {
   Map<String, PeerState> get states => {for (final entry in _peers.entries) entry.key: entry.value.state};
 
   /// How each other player is reached now, by user ID.
-  Future<Map<String, PeerPath>> links() async {
+  Future<Map<String, PeerPath>> paths() async {
     final peers = _peers.entries.toList();
     final paths = await Future.wait([for (final entry in peers) _path(entry.value)]);
     return {for (var index = 0; index < peers.length; index++) peers[index].key: paths[index]};

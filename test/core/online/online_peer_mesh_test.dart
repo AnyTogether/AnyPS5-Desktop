@@ -527,11 +527,11 @@ void main() {
         local,
         relayed,
       ];
-      var links = await mesh.links();
+      var links = await mesh.paths();
       expect(links[bob]!.route, PeerRoute.relay);
       expect(links[bob]!.rttMs, 80);
       players.network.stats = null;
-      links = await mesh.links();
+      links = await mesh.paths();
       expect(links[bob]!.route, PeerRoute.connected);
       expect(links[bob]!.rttMs, isNull);
     });
