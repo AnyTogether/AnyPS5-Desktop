@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import '../core/desktop_notice.dart';
+import 'package:flutter/material.dart' show Icons;
+
 import '../core/family/family_cache.dart';
 import '../core/family/family_policy.dart';
 import '../core/family/family_rules.dart';
@@ -25,8 +26,9 @@ class FamilyGate {
 
   AppModel get app => together.app;
 
-  /// A notice on the desktop, over the game (replaced in tests).
-  void Function(String title, String body) notify = DesktopNotice.show;
+  /// A card over the game as on the Mac, or a notice on the desktop (replaced in tests).
+  late void Function(String title, String body) notify = (title, body) =>
+      unawaited(app.noticeOverGame(body, symbol: Icons.hourglass_bottom_rounded));
 
   /// The clock (replaced in tests).
   DateTime Function() now = DateTime.now;

@@ -351,6 +351,8 @@
   "reactionLaugh": "Haha",
   "reactionWow": "Vay",
   "reactionSad": "Üzgün",
+  "reactionClap": "Alkış",
+  "onboardingStep": "Adım %d / %d",
   "reactionFire": "Ateş",
   "reactionGg": "GG",
   "messagesReply": "Yanıtla",

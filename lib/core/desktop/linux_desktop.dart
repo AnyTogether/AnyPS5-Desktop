@@ -569,6 +569,9 @@ class LinuxDesktop implements DesktopWindows, GameAreas {
   Future<bool> showBadge(RgbaImage? badge, {int? pid}) async => false;
 
   @override
+  bool get canShowCard => _x != null;
+
+  @override
   Future<bool> showCard(RgbaImage card, {int? pid}) async {
     if (_showing) return false;
     final x = _x;

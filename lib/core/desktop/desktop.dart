@@ -78,6 +78,10 @@ abstract class DesktopWindows {
   /// The size a card's pixels should be drawn at for the screen the game is on (1 at 96 dpi).
   double cardScale(int? pid);
 
+  /// Whether a card can be drawn over the game here (Wayland gives a client no way to place a
+  /// window above another program's: [notify] is the way there).
+  bool get canShowCard;
+
   /// Shows [card] at the top of the game's screen for a few seconds, above the game, never taking
   /// its input; completes when it has gone. False when this desktop cannot (then
   /// [notify] is the way).
@@ -141,6 +145,8 @@ class NoDesktop implements DesktopWindows {
   Future<RgbaImage?> captureGame(int pid) async => null;
   @override
   double cardScale(int? pid) => 1;
+  @override
+  bool get canShowCard => false;
   @override
   Future<bool> showCard(RgbaImage card, {int? pid}) async => false;
   @override
