@@ -6,7 +6,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui show Image;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/painting.dart' show Color;
+import 'package:flutter/material.dart' show Color, IconData, Icons;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:path/path.dart' as p;
 
