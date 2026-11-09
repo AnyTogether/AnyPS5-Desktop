@@ -18,6 +18,7 @@ import 'package:anyps5_desktop/core/gamepad/pad_navigation.dart';
 import 'package:anyps5_desktop/core/host.dart';
 import 'package:anyps5_desktop/core/power.dart';
 import 'package:anyps5_desktop/core/release_signing.dart';
+import 'package:anyps5_desktop/core/capture/wayland_capture.dart';
 import 'package:anyps5_desktop/core/replay_buffer.dart';
 import 'package:anyps5_desktop/core/trophies.dart';
 import 'package:anyps5_desktop/core/installer.dart';
@@ -53,8 +54,10 @@ bool _fontsLoaded = false;
 Future<void> loadFonts() async {
   if (_fontsLoaded) return;
   _fontsLoaded = true;
-  final figtree = FontLoader('Figtree')..addFont(rootBundle.load('assets/fonts/Figtree.ttf'));
-  final icons = FontLoader('MaterialIcons')..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
+  final figtree = FontLoader('Figtree')
+    ..addFont(rootBundle.load('assets/fonts/Figtree.ttf'));
+  final icons = FontLoader('MaterialIcons')
+    ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
   await Future.wait([figtree.load(), icons.load()]);
 }
 
@@ -65,10 +68,16 @@ Uint8List png(int width, int height, int Function(int x, int y) color) {
     raw.addByte(0);
     for (var x = 0; x < width; x++) {
       final value = color(x, y);
-      raw.add([value >> 24 & 0xFF, value >> 16 & 0xFF, value >> 8 & 0xFF, value & 0xFF]);
+      raw.add([
+        value >> 24 & 0xFF,
+        value >> 16 & 0xFF,
+        value >> 8 & 0xFF,
+        value & 0xFF,
+      ]);
     }
   }
-  final out = BytesBuilder()..add([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+  final out = BytesBuilder()
+    ..add([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
   void chunk(String type, List<int> data) {
     final body = [...type.codeUnits, ...data];
     out
@@ -83,7 +92,12 @@ Uint8List png(int width, int height, int Function(int x, int y) color) {
   return out.toBytes();
 }
 
-List<int> _u32(int value) => [value >> 24 & 0xFF, value >> 16 & 0xFF, value >> 8 & 0xFF, value & 0xFF];
+List<int> _u32(int value) => [
+  value >> 24 & 0xFF,
+  value >> 16 & 0xFF,
+  value >> 8 & 0xFF,
+  value & 0xFF,
+];
 
 int _crc(List<int> bytes) {
   var crc = 0xFFFFFFFF;
@@ -99,7 +113,12 @@ int _crc(List<int> bytes) {
 /// A made-up game icon: a diagonal gradient between two colors with a soft disc.
 Uint8List iconArt(int from, int to, {int size = 96}) => png(size, size, (x, y) {
   final t = (x + y) / (2 * size);
-  final disc = math.max(0.0, 1 - math.sqrt(math.pow(x - size * 0.62, 2) + math.pow(y - size * 0.4, 2)) / (size * 0.3));
+  final disc = math.max(
+    0.0,
+    1 -
+        math.sqrt(math.pow(x - size * 0.62, 2) + math.pow(y - size * 0.4, 2)) /
+            (size * 0.3),
+  );
   int mix(int shift) {
     final a = from >> shift & 0xFF;
     final b = to >> shift & 0xFF;
@@ -112,7 +131,10 @@ Uint8List iconArt(int from, int to, {int size = 96}) => png(size, size, (x, y) {
 /// A made-up wide background: dark horizon bands.
 Uint8List backgroundArt(int tint) => png(160, 90, (x, y) {
   final t = y / 90;
-  int channel(int shift) => ((tint >> shift & 0xFF) * (0.25 + 0.55 * (1 - (t - 0.55).abs() * 1.6).clamp(0, 1))).round();
+  int channel(int shift) =>
+      ((tint >> shift & 0xFF) *
+              (0.25 + 0.55 * (1 - (t - 0.55).abs() * 1.6).clamp(0, 1)))
+          .round();
   return channel(16) << 24 | channel(8) << 16 | channel(0) << 8 | 0xFF;
 });
 
@@ -155,24 +177,32 @@ Fixture makeFixture({
   WindowBackdrop? backdrop,
   PadSource Function()? pads,
   Future<RgbaImage> Function(Trophy trophy, double scale)? renderTrophyCard,
-  Future<RgbaImage> Function(bool live, String time, double scale)? renderLiveBadge,
+  Future<RgbaImage> Function(bool live, String time, double scale)?
+  renderLiveBadge,
   String? glibc,
   AudioOut? audio,
   Future<PlayableSong?> Function(String path)? decodeSong,
   FontArchive? cjkFonts,
   String? builtInFonts,
   Future<String?> Function(String suggestedName)? saveFile,
-  Future<String?> Function(String suggestedName, String label, List<String> extensions)? saveFileAs,
+  Future<String?> Function(
+    String suggestedName,
+    String label,
+    List<String> extensions,
+  )?
+  saveFileAs,
   Future<String?> Function(String label, List<String> extensions)? pickFile,
   HostSystem system = HostSystem.linux,
   GitHubReleases? launcherReleases,
-  Future<void> Function(String executable, List<String> arguments)? startDetached,
+  Future<void> Function(String executable, List<String> arguments)?
+  startDetached,
   void Function(int code)? quit,
   Map<String, String> environment = const {},
   bool prepareNewGames = false,
   int? Function(String folder)? freeSpace,
   LauncherWindow? window,
   ReplayBuffer? Function(int seconds)? replay,
+  WaylandCapture? waylandCapture,
   Future<int> Function(String folder)? folderSize,
   Future<Map<PadAction, List<String>>?> Function(String folder)? gameControls,
   Future<String?> Function(String title)? pickFolder,
@@ -190,8 +220,10 @@ Fixture makeFixture({
   final root = p.join(temp.path, 'Games');
   final toolkit = makeFakeToolkit(p.join(temp.path, 'toolkit'));
   void pictures(String folder, int from, int to) {
-    File(p.join(folder, 'sce_sys', 'icon0.png')).writeAsBytesSync(iconArt(from, to));
-    File(p.join(folder, 'sce_sys', 'pic0.png')).writeAsBytesSync(backgroundArt(to));
+    File(p.join(folder, 'sce_sys', 'icon0.png'))
+        .writeAsBytesSync(iconArt(from, to));
+    File(p.join(folder, 'sce_sys', 'pic0.png'))
+        .writeAsBytesSync(backgroundArt(to));
   }
 
   final astro = makeDump(
@@ -201,11 +233,29 @@ Fixture makeFixture({
     names: {'en-US': 'Orbit Runner', 'tr-TR': 'Yörünge Koşucusu'},
   );
   pictures(astro, 0x3A6BFF, 0x0B1E5C);
-  final stray = makeDump(root, 'stray', titleId: 'PPSA02002', names: {'en-US': 'Neon Alley'}, eboot: selfHead);
+  final stray = makeDump(
+    root,
+    'stray',
+    titleId: 'PPSA02002',
+    names: {'en-US': 'Neon Alley'},
+    eboot: selfHead,
+  );
   pictures(stray, 0xFF8A3D, 0x5C1B0B);
-  final forest = makeDump(root, 'forest', titleId: 'PPSA03003', names: {'en-US': 'Quiet Forest'}, eboot: selfHead);
+  final forest = makeDump(
+    root,
+    'forest',
+    titleId: 'PPSA03003',
+    names: {'en-US': 'Quiet Forest'},
+    eboot: selfHead,
+  );
   pictures(forest, 0x42D392, 0x0B3D2A);
-  makeDump(root, 'broken', titleId: 'PPSA04004', names: {'en-US': 'Sealed Archive'}, eboot: const [1, 2, 3, 4]);
+  makeDump(
+    root,
+    'broken',
+    titleId: 'PPSA04004',
+    names: {'en-US': 'Sealed Archive'},
+    eboot: const [1, 2, 3, 4],
+  );
   final preferences = Preferences()
     ..onboarded = onboarded
     ..gamesFolders = [root]
@@ -218,7 +268,10 @@ Fixture makeFixture({
   // The Theme Hub reads no server in the tests unless one asks for it: an empty Hub.
   ThemeHubModel.basesInstead = const [];
   final model = AppModel(
-    paths: AppPaths.forSystem(HostSystem.linux, environment: {'HOME': p.join(temp.path, 'home')}),
+    paths: AppPaths.forSystem(
+      HostSystem.linux,
+      environment: {'HOME': p.join(temp.path, 'home')},
+    ),
     preferences: preferences,
     system: system,
     persist: false,
@@ -246,7 +299,11 @@ Fixture makeFixture({
       engineReleases: engine == null ? null : GitHubReleases(api: engine),
       armEngineReleases: armEngine == null
           ? null
-          : GitHubReleases(api: armEngine, repository: ArmToolkitPackage.repository, signingKeys: armKeys),
+          : GitHubReleases(
+              api: armEngine,
+              repository: ArmToolkitPackage.repository,
+              signingKeys: armKeys,
+            ),
       desktop: desktop,
       backdrop: backdrop,
       pads: pads,
@@ -265,15 +322,22 @@ Fixture makeFixture({
       quit: quit,
       window: window,
       replay: replay,
+      waylandCapture: waylandCapture,
       // The size at once, as a finished measurement: the screens and goldens show it.
-      folderSize: folderSize ?? (folder) => SynchronousFuture(GameLibrary.size(folder)),
+      folderSize:
+          folderSize ?? (folder) => SynchronousFuture(GameLibrary.size(folder)),
       // An Unreal game's own controls at once, read from its paks.
-      gameControls: gameControls ?? (folder) => SynchronousFuture(UnrealControls.read(folder)),
+      gameControls:
+          gameControls ??
+          (folder) => SynchronousFuture(UnrealControls.read(folder)),
       commands: commands,
       discord: discord,
       discordGames: (_) async => null,
-      systemInfo: () async =>
-          const SystemInfo(os: 'Ubuntu 24.04.1 LTS, kernel 6.8.0-45-generic', cpu: 'AMD Ryzen 7 5800X', memoryGB: 32),
+      systemInfo: () async => const SystemInfo(
+        os: 'Ubuntu 24.04.1 LTS, kernel 6.8.0-45-generic',
+        cpu: 'AMD Ryzen 7 5800X',
+        memoryGB: 32,
+      ),
     ),
   );
   // Room enough for any made-up size, and on mains power, unless a test says otherwise.
@@ -313,7 +377,11 @@ Future<void> pumpLauncher(
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  final app = AnyPS5App(model: model, time: 120, now: DateTime(2026, 10, 24, 21, 30));
+  final app = AnyPS5App(
+    model: model,
+    time: 120,
+    now: DateTime(2026, 10, 24, 21, 30),
+  );
   await tester.pumpWidget(wrap == null ? app : wrap(app));
   await settle(tester);
 }
@@ -340,9 +408,17 @@ Future<void> press(WidgetTester tester, LogicalKeyboardKey key) async {
 
 /// An upstream release as GitHub's API describes it, with both systems' files and checksums,
 /// for screens that show a version and a size without downloading anything.
-UpstreamRelease sampleRelease(String version, {int librariesSize = 96653447, bool prerelease = false}) {
-  ReleaseAsset asset(String name, int size) =>
-      ReleaseAsset(name: name, size: size, url: Uri.parse('https://example.invalid/$name'), sha256: 'a' * 64);
+UpstreamRelease sampleRelease(
+  String version, {
+  int librariesSize = 96653447,
+  bool prerelease = false,
+}) {
+  ReleaseAsset asset(String name, int size) => ReleaseAsset(
+    name: name,
+    size: size,
+    url: Uri.parse('https://example.invalid/$name'),
+    sha256: 'a' * 64,
+  );
   return UpstreamRelease(
     tag: 'v$version',
     prerelease: prerelease,

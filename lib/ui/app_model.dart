@@ -12,7 +12,9 @@ import 'package:path/path.dart' as p;
 
 import '../core/audio/atrac9.dart';
 import '../core/capture/game_sound.dart';
+import '../core/capture/screen_cast_portal.dart';
 import '../core/capture/video_encoders.dart';
+import '../core/capture/wayland_capture.dart';
 import '../core/audio/audio_out.dart';
 import '../core/audio/interface_sounds.dart';
 import '../core/audio/theme_music.dart';
@@ -65,7 +67,8 @@ import '../core/toolkit.dart';
 import '../core/toolkit_download.dart';
 import '../core/profiles/profile_saves.dart';
 import '../core/profiles/profiles.dart';
-import '../core/together/account.dart' show ClientTooOld, TogetherAccount, TogetherProblem;
+import '../core/together/account.dart'
+    show ClientTooOld, TogetherAccount, TogetherProblem;
 import '../core/together/e2ee_keys.dart';
 import '../core/together/levels.dart';
 import '../core/together/media.dart' show SfuRoom;
@@ -159,7 +162,9 @@ class Preferences {
     ..updateChannel = json['updateChannel'] as String?
     ..engineGitBeforePlay = json['engineGitBeforePlay'] == true
     ..engineGitBuilt = {
-      for (final entry in (json['engineGitBuilt'] as Map<String, dynamic>? ?? const {}).entries)
+      for (final entry
+          in (json['engineGitBuilt'] as Map<String, dynamic>? ?? const {})
+              .entries)
         if (entry.value is String) entry.key: entry.value as String,
     }
     ..fontsFolder = json['fontsFolder'] as String?
@@ -194,18 +199,22 @@ class Preferences {
     ..hideWhilePlaying = json['hideWhilePlaying'] == true
     ..checkUpdates = json['checkUpdates'] as bool? ?? true
     ..replayBuffer = json['replayBuffer'] == true
+    ..waylandRestoreToken = json['waylandRestoreToken'] as String? ?? ''
     ..replaySeconds = switch (json['replaySeconds']) {
-      final num seconds when ReplayBuffer.lengths.contains(seconds.toInt()) => seconds.toInt(),
+      final num seconds when ReplayBuffer.lengths.contains(seconds.toInt()) =>
+        seconds.toInt(),
       _ => ReplayBuffer.defaultLength,
     }
     ..shortcuts = ShortcutMap.fromJson(json['shortcuts'])
     ..compatNever = json['compatNever'] == true
     ..compatAsked = {
-      for (final entry in (json['compatAsked'] as Map<String, dynamic>? ?? const {}).entries)
+      for (final entry
+          in (json['compatAsked'] as Map<String, dynamic>? ?? const {}).entries)
         if (entry.value is String) entry.key: entry.value as String,
     }
     ..lastPlayed = {
-      for (final entry in (json['lastPlayed'] as Map<String, dynamic>? ?? const {}).entries)
+      for (final entry
+          in (json['lastPlayed'] as Map<String, dynamic>? ?? const {}).entries)
         entry.key: entry.value as String,
     };
 
@@ -385,6 +394,9 @@ class Preferences {
   bool replayBuffer = false;
   int replaySeconds = ReplayBuffer.defaultLength;
 
+  /// Under Wayland: brings back the window shared last time without the desktop's dialog.
+  String waylandRestoreToken = '';
+
   /// Settings › Shortcuts.
   ShortcutMap shortcuts = ShortcutMap();
 
@@ -457,6 +469,8 @@ class Preferences {
     if (hideWhilePlaying) 'hideWhilePlaying': true,
     if (!checkUpdates) 'checkUpdates': false,
     'replayBuffer': replayBuffer,
+    if (waylandRestoreToken.isNotEmpty)
+      'waylandRestoreToken': waylandRestoreToken,
     'replaySeconds': replaySeconds,
     if (!shortcuts.isDefault) 'shortcuts': shortcuts.toJson(),
     if (compatNever) 'compatNever': true,
@@ -468,7 +482,9 @@ class Preferences {
   static List<String> _folders(Object? list, Object? single) {
     final folders = <String>[];
     for (final folder in list is List<dynamic> ? list : [single]) {
-      if (folder is String && folder.isNotEmpty && !folders.any((known) => p.equals(known, folder))) {
+      if (folder is String &&
+          folder.isNotEmpty &&
+          !folders.any((known) => p.equals(known, folder))) {
         folders.add(folder);
       }
     }
@@ -483,12 +499,16 @@ class Preferences {
       // A first start gets AnyPS5-ARM's engine (the phone controller, full screen, window size).
       // A launcher that saved its choices before keeps the engine it had: never switched silently.
       return Preferences()
-        ..language = Language.forSystem(systemLocales ?? Preferences.systemLocales()).code
+        ..language = Language.forSystem(
+          systemLocales ?? Preferences.systemLocales(),
+        ).code
         ..engineSource = 'arm';
     }
     try {
       final json = jsonDecode(File(file).readAsStringSync());
-      return json is Map<String, dynamic> ? Preferences.fromJson(json) : Preferences();
+      return json is Map<String, dynamic>
+          ? Preferences.fromJson(json)
+          : Preferences();
     } on Object {
       return Preferences();
     }
@@ -497,14 +517,17 @@ class Preferences {
   /// The computer's languages, the one it is set to first: Windows' list of display languages
   /// and Linux's LANGUAGE and LANG as Flutter reads them, then Dart's locale name.
   static List<String> systemLocales() => [
-    for (final locale in PlatformDispatcher.instance.locales) locale.toLanguageTag(),
+    for (final locale in PlatformDispatcher.instance.locales)
+      locale.toLanguageTag(),
     Platform.localeName,
   ];
 
   void save(String file) {
     try {
       File(file).parent.createSync(recursive: true);
-      File(file).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(toJson()));
+      File(
+        file,
+      ).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(toJson()));
     } on FileSystemException {
       // Kept in memory for this run.
     }
@@ -697,7 +720,8 @@ class HomeFocus {
   bool get isNotice => area == 'notice';
 
   @override
-  bool operator ==(Object other) => other is HomeFocus && other.area == area && other.index == index;
+  bool operator ==(Object other) =>
+      other is HomeFocus && other.area == area && other.index == index;
 
   @override
   int get hashCode => Object.hash(area, index);
@@ -922,7 +946,10 @@ class StepperRow extends RowKind {
   /// step.
   int valueAt(double fraction) {
     final steps = ((max - min) / step).round();
-    return (min + (fraction.clamp(0.0, 1.0) * steps).round() * step).clamp(min, max);
+    return (min + (fraction.clamp(0.0, 1.0) * steps).round() * step).clamp(
+      min,
+      max,
+    );
   }
 
   /// [value] moved [steps] steps: kept between [min] and [max], or round the circle.
@@ -965,7 +992,13 @@ class InfoRow extends RowKind {
 
 /// A field to type in: choosing the row puts the cursor in it; Enter sends [submit].
 class TextRow extends RowKind {
-  const TextRow(this.value, this.set, {this.submit, this.hint, this.obscure = false});
+  const TextRow(
+    this.value,
+    this.set, {
+    this.submit,
+    this.hint,
+    this.obscure = false,
+  });
   final String value;
   final void Function(String) set;
   final void Function()? submit;
@@ -978,7 +1011,14 @@ class TextRow extends RowKind {
 /// How a person shows in a row: their initials or picture, a dot for what they are doing, a
 /// ring while they speak in party voice.
 class PanelPerson {
-  const PanelPerson({required this.name, this.avatar, this.picture, this.tint, this.status, this.speaking = false});
+  const PanelPerson({
+    required this.name,
+    this.avatar,
+    this.picture,
+    this.tint,
+    this.status,
+    this.speaking = false,
+  });
   final String name;
   final String? avatar;
 
@@ -992,7 +1032,11 @@ class PanelPerson {
 
   /// One or two letters for a person with no picture.
   String get initials {
-    final words = name.trim().split(RegExp(r'\s+')).where((word) => word.isNotEmpty).take(2);
+    final words = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((word) => word.isNotEmpty)
+        .take(2);
     final letters = words.map(T.initial).join();
     return letters.isEmpty ? '?' : letters;
   }
@@ -1013,7 +1057,12 @@ class KeysRow extends RowKind {
 /// A shortcut's key and controller binding (Settings › Shortcuts); choosing it waits for a key or
 /// buttons.
 class ShortcutRow extends RowKind {
-  const ShortcutRow({required this.key, required this.pad, required this.capturing, required this.capture});
+  const ShortcutRow({
+    required this.key,
+    required this.pad,
+    required this.capturing,
+    required this.capture,
+  });
   final String? key;
   final String? pad;
   final bool capturing;
@@ -1021,7 +1070,11 @@ class ShortcutRow extends RowKind {
 }
 
 class PanelCategory {
-  const PanelCategory({required this.id, required this.title, required this.rows});
+  const PanelCategory({
+    required this.id,
+    required this.title,
+    required this.rows,
+  });
   final String id;
   final String title;
   final List<PanelRow> rows;
@@ -1075,6 +1128,7 @@ class LauncherServices {
     this.quit,
     this.window,
     this.replay,
+    this.waylandCapture,
     this.folderSize,
     this.gameControls,
     this.commands,
@@ -1098,7 +1152,8 @@ class LauncherServices {
 
   /// What an Unreal game's own input settings say each pad button does, read from its paks
   /// away from the interface (Isolate.run by default); null when they say nothing readable.
-  final Future<Map<PadAction, List<String>>?> Function(String folder)? gameControls;
+  final Future<Map<PadAction, List<String>>?> Function(String folder)?
+  gameControls;
 
   /// The launcher's own window: full screen or not; nothing when not given.
   final LauncherWindow? window;
@@ -1107,9 +1162,14 @@ class LauncherServices {
   /// default (null: none, or a desktop it cannot record).
   final ReplayBuffer? Function(int seconds)? replay;
 
+  /// Recording through the desktop's portal under Wayland; made for a real Wayland session by
+  /// default, and null elsewhere.
+  final WaylandCapture? waylandCapture;
+
   /// Starts a program that outlives the launcher (an update's installer, the new AppImage);
   /// Process.start detached by default.
-  final Future<void> Function(String executable, List<String> arguments)? startDetached;
+  final Future<void> Function(String executable, List<String> arguments)?
+  startDetached;
 
   /// Ends the launcher (Restart Now); exit by default.
   final void Function(int code)? quit;
@@ -1126,14 +1186,25 @@ class LauncherServices {
 
   /// Asks where to save a file of [label]'s kind (one of [extensions]), [suggestedName] first;
   /// null when they cancelled.
-  final Future<String?> Function(String suggestedName, String label, List<String> extensions)? saveFileAs;
+  final Future<String?> Function(
+    String suggestedName,
+    String label,
+    List<String> extensions,
+  )?
+  saveFileAs;
 
   /// Asks the user for a file of [label]'s kind (one of [extensions]) to open; null when they
   /// cancelled.
-  final Future<String?> Function(String label, List<String> extensions)? pickFile;
+  final Future<String?> Function(String label, List<String> extensions)?
+  pickFile;
 
   /// The same, opened in [folder] when one is given (a game's backups).
-  final Future<String?> Function(String label, List<String> extensions, String? folder)? pickFileAt;
+  final Future<String?> Function(
+    String label,
+    List<String> extensions,
+    String? folder,
+  )?
+  pickFileAt;
 
   /// This computer for a crash report; read from the system when not given.
   final Future<SystemInfo> Function()? systemInfo;
@@ -1169,10 +1240,12 @@ class LauncherServices {
   final WindowBackdrop? backdrop;
 
   /// Draws the trophy card for the desktop's window; TrophyCard.render by default.
-  final Future<RgbaImage> Function(Trophy trophy, double scale)? renderTrophyCard;
+  final Future<RgbaImage> Function(Trophy trophy, double scale)?
+  renderTrophyCard;
 
   /// Draws the LIVE badge for the desktop's window; LiveBadge.render by default.
-  final Future<RgbaImage> Function(bool live, String time, double scale)? renderLiveBadge;
+  final Future<RgbaImage> Function(bool live, String time, double scale)?
+  renderLiveBadge;
 
   /// The sound card for the interface sounds and theme songs; none (silence) when not given.
   final AudioOut Function()? audio;
@@ -1265,7 +1338,10 @@ class AppModel extends ChangeNotifier {
     // Profiles: a launcher set up before them becomes its first profile at once.
     profiles = ProfileStore(
       p.join(paths.config, 'Profiles'),
-      existing: ExistingSetup(onboarded: this.preferences.onboarded, name: this.preferences.profileName),
+      existing: ExistingSetup(
+        onboarded: this.preferences.onboarded,
+        name: this.preferences.profileName,
+      ),
       persist: persist,
       defaultName: LauncherProfiles.defaultName,
     );
@@ -1293,7 +1369,10 @@ class AppModel extends ChangeNotifier {
 
   /// The pulses the controller gives: Settings › Behaviour › Controller Vibration, never while a
   /// game (or another window) is in front, only while the pad is the device in use.
-  late final HapticFeedback haptics = HapticFeedback(_pulses, enabled: preferences.controllerVibration);
+  late final HapticFeedback haptics = HapticFeedback(
+    _pulses,
+    enabled: preferences.controllerVibration,
+  );
 
   final EdgeBump _edge = EdgeBump();
   final HoverGate _hover = HoverGate();
@@ -1339,7 +1418,8 @@ class AppModel extends ChangeNotifier {
     if (shortcutCapture != null) return cancelShortcutCapture();
     final (from, game) = (overlay, selected);
     command(Command.back);
-    if (from != null && overlay != from && _forwardLayers.contains(from)) _forward = (from, overlay, game);
+    if (from != null && overlay != from && _forwardLayers.contains(from))
+      _forward = (from, overlay, game);
   }
 
   /// The mouse's Forward button (XBUTTON2, button 9): the layer Back just closed opens again,
@@ -1413,7 +1493,10 @@ class AppModel extends ChangeNotifier {
       _repeatingNow = false;
     }
     final direction =
-        command == Command.left || command == Command.right || command == Command.up || command == Command.down;
+        command == Command.left ||
+        command == Command.right ||
+        command == Command.up ||
+        command == Command.down;
     if (_edge.handled(
       direction: direction,
       repeat: repeat,
@@ -1425,11 +1508,25 @@ class AppModel extends ChangeNotifier {
 
   /// The pointer arrived on a control, tile, row or card: the quiet tick, when [HoverGate] lets
   /// it.
-  void hoverArrived(Object id, {required double x, required double y, required bool buttonsDown}) {
+  void hoverArrived(
+    Object id, {
+    required double x,
+    required double y,
+    required bool buttonsDown,
+  }) {
     // Not while a list is dragged or still gliding after one: rows passing under the pointer
     // are not arrivals.
-    final allowed = preferences.sounds && active && preferences.onboarded && !panning;
-    if (_hover.arrive(id, x: x, y: y, now: feelNow, lastCue: _lastCue, buttonsDown: buttonsDown, allowed: allowed)) {
+    final allowed =
+        preferences.sounds && active && preferences.onboarded && !panning;
+    if (_hover.arrive(
+      id,
+      x: x,
+      y: y,
+      now: feelNow,
+      lastCue: _lastCue,
+      buttonsDown: buttonsDown,
+      allowed: allowed,
+    )) {
       sounds.play(Cue.hover);
     }
   }
@@ -1556,7 +1653,11 @@ class AppModel extends ChangeNotifier {
   /// The accent as red, green and blue (0 to 255), for the light bars' Theme Colour.
   (int, int, int) get accentRgb {
     final color = accentChoice.color;
-    return ((color.r * 255).round(), (color.g * 255).round(), (color.b * 255).round());
+    return (
+      (color.r * 255).round(),
+      (color.g * 255).round(),
+      (color.b * 255).round(),
+    );
   }
 
   /// A controller connect or disconnect: the debug log (ANYPS5_PAD_LOG) and the console.
@@ -1590,7 +1691,9 @@ class AppModel extends ChangeNotifier {
   void closeControllerTest() {
     open(Layer.settings, cue: Cue.back);
     final categories = panelCategories();
-    final index = categories.indexWhere((category) => category.id == 'controllers');
+    final index = categories.indexWhere(
+      (category) => category.id == 'controllers',
+    );
     if (index < 0) return;
     panelCategory = index;
     panelRow = categories[index].rows
@@ -1606,13 +1709,15 @@ class AppModel extends ChangeNotifier {
   bool get launcherInFront {
     // Steam's Game Mode (gamescope) may report no active window at all: with no game running
     // the launcher is what is on screen.
-    if (steamLaunch.gameMode && running == null && starting == null) return true;
+    if (steamLaunch.gameMode && running == null && starting == null)
+      return true;
     return active && (desktop.launcherFocused() ?? true);
   }
 
   /// A line for the controller's debug log: ANYPS5_PAD_LOG names a file to add them to.
   late final void Function(String line)? _padLog = () {
-    final path = (services.environment ?? Platform.environment)['ANYPS5_PAD_LOG'];
+    final path =
+        (services.environment ?? Platform.environment)['ANYPS5_PAD_LOG'];
     if (path == null || path.isEmpty) return null;
     return (String line) {
       try {
@@ -1634,7 +1739,12 @@ class AppModel extends ChangeNotifier {
     final source = services.pads?.call();
     if (source == null) return;
     final navigator = _padNavigator;
-    final gate = PadGate(_padEvent, inFront: () => launcherInFront, log: _padLog, passesInGame: navigator.passesInGame);
+    final gate = PadGate(
+      _padEvent,
+      inFront: () => launcherInFront,
+      log: _padLog,
+      passesInGame: navigator.passesInGame,
+    );
     _gate = gate;
     final deadzone = DeadzoneStage(gate.handle);
     _deadzone = deadzone;
@@ -1649,7 +1759,9 @@ class AppModel extends ChangeNotifier {
         final now = desktop.launcherFocused();
         if (now == said) return;
         said = now;
-        log('desktop: launcher ${now == null ? 'cannot tell' : (now ? 'in front' : 'behind')}');
+        log(
+          'desktop: launcher ${now == null ? 'cannot tell' : (now ? 'in front' : 'behind')}',
+        );
       });
     }
   }
@@ -1663,7 +1775,8 @@ class AppModel extends ChangeNotifier {
     final navigator = PadNavigator(
       padCommand,
       shortcuts: preferences.shortcuts,
-      isPlayStation: (pad) => controllers.roster.pad(pad)?.kind.isPlayStation ?? false,
+      isPlayStation: (pad) =>
+          controllers.roster.pad(pad)?.kind.isPlayStation ?? false,
     );
     _navigator = navigator;
     _applyPadPreferences();
@@ -1678,7 +1791,8 @@ class AppModel extends ChangeNotifier {
 
   /// Whether a phone's pad moves the launcher now: with no game starting or playing and the
   /// launcher in front, as a controller does; otherwise its input is the game's alone.
-  bool get phonePadMovesLauncher => running == null && starting == null && launcherInFront;
+  bool get phonePadMovesLauncher =>
+      running == null && starting == null && launcherInFront;
 
   void _phonePadEvent(PadEvent event) {
     final navigator = _padNavigator;
@@ -1688,7 +1802,8 @@ class AppModel extends ChangeNotifier {
     }
     if (!phonePadMovesLauncher) {
       // A game (or another window) is in front: what the launcher held from this pad lets go.
-      if (_phonePadsMoving.remove(event.pad)) navigator.handle(PadGone(event.pad));
+      if (_phonePadsMoving.remove(event.pad))
+        navigator.handle(PadGone(event.pad));
       return;
     }
     // Options (the pad's settings button): the launcher's Settings, and out of them again.
@@ -1701,7 +1816,11 @@ class AppModel extends ChangeNotifier {
   }
 
   void _phoneOptions() {
-    if (pairing != null || editingRow != null || shortcutCapture != null || !preferences.onboarded) return;
+    if (pairing != null ||
+        editingRow != null ||
+        shortcutCapture != null ||
+        !preferences.onboarded)
+      return;
     _usedInput(InputMode.pad);
     if (overlay == Layer.settings) {
       closeOverlay();
@@ -1713,7 +1832,8 @@ class AppModel extends ChangeNotifier {
   /// A controller's event past the gate: to the navigator, or to Settings › Shortcuts while it
   /// waits for buttons.
   void _padEvent(PadEvent event) {
-    if (shortcutCapture != null && event is PadButtonEvent) return _capturePad(event);
+    if (shortcutCapture != null && event is PadButtonEvent)
+      return _capturePad(event);
     _navigator?.handle(event);
   }
 
@@ -1736,7 +1856,10 @@ class AppModel extends ChangeNotifier {
     final inFront = launcherInFront;
     final Command mapped;
     switch (command) {
-      case PadCommand.homeHold || PadCommand.quickMenu || PadCommand.screenshot || PadCommand.saveClip:
+      case PadCommand.homeHold ||
+          PadCommand.quickMenu ||
+          PadCommand.screenshot ||
+          PadCommand.saveClip:
         _pulses.pad = _navigator?.lastPad;
         // A controller's press, in the game or not: the menus it opens show its buttons.
         _usedInput(InputMode.pad);
@@ -1769,7 +1892,11 @@ class AppModel extends ChangeNotifier {
       case PadCommand.menu:
         // Options/Start on Home: Switch Profile, online or offline (Triangle stays the game's).
         mapped = Command.options;
-        if (overlay == null && preferences.onboarded && inFront && pairing == null && starting == null) {
+        if (overlay == null &&
+            preferences.onboarded &&
+            inFront &&
+            pairing == null &&
+            starting == null) {
           haptics.padInUse = true;
           _usedInput(InputMode.pad);
           return openProfileMenu();
@@ -1790,14 +1917,16 @@ class AppModel extends ChangeNotifier {
     if (overlay == Layer.controllerTest && mapped != Command.home) return;
     if (editingRow != null) {
       // Typing in Settings' search: ○ stops (the field keeps the focus), ↓ goes to what it found.
-      if (editingRow == SettingsSearch.searchRow && (mapped == Command.back || mapped == Command.down)) {
+      if (editingRow == SettingsSearch.searchRow &&
+          (mapped == Command.back || mapped == Command.down)) {
         stopEditing();
         if (mapped == Command.down) _searchCommand(Command.down);
       }
       return;
     }
     if (capturing != null && mapped != Command.back) return;
-    if (overlay == Layer.settings && (mapped == Command.previousGame || mapped == Command.nextGame)) {
+    if (overlay == Layer.settings &&
+        (mapped == Command.previousGame || mapped == Command.nextGame)) {
       return moveCategory(mapped == Command.nextGame ? 1 : -1);
     }
     _viaPad = true;
@@ -1840,7 +1969,8 @@ class AppModel extends ChangeNotifier {
   }
 
   void _capturePad(PadButtonEvent event) {
-    final button = _navigator?.normalize(event.pad, event.button) ?? event.button;
+    final button =
+        _navigator?.normalize(event.pad, event.button) ?? event.button;
     if (event.down) {
       _captureHeld.add(button);
       _captureChord.add(button);
@@ -1856,9 +1986,14 @@ class AppModel extends ChangeNotifier {
     _usedInput(InputMode.pad);
     // Circle alone (Cross with Circle confirming) is the way out.
     final cancel = preferences.confirmCircle ? PadButton.south : PadButton.east;
-    if (!chord.hold && chord.buttons.length == 1 && chord.buttons.first == cancel) return cancelShortcutCapture();
+    if (!chord.hold &&
+        chord.buttons.length == 1 &&
+        chord.buttons.first == cancel)
+      return cancelShortcutCapture();
     // Triangle alone clears the controller's binding.
-    if (!chord.hold && chord.buttons.length == 1 && chord.buttons.first == PadButton.north) {
+    if (!chord.hold &&
+        chord.buttons.length == 1 &&
+        chord.buttons.first == PadButton.north) {
       final action = shortcutCapture!;
       shortcutCapture = null;
       return clearShortcut(action, input: InputMode.pad);
@@ -1886,23 +2021,34 @@ class AppModel extends ChangeNotifier {
     final action = shortcutCapture;
     if (action == null) return;
     final conflict = preferences.shortcuts.padConflict(action, chord);
-    _finishCapture(conflict, () => preferences.shortcuts[action].withPad(chord));
+    _finishCapture(
+      conflict,
+      () => preferences.shortcuts[action].withPad(chord),
+    );
   }
 
-  void _finishCapture(ShortcutConflict? conflict, ShortcutBinding Function() binding) {
+  void _finishCapture(
+    ShortcutConflict? conflict,
+    ShortcutBinding Function() binding,
+  ) {
     final action = shortcutCapture!;
     shortcutCapture = null;
     if (conflict != null) {
       vibrate(HapticCue.error);
       sounds.play(Cue.bump);
       show(switch (conflict) {
-        TakenBy(:final action) => T.format('shortcutTaken', [shortcutTitle(action)]),
+        TakenBy(:final action) => T.format('shortcutTaken', [
+          shortcutTitle(action),
+        ]),
         Reserved() => T.text('shortcutReserved'),
       });
       _changed();
       return;
     }
-    preferences.shortcuts = preferences.shortcuts.withBinding(action, binding());
+    preferences.shortcuts = preferences.shortcuts.withBinding(
+      action,
+      binding(),
+    );
     sounds.play(Cue.move);
     savePreferences();
   }
@@ -1912,13 +2058,17 @@ class AppModel extends ChangeNotifier {
     if (overlay != Layer.settings) return null;
     final rows = _currentRows;
     final id = panelRow < rows.length ? rows[panelRow].id : '';
-    return id.startsWith('shortcut-') ? LauncherAction.byName(id.substring('shortcut-'.length)) : null;
+    return id.startsWith('shortcut-')
+        ? LauncherAction.byName(id.substring('shortcut-'.length))
+        : null;
   }
 
   /// △ (or Delete) on a shortcut: the binding of the input in use goes.
   void clearShortcut(LauncherAction action, {InputMode? input}) {
     final binding = preferences.shortcuts[action];
-    final next = (input ?? inputMode) == InputMode.pad ? binding.withPad(null) : binding.withKey(null);
+    final next = (input ?? inputMode) == InputMode.pad
+        ? binding.withPad(null)
+        : binding.withKey(null);
     if (next == binding) return _changed();
     preferences.shortcuts = preferences.shortcuts.withBinding(action, next);
     sounds.play(Cue.back);
@@ -1926,7 +2076,8 @@ class AppModel extends ChangeNotifier {
   }
 
   /// The action a key runs while the launcher has the keyboard, if any.
-  LauncherAction? shortcutForKey(KeyCombo key) => preferences.shortcuts.actionForKey(key);
+  LauncherAction? shortcutForKey(KeyCombo key) =>
+      preferences.shortcuts.actionForKey(key);
 
   /// A shortcut's key pressed in the launcher.
   void runKeyShortcut(LauncherAction action) {
@@ -2016,8 +2167,13 @@ class AppModel extends ChangeNotifier {
 
   /// Send Report? once, when nothing else is on the home screen (after "Who's playing?").
   void offerLauncherReport() {
-    if (_problemOffered || launcherProblem == null || !preferences.onboarded) return;
-    if (overlay != null || running != null || starting != null || pairing != null) return;
+    if (_problemOffered || launcherProblem == null || !preferences.onboarded)
+      return;
+    if (overlay != null ||
+        running != null ||
+        starting != null ||
+        pairing != null)
+      return;
     _problemOffered = true;
     open(Layer.launcherReport);
   }
@@ -2029,10 +2185,20 @@ class AppModel extends ChangeNotifier {
     _launcherProblemDone();
     final system = await crash.systemInfo();
     final privacy = crash.privacy();
-    final draft = IssueDraft.launcherProblem(problem, system: system, privacy: privacy);
+    final draft = IssueDraft.launcherProblem(
+      problem,
+      system: system,
+      privacy: privacy,
+    );
     // The link had no room for every line: the whole report on the clipboard, to paste there.
     if (draft.linesLeftOut > 0 && services.copyText != null) {
-      services.copyText!(IssueDraft.launcherProblemText(problem, system: system, privacy: privacy));
+      services.copyText!(
+        IssueDraft.launcherProblemText(
+          problem,
+          system: system,
+          privacy: privacy,
+        ),
+      );
       show(T.text('launcherReportCopied'));
     }
     services.openUrl?.call(draft.url);
@@ -2113,7 +2279,9 @@ class AppModel extends ChangeNotifier {
   GamePresets get gamePresets {
     final owner = _presetsOwner;
     if (_presets == null || owner != _cachedPresetsOwner) {
-      _presets = persist ? GamePresetsStore(gamePresetsFile(owner)).load() : const GamePresets();
+      _presets = persist
+          ? GamePresetsStore(gamePresetsFile(owner)).load()
+          : const GamePresets();
       _cachedPresetsOwner = owner;
     }
     return _presets!;
@@ -2121,10 +2289,12 @@ class AppModel extends ChangeNotifier {
 
   GamePresets? _presets;
   String? _cachedPresetsOwner;
-  String get _presetsOwner => profiles.book.currentProfile?.id ?? LauncherProfile.legacyId;
+  String get _presetsOwner =>
+      profiles.book.currentProfile?.id ?? LauncherProfile.legacyId;
 
   /// Where profile [id]'s presets are kept: beside its other files, under the profiles folder.
-  String gamePresetsFile(String id) => p.join(profiles.folder, id, 'GamePresets.json');
+  String gamePresetsFile(String id) =>
+      p.join(profiles.folder, id, 'GamePresets.json');
 
   void setGamePresets(GamePresets presets) {
     if (presets == gamePresets) return;
@@ -2144,30 +2314,57 @@ class AppModel extends ChangeNotifier {
       'presetHard',
       'presetHardest',
     ];
-    const priorityNames = ['presetGameDefault', 'presetPerformance', 'presetResolution'];
+    const priorityNames = [
+      'presetGameDefault',
+      'presetPerformance',
+      'presetResolution',
+    ];
     const subtitleNames = ['presetGameDefault', 'presetShow', 'presetHide'];
     const languages = ConsoleLanguage.all;
     final languageIndex = presets.audioLanguage == null
         ? 0
-        : languages.indexWhere((language) => language.$1 == presets.audioLanguage) + 1;
+        : languages.indexWhere(
+                (language) => language.$1 == presets.audioLanguage,
+              ) +
+              1;
     PanelRow toggle(String id, bool value, GamePresets Function(bool) change) =>
-        PanelRow(id: id, title: T.text(id), kind: ToggleRow(value, (on) => setGamePresets(change(on))));
+        PanelRow(
+          id: id,
+          title: T.text(id),
+          kind: ToggleRow(value, (on) => setGamePresets(change(on))),
+        );
     return [
-      PanelRow(id: 'presetsIntro', title: T.text('presetsIntroTitle'), kind: InfoRow(T.text('presetsIntro'))),
+      PanelRow(
+        id: 'presetsIntro',
+        title: T.text('presetsIntroTitle'),
+        kind: InfoRow(T.text('presetsIntro')),
+      ),
       PanelRow(
         id: 'presetDifficulty',
         title: T.text('presetDifficulty'),
-        kind: ChoiceRow([for (final name in difficultyNames) T.text(name)], presets.difficulty.index, (index) {
-          setGamePresets(presets.copyWith(difficulty: PresetDifficulty.values[index]));
-        }),
+        kind: ChoiceRow(
+          [for (final name in difficultyNames) T.text(name)],
+          presets.difficulty.index,
+          (index) {
+            setGamePresets(
+              presets.copyWith(difficulty: PresetDifficulty.values[index]),
+            );
+          },
+        ),
       ),
       PanelRow(
         id: 'presetPriority',
         title: T.text('presetPriority'),
         detail: T.text('presetPriorityDetail'),
-        kind: ChoiceRow([for (final name in priorityNames) T.text(name)], presets.priority.index, (index) {
-          setGamePresets(presets.copyWith(priority: PresetPriority.values[index]));
-        }),
+        kind: ChoiceRow(
+          [for (final name in priorityNames) T.text(name)],
+          presets.priority.index,
+          (index) {
+            setGamePresets(
+              presets.copyWith(priority: PresetPriority.values[index]),
+            );
+          },
+        ),
       ),
       toggle(
         'presetInvertVerticalFirst',
@@ -2192,17 +2389,30 @@ class AppModel extends ChangeNotifier {
       PanelRow(
         id: 'presetSubtitles',
         title: T.text('presetSubtitles'),
-        kind: ChoiceRow([for (final name in subtitleNames) T.text(name)], presets.subtitles.index, (index) {
-          setGamePresets(presets.copyWith(subtitles: PresetSubtitles.values[index]));
-        }),
+        kind: ChoiceRow(
+          [for (final name in subtitleNames) T.text(name)],
+          presets.subtitles.index,
+          (index) {
+            setGamePresets(
+              presets.copyWith(subtitles: PresetSubtitles.values[index]),
+            );
+          },
+        ),
       ),
       PanelRow(
         id: 'presetAudioLanguage',
         title: T.text('presetAudioLanguage'),
         kind: ChoiceRow(
-          [T.text('presetGameDefault'), for (final language in languages) language.$2],
+          [
+            T.text('presetGameDefault'),
+            for (final language in languages) language.$2,
+          ],
           languageIndex < 0 ? 0 : languageIndex,
-          (index) => setGamePresets(presets.copyWith(audioLanguage: () => index == 0 ? null : languages[index - 1].$1)),
+          (index) => setGamePresets(
+            presets.copyWith(
+              audioLanguage: () => index == 0 ? null : languages[index - 1].$1,
+            ),
+          ),
         ),
       ),
       if (!presets.isEmpty)
@@ -2264,7 +2474,8 @@ class AppModel extends ChangeNotifier {
 
   static const galleryColumns = 4;
 
-  List<String> screenshotsOf(Game game) => Screenshots.list(picturesFolder, game);
+  List<String> screenshotsOf(Game game) =>
+      Screenshots.list(picturesFolder, game);
 
   /// Where F12 screenshots, trophy pictures and clips go: Settings › Captures › Screenshots
   /// Folder, else Pictures/AnyPS5.
@@ -2293,7 +2504,8 @@ class AppModel extends ChangeNotifier {
 
   void _galleryCommand(Command command) {
     // The post being written, then the Share menu, have the keys over the gallery.
-    if (together.captures.draft != null) return together.postDraftCommand(command);
+    if (together.captures.draft != null)
+      return together.postDraftCommand(command);
     if (together.captures.sharing) return together.shareCommand(command);
     final count = galleryShots.length;
     void move(int delta) {
@@ -2365,7 +2577,11 @@ class AppModel extends ChangeNotifier {
   /// system's video player instead.
   void playClipOutside(String source) {
     final link = Uri.tryParse(source);
-    services.openUrl?.call(link != null && link.hasScheme && link.scheme.length > 1 ? link : Uri.file(source));
+    services.openUrl?.call(
+      link != null && link.hasScheme && link.scheme.length > 1
+          ? link
+          : Uri.file(source),
+    );
   }
 
   /// Each game's trophies, read at the scan; a game without trophy packages has none.
@@ -2376,13 +2592,18 @@ class AppModel extends ChangeNotifier {
   Set<String> revealedTrophies = {};
 
   /// Whether [trophy] is hidden from the list until it is earned, and can be shown with △.
-  bool canReveal(Trophy trophy) => trophy.hidden && trophy.unlocked == null && !preferences.showHiddenTrophies;
+  bool canReveal(Trophy trophy) =>
+      trophy.hidden &&
+      trophy.unlocked == null &&
+      !preferences.showHiddenTrophies;
 
   /// Whether the list shows [trophy] as a hidden trophy: no name, description or icon.
-  bool isSecret(Trophy trophy) => canReveal(trophy) && !revealedTrophies.contains(trophy.id);
+  bool isSecret(Trophy trophy) =>
+      canReveal(trophy) && !revealedTrophies.contains(trophy.id);
 
   /// The trophy the list's focus is on.
-  Trophy? get focusedTrophy => trophies[selectedGame?.id]?.trophies.elementAtOrNull(trophyIndex);
+  Trophy? get focusedTrophy =>
+      trophies[selectedGame?.id]?.trophies.elementAtOrNull(trophyIndex);
 
   /// Shows a hidden trophy in the list, or hides it again (△, or a click on its Show).
   void toggleReveal(int index) {
@@ -2433,7 +2654,8 @@ class AppModel extends ChangeNotifier {
   RemoteMessage? _toldLibrary;
 
   /// Settings › About › Update Channel.
-  UpdateChannel get updateChannel => UpdateChannel.of(preferences.updateChannel);
+  UpdateChannel get updateChannel =>
+      UpdateChannel.of(preferences.updateChannel);
 
   /// A new update channel: the engine picker and the launcher's own update ask for it at once.
   /// Stable offers a release only when it is newer than what is in use, so going back to Stable
@@ -2447,7 +2669,8 @@ class AppModel extends ChangeNotifier {
   }
 
   /// The animated background in use: the custom theme's when one is used.
-  LookStyle get look => LookStyle.fromIndex(activeDesign?.style ?? preferences.theme);
+  LookStyle get look =>
+      LookStyle.fromIndex(activeDesign?.style ?? preferences.theme);
 
   /// Glass gave up its transparency: the GPU took too long to draw it (RasterWatch), this run or
   /// an earlier one (kept as Preferences.glassTooSlow).
@@ -2479,7 +2702,8 @@ class AppModel extends ChangeNotifier {
   /// window first shows it cannot be found, so it is tried again a little later.
   void applyBackdrop() {
     final seeThrough = glassWindow.seeThrough;
-    if (_backdropApplied == seeThrough || backdrop.kind == BackdropKind.none) return;
+    if (_backdropApplied == seeThrough || backdrop.kind == BackdropKind.none)
+      return;
     _backdropRetry?.cancel();
     if (backdrop.apply(seeThrough: seeThrough)) {
       _backdropApplied = seeThrough;
@@ -2528,7 +2752,8 @@ class AppModel extends ChangeNotifier {
   /// For PS/Guide, which window is in front now: the desktop's answer, which changes the moment
   /// the window does (Flutter's focus can lag behind it, or not change at all on Windows).
   bool get _frontForGuide {
-    if (steamLaunch.gameMode && running == null && starting == null) return true;
+    if (steamLaunch.gameMode && running == null && starting == null)
+      return true;
     return desktop.launcherFocused() ?? active;
   }
 
@@ -2536,8 +2761,11 @@ class AppModel extends ChangeNotifier {
   /// launcher while a game runs).
   Future<void> _showGame(RunningGame run) async {
     final shown = await desktop.focusGame(run.pid);
-    _padLog?.call('PS: game ${shown ? 'in front' : 'could not be brought in front'}');
-    if (preferences.hideWhilePlaying && running?.$2 == run) await _hideForGame();
+    _padLog?.call(
+      'PS: game ${shown ? 'in front' : 'could not be brought in front'}',
+    );
+    if (preferences.hideWhilePlaying && running?.$2 == run)
+      await _hideForGame();
     checkFront();
   }
 
@@ -2570,18 +2798,29 @@ class AppModel extends ChangeNotifier {
   }
 
   /// The built-in accent chosen in Settings › Appearance (or the look's own).
-  Accent get builtInAccent =>
-      Accent.values.firstWhere((accent) => accent.name == preferences.accent, orElse: () => look.defaultAccent);
+  Accent get builtInAccent => Accent.values.firstWhere(
+    (accent) => accent.name == preferences.accent,
+    orElse: () => look.defaultAccent,
+  );
 
   /// The accent in use: a custom theme's own colour, else the built-in one.
   AccentChoice get accentChoice {
     final design = activeDesign;
-    if (design == null) return AccentChoice(builtInAccent.color, index: builtInAccent.index);
+    if (design == null)
+      return AccentChoice(builtInAccent.color, index: builtInAccent.index);
     final rgb = design.accentRgb;
-    return AccentChoice(Color.fromRGBO((rgb.r * 255).round(), (rgb.g * 255).round(), (rgb.b * 255).round(), 1));
+    return AccentChoice(
+      Color.fromRGBO(
+        (rgb.r * 255).round(),
+        (rgb.g * 255).round(),
+        (rgb.b * 255).round(),
+        1,
+      ),
+    );
   }
 
-  Game? get selectedGame => games.isEmpty ? null : games[selected.clamp(0, games.length - 1)];
+  Game? get selectedGame =>
+      games.isEmpty ? null : games[selected.clamp(0, games.length - 1)];
 
   /// The chosen toolkit; without one (or when it is gone), the newest downloaded engine.
   ///
@@ -2589,10 +2828,17 @@ class AppModel extends ChangeNotifier {
   /// for it for every game on every frame it builds: it is looked up again only when the choice,
   /// the downloaded engines or the library change.
   Toolkit? get toolkit {
-    final key = (preferences.toolkitFolder, identityHashCode(engine.downloaded), _toolkitEpoch);
+    final key = (
+      preferences.toolkitFolder,
+      identityHashCode(engine.downloaded),
+      _toolkitEpoch,
+    );
     if (key != _toolkitKey) {
       final folder = preferences.toolkitFolder;
-      _toolkit = Toolkit.locate([?folder, for (final kit in engine.downloaded) kit.root], system: system);
+      _toolkit = Toolkit.locate([
+        ?folder,
+        for (final kit in engine.downloaded) kit.root,
+      ], system: system);
       _toolkitVersion = _toolkit?.version;
       _toolkitKey = key;
     }
@@ -2638,16 +2884,22 @@ class AppModel extends ChangeNotifier {
   /// Whether the title's patch file lets Game Settings choose its resolution.
   bool supportsResolution(Game game) => _factsOf(game).resolution;
 
-  ({bool resolution, List<String> backups}) _factsOf(Game game) => _gameFacts.putIfAbsent(game.id, () {
-    final patch = toolkitFor(game)?.patchFile(game.titleId);
-    var resolution = false;
-    try {
-      resolution = patch != null && ResolutionPatch.supports(File(patch).readAsStringSync());
-    } on FileSystemException {
-      resolution = false;
-    }
-    return (resolution: resolution, backups: SaveBackup.backups(backupFolder(game)));
-  });
+  ({bool resolution, List<String> backups}) _factsOf(Game game) =>
+      _gameFacts.putIfAbsent(game.id, () {
+        final patch = toolkitFor(game)?.patchFile(game.titleId);
+        var resolution = false;
+        try {
+          resolution =
+              patch != null &&
+              ResolutionPatch.supports(File(patch).readAsStringSync());
+        } on FileSystemException {
+          resolution = false;
+        }
+        return (
+          resolution: resolution,
+          backups: SaveBackup.backups(backupFolder(game)),
+        );
+      });
 
   /// The log shown in the log layer, read as it opens.
   String shownLog = '';
@@ -2738,7 +2990,8 @@ class AppModel extends ChangeNotifier {
     final key = folders.join('\n');
     final counted = !mapEquals(folderCounts, survey.folders);
     folderCounts = survey.folders;
-    if (key != _scannedFolders || !GameLibrary.sameListing(games, survey.games)) {
+    if (key != _scannedFolders ||
+        !GameLibrary.sameListing(games, survey.games)) {
       if (key != _scannedFolders) {
         _tracker.reset();
         _connected.clear();
@@ -2763,7 +3016,9 @@ class AppModel extends ChangeNotifier {
   /// unlock going on is left as it is: its record is written only when it is done.
   void _takeScan(List<Game> found, {Set<String> quiet = const {}}) {
     final previous = selectedGame?.id;
-    final focusedInLibrary = libraryIndex >= 0 && libraryIndex < games.length ? games[libraryIndex].id : null;
+    final focusedInLibrary = libraryIndex >= 0 && libraryIndex < games.length
+        ? games[libraryIndex].id
+        : null;
     _forgetDiskFacts();
     games = found;
     records.clear();
@@ -2775,9 +3030,13 @@ class AppModel extends ChangeNotifier {
       _loadTrophies(game);
     }
     final index = games.indexWhere((game) => game.id == previous);
-    selected = index >= 0 ? index : selected.clamp(0, games.isEmpty ? 0 : games.length - 1);
+    selected = index >= 0
+        ? index
+        : selected.clamp(0, games.isEmpty ? 0 : games.length - 1);
     final libraryAt = games.indexWhere((game) => game.id == focusedInLibrary);
-    libraryIndex = libraryAt >= 0 ? libraryAt : libraryIndex.clamp(0, games.isEmpty ? 0 : games.length - 1);
+    libraryIndex = libraryAt >= 0
+        ? libraryAt
+        : libraryIndex.clamp(0, games.isEmpty ? 0 : games.length - 1);
     final added = [
       for (final game in _tracker.update(found))
         if (!quiet.any((folder) => p.isWithin(folder, game.folder))) game,
@@ -2809,8 +3068,16 @@ class AppModel extends ChangeNotifier {
     show(text, icon: added.length == 1 ? added.first.icon : null);
     sounds.play(Cue.select);
     if (!active) {
-      final names = added.take(3).map((game) => game.nameFor([T.language.code])).join(', ');
-      desktopNotify(text, added.length == 1 ? T.text('newGameDetail') : (added.length > 3 ? '$names…' : names));
+      final names = added
+          .take(3)
+          .map((game) => game.nameFor([T.language.code]))
+          .join(', ');
+      desktopNotify(
+        text,
+        added.length == 1
+            ? T.text('newGameDetail')
+            : (added.length > 3 ? '$names…' : names),
+      );
     }
   }
 
@@ -2819,7 +3086,11 @@ class AppModel extends ChangeNotifier {
     if (folder == null) return;
     final installed = Installer.installedFolder(game, folder);
     final language = ConsoleLanguage.tag(T.language.consoleLanguage);
-    final set = Trophies.load(game, installed: installed, languages: [?language]);
+    final set = Trophies.load(
+      game,
+      installed: installed,
+      languages: [?language],
+    );
     if (set == null) {
       trophies.remove(game.id);
     } else {
@@ -2839,11 +3110,17 @@ class AppModel extends ChangeNotifier {
   /// back, and its games come with it. An unlock going on does not hold the scans back.
   void watchGamesFolders() {
     final folders = preferences.gamesFolders;
-    for (final gone in _libraries.keys.where((folder) => !folders.contains(folder)).toList()) {
+    for (final gone
+        in _libraries.keys
+            .where((folder) => !folders.contains(folder))
+            .toList()) {
       _libraries.remove(gone)?.stop();
     }
     for (final folder in folders) {
-      _libraries[folder] ??= LibraryWatcher(folder, onScan: () => _watchedScan(folder))..start();
+      _libraries[folder] ??= LibraryWatcher(
+        folder,
+        onScan: () => _watchedScan(folder),
+      )..start();
     }
   }
 
@@ -2855,10 +3132,15 @@ class AppModel extends ChangeNotifier {
     final game = selectedGame;
     if (game == null || sizes.containsKey(game.id) || _measuring) return;
     _measuring = true;
-    final size = services.folderSize ?? (folder) => Isolate.run(() => GameLibrary.size(folder));
+    final size =
+        services.folderSize ??
+        (folder) => Isolate.run(() => GameLibrary.size(folder));
     unawaited(
       size(game.folder)
-          .then((bytes) => sizes[game.id] = bytes, onError: (Object _) => sizes[game.id] = 0)
+          .then(
+            (bytes) => sizes[game.id] = bytes,
+            onError: (Object _) => sizes[game.id] = 0,
+          )
           .whenComplete(() {
             _measuring = false;
             if (_disposed) return;
@@ -2872,8 +3154,9 @@ class AppModel extends ChangeNotifier {
 
   /// A game's own controls read on another isolate. Static, so the closure sent there holds
   /// only the folder and not the model.
-  static Future<Map<PadAction, List<String>>?> _readGameControls(String folder) =>
-      Isolate.run(() => UnrealControls.read(folder));
+  static Future<Map<PadAction, List<String>>?> _readGameControls(
+    String folder,
+  ) => Isolate.run(() => UnrealControls.read(folder));
 
   /// Reads what the game's own files say each pad button does, once per game.
   void _readControls(Game game) {
@@ -2890,7 +3173,8 @@ class AppModel extends ChangeNotifier {
   }
 
   GameState stateOf(Game game) {
-    if (running case (final Game playing, final RunningGame run) when playing.id == game.id) {
+    if (running case (final Game playing, final RunningGame run)
+        when playing.id == game.id) {
       return stopping ? Stopping(run.pid) : Running(run.pid);
     }
     if (starting?.id == game.id) return const Starting();
@@ -2908,13 +3192,19 @@ class AppModel extends ChangeNotifier {
       );
     }
     final job = engine.git.job;
-    if (queue.contains(game.id)) return Queued(updating: installed, waitingForEngine: job != null && !job.checking);
+    if (queue.contains(game.id))
+      return Queued(
+        updating: installed,
+        waitingForEngine: job != null && !job.checking,
+      );
     final failure = failures[game.id];
     if (failure != null) return Failed(failure);
     final record = records[game.id];
     // The engine is checked for this game's Play, or built in place: no game starts on a build
     // half done.
-    if (job != null && record != null && (job.forGame == game.id || !job.checking)) {
+    if (job != null &&
+        record != null &&
+        (job.forGame == game.id || !job.checking)) {
       return WaitingForEngine(job, forThisGame: job.forGame == game.id);
     }
     // An update dumped (or removed) since the unlock needs its executable relinked: unlocking
@@ -2926,7 +3216,11 @@ class AppModel extends ChangeNotifier {
         return Installed(outdated: own != null && own != record.toolkit);
       }
       final version = toolkitVersion;
-      return Installed(outdated: (version != null && version != record.toolkit) || engine.updateAvailable);
+      return Installed(
+        outdated:
+            (version != null && version != record.toolkit) ||
+            engine.updateAvailable,
+      );
     }
     if (game.executable == ExecutableKind.unreadable) return const Unreadable();
     return Locked(waitingToPrepare: prepare.pending.contains(game.id));
@@ -2942,13 +3236,18 @@ class AppModel extends ChangeNotifier {
   Toolkit? toolkitFor(Game game) {
     final pin = currentSettings(game).engine;
     if (pin == null) return toolkit;
-    return engine.downloaded.where((kit) => p.basename(kit.root) == pin).firstOrNull;
+    return engine.downloaded
+        .where((kit) => p.basename(kit.root) == pin)
+        .firstOrNull;
   }
 
   /// The engine [game] is pinned to when that one is not on this computer, null otherwise.
   String? missingEngine(Game game) {
     final pin = currentSettings(game).engine;
-    return pin != null && !engine.downloaded.any((kit) => p.basename(kit.root) == pin) ? pin : null;
+    return pin != null &&
+            !engine.downloaded.any((kit) => p.basename(kit.root) == pin)
+        ? pin
+        : null;
   }
 
   /// A game pinned to an engine that is not downloaded: says so, and the game's settings offer
@@ -2968,17 +3267,21 @@ class AppModel extends ChangeNotifier {
 
   final Map<String, GameSettings> _cachedSettings = {};
 
-  GameSettings currentSettings(Game game) => _cachedSettings.putIfAbsent(game.slug, () => settingsFor(game));
+  GameSettings currentSettings(Game game) =>
+      _cachedSettings.putIfAbsent(game.slug, () => settingsFor(game));
 
   /// The settings [game] starts with: its own, and Settings › Default Display for the display
   /// choices it left at Default.
-  GameSettings launchSettings(Game game) => currentSettings(game).withDefaults(preferences.displayDefaults);
+  GameSettings launchSettings(Game game) =>
+      currentSettings(game).withDefaults(preferences.displayDefaults);
 
   /// Onboarding: the first games folder, picked (or picked again: it changes).
   Future<void> chooseGamesFolder() async {
     final folder = await services.pickFolder?.call(T.text('chooseFolder'));
     if (folder == null) return;
-    final others = preferences.gamesFolders.skip(1).where((known) => !p.equals(known, folder));
+    final others = preferences.gamesFolders
+        .skip(1)
+        .where((known) => !p.equals(known, folder));
     _setGamesFolders([folder, ...others]);
   }
 
@@ -2999,13 +3302,18 @@ class AppModel extends ChangeNotifier {
   Future<void> chooseFirstGamesFolder() async {
     final folder = await services.pickFolder?.call(T.text('chooseFolder'));
     if (folder == null) return;
-    _setGamesFolders([folder, ...preferences.gamesFolders.where((known) => !p.equals(known, folder))]);
+    _setGamesFolders([
+      folder,
+      ...preferences.gamesFolders.where((known) => !p.equals(known, folder)),
+    ]);
   }
 
   /// Settings › Game Library: [folder] out of the library; nothing on its drive is touched. With
   /// the last one gone the library is empty.
   void removeGamesFolder(String folder) {
-    _setGamesFolders([...preferences.gamesFolders.where((known) => known != folder)]);
+    _setGamesFolders([
+      ...preferences.gamesFolders.where((known) => known != folder),
+    ]);
     show(T.text('folderRemoved'));
   }
 
@@ -3050,7 +3358,15 @@ class AppModel extends ChangeNotifier {
     preferences.toolkitFolder = folder;
     savePreferences();
     if (!preferences.onboarded) return;
-    show(engine.withGames(T.text(engine.git.checkout != null ? 'engineOwnCheckoutChosen' : 'engineOwnChosen')));
+    show(
+      engine.withGames(
+        T.text(
+          engine.git.checkout != null
+              ? 'engineOwnCheckoutChosen'
+              : 'engineOwnChosen',
+        ),
+      ),
+    );
   }
 
   // Installing.
@@ -3058,12 +3374,19 @@ class AppModel extends ChangeNotifier {
   void primaryAction(Game game) {
     switch (stateOf(game)) {
       case Installed(:final outdated):
-        void go() => outdated ? open(Layer.updateChoice) : unawaited(play(game));
+        void go() =>
+            outdated ? open(Layer.updateChoice) : unawaited(play(game));
         // Settings › AnyPS5 Engine › Update from Git Before Playing: the checkout's remote first.
-        engine.git.updatesBeforePlay ? unawaited(engine.git.beforePlay(game, go)) : go();
+        engine.git.updatesBeforePlay
+            ? unawaited(engine.git.beforePlay(game, go))
+            : go();
       case WaitingForEngine(:final forThisGame):
         // The engine is being built in place: its relinker and libraries are not whole yet.
-        show(forThisGame ? T.format('gameStartsAfterEngine', [game.name]) : T.text('gameWaitsForEngine'));
+        show(
+          forThisGame
+              ? T.format('gameStartsAfterEngine', [game.name])
+              : T.text('gameWaitsForEngine'),
+        );
       case Locked() || Failed():
         unlock(game);
       case Installing(preparing: true):
@@ -3090,7 +3413,8 @@ class AppModel extends ChangeNotifier {
   /// The game an unlock waits for an answer about, the size of its files that would be copied,
   /// and the room it lacks on the games folder's drive (see [Layer.copyWarning]); [free] is what
   /// the drive has, null when it does not say.
-  ({Game game, int bytes, SpaceShortage? shortage, int? needed, int? free})? copyWarning;
+  ({Game game, int bytes, SpaceShortage? shortage, int? needed, int? free})?
+  copyWarning;
 
   /// The free bytes where a folder is (FreeSpace.of); replaceable in tests.
   int? Function(String folder) freeSpace = FreeSpace.of;
@@ -3108,7 +3432,8 @@ class AppModel extends ChangeNotifier {
     if (folder == null) return;
     final kit = toolkitFor(game);
     if (kit == null) {
-      if (missingEngine(game) case final String pin) return _tellEngineMissing(game, pin);
+      if (missingEngine(game) case final String pin)
+        return _tellEngineMissing(game, pin);
       return show(T.text('noToolkit'));
     }
     // Asked for while it is being prepared: it becomes the user's own.
@@ -3131,9 +3456,18 @@ class AppModel extends ChangeNotifier {
       // The room first: a drive that is short says so before anything is written, copy or not.
       final free = plan == null ? null : freeSpace(folder);
       final shortage = plan?.space?.shortage(free: free, folder: folder);
-      if (plan != null && (shortage != null || (!copy && plan.copies && plan.bytes >= copyWarningFrom))) {
-        if (shortage != null && _playAfterInstall == game.id) _playAfterInstall = null;
-        copyWarning = (game: game, bytes: plan.bytes, shortage: shortage, needed: plan.space?.needed, free: free);
+      if (plan != null &&
+          (shortage != null ||
+              (!copy && plan.copies && plan.bytes >= copyWarningFrom))) {
+        if (shortage != null && _playAfterInstall == game.id)
+          _playAfterInstall = null;
+        copyWarning = (
+          game: game,
+          bytes: plan.bytes,
+          shortage: shortage,
+          needed: plan.space?.needed,
+          free: free,
+        );
         open(Layer.copyWarning, cue: shortage == null ? Cue.select : Cue.back);
         return;
       }
@@ -3191,7 +3525,8 @@ class AppModel extends ChangeNotifier {
     if (_installer != null || queue.isEmpty || root == null) return;
     final next = games.where((game) => game.id == queue.first).firstOrNull;
     final kit = next == null ? toolkit : toolkitFor(next);
-    if (next != null && kit == null && missingEngine(next) == null) return; // No engine yet: it waits.
+    if (next != null && kit == null && missingEngine(next) == null)
+      return; // No engine yet: it waits.
     final id = queue.removeAt(0);
     final game = next;
     if (game == null) return _startNext();
@@ -3273,13 +3608,18 @@ class AppModel extends ChangeNotifier {
       } on SpaceShortage catch (error) {
         failure = error;
       } on Object catch (error) {
-        GameLog.writeUnlockLog(unlockLog, unlockLines, failure: error.toString());
+        GameLog.writeUnlockLog(
+          unlockLog,
+          unlockLines,
+          failure: error.toString(),
+        );
         failure = error;
       }
       progress.remove(id);
       if (_disposed) return;
       done(failure);
-      if (failure == null && installer.leftOut.isNotEmpty) show(leftOutText(game, installer.leftOut), icon: game.icon);
+      if (failure == null && installer.leftOut.isNotEmpty)
+        show(leftOutText(game, installer.leftOut), icon: game.icon);
       _changed();
       _publishActivity();
       _startNext();
@@ -3292,8 +3632,13 @@ class AppModel extends ChangeNotifier {
   /// sentence, encrypted files first since dumping again fixes those. The files themselves are in
   /// the unlock's log; a list of them here was too long to read before the notice went.
   static String leftOutText(Game game, List<LeftOutModule> leftOut) {
-    final encrypted = leftOut.any((module) => module.reason == LeftOutReason.encrypted);
-    return T.format(encrypted ? 'unlockLeftOutEncrypted' : 'unlockLeftOutNotRelinked', [game.name]);
+    final encrypted = leftOut.any(
+      (module) => module.reason == LeftOutReason.encrypted,
+    );
+    return T.format(
+      encrypted ? 'unlockLeftOutEncrypted' : 'unlockLeftOutNotRelinked',
+      [game.name],
+    );
   }
 
   /// The whole error of [game]'s failed unlock to the clipboard: the message, then the unlock's
@@ -3301,8 +3646,14 @@ class AppModel extends ChangeNotifier {
   void copyFailure(Game game) {
     final failure = failures[game.id];
     if (failure == null) return;
-    final log = GameLog.read(GameLog.unlockFile(paths.logs, game.titleId))?.trimRight();
-    services.copyText?.call([failure, if (log != null && log.isNotEmpty && log != failure) log].join('\n\n'));
+    final log = GameLog.read(GameLog.unlockFile(paths.logs, game.titleId))
+        ?.trimRight();
+    services.copyText?.call(
+      [
+        failure,
+        if (log != null && log.isNotEmpty && log != failure) log,
+      ].join('\n\n'),
+    );
     show(T.text('unlockErrorCopied'));
   }
 
@@ -3310,7 +3661,13 @@ class AppModel extends ChangeNotifier {
   /// and free, and what to do.
   void _tellShortage(Game game, SpaceShortage shortage) {
     if (_playAfterInstall == game.id) _playAfterInstall = null;
-    copyWarning = (game: game, bytes: 0, shortage: shortage, needed: shortage.needed, free: shortage.free);
+    copyWarning = (
+      game: game,
+      bytes: 0,
+      shortage: shortage,
+      needed: shortage.needed,
+      free: shortage.free,
+    );
     open(Layer.copyWarning, cue: Cue.back);
   }
 
@@ -3381,7 +3738,10 @@ class AppModel extends ChangeNotifier {
               toolkit: toolkitFor(game) ?? kit,
               resolution: _unlockResolution(game, toolkitFor(game) ?? kit),
             );
-            return plan.space?.shortage(free: freeSpace(folder), folder: folder);
+            return plan.space?.shortage(
+              free: freeSpace(folder),
+              folder: folder,
+            );
           } on FileSystemException {
             return null;
           }
@@ -3423,7 +3783,10 @@ class AppModel extends ChangeNotifier {
       _prepareTimer = null;
       return;
     }
-    _prepareTimer ??= Timer.periodic(const Duration(seconds: 30), (_) => _stepPrepare());
+    _prepareTimer ??= Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _stepPrepare(),
+    );
   }
 
   void _startPreparing(String id, Toolkit kit) {
@@ -3446,7 +3809,8 @@ class AppModel extends ChangeNotifier {
             sounds.play(Cue.unlocked);
             final text = T.format('readyToPlay', [game.name]);
             show(text, icon: game.icon);
-            if (!active && running == null && starting == null) desktopNotify(text, T.text('readyToPlayDetail'));
+            if (!active && running == null && starting == null)
+              desktopNotify(text, T.text('readyToPlayDetail'));
             if (promoted && _playAfterInstall == id) {
               _playAfterInstall = null;
               unawaited(play(game));
@@ -3455,7 +3819,9 @@ class AppModel extends ChangeNotifier {
             if (_playAfterInstall == id) _playAfterInstall = null;
           case final SpaceShortage shortage:
             // The room went while it waited.
-            promoted ? _tellShortage(game, shortage) : _tellSkipped(id, SpaceShort(shortage));
+            promoted
+                ? _tellShortage(game, shortage)
+                : _tellSkipped(id, SpaceShort(shortage));
           default:
             if (_playAfterInstall == id) _playAfterInstall = null;
             failures[id] = error.toString();
@@ -3486,7 +3852,11 @@ class AppModel extends ChangeNotifier {
         show(T.format('notPreparedBattery', [game.name]), icon: game.icon);
       case SpaceShort(:final shortage):
         show(
-          T.format('notPreparedSpace', [game.name, byteText(shortage.needed), byteText(shortage.free)]),
+          T.format('notPreparedSpace', [
+            game.name,
+            byteText(shortage.needed),
+            byteText(shortage.free),
+          ]),
           icon: game.icon,
         );
     }
@@ -3494,7 +3864,9 @@ class AppModel extends ChangeNotifier {
 
   /// New games from a scan: the locked ones go to the background queue, and what happens to the
   /// first is returned for the "New game" notice.
-  ({bool preparing, bool waiting, PrepareSkip? skipped}) _prepareNewGames(List<Game> added) {
+  ({bool preparing, bool waiting, PrepareSkip? skipped}) _prepareNewGames(
+    List<Game> added,
+  ) {
     const nothing = (preparing: false, waiting: false, skipped: null);
     if (!preferences.prepareNewGames || toolkit == null) return nothing;
     final locked = added.where((game) => stateOf(game) is Locked).toList();
@@ -3503,13 +3875,23 @@ class AppModel extends ChangeNotifier {
     final skips = _stepPrepare(quiet: true);
     final first = locked.first.id;
     for (final (id, reason) in skips) {
-      if (id == first) return (preparing: false, waiting: false, skipped: reason);
+      if (id == first)
+        return (preparing: false, waiting: false, skipped: reason);
     }
-    return (preparing: prepare.active == first, waiting: prepare.pending.contains(first), skipped: null);
+    return (
+      preparing: prepare.active == first,
+      waiting: prepare.pending.contains(first),
+      skipped: null,
+    );
   }
 
   /// "New game: [name]", with what happens to it when it is prepared in the background.
-  static String newGameText(List<String> names, {bool preparing = false, bool waiting = false, PrepareSkip? skipped}) {
+  static String newGameText(
+    List<String> names, {
+    bool preparing = false,
+    bool waiting = false,
+    PrepareSkip? skipped,
+  }) {
     final one = names.length == 1;
     switch (skipped) {
       case BatteryLow():
@@ -3520,12 +3902,18 @@ class AppModel extends ChangeNotifier {
         break;
     }
     if (preparing) {
-      return one ? T.format('newGamePreparing', [names.first]) : T.format('newGamesPreparing', [names.length]);
+      return one
+          ? T.format('newGamePreparing', [names.first])
+          : T.format('newGamesPreparing', [names.length]);
     }
     if (waiting) {
-      return one ? T.format('newGameWaiting', [names.first]) : T.format('newGamesWaiting', [names.length]);
+      return one
+          ? T.format('newGameWaiting', [names.first])
+          : T.format('newGamesWaiting', [names.length]);
     }
-    return one ? T.format('newGame', [names.first]) : T.format('newGames', [names.length]);
+    return one
+        ? T.format('newGame', [names.first])
+        : T.format('newGames', [names.length]);
   }
 
   void uninstall(Game game) {
@@ -3543,7 +3931,8 @@ class AppModel extends ChangeNotifier {
     show(T.text('cacheCleared'));
   }
 
-  String backupFolder(Game game) => SaveBackup.folderFor(paths.backupsFolder, game.name, game.titleId);
+  String backupFolder(Game game) =>
+      SaveBackup.folderFor(paths.backupsFolder, game.name, game.titleId);
 
   String? _lastBackupText(Game game) {
     final latest = _factsOf(game).backups.firstOrNull;
@@ -3555,7 +3944,11 @@ class AppModel extends ChangeNotifier {
     final folder = rootOf(game);
     if (folder == null) return;
     try {
-      SaveBackup.backUp(Installer.installedFolder(game, folder), backupFolder(game), DateTime.now());
+      SaveBackup.backUp(
+        Installer.installedFolder(game, folder),
+        backupFolder(game),
+        DateTime.now(),
+      );
       _gameFacts.remove(game.id);
       show(T.text('savesBackedUp'));
     } on Object catch (error) {
@@ -3570,7 +3963,12 @@ class AppModel extends ChangeNotifier {
     if (folder == null || latest == null) return;
     if (running?.$1 == game) return show(T.text('closeGameFirst'));
     try {
-      SaveBackup.restore(latest, Installer.installedFolder(game, folder), backupFolder(game), DateTime.now());
+      SaveBackup.restore(
+        latest,
+        Installer.installedFolder(game, folder),
+        backupFolder(game),
+        DateTime.now(),
+      );
       _gameFacts.remove(game.id);
       _loadTrophies(game);
       show(T.text('savesRestored'));
@@ -3583,18 +3981,27 @@ class AppModel extends ChangeNotifier {
   /// A backup the user picks takes the saves' place (the current ones backed up first), as on
   /// the Mac; the game must not be running.
   Future<void> restoreChosenSaves(Game game) async {
-    if (running?.$1 == game || starting == game) return show(T.text('closeGameFirst'));
+    if (running?.$1 == game || starting == game)
+      return show(T.text('closeGameFirst'));
     final folder = rootOf(game);
     if (folder == null) return;
     final backups = backupFolder(game);
     final title = T.text('restoreSaves');
     final picked = services.pickFileAt != null
-        ? await services.pickFileAt!(title, const ['zip'], Directory(backups).existsSync() ? backups : null)
+        ? await services.pickFileAt!(title, const [
+            'zip',
+          ], Directory(backups).existsSync() ? backups : null)
         : await services.pickFile?.call(title, const ['zip']);
     if (picked == null) return;
-    if (running?.$1 == game || starting == game) return show(T.text('closeGameFirst'));
+    if (running?.$1 == game || starting == game)
+      return show(T.text('closeGameFirst'));
     try {
-      SaveBackup.restore(picked, Installer.installedFolder(game, folder), backups, DateTime.now());
+      SaveBackup.restore(
+        picked,
+        Installer.installedFolder(game, folder),
+        backups,
+        DateTime.now(),
+      );
       _gameFacts.remove(game.id);
       _loadTrophies(game);
       show(T.text('savesRestored'));
@@ -3627,13 +4034,24 @@ class AppModel extends ChangeNotifier {
 
   /// Plays [game]; [trace] turns detailed logging on for this start only, and [once] adds to the
   /// engine's environment for this start only (the crash report's PlayGo answer).
-  Future<void> play(Game game, {bool trace = false, Map<String, String> once = const {}}) async {
+  Future<void> play(
+    Game game, {
+    bool trace = false,
+    Map<String, String> once = const {},
+  }) async {
     final folder = rootOf(game);
-    if (folder == null || starting != null || running != null || saveSync.syncing != null) return;
+    if (folder == null ||
+        starting != null ||
+        running != null ||
+        saveSync.syncing != null)
+      return;
     // The profile's own saves and trophies in the game's folder before anything reads them.
     activateProfileSaves(game);
     final allowed = together.family.beforePlay(game);
-    if (!(allowed is bool ? allowed : await allowed) || starting != null || running != null) return;
+    if (!(allowed is bool ? allowed : await allowed) ||
+        starting != null ||
+        running != null)
+      return;
     // Settings › Behaviour › Save Sync: the saves from the other computers (or the cloud) first.
     // Off, the game starts at once, as it always did.
     if (saveSync.on) {
@@ -3643,7 +4061,12 @@ class AppModel extends ChangeNotifier {
     var settings = launchSettings(game);
     // Settings › Controllers › Stick Dead Zone, for a game that set none of its own.
     if (preferences.stickDeadzone > 0) {
-      settings = settings.copyWith(tuning: StickDeadzone.tuning(settings.tuning, preferences.stickDeadzone));
+      settings = settings.copyWith(
+        tuning: StickDeadzone.tuning(
+          settings.tuning,
+          preferences.stickDeadzone,
+        ),
+      );
     }
     final inputFile = p.join(paths.inputFilesFolder, '${game.slug}.ini');
     var written = true;
@@ -3661,7 +4084,8 @@ class AppModel extends ChangeNotifier {
     starting = game;
     _phoneToldFor = null;
     // A game linked to its dump cannot start once the dump moved: said instead of a crash.
-    if (await Installer.brokenLink(Installer.installedFolder(game, folder)) != null) {
+    if (await Installer.brokenLink(Installer.installedFolder(game, folder)) !=
+        null) {
       starting = null;
       sounds.play(Cue.back);
       show(T.text('dumpMoved'));
@@ -3676,7 +4100,10 @@ class AppModel extends ChangeNotifier {
     try {
       // A game in Japanese, Korean or Chinese waits for those fonts; every game gets the folder
       // the fonts are put together in.
-      final systemFonts = await fonts.prepare(game, settings.language ?? T.language.consoleLanguage);
+      final systemFonts = await fonts.prepare(
+        game,
+        settings.language ?? T.language.consoleLanguage,
+      );
       // Settings › AnyTogether › Online play: the loopback bridge the engine connects to
       // (ANYPS5_ONLINE, ANYPS5_ONLINE_SECRET) and the title's observation log; nothing when off.
       final online = await together.onlineEnvironment(game);
@@ -3695,7 +4122,8 @@ class AppModel extends ChangeNotifier {
         // Settings › Game Presets, for the games that ask the console for them.
         ...gamePresets.environment,
         // The engine's online bridge reads the AnyTogether game session there.
-        if (together.signedIn) 'ANYPS5_TOGETHER_SESSION': together.hub.games.bridgeFile,
+        if (together.signedIn)
+          'ANYPS5_TOGETHER_SESSION': together.hub.games.bridgeFile,
         // Settings › Battery & Heat: the frame cap now, and the file it changes in while it runs.
         ...powerWatch.environment(),
         ...online,
@@ -3710,13 +4138,17 @@ class AppModel extends ChangeNotifier {
         traced: traced,
         // The controllers at the start, in the log a crash report reads.
         notes: [
-          for (final line in controllers.reportLines) '[anyps5-launcher] controllers: $line',
-          if (phonesConnected) '[anyps5-launcher] phones: ${_phoneReachNote(game)}',
-          for (final MapEntry(:key, :value) in once.entries) '[anyps5-launcher] this start only: $key=$value',
+          for (final line in controllers.reportLines)
+            '[anyps5-launcher] controllers: $line',
+          if (phonesConnected)
+            '[anyps5-launcher] phones: ${_phoneReachNote(game)}',
+          for (final MapEntry(:key, :value) in once.entries)
+            '[anyps5-launcher] this start only: $key=$value',
         ],
       );
       starting = null;
       running = (game, run);
+      _gameBegan = DateTime.now();
       _stopped = false;
       stopping = false;
       _checkPhoneReach(game);
@@ -3727,7 +4159,13 @@ class AppModel extends ChangeNotifier {
       // Upstream's engine does not read ANYPS5_FULLSCREEN or ANYPS5_WINDOW_SIZE: the launcher
       // sizes its window or presses its F11 once the window is open.
       if (!engine.readsDisplaySettingsOf(game)) {
-        unawaited(desktop.applyDisplay(run.pid, fullscreen: settings.fullscreen, windowSize: settings.windowSize));
+        unawaited(
+          desktop.applyDisplay(
+            run.pid,
+            fullscreen: settings.fullscreen,
+            windowSize: settings.windowSize,
+          ),
+        );
       }
       // Settings › Behaviour › Hide the launcher while a game runs.
       if (preferences.hideWhilePlaying) unawaited(_hideForGame());
@@ -3739,7 +4177,12 @@ class AppModel extends ChangeNotifier {
       _phoneAnswerTimer?.cancel();
       unawaited(together.onlineGameEnded());
       fonts.ended();
-      together.recordPlay(game, began, DateTime.now(), exit: _stopped ? 'killed' : (code == 0 ? 'normal' : 'crashed'));
+      together.recordPlay(
+        game,
+        began,
+        DateTime.now(),
+        exit: _stopped ? 'killed' : (code == 0 ? 'normal' : 'crashed'),
+      );
       _trophyWatch?.cancel();
       _loadTrophies(game);
       if (running?.$1 == game) running = null;
@@ -3748,6 +4191,7 @@ class AppModel extends ChangeNotifier {
       _stopTimer = null;
       unawaited(_stopReplay());
       media.gameEnded();
+      unawaited(waylandCapture?.end());
       sharePlay.gameEnded();
       // Minimized for the game: back in front now it has closed, as on the Mac.
       if (hiddenForGame) {
@@ -3755,7 +4199,8 @@ class AppModel extends ChangeNotifier {
         unawaited(services.window?.restore());
       }
       // The quick menu and the question go with the game.
-      if (overlay == Layer.quickMenu || overlay == Layer.closeGame) overlay = null;
+      if (overlay == Layer.quickMenu || overlay == Layer.closeGame)
+        overlay = null;
       updates.gameEnded();
       together.gameChanged();
       discord.update();
@@ -3803,10 +4248,13 @@ class AppModel extends ChangeNotifier {
       sounds.play(Cue.unlocked, overGame: true);
       vibrate(HapticCue.trophy);
       for (final id in fresh) {
-        final trophy = trophies[game.id]?.trophies.where((trophy) => trophy.id == id).firstOrNull;
+        final trophy = trophies[game.id]?.trophies
+            .where((trophy) => trophy.id == id)
+            .firstOrNull;
         if (trophy == null) continue;
         show('${T.text('trophyEarned')} · ${trophy.name}');
-        if (running case (final Game playing, final RunningGame run) when playing == game) {
+        if (running case (final Game playing, final RunningGame run)
+            when playing == game) {
           unawaited(celebrate(game, trophy, run.pid));
         }
         remote?.publish(
@@ -3842,7 +4290,11 @@ class AppModel extends ChangeNotifier {
       final scale = desktop.cardScale(pid);
       final render =
           services.renderTrophyCard ??
-          (trophy, scale) => TrophyCard.render(trophy, scale: scale, glass: look == LookStyle.glass);
+          (trophy, scale) => TrophyCard.render(
+            trophy,
+            scale: scale,
+            glass: look == LookStyle.glass,
+          );
       final card = await render(trophy, scale);
       if (!await desktop.showCard(card, pid: pid)) {
         await desktop.notify(
@@ -3863,11 +4315,18 @@ class AppModel extends ChangeNotifier {
     try {
       final frame = await desktop.captureGame(pid);
       if (frame == null) return null;
-      final path = Screenshots.trophyPath(picturesFolder, game, trophy.id, DateTime.now());
+      final path = Screenshots.trophyPath(
+        picturesFolder,
+        game,
+        trophy.id,
+        DateTime.now(),
+      );
       await Isolate.run(() {
         File(path)
           ..parent.createSync(recursive: true)
-          ..writeAsBytesSync(PngEncoder.rgba(frame.width, frame.height, frame.pixels));
+          ..writeAsBytesSync(
+            PngEncoder.rgba(frame.width, frame.height, frame.pixels),
+          );
       });
       return path;
     } on Object {
@@ -3940,7 +4399,12 @@ class AppModel extends ChangeNotifier {
 
   // Messages.
 
-  void show(String message, {LevelBadge? level, String? icon, void Function()? onTap}) {
+  void show(
+    String message, {
+    LevelBadge? level,
+    String? icon,
+    void Function()? onTap,
+  }) {
     toast = message;
     toastLevel = level;
     toastIcon = icon;
@@ -3980,19 +4444,26 @@ class AppModel extends ChangeNotifier {
     capturing = null;
     if (next == Layer.library) libraryIndex = selected;
     if (next == Layer.gameSettings) _gameFacts.clear();
-    if (next == Layer.log) shownLog = selectedGame == null ? '' : logText(selectedGame!);
+    if (next == Layer.log)
+      shownLog = selectedGame == null ? '' : logText(selectedGame!);
     if (next == Layer.trophies) {
       trophyIndex = 0;
       revealedTrophies = {};
     }
     if (next == Layer.trophies || next == Layer.gallery) _loadShots();
-    if (next == Layer.controls && selectedGame != null) _readControls(selectedGame!);
+    if (next == Layer.controls && selectedGame != null)
+      _readControls(selectedGame!);
     // The screens that show the own name and handle read them again first.
-    if (next == Layer.friends || next == Layer.profile || next == Layer.settings || next == Layer.profilePicker) {
+    if (next == Layer.friends ||
+        next == Layer.profile ||
+        next == Layer.settings ||
+        next == Layer.profilePicker) {
       together.refreshOwnProfile();
     }
     // Friends' private picture links run out (6 to 12 hours): the list is read again.
-    if ((next == Layer.friends || next == Layer.party || next == Layer.profile) &&
+    if ((next == Layer.friends ||
+            next == Layer.party ||
+            next == Layer.profile) &&
         together.signedIn &&
         together.hub.friends.identities.learnedAt != null &&
         together.hub.friends.identities.stale()) {
@@ -4013,9 +4484,15 @@ class AppModel extends ChangeNotifier {
     final layer = overlay;
     if (layer == null) return null;
     final categories = panelCategories();
-    final category = categories.isEmpty ? null : categories[panelCategory.clamp(0, categories.length - 1)];
+    final category = categories.isEmpty
+        ? null
+        : categories[panelCategory.clamp(0, categories.length - 1)];
     final rows = category?.rows ?? const <PanelRow>[];
-    return (layer: layer, category: category?.id, row: panelRow < rows.length ? rows[panelRow].id : null);
+    return (
+      layer: layer,
+      category: category?.id,
+      row: panelRow < rows.length ? rows[panelRow].id : null,
+    );
   }
 
   /// Back where [spot] was taken: its layer, section and row, with the back sound. Home when
@@ -4024,7 +4501,9 @@ class AppModel extends ChangeNotifier {
     if (spot == null) return closeOverlay();
     open(spot.layer, cue: Cue.back);
     final categories = panelCategories();
-    final index = categories.indexWhere((category) => category.id == spot.category);
+    final index = categories.indexWhere(
+      (category) => category.id == spot.category,
+    );
     if (index < 0) return;
     panelCategory = index;
     final row = categories[index].rows.indexWhere((row) => row.id == spot.row);
@@ -4047,7 +4526,9 @@ class AppModel extends ChangeNotifier {
   /// Settings › AnyPS5 Engine, from Home's engine line.
   void openEngineSettings() {
     open(Layer.settings);
-    final index = panelCategories().indexWhere((category) => category.id == 'engine');
+    final index = panelCategories().indexWhere(
+      (category) => category.id == 'engine',
+    );
     if (index < 0) return;
     panelCategory = index;
     panelRow = 0;
@@ -4089,11 +4570,14 @@ class AppModel extends ChangeNotifier {
   /// [quitAfter] (Steam started the launcher) it closes when the game ends normally.
   Future<void> playAtLaunch(String titleId, {bool quitAfter = false}) async {
     final wanted = titleId.toUpperCase();
-    final index = games.indexWhere((game) => game.titleId.toUpperCase() == wanted);
+    final index = games.indexWhere(
+      (game) => game.titleId.toUpperCase() == wanted,
+    );
     if (index < 0) return show(T.format('steamPlayMissing', [titleId]));
     final game = games[index];
     select(index);
-    if (!records.containsKey(game.id)) return show(T.format('steamPlayLocked', [game.name]));
+    if (!records.containsKey(game.id))
+      return show(T.format('steamPlayLocked', [game.name]));
     if (quitAfter) _quitAfterGame = game.id;
     await play(game);
     if (running?.$1 != game && _quitAfterGame == game.id) _quitAfterGame = null;
@@ -4110,17 +4594,22 @@ class AppModel extends ChangeNotifier {
   }
 
   /// Play, the trophies when the game has any, and the settings.
-  int get actionCount => selectedGame != null && trophies.containsKey(selectedGame!.id) ? 3 : 2;
+  int get actionCount =>
+      selectedGame != null && trophies.containsKey(selectedGame!.id) ? 3 : 2;
 
   /// Which of the buttons under the title opens the settings.
   int get settingsAction => actionCount - 1;
 
   void moveSelection(int delta) {
-    final next = (selected + delta).clamp(0, games.isEmpty ? 0 : games.length - 1);
+    final next = (selected + delta).clamp(
+      0,
+      games.isEmpty ? 0 : games.length - 1,
+    );
     if (next == selected) return;
     selected = next;
     sounds.play(Cue.move);
-    if (focus.isActions && focus.index >= actionCount) focus = HomeFocus.actions(actionCount - 1);
+    if (focus.isActions && focus.index >= actionCount)
+      focus = HomeFocus.actions(actionCount - 1);
     if (overlay == Layer.trophies) {
       trophyIndex = 0;
       revealedTrophies = {};
@@ -4134,7 +4623,8 @@ class AppModel extends ChangeNotifier {
   void handle(Command command) {
     // Mirrored screens (Arabic, Urdu): → moves to what is drawn on the right, as on the Mac.
     // Watching a share play the controller is the game's, so it stays as it is there.
-    if (T.language.isRightToLeft && overlay != Layer.shareWatch) command = command.mirrored;
+    if (T.language.isRightToLeft && overlay != Layer.shareWatch)
+      command = command.mirrored;
     if (pairing != null) {
       if (command == Command.select) answerPairing(true);
       if (command == Command.back) answerPairing(false);
@@ -4150,7 +4640,10 @@ class AppModel extends ChangeNotifier {
     // Watching a share play: the controller is the game's.
     if (overlay == Layer.shareWatch) return sharePlay.watchCommand(command);
     // At start a profile is picked first: PS waits.
-    if (overlay == Layer.profilePicker && profileFlow.atLaunch && command == Command.home) return sounds.play(Cue.bump);
+    if (overlay == Layer.profilePicker &&
+        profileFlow.atLaunch &&
+        command == Command.home)
+      return sounds.play(Cue.bump);
     if (command == Command.home) {
       // PS/Guide: from the game to the launcher and back; behind another window, to the front.
       final run = running?.$2;
@@ -4210,7 +4703,8 @@ class AppModel extends ChangeNotifier {
         }
         return;
       case Layer.log:
-        if (command == Command.back || command == Command.select) closeOverlay();
+        if (command == Command.back || command == Command.select)
+          closeOverlay();
         return;
       case Layer.crashReport:
         crash.command(command);
@@ -4232,16 +4726,21 @@ class AppModel extends ChangeNotifier {
         final count = trophies[selectedGame?.id]?.trophies.length ?? 0;
         switch (command) {
           case Command.up || Command.down:
-            final next = (trophyIndex + (command == Command.down ? 1 : -1)).clamp(0, count == 0 ? 0 : count - 1);
+            final next = (trophyIndex + (command == Command.down ? 1 : -1))
+                .clamp(0, count == 0 ? 0 : count - 1);
             if (next == trophyIndex) return;
             sounds.play(Cue.move);
             trophyIndex = next;
             _changed();
           case Command.select:
-            final trophy = trophies[selectedGame?.id]?.trophies.elementAtOrNull(trophyIndex);
-            if (trophyShots[trophy?.id] case final String shot) openGallery(shot: shot);
+            final trophy = trophies[selectedGame?.id]?.trophies.elementAtOrNull(
+              trophyIndex,
+            );
+            if (trophyShots[trophy?.id] case final String shot)
+              openGallery(shot: shot);
           // △ (Triangle, Y, O) on a hidden trophy shows it, and hides it again.
-          case Command.options when focusedTrophy != null && canReveal(focusedTrophy!):
+          case Command.options
+              when focusedTrophy != null && canReveal(focusedTrophy!):
             toggleReveal(trophyIndex);
           case Command.back || Command.options:
             closeOverlay();
@@ -4268,7 +4767,11 @@ class AppModel extends ChangeNotifier {
         // Back to the game's settings, on the row that opened the page.
         if (command == Command.back || command == Command.options) {
           open(Layer.gameSettings, cue: Cue.back);
-          final row = panelCategories().firstOrNull?.rows.indexWhere((row) => row.id == 'advanced') ?? -1;
+          final row =
+              panelCategories().firstOrNull?.rows.indexWhere(
+                (row) => row.id == 'advanced',
+              ) ??
+              -1;
           if (row >= 0) panelRow = row;
           _changed();
           return;
@@ -4302,7 +4805,8 @@ class AppModel extends ChangeNotifier {
       case Layer.shareWatch:
         // Taken above; here only for the switch's sake.
         return sharePlay.watchCommand(command);
-      case Layer.quickMenu || Layer.closeGame when command == Command.back || command == Command.options:
+      case Layer.quickMenu || Layer.closeGame
+          when command == Command.back || command == Command.options:
         resumeGame();
         return;
       case Layer.profilePicker:
@@ -4314,27 +4818,34 @@ class AppModel extends ChangeNotifier {
       case Layer.signIn:
         _signInCommand(command);
         return;
-      case Layer.gameFiles when command == Command.back || command == Command.options:
+      case Layer.gameFiles
+          when command == Command.back || command == Command.options:
         files.back();
         return;
-      case Layer.cloudQuestion when command == Command.back || command == Command.options:
+      case Layer.cloudQuestion
+          when command == Command.back || command == Command.options:
         saveSync.answerBack();
         return;
-      case Layer.cloudStorage when command == Command.back || command == Command.options:
+      case Layer.cloudStorage
+          when command == Command.back || command == Command.options:
         saveSync.backFromStorage();
         return;
-      case Layer.lfgPost || Layer.gameHub when command == Command.back || command == Command.options:
+      case Layer.lfgPost || Layer.gameHub
+          when command == Command.back || command == Command.options:
         together.backFromFind();
         return;
-      case Layer.findPlayers when command == Command.back || command == Command.options:
+      case Layer.findPlayers
+          when command == Command.back || command == Command.options:
         _panelCommand(command);
         // Closed: the board's topics are no longer listened to.
         if (overlay != Layer.findPlayers) together.findClosed();
         return;
-      case Layer.showcaseEdit || Layer.profileTheme when command == Command.back || command == Command.options:
+      case Layer.showcaseEdit || Layer.profileTheme
+          when command == Command.back || command == Command.options:
         together.backToProfile();
         return;
-      case Layer.friendOptions when command == Command.back || command == Command.options:
+      case Layer.friendOptions
+          when command == Command.back || command == Command.options:
         // A question asked in place (together_ask.dart) is answered Cancel first.
         if (!together.cancelAsk()) open(Layer.friends, cue: Cue.back);
         return;
@@ -4382,7 +4893,8 @@ class AppModel extends ChangeNotifier {
     }
     // The notice went (Later, or the update went in): its focus goes to the top bar.
     if (focus.isNotice && !updates.showsNotice) focus = const HomeFocus.top(0);
-    if (focus == const HomeFocus.notice(1) && updates.restartAfterGame) focus = const HomeFocus.notice(0);
+    if (focus == const HomeFocus.notice(1) && updates.restartAfterGame)
+      focus = const HomeFocus.notice(0);
     switch ((focus.area, command)) {
       case ('tiles', Command.left):
         moveSelection(-1);
@@ -4401,11 +4913,17 @@ class AppModel extends ChangeNotifier {
       case ('notice', Command.left):
         _moveFocus(HomeFocus.notice(focus.index > 0 ? focus.index - 1 : 0));
       case ('notice', Command.right):
-        _moveFocus(focus.index == 1 || updates.restartAfterGame ? const HomeFocus.top(0) : const HomeFocus.notice(1));
+        _moveFocus(
+          focus.index == 1 || updates.restartAfterGame
+              ? const HomeFocus.top(0)
+              : const HomeFocus.notice(1),
+        );
       case ('notice', Command.down) || ('notice', Command.back):
         _moveFocus(HomeFocus.tiles);
       case ('notice', Command.select) when focus.index == 0:
-        updates.restartAfterGame ? updates.cancelRestart() : unawaited(updates.restartNow());
+        updates.restartAfterGame
+            ? updates.cancelRestart()
+            : unawaited(updates.restartNow());
       case ('notice', Command.select):
         updates.later();
         _moveFocus(const HomeFocus.top(0));
@@ -4424,9 +4942,13 @@ class AppModel extends ChangeNotifier {
             open(layer);
         }
       case ('actions', Command.left):
-        _moveFocus(HomeFocus.actions((focus.index - 1).clamp(0, actionCount - 1)));
+        _moveFocus(
+          HomeFocus.actions((focus.index - 1).clamp(0, actionCount - 1)),
+        );
       case ('actions', Command.right):
-        _moveFocus(HomeFocus.actions((focus.index + 1).clamp(0, actionCount - 1)));
+        _moveFocus(
+          HomeFocus.actions((focus.index + 1).clamp(0, actionCount - 1)),
+        );
       case ('actions', Command.up) || ('actions', Command.back):
         _moveFocus(HomeFocus.tiles);
       case ('actions', Command.select):
@@ -4457,7 +4979,10 @@ class AppModel extends ChangeNotifier {
 
   /// The key the game's Options is on (its controls), for pausing it; null when it has none.
   String? optionsKey(Game game) {
-    final sources = Controls.sources(PadAction.options, currentSettings(game).controls ?? const {});
+    final sources = Controls.sources(
+      PadAction.options,
+      currentSettings(game).controls ?? const {},
+    );
     for (final source in sources) {
       if (source.startsWith('KEY:')) return source.substring(4);
     }
@@ -4482,12 +5007,16 @@ class AppModel extends ChangeNotifier {
         final sent = server.pressButtons(RemotePacket.options);
         await Future<void>.delayed(const Duration(milliseconds: 210));
         quickMenuPaused = await sent;
-        _padLog?.call('quick menu: ${quickMenuPaused ? 'Options pressed through the bridge' : 'no bridge took it'}');
+        _padLog?.call(
+          'quick menu: ${quickMenuPaused ? 'Options pressed through the bridge' : 'no bridge took it'}',
+        );
       } else {
         final key = optionsKey(game);
         final paused = key != null && await desktop.pressKey(run.pid, key);
         quickMenuPaused = paused;
-        _padLog?.call('quick menu: ${paused ? 'pressed $key in the game' : 'could not pause the game'}');
+        _padLog?.call(
+          'quick menu: ${paused ? 'pressed $key in the game' : 'could not pause the game'}',
+        );
       }
     }
     if (running?.$2 != run) return;
@@ -4541,7 +5070,11 @@ class AppModel extends ChangeNotifier {
   /// Escape on the home screen, the games in focus and nothing over them, asks Quit AnyPS5?
   /// (Cancel first); everywhere else Escape keeps its meaning.
   bool askQuit() {
-    if (!preferences.onboarded || overlay != null || pairing != null || starting != null || !focus.isTiles) {
+    if (!preferences.onboarded ||
+        overlay != null ||
+        pairing != null ||
+        starting != null ||
+        !focus.isTiles) {
       return false;
     }
     open(Layer.confirmQuit);
@@ -4563,10 +5096,17 @@ class AppModel extends ChangeNotifier {
   /// Whether the replay buffer is recording now.
   bool get replayRecording => _replay?.running ?? false;
 
-  ReplayBuffer? _defaultReplay(int seconds, {VideoEncoder? encoder, GameSound? sound}) {
+  ReplayBuffer? _defaultReplay(
+    int seconds, {
+    VideoEncoder? encoder,
+    GameSound? sound,
+  }) {
     final environment = services.environment ?? Platform.environment;
     final ffmpeg = replayFfmpeg;
-    if (ffmpeg == null || !ReplayBuffer.supported(system, environment)) return null;
+    final wayland = waylandCapture;
+    if (ffmpeg == null ||
+        (wayland == null && !ReplayBuffer.supported(system, environment)))
+      return null;
     return ReplayBuffer(
       ffmpeg: ffmpeg,
       folder: p.join(Directory.systemTemp.path, 'anyps5-replay-$pid'),
@@ -4575,7 +5115,70 @@ class AppModel extends ChangeNotifier {
       environment: environment,
       encoder: encoder,
       sound: sound,
+      wayland: wayland,
     );
+  }
+
+  /// Under Wayland, the desktop's portal and what it needs; null on every other desktop.
+  late final WaylandCapture? waylandCapture =
+      services.waylandCapture ??
+      (WaylandCapture.applies(
+            system,
+            services.environment ?? Platform.environment,
+          )
+          ? WaylandCapture(
+              portal: DbusScreenCastPortal(),
+              environment: services.environment ?? Platform.environment,
+              readToken: () => preferences.waylandRestoreToken,
+              saveToken: (token) {
+                preferences.waylandRestoreToken = token;
+                savePreferences();
+              },
+              beforeAsking: _gameWindowOpen,
+              log: (line) =>
+                  addRecentLine('${DateTime.now().toIso8601String()} $line'),
+            )
+          : null);
+
+  DateTime? _gameBegan;
+
+  /// How long a game gets to open its window before the desktop is asked for it anyway: a
+  /// window drawn natively for Wayland cannot be seen from here.
+  static const _gameWindowWait = Duration(seconds: 8);
+
+  /// Returns once the game's window is open, as far as can be told: the desktop's dialog lists
+  /// open windows, and bringing a window back needs it there.
+  Future<void> _gameWindowOpen() async {
+    final deadline = (_gameBegan ?? DateTime.now()).add(_gameWindowWait);
+    while (DateTime.now().isBefore(deadline)) {
+      final playing = running;
+      if (playing == null) return;
+      final desktop = this.desktop;
+      if (desktop is GameAreas &&
+          (desktop as GameAreas).gameArea(playing.$2.pid) != null)
+        return;
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+  }
+
+  /// Turns the replay buffer on under Wayland: says now what is missing, and asks the desktop
+  /// now when a game is open. Without a game there is no window to choose yet, so the user is
+  /// told the desktop will ask when one opens.
+  Future<void> _turnOnReplayUnderWayland(WaylandCapture capture) async {
+    final problem = await capture.check();
+    if (problem != null) return show(T.text(problem.textKey));
+    if (services.replay == null && await media.encoders?.encoder == null)
+      return show(T.text('waylandNoEncoder'));
+    preferences.replayBuffer = true;
+    savePreferences();
+    if (running == null) {
+      unawaited(
+        notice(T.text('waylandAskTitle'), detail: T.text('waylandAskDetail')),
+      );
+      return _changed();
+    }
+    await _startReplay();
+    _changed();
   }
 
   /// ffmpeg for the replay buffer: beside the launcher or on the PATH.
@@ -4585,10 +5188,15 @@ class AppModel extends ChangeNotifier {
     launcherFolder: p.dirname(Platform.resolvedExecutable),
   );
 
-  /// Why the replay buffer cannot record here (no ffmpeg, Wayland), or null when it can.
+  /// Why the replay buffer cannot record here (no ffmpeg, no desktop to record), or null when it
+  /// can. What the Wayland portal needs is checked when the buffer is turned on.
   String? get replayUnavailable {
     if (services.replay != null) return null;
-    if (!ReplayBuffer.supported(system, services.environment ?? Platform.environment)) {
+    if (waylandCapture == null &&
+        !ReplayBuffer.supported(
+          system,
+          services.environment ?? Platform.environment,
+        )) {
       return T.text('replayNoScreen');
     }
     return replayFfmpeg == null ? T.text('replayNoFfmpeg') : null;
@@ -4603,14 +5211,24 @@ class AppModel extends ChangeNotifier {
       // The graphics card's encoder when one works, and the game's sound with the picture.
       final encoder = await media.encoders?.encoder;
       final playing = running;
-      if (playing == null || !preferences.replayBuffer || _replay != null) return;
-      buffer = _defaultReplay(preferences.replaySeconds, encoder: encoder, sound: media.soundOf(playing.$2.pid));
+      if (playing == null || !preferences.replayBuffer || _replay != null)
+        return;
+      if (waylandCapture != null && encoder == null)
+        return show(T.text('waylandNoEncoder'));
+      buffer = _defaultReplay(
+        preferences.replaySeconds,
+        encoder: encoder,
+        sound: media.soundOf(playing.$2.pid),
+      );
     }
     if (buffer == null) return;
     _replay = buffer;
     if (!await buffer.start()) {
+      // Stopped meanwhile (the game ended during the desktop's dialog): nothing to say.
+      if (_replay != buffer) return;
       _replay = null;
-      show(T.text('replayFailed'));
+      final problem = waylandCapture?.problem;
+      show(T.text(problem?.textKey ?? 'replayFailed'));
     }
     notifyListeners();
   }
@@ -4624,10 +5242,13 @@ class AppModel extends ChangeNotifier {
   // The phone in games.
 
   /// Whether a phone or a browser pad is connected.
-  bool get phonesConnected => (remote?.connectedDevices.isNotEmpty ?? false) || browserPlay.pads.isNotEmpty;
+  bool get phonesConnected =>
+      (remote?.connectedDevices.isNotEmpty ?? false) ||
+      browserPlay.pads.isNotEmpty;
 
   /// The engine in use cannot read the phones (upstream's release builds and nightlies).
-  bool get phoneEngineMissing => EngineModel.readsPhone(toolkitVersion) == false;
+  bool get phoneEngineMissing =>
+      EngineModel.readsPhone(toolkitVersion) == false;
 
   /// The switch was offered this run: a phone that comes again is not asked about again.
   bool _phoneEngineAsked = false;
@@ -4690,13 +5311,18 @@ class AppModel extends ChangeNotifier {
               : T.format('phoneEngineSwitchSize', [byteText(package.size)]),
           kind: ActionRow(() => unawaited(switchToArmForPhone())),
         ),
-      PanelRow(id: 'phoneEngineLater', title: T.text('phoneEngineLater'), kind: ActionRow(closeOverlay)),
+      PanelRow(
+        id: 'phoneEngineLater',
+        title: T.text('phoneEngineLater'),
+        kind: ActionRow(closeOverlay),
+      ),
     ];
   }
 
   /// Whether [game]'s engine reads the phones, from the engine it was unlocked with (the unlock
   /// puts that engine's libraries in the game's folder): null when the launcher cannot tell.
-  bool? phoneReaches(Game game) => EngineModel.readsPhone(records[game.id]?.toolkit);
+  bool? phoneReaches(Game game) =>
+      EngineModel.readsPhone(records[game.id]?.toolkit);
 
   /// How long a game may stay quiet on the phones' bridges before the launcher says the phone
   /// does not reach it. The engine says hello every second once the game's window is open.
@@ -4720,10 +5346,12 @@ class AppModel extends ChangeNotifier {
   /// it stayed quiet on the phones' bridges for [phoneAnswerWait]. Said once a game.
   void _checkPhoneReach(Game game) {
     if (_phoneToldFor == game.id || !phonesConnected) return;
-    if (phoneReaches(game) == false) return _phoneCannotReach(game, T.text('phoneUpstreamGame'));
+    if (phoneReaches(game) == false)
+      return _phoneCannotReach(game, T.text('phoneUpstreamGame'));
     _phoneAnswerTimer?.cancel();
     _phoneAnswerTimer = Timer(phoneAnswerWait, () {
-      if (running?.$1 != game || _phoneToldFor == game.id || !phonesConnected) return;
+      if (running?.$1 != game || _phoneToldFor == game.id || !phonesConnected)
+        return;
       if (remote?.gameHeard ?? true) return;
       _phoneCannotReach(game, T.text('phoneNoAnswer'));
     });
@@ -4754,7 +5382,8 @@ class AppModel extends ChangeNotifier {
   Future<void> notice(String text, {String? detail}) async {
     show(detail == null ? text : '$text. $detail');
     if (launcherInFront) return;
-    if (!await desktop.notify(text, detail ?? 'AnyPS5')) desktopNotify(text, detail ?? 'AnyPS5');
+    if (!await desktop.notify(text, detail ?? 'AnyPS5'))
+      desktopNotify(text, detail ?? 'AnyPS5');
   }
 
   /// The game's window now, into its gallery (Share held); the picture's path.
@@ -4772,7 +5401,9 @@ class AppModel extends ChangeNotifier {
       await Isolate.run(() {
         File(path)
           ..parent.createSync(recursive: true)
-          ..writeAsBytesSync(PngEncoder.rgba(frame.width, frame.height, frame.pixels));
+          ..writeAsBytesSync(
+            PngEncoder.rgba(frame.width, frame.height, frame.pixels),
+          );
       });
     } on Object {
       unawaited(_captureSaid(T.text('screenshotFailed')));
@@ -4790,16 +5421,23 @@ class AppModel extends ChangeNotifier {
     if (playing == null) return null;
     final buffer = _replay;
     if (buffer == null || !buffer.running) return takeScreenshot();
-    final saved = await buffer.save(Screenshots.clipPath(picturesFolder, playing.$1, DateTime.now()));
+    final saved = await buffer.save(
+      Screenshots.clipPath(picturesFolder, playing.$1, DateTime.now()),
+    );
     if (saved != null) sounds.play(Cue.unlocked);
     unawaited(
-      _captureSaid(saved == null ? T.text('clipFailed') : T.format('clipSaved', [replayLengthText(buffer.seconds)])),
+      _captureSaid(
+        saved == null
+            ? T.text('clipFailed')
+            : T.format('clipSaved', [replayLengthText(buffer.seconds)]),
+      ),
     );
     return saved;
   }
 
-  static String replayLengthText(int seconds) =>
-      seconds < 60 ? T.format('replaySeconds', [seconds]) : T.format('replayMinutes', [seconds ~/ 60]);
+  static String replayLengthText(int seconds) => seconds < 60
+      ? T.format('replaySeconds', [seconds])
+      : T.format('replayMinutes', [seconds ~/ 60]);
 
   // The launcher's window.
 
@@ -4821,7 +5459,8 @@ class AppModel extends ChangeNotifier {
   }
 
   /// At launch: full screen the first time, then as the user left it.
-  Future<void> applyLauncherWindow() => _setWindowFullscreen(launcherFullscreen);
+  Future<void> applyLauncherWindow() =>
+      _setWindowFullscreen(launcherFullscreen);
 
   Future<bool> _setWindowFullscreen(bool on) async {
     final window = services.window;
@@ -4852,7 +5491,8 @@ class AppModel extends ChangeNotifier {
     _changed();
   }
 
-  void _windowLine(String what) => addRecentLine('${DateTime.now().toIso8601String()} window $what');
+  void _windowLine(String what) =>
+      addRecentLine('${DateTime.now().toIso8601String()} window $what');
 
   /// Whether the window is full screen now, with no title bar of the system's: set as the
   /// launcher makes it so (and by main.dart for Steam's --fullscreen).
@@ -4860,7 +5500,8 @@ class AppModel extends ChangeNotifier {
 
   /// The launcher's own window buttons wait at the top edge: full screen, the setting on, not
   /// in Steam's Game Mode (gamescope has no windows to go back to).
-  bool get showsWindowButtons => windowFullscreen && preferences.windowButtons && !steamLaunch.gameMode;
+  bool get showsWindowButtons =>
+      windowFullscreen && preferences.windowButtons && !steamLaunch.gameMode;
 
   /// The window buttons' Minimize.
   void minimizeLauncher() => unawaited(services.window?.minimize());
@@ -4878,10 +5519,14 @@ class AppModel extends ChangeNotifier {
   ];
 
   /// The bell (the last) shows only while signed in to AnyTogether.
-  int get topButtons => together.signedIn ? topLayers.length : topLayers.length - 1;
+  int get topButtons =>
+      together.signedIn ? topLayers.length : topLayers.length - 1;
 
   void _moveLibrary(int delta) {
-    final next = (libraryIndex + delta).clamp(0, games.isEmpty ? 0 : games.length - 1);
+    final next = (libraryIndex + delta).clamp(
+      0,
+      games.isEmpty ? 0 : games.length - 1,
+    );
     if (next == libraryIndex) return;
     libraryIndex = next;
     sounds.play(Cue.move);
@@ -4903,11 +5548,25 @@ class AppModel extends ChangeNotifier {
       case Layer.settings:
         return _searchedSettings(_settingsCategories());
       case Layer.gameSettings when game != null:
-        return [PanelCategory(id: 'game', title: game.name, rows: _gameRows(game))];
+        return [
+          PanelCategory(id: 'game', title: game.name, rows: _gameRows(game)),
+        ];
       case Layer.controls when game != null:
-        return [PanelCategory(id: 'controls', title: game.name, rows: _controlRows(game))];
+        return [
+          PanelCategory(
+            id: 'controls',
+            title: game.name,
+            rows: _controlRows(game),
+          ),
+        ];
       case Layer.advanced when game != null:
-        return [PanelCategory(id: 'advanced', title: game.name, rows: _advancedRows(game))];
+        return [
+          PanelCategory(
+            id: 'advanced',
+            title: game.name,
+            rows: _advancedRows(game),
+          ),
+        ];
       case Layer.confirmUninstall when game != null:
         return [
           PanelCategory(
@@ -4923,7 +5582,11 @@ class AppModel extends ChangeNotifier {
                   closeOverlay();
                 }, destructive: true),
               ),
-              PanelRow(id: 'cancel', title: T.text('cancel'), kind: ActionRow(closeOverlay)),
+              PanelRow(
+                id: 'cancel',
+                title: T.text('cancel'),
+                kind: ActionRow(closeOverlay),
+              ),
             ],
           ),
         ];
@@ -4933,57 +5596,128 @@ class AppModel extends ChangeNotifier {
         return [
           PanelCategory(
             id: 'copy',
-            title: warning.shortage == null ? T.text('copyWarningTitle') : T.text('noSpaceTitle'),
+            title: warning.shortage == null
+                ? T.text('copyWarningTitle')
+                : T.text('noSpaceTitle'),
             rows: _copyWarningRows(warning),
           ),
         ];
       case Layer.gameFiles:
-        return [PanelCategory(id: 'files', title: files.title, rows: files.rows())];
+        return [
+          PanelCategory(id: 'files', title: files.title, rows: files.rows()),
+        ];
       case Layer.friends:
-        return [PanelCategory(id: 'friends', title: T.text('friendsTitle'), rows: together.friendRows())];
+        return [
+          PanelCategory(
+            id: 'friends',
+            title: T.text('friendsTitle'),
+            rows: together.friendRows(),
+          ),
+        ];
       case Layer.party:
-        return [PanelCategory(id: 'party', title: T.text('partyTitle'), rows: together.partyRows())];
+        return [
+          PanelCategory(
+            id: 'party',
+            title: T.text('partyTitle'),
+            rows: together.partyRows(),
+          ),
+        ];
       case Layer.notifications:
         return [
-          PanelCategory(id: 'notifications', title: together.notificationsSubtitle, rows: together.notificationRows()),
+          PanelCategory(
+            id: 'notifications',
+            title: together.notificationsSubtitle,
+            rows: together.notificationRows(),
+          ),
         ];
       case Layer.compat:
-        return [PanelCategory(id: 'compat', title: T.text('socialCompatSubtitle'), rows: together.compatRows())];
+        return [
+          PanelCategory(
+            id: 'compat',
+            title: T.text('socialCompatSubtitle'),
+            rows: together.compatRows(),
+          ),
+        ];
       case Layer.findPlayers:
         return together.findPlayersCategories();
       case Layer.gameHub:
         return together.hubCategories();
       case Layer.lfgPost:
-        return [PanelCategory(id: 'post', title: together.findState.draftName, rows: together.lfgPostRows())];
+        return [
+          PanelCategory(
+            id: 'post',
+            title: together.findState.draftName,
+            rows: together.lfgPostRows(),
+          ),
+        ];
       case Layer.family:
-        return [PanelCategory(id: 'family', title: T.text('familyTitle'), rows: together.family.rows())];
+        return [
+          PanelCategory(
+            id: 'family',
+            title: T.text('familyTitle'),
+            rows: together.family.rows(),
+          ),
+        ];
       case Layer.crashReport:
-        return [PanelCategory(id: 'report', title: T.text('reportKicker'), rows: crash.rows())];
+        return [
+          PanelCategory(
+            id: 'report',
+            title: T.text('reportKicker'),
+            rows: crash.rows(),
+          ),
+        ];
       case Layer.themes:
-        return [PanelCategory(id: 'themes', title: T.text('themes'), rows: themeRows())];
+        return [
+          PanelCategory(
+            id: 'themes',
+            title: T.text('themes'),
+            rows: themeRows(),
+          ),
+        ];
       case Layer.themeStudio:
-        return [PanelCategory(id: 'studio', title: T.text('themeStudio'), rows: studioRows())];
+        return [
+          PanelCategory(
+            id: 'studio',
+            title: T.text('themeStudio'),
+            rows: studioRows(),
+          ),
+        ];
       case Layer.showcaseEdit:
         return [
           PanelCategory(
             id: 'showcase',
-            title: T.format('showcasePinned', [together.showcasePins?.count ?? 0]),
+            title: T.format('showcasePinned', [
+              together.showcasePins?.count ?? 0,
+            ]),
             rows: together.showcaseRows(),
           ),
         ];
       case Layer.profileTheme:
         // Under the heading Profile theme: where the themes come from.
-        return [PanelCategory(id: 'profileTheme', title: T.text('themesHub'), rows: together.profileThemeRows())];
+        return [
+          PanelCategory(
+            id: 'profileTheme',
+            title: T.text('themesHub'),
+            rows: together.profileThemeRows(),
+          ),
+        ];
       case Layer.friendOptions:
         return [
           PanelCategory(
             id: 'friend',
-            title: together.chosen?.person.displayName ?? T.text('friendsTitle'),
+            title:
+                together.chosen?.person.displayName ?? T.text('friendsTitle'),
             rows: together.friendOptionRows(),
           ),
         ];
       case Layer.phoneEngine:
-        return [PanelCategory(id: 'phoneEngine', title: T.text('phoneEngineTitle'), rows: phoneEngineRows())];
+        return [
+          PanelCategory(
+            id: 'phoneEngine',
+            title: T.text('phoneEngineTitle'),
+            rows: phoneEngineRows(),
+          ),
+        ];
       case Layer.updateRequired when together.account.tooOld != null:
         return [
           PanelCategory(
@@ -4998,7 +5732,11 @@ class AppModel extends ChangeNotifier {
             id: 'quickMenu',
             title: running!.$1.name,
             rows: [
-              PanelRow(id: 'resume', title: T.text('quickResume'), kind: ActionRow(resumeGame)),
+              PanelRow(
+                id: 'resume',
+                title: T.text('quickResume'),
+                kind: ActionRow(resumeGame),
+              ),
               // Settings › Battery & Heat: the profile that holds lifted for now.
               if (powerWatch.canUndo)
                 PanelRow(
@@ -5035,7 +5773,11 @@ class AppModel extends ChangeNotifier {
                 detail: T.text('closeGameDetail'),
                 kind: ActionRow(closeRunningGame, destructive: true),
               ),
-              PanelRow(id: 'cancel', title: T.text('cancel'), kind: ActionRow(resumeGame)),
+              PanelRow(
+                id: 'cancel',
+                title: T.text('cancel'),
+                kind: ActionRow(resumeGame),
+              ),
             ],
           ),
         ];
@@ -5052,7 +5794,8 @@ class AppModel extends ChangeNotifier {
           PanelCategory(
             id: 'signIn',
             title: T.text(switch (profileFlow.origin) {
-              ProfileOrigin.firstStart || ProfileOrigin.adding => 'profileSignInNew',
+              ProfileOrigin.firstStart ||
+              ProfileOrigin.adding => 'profileSignInNew',
               ProfileOrigin.goingOnline => 'profileSignInOnline',
               ProfileOrigin.signingInAgain => 'profileSignInAgain',
             }),
@@ -5079,7 +5822,9 @@ class AppModel extends ChangeNotifier {
               PanelRow(
                 id: 'quit',
                 title: T.text('quitLauncher'),
-                detail: running == null ? null : T.format('quitLauncherGame', [running!.$1.name]),
+                detail: running == null
+                    ? null
+                    : T.format('quitLauncherGame', [running!.$1.name]),
                 kind: ActionRow(quitLauncher, destructive: true),
               ),
             ],
@@ -5091,11 +5836,17 @@ class AppModel extends ChangeNotifier {
           PanelCategory(
             id: 'launcherReport',
             title: switch (problem.kind) {
-              LauncherProblemKind.crash when problem.whileClosing => T.text('launcherReportCrashClosing'),
+              LauncherProblemKind.crash when problem.whileClosing => T.text(
+                'launcherReportCrashClosing',
+              ),
               LauncherProblemKind.crash => T.text('launcherReportCrash'),
-              LauncherProblemKind.hang when problem.recovered => T.format('launcherReportHang', [
-                problem.stalledFor?.inSeconds ?? LauncherHealth.stall.inSeconds,
-              ]),
+              LauncherProblemKind.hang when problem.recovered => T.format(
+                'launcherReportHang',
+                [
+                  problem.stalledFor?.inSeconds ??
+                      LauncherHealth.stall.inSeconds,
+                ],
+              ),
               LauncherProblemKind.hang => T.text('launcherReportHangEnded'),
             },
             rows: _launcherReportRows(),
@@ -5103,21 +5854,37 @@ class AppModel extends ChangeNotifier {
         ];
       case Layer.cloudQuestion:
         return [
-          PanelCategory(id: 'cloudQuestion', title: saveSync.question?.title ?? '', rows: saveSync.questionRows()),
+          PanelCategory(
+            id: 'cloudQuestion',
+            title: saveSync.question?.title ?? '',
+            rows: saveSync.questionRows(),
+          ),
         ];
       case Layer.cloudStorage:
-        return [PanelCategory(id: 'cloudStorage', title: T.text('cloudStorageSubtitle'), rows: saveSync.storageRows())];
+        return [
+          PanelCategory(
+            id: 'cloudStorage',
+            title: T.text('cloudStorageSubtitle'),
+            rows: saveSync.storageRows(),
+          ),
+        ];
       case Layer.confirmQuit:
         return [
           PanelCategory(
             id: 'confirmQuit',
             title: T.text('quitQuestion'),
             rows: [
-              PanelRow(id: 'cancel', title: T.text('cancel'), kind: ActionRow(closeOverlay)),
+              PanelRow(
+                id: 'cancel',
+                title: T.text('cancel'),
+                kind: ActionRow(closeOverlay),
+              ),
               PanelRow(
                 id: 'quit',
                 title: T.text('quit'),
-                detail: running == null ? null : T.format('quitLauncherGame', [running!.$1.name]),
+                detail: running == null
+                    ? null
+                    : T.format('quitLauncherGame', [running!.$1.name]),
                 kind: ActionRow(quitLauncher, destructive: true),
               ),
             ],
@@ -5133,8 +5900,13 @@ class AppModel extends ChangeNotifier {
                 id: 'update',
                 title: T.text('updateAndPlay'),
                 detail: switch (engine.latestPackage) {
-                  final ToolkitPackage newest when engine.updateAvailable && currentSettings(game).engine == null =>
-                    T.format('engineUpdateAndPlayDetail', ['v${newest.version}', byteText(newest.size)]),
+                  final ToolkitPackage newest
+                      when engine.updateAvailable &&
+                          currentSettings(game).engine == null =>
+                    T.format('engineUpdateAndPlayDetail', [
+                      'v${newest.version}',
+                      byteText(newest.size),
+                    ]),
                   _ => T.text('updateAndPlayDetail'),
                 },
                 kind: ActionRow(() {
@@ -5161,7 +5933,10 @@ class AppModel extends ChangeNotifier {
 
   /// The copy panel: the room the unlock lacks (when it does), why the game's files would be
   /// copied (when they would), and the ways out.
-  List<PanelRow> _copyWarningRows(({Game game, int bytes, SpaceShortage? shortage, int? needed, int? free}) warning) {
+  List<PanelRow> _copyWarningRows(
+    ({Game game, int bytes, SpaceShortage? shortage, int? needed, int? free})
+    warning,
+  ) {
     final windows = system == HostSystem.windows;
     final size = byteText(warning.bytes);
     final shortage = warning.shortage;
@@ -5175,7 +5950,10 @@ class AppModel extends ChangeNotifier {
       if (shortage != null)
         PanelRow(
           id: 'space',
-          title: T.format('noSpaceAmount', [byteText(shortage.needed), byteText(shortage.free)]),
+          title: T.format('noSpaceAmount', [
+            byteText(shortage.needed),
+            byteText(shortage.free),
+          ]),
           kind: InfoRow(
             '${T.text('noSpaceNothingWritten')}\n${copying ? T.format('noSpaceCopying', [size]) : T.text('noSpaceWhy')}',
           ),
@@ -5185,8 +5963,12 @@ class AppModel extends ChangeNotifier {
           id: 'why',
           title: warning.game.name,
           kind: InfoRow(
-            T.format(windows ? 'copyWarningWindows' : 'copyWarningLinux', [size]) +
-                (shortage == null && warning.needed != null && warning.free != null
+            T.format(windows ? 'copyWarningWindows' : 'copyWarningLinux', [
+                  size,
+                ]) +
+                (shortage == null &&
+                        warning.needed != null &&
+                        warning.free != null
                     ? '\n${T.format('copySpace', [byteText(warning.needed!), byteText(warning.free!)])}'
                     : ''),
           ),
@@ -5274,19 +6056,28 @@ class AppModel extends ChangeNotifier {
               }),
             ),
           // How much of the desktop shows through Glass's window, where the system can show it.
-          if (look == LookStyle.glass && backdrop.kind.seeThrough && !preferences.reduceTransparency)
+          if (look == LookStyle.glass &&
+              backdrop.kind.seeThrough &&
+              !preferences.reduceTransparency)
             PanelRow(
               id: 'glassTransparency',
               title: T.text('glassTransparency'),
-              detail: T.text(backdrop.kind.blurs ? 'glassTransparencyDetail' : 'glassTransparencySharp'),
+              detail: T.text(
+                backdrop.kind.blurs
+                    ? 'glassTransparencyDetail'
+                    : 'glassTransparencySharp',
+              ),
               kind: StepperRow(
-                value: preferences.glassTransparency ?? GlassWindow.defaultTransparency,
+                value:
+                    preferences.glassTransparency ??
+                    GlassWindow.defaultTransparency,
                 min: 0,
                 max: 100,
                 step: 10,
                 format: _percent,
                 set: (value) {
-                  preferences.glassTransparency = value == GlassWindow.defaultTransparency ? null : value;
+                  preferences.glassTransparency =
+                      value == GlassWindow.defaultTransparency ? null : value;
                   savePreferences();
                 },
               ),
@@ -5296,10 +6087,14 @@ class AppModel extends ChangeNotifier {
             PanelRow(
               id: 'accent',
               title: T.text('accent'),
-              kind: ChoiceRow([for (final accent in Accent.values) accent.title], builtInAccent.index, (index) {
-                preferences.accent = Accent.values[index].name;
-                savePreferences();
-              }),
+              kind: ChoiceRow(
+                [for (final accent in Accent.values) accent.title],
+                builtInAccent.index,
+                (index) {
+                  preferences.accent = Accent.values[index].name;
+                  savePreferences();
+                },
+              ),
             ),
           // Themes and the Theme Studio.
           ...appearanceThemeLinks(),
@@ -5329,9 +6124,15 @@ class AppModel extends ChangeNotifier {
             id: 'fullscreen',
             title: T.text('launcherFullscreen'),
             detail: T.format('launcherFullscreenDetail', [
-              keyLabel(preferences.shortcuts[LauncherAction.toggleFullscreen].key) ?? '—',
+              keyLabel(
+                    preferences.shortcuts[LauncherAction.toggleFullscreen].key,
+                  ) ??
+                  '—',
             ]),
-            kind: ToggleRow(launcherFullscreen, (value) => unawaited(setLauncherFullscreen(value))),
+            kind: ToggleRow(
+              launcherFullscreen,
+              (value) => unawaited(setLauncherFullscreen(value)),
+            ),
           ),
           PanelRow(
             id: 'windowButtons',
@@ -5345,13 +6146,15 @@ class AppModel extends ChangeNotifier {
           PanelRow(
             id: 'motion',
             title: T.text('motion'),
-            kind: ChoiceRow([T.text('motionFull'), T.text('motionReduced')], preferences.reducedMotion ? 1 : 0, (
-              index,
-            ) {
-              preferences.reducedMotion = index == 1;
-              Motion.reduced = preferences.reducedMotion || powerWatch.dimmed;
-              savePreferences();
-            }),
+            kind: ChoiceRow(
+              [T.text('motionFull'), T.text('motionReduced')],
+              preferences.reducedMotion ? 1 : 0,
+              (index) {
+                preferences.reducedMotion = index == 1;
+                Motion.reduced = preferences.reducedMotion || powerWatch.dimmed;
+                savePreferences();
+              },
+            ),
           ),
         ],
       ),
@@ -5360,8 +6163,16 @@ class AppModel extends ChangeNotifier {
         title: T.text('library'),
         rows: [
           ...folderRows(),
-          PanelRow(id: 'addFolder', title: T.text('addFolder'), kind: ActionRow(() => unawaited(addGamesFolder()))),
-          PanelRow(id: 'rescan', title: T.text('rescan'), kind: ActionRow(rescan)),
+          PanelRow(
+            id: 'addFolder',
+            title: T.text('addFolder'),
+            kind: ActionRow(() => unawaited(addGamesFolder())),
+          ),
+          PanelRow(
+            id: 'rescan',
+            title: T.text('rescan'),
+            kind: ActionRow(rescan),
+          ),
           PanelRow(
             id: 'prepareNewGames',
             title: T.text('prepareNewGames'),
@@ -5374,9 +6185,21 @@ class AppModel extends ChangeNotifier {
           ),
         ],
       ),
-      PanelCategory(id: 'engine', title: T.text('engine'), rows: engine.settingsRows()),
-      PanelCategory(id: 'profiles', title: T.text('profilesCategory'), rows: profileRows()),
-      PanelCategory(id: 'together', title: 'AnyTogether', rows: together.settingsRows()),
+      PanelCategory(
+        id: 'engine',
+        title: T.text('engine'),
+        rows: engine.settingsRows(),
+      ),
+      PanelCategory(
+        id: 'profiles',
+        title: T.text('profilesCategory'),
+        rows: profileRows(),
+      ),
+      PanelCategory(
+        id: 'together',
+        title: 'AnyTogether',
+        rows: together.settingsRows(),
+      ),
       PanelCategory(
         id: 'phone',
         title: T.text('phones'),
@@ -5409,7 +6232,9 @@ class AppModel extends ChangeNotifier {
             PanelRow(
               id: 'address',
               title: T.text('phoneAddress'),
-              kind: InfoRow('${services.computerName ?? Platform.localHostname} · $port'),
+              kind: InfoRow(
+                '${services.computerName ?? Platform.localHostname} · $port',
+              ),
             ),
           // The phones that are paired, which of them are connected now, as on the Mac.
           if (remote case final RemoteServer server)
@@ -5421,7 +6246,9 @@ class AppModel extends ChangeNotifier {
                     ? T.text('phonesNone')
                     : server.connectedDeviceIds.isEmpty
                     ? ''
-                    : T.format('phonesConnectedCount', [server.connectedDeviceIds.toSet().length]),
+                    : T.format('phonesConnectedCount', [
+                        server.connectedDeviceIds.toSet().length,
+                      ]),
               ),
             ),
           for (final device in remote?.devices.all ?? const <PairedDevice>[])
@@ -5455,7 +6282,11 @@ class AppModel extends ChangeNotifier {
               },
             ),
           ),
-          PanelRow(id: 'profile', title: T.text('profileName'), kind: InfoRow(preferences.profileName)),
+          PanelRow(
+            id: 'profile',
+            title: T.text('profileName'),
+            kind: InfoRow(preferences.profileName),
+          ),
           PanelRow(
             id: 'launcherVolume',
             title: T.text('launcherVolume'),
@@ -5563,21 +6394,61 @@ class AppModel extends ChangeNotifier {
           ),
         ],
       ),
-      PanelCategory(id: 'steam', title: T.text('steam'), rows: steam.settingsRows()),
-      PanelCategory(id: 'controllers', title: T.text('padTitle'), rows: controllers.rows()),
-      PanelCategory(id: 'displayDefaults', title: T.text('displayDefaults'), rows: _displayDefaultRows()),
-      PanelCategory(id: 'power', title: T.text('powerTitle'), rows: powerWatch.rows()),
-      PanelCategory(id: 'presets', title: T.text('presetsTitle'), rows: _presetRows()),
-      PanelCategory(id: 'captures', title: T.text('captures'), rows: _captureRows()),
-      PanelCategory(id: 'broadcast', title: T.text('broadcastTitle'), rows: media.settingsRows()),
-      PanelCategory(id: 'shortcuts', title: T.text('shortcuts'), rows: _shortcutRows()),
+      PanelCategory(
+        id: 'steam',
+        title: T.text('steam'),
+        rows: steam.settingsRows(),
+      ),
+      PanelCategory(
+        id: 'controllers',
+        title: T.text('padTitle'),
+        rows: controllers.rows(),
+      ),
+      PanelCategory(
+        id: 'displayDefaults',
+        title: T.text('displayDefaults'),
+        rows: _displayDefaultRows(),
+      ),
+      PanelCategory(
+        id: 'power',
+        title: T.text('powerTitle'),
+        rows: powerWatch.rows(),
+      ),
+      PanelCategory(
+        id: 'presets',
+        title: T.text('presetsTitle'),
+        rows: _presetRows(),
+      ),
+      PanelCategory(
+        id: 'captures',
+        title: T.text('captures'),
+        rows: _captureRows(),
+      ),
+      PanelCategory(
+        id: 'broadcast',
+        title: T.text('broadcastTitle'),
+        rows: media.settingsRows(),
+      ),
+      PanelCategory(
+        id: 'shortcuts',
+        title: T.text('shortcuts'),
+        rows: _shortcutRows(),
+      ),
       // Fonts are rarely changed: near the end, before About.
-      PanelCategory(id: 'fonts', title: T.text('fonts'), rows: fonts.settingsRows()),
+      PanelCategory(
+        id: 'fonts',
+        title: T.text('fonts'),
+        rows: fonts.settingsRows(),
+      ),
       PanelCategory(
         id: 'about',
         title: T.text('about'),
         rows: [
-          PanelRow(id: 'about', title: 'AnyPS5', kind: InfoRow(T.text('aboutText'))),
+          PanelRow(
+            id: 'about',
+            title: 'AnyPS5',
+            kind: InfoRow(T.text('aboutText')),
+          ),
           PanelRow(
             id: 'toolkitVersion',
             title: T.text('toolkitVersion'),
@@ -5585,37 +6456,56 @@ class AppModel extends ChangeNotifier {
           ),
           ...updates.aboutRows(),
           updates.channelRow(),
-          PanelRow(id: 'author', title: T.text('madeBy'), kind: const InfoRow('Utku Halis')),
+          PanelRow(
+            id: 'author',
+            title: T.text('madeBy'),
+            kind: const InfoRow('Utku Halis'),
+          ),
           PanelRow(
             id: 'github',
             title: 'GitHub',
             detail: 'github.com/${LauncherUpdates.repository}',
-            kind: ActionRow(() => services.openUrl?.call(Uri.https('github.com', LauncherUpdates.repository))),
+            kind: ActionRow(
+              () => services.openUrl?.call(
+                Uri.https('github.com', LauncherUpdates.repository),
+              ),
+            ),
           ),
           PanelRow(
             id: 'upstream',
             title: T.text('builtOn'),
             detail: 'github.com/boykopovar/AnyPS5',
-            kind: ActionRow(() => services.openUrl?.call(Uri.https('github.com', 'boykopovar/AnyPS5'))),
+            kind: ActionRow(
+              () => services.openUrl?.call(
+                Uri.https('github.com', 'boykopovar/AnyPS5'),
+              ),
+            ),
           ),
         ],
       ),
     ];
   }
 
-  static String _percent(int value) => value == 0 ? T.text('off') : T.percent(value);
+  static String _percent(int value) =>
+      value == 0 ? T.text('off') : T.percent(value);
 
   List<PanelRow> _captureRows() {
     final unavailable = replayUnavailable;
-    final share = padLabel(preferences.shortcuts[LauncherAction.saveClip].pad) ?? '—';
-    final shot = padLabel(preferences.shortcuts[LauncherAction.screenshot].pad) ?? '—';
+    final share =
+        padLabel(preferences.shortcuts[LauncherAction.saveClip].pad) ?? '—';
+    final shot =
+        padLabel(preferences.shortcuts[LauncherAction.screenshot].pad) ?? '—';
     return [
       PanelRow(
         id: 'replayBuffer',
         title: T.text('replayBuffer'),
         detail: unavailable ?? T.text('replayBufferDetail'),
-        kind: ToggleRow(preferences.replayBuffer && unavailable == null, (value) {
+        kind: ToggleRow(preferences.replayBuffer && unavailable == null, (
+          value,
+        ) {
           if (unavailable != null) return show(unavailable);
+          if (value && waylandCapture != null)
+            return unawaited(_turnOnReplayUnderWayland(waylandCapture!));
           preferences.replayBuffer = value;
           savePreferences();
           unawaited(value ? _startReplay() : _stopReplay());
@@ -5626,13 +6516,19 @@ class AppModel extends ChangeNotifier {
           id: 'replayLength',
           title: T.text('replayLength'),
           kind: ChoiceRow(
-            [for (final seconds in ReplayBuffer.lengths) replayLengthText(seconds)],
-            ReplayBuffer.lengths.indexOf(preferences.replaySeconds).clamp(0, ReplayBuffer.lengths.length - 1),
+            [
+              for (final seconds in ReplayBuffer.lengths)
+                replayLengthText(seconds),
+            ],
+            ReplayBuffer.lengths
+                .indexOf(preferences.replaySeconds)
+                .clamp(0, ReplayBuffer.lengths.length - 1),
             (index) {
               preferences.replaySeconds = ReplayBuffer.lengths[index];
               savePreferences();
               // A new length: the buffer starts again with it.
-              if (_replay != null) unawaited(_stopReplay().then((_) => _startReplay()));
+              if (_replay != null)
+                unawaited(_stopReplay().then((_) => _startReplay()));
             },
           ),
         ),
@@ -5642,15 +6538,21 @@ class AppModel extends ChangeNotifier {
         detail: picturesFolder,
         kind: ActionRow(() => unawaited(chooseScreenshotsFolder())),
       ),
-      PanelRow(id: 'showScreenshots', title: T.text('showScreenshots'), kind: ActionRow(showScreenshots)),
+      PanelRow(
+        id: 'showScreenshots',
+        title: T.text('showScreenshots'),
+        kind: ActionRow(showScreenshots),
+      ),
       PanelRow(
         id: 'capturesHow',
         title: T.text('capturesHow'),
         kind: InfoRow(
-          T.format(preferences.replayBuffer && unavailable == null ? 'capturesHowClip' : 'capturesHowShot', [
-            share,
-            shot,
-          ]),
+          T.format(
+            preferences.replayBuffer && unavailable == null
+                ? 'capturesHowClip'
+                : 'capturesHowShot',
+            [share, shot],
+          ),
         ),
       ),
     ];
@@ -5676,7 +6578,11 @@ class AppModel extends ChangeNotifier {
             capture: () => startShortcutCapture(action),
           ),
         ),
-      PanelRow(id: 'shortcutsHow', title: T.text('shortcutsHow'), kind: InfoRow(T.text('shortcutsHowDetail'))),
+      PanelRow(
+        id: 'shortcutsHow',
+        title: T.text('shortcutsHow'),
+        kind: InfoRow(T.text('shortcutsHowDetail')),
+      ),
       PanelRow(
         id: 'gameControls',
         title: T.text('shortcutsGameButtons'),
@@ -5704,7 +6610,12 @@ class AppModel extends ChangeNotifier {
     var name = logical?.keyLabel ?? '';
     if (name.trim().isEmpty) name = logical?.debugName ?? '?';
     if (name.length == 1) name = name.toUpperCase();
-    return [if (key.control) 'Ctrl', if (key.alt) 'Alt', if (key.shift) 'Shift', name].join('+');
+    return [
+      if (key.control) 'Ctrl',
+      if (key.alt) 'Alt',
+      if (key.shift) 'Shift',
+      name,
+    ].join('+');
   }
 
   /// A controller button as the launcher writes it.
@@ -5753,9 +6664,13 @@ class AppModel extends ChangeNotifier {
         id: 'defaultDisplay',
         title: T.text('display'),
         detail: T.text('displayDefaultsDetail'),
-        kind: ChoiceRow([T.text('windowed'), T.text('fullscreen')], defaults.fullscreen ? 1 : 0, (index) {
-          change(defaults.copyWith(fullscreen: index == 1));
-        }),
+        kind: ChoiceRow(
+          [T.text('windowed'), T.text('fullscreen')],
+          defaults.fullscreen ? 1 : 0,
+          (index) {
+            change(defaults.copyWith(fullscreen: index == 1));
+          },
+        ),
       ),
       if (!defaults.fullscreen)
         PanelRow(
@@ -5773,7 +6688,10 @@ class AppModel extends ChangeNotifier {
       PanelRow(
         id: 'defaultVsync',
         title: T.text('vsync'),
-        kind: ToggleRow(defaults.vsync, (value) => change(defaults.copyWith(vsync: value))),
+        kind: ToggleRow(
+          defaults.vsync,
+          (value) => change(defaults.copyWith(vsync: value)),
+        ),
       ),
     ];
   }
@@ -5816,7 +6734,8 @@ class AppModel extends ChangeNotifier {
         },
       ),
     );
-    PanelRow section(String id, String title) => PanelRow(id: id, title: T.text(title), kind: const InfoRow(''));
+    PanelRow section(String id, String title) =>
+        PanelRow(id: id, title: T.text(title), kind: const InfoRow(''));
     return [
       section('sticksSection', 'sectionSticks'),
       tune(
@@ -5960,7 +6879,8 @@ class AppModel extends ChangeNotifier {
         detail: T.text('shaderCacheDetail'),
         kind: ToggleRow(
           settings.shaderCache ?? true,
-          (value) => change(settings.copyWith(shaderCache: value ? null : false)),
+          (value) =>
+              change(settings.copyWith(shaderCache: value ? null : false)),
         ),
       ),
       section('shareSection', 'sectionShare'),
@@ -5979,7 +6899,9 @@ class AppModel extends ChangeNotifier {
       PanelRow(
         id: 'resetAdvanced',
         title: T.text('resetAdvanced'),
-        kind: ActionRow(() => change(settings.copyWith(tuning: null, shaderCache: null))),
+        kind: ActionRow(
+          () => change(settings.copyWith(tuning: null, shaderCache: null)),
+        ),
       ),
     ];
   }
@@ -6006,7 +6928,9 @@ class AppModel extends ChangeNotifier {
       _ => null,
     };
     PanelRow held(String id, String title, PanelRow Function() row) =>
-        busy == null ? row() : PanelRow(id: id, title: title, kind: InfoRow(busy));
+        busy == null
+        ? row()
+        : PanelRow(id: id, title: title, kind: InfoRow(busy));
     final failure = failures[game.id];
     return [
       if (failure != null)
@@ -6015,7 +6939,13 @@ class AppModel extends ChangeNotifier {
           title: T.text('unlockError'),
           // The end of the error, as Update from Git shows its own; all of it goes to the clipboard.
           detail: [
-            ...failure.split('\n').reversed.take(2).toList().reversed.map((line) => line.trim()),
+            ...failure
+                .split('\n')
+                .reversed
+                .take(2)
+                .toList()
+                .reversed
+                .map((line) => line.trim()),
             T.text('unlockErrorCopy'),
           ].join(' · '),
           kind: ActionRow(() => copyFailure(game)),
@@ -6027,7 +6957,9 @@ class AppModel extends ChangeNotifier {
         // AnyPS5-ARM's engine opens the game borderless full screen itself (SDL's desktop full
         // screen), and the line says what that is; upstream's ignores the choice: the launcher
         // presses F11 for it, and says so.
-        detail: engine.readsDisplaySettingsOf(game) ? T.text('displayBorderless') : T.text('displayUpstream'),
+        detail: engine.readsDisplaySettingsOf(game)
+            ? T.text('displayBorderless')
+            : T.text('displayUpstream'),
         // Default (Settings › Default Display), then the game's own choices.
         kind: ChoiceRow(
           [
@@ -6040,21 +6972,27 @@ class AppModel extends ChangeNotifier {
             false => 1,
             true => 2,
           },
-          (index) => change(settings.copyWith(fullscreen: index == 0 ? null : index == 2)),
+          (index) => change(
+            settings.copyWith(fullscreen: index == 0 ? null : index == 2),
+          ),
         ),
       ),
       if (!display.fullscreen)
         PanelRow(
           id: 'windowSize',
           title: T.text('windowSize'),
-          detail: engine.readsDisplaySettingsOf(game) ? null : T.text('windowSizeUpstream'),
+          detail: engine.readsDisplaySettingsOf(game)
+              ? null
+              : T.text('windowSizeUpstream'),
           kind: StepperRow(
             value: display.windowSize,
             min: DisplayDefaults.minimumWindowSize,
             max: 100,
             step: 5,
             // The default's size until the game picks one.
-            format: (value) => settings.ownWindowSize == null ? byDefault(T.percent(value)) : T.percent(value),
+            format: (value) => settings.ownWindowSize == null
+                ? byDefault(T.percent(value))
+                : T.percent(value),
             set: (value) => change(settings.copyWith(windowSize: value)),
           ),
         ),
@@ -6069,8 +7007,16 @@ class AppModel extends ChangeNotifier {
             detail: T.text('resolutionReinstall'),
             kind: ChoiceRow(
               [T.text('resolutionDefault'), ...ResolutionPatch.choices],
-              settings.resolution == null ? 0 : ResolutionPatch.choices.indexOf(settings.resolution!) + 1,
-              (index) => change(settings.copyWith(resolution: index == 0 ? null : ResolutionPatch.choices[index - 1])),
+              settings.resolution == null
+                  ? 0
+                  : ResolutionPatch.choices.indexOf(settings.resolution!) + 1,
+              (index) => change(
+                settings.copyWith(
+                  resolution: index == 0
+                      ? null
+                      : ResolutionPatch.choices[index - 1],
+                ),
+              ),
             ),
           ),
         ),
@@ -6079,11 +7025,17 @@ class AppModel extends ChangeNotifier {
       PanelRow(
         id: 'upscaling',
         title: T.text('upscaling'),
-        detail: engine.readsDisplaySettingsOf(game) ? T.text('upscalingDetail') : T.text('upscalingUpstream'),
+        detail: engine.readsDisplaySettingsOf(game)
+            ? T.text('upscalingDetail')
+            : T.text('upscalingUpstream'),
         kind: ChoiceRow(
           [T.text('upscalingBilinear'), T.text('upscalingFsr1')],
           (settings.upscaler ?? Upscaler.bilinear).index,
-          (index) => change(settings.copyWith(upscaler: index == 0 ? null : Upscaler.values[index])),
+          (index) => change(
+            settings.copyWith(
+              upscaler: index == 0 ? null : Upscaler.values[index],
+            ),
+          ),
         ),
       ),
       if (settings.upscaler == Upscaler.fsr1)
@@ -6104,7 +7056,11 @@ class AppModel extends ChangeNotifier {
         id: 'vsync',
         title: T.text('vsync'),
         kind: ChoiceRow(
-          [byDefault(T.text(defaults.vsync ? 'on' : 'off')), T.text('on'), T.text('off')],
+          [
+            byDefault(T.text(defaults.vsync ? 'on' : 'off')),
+            T.text('on'),
+            T.text('off'),
+          ],
           // Frame generation needs vertical sync: on whatever is chosen while it is on.
           switch (settings.ownVsync) {
             _ when settings.frameGeneration == true => 1,
@@ -6112,7 +7068,8 @@ class AppModel extends ChangeNotifier {
             true => 1,
             false => 2,
           },
-          (index) => change(settings.copyWith(vsync: index == 0 ? null : index == 1)),
+          (index) =>
+              change(settings.copyWith(vsync: index == 0 ? null : index == 1)),
         ),
       ),
       PanelRow(
@@ -6122,12 +7079,14 @@ class AppModel extends ChangeNotifier {
         detail: !engine.readsDisplaySettingsOf(game)
             ? T.text('frameGenerationUpstream')
             // Settings › Battery & Heat holds it paused now.
-            : settings.frameGeneration == true && powerWatch.adjustment.pauseFrameGeneration
+            : settings.frameGeneration == true &&
+                  powerWatch.adjustment.pauseFrameGeneration
             ? T.text('frameGenerationPaused')
             : T.text('frameGenerationDetail'),
         kind: ToggleRow(
           settings.frameGeneration == true,
-          (value) => change(settings.copyWith(frameGeneration: value ? true : null)),
+          (value) =>
+              change(settings.copyWith(frameGeneration: value ? true : null)),
         ),
       ),
       if (!settings.followsDisplayDefaults)
@@ -6149,7 +7108,8 @@ class AppModel extends ChangeNotifier {
             T.text('overlayBottomRight'),
           ],
           settings.overlay.index,
-          (index) => change(settings.copyWith(overlay: OverlayCorner.values[index])),
+          (index) =>
+              change(settings.copyWith(overlay: OverlayCorner.values[index])),
         ),
       ),
       if (settings.overlay != OverlayCorner.off)
@@ -6159,7 +7119,9 @@ class AppModel extends ChangeNotifier {
           kind: ChoiceRow(
             [T.text('overlayMinimal'), T.text('overlayDetailed')],
             settings.style.index,
-            (index) => change(settings.copyWith(overlayStyle: OverlayStyle.values[index])),
+            (index) => change(
+              settings.copyWith(overlayStyle: OverlayStyle.values[index]),
+            ),
           ),
         ),
       PanelRow(
@@ -6168,7 +7130,11 @@ class AppModel extends ChangeNotifier {
         kind: ChoiceRow(
           [T.text('followLauncher'), for (final entry in languages) entry.$2],
           languageIndex,
-          (index) => change(settings.copyWith(language: index == 0 ? null : languages[index - 1].$1)),
+          (index) => change(
+            settings.copyWith(
+              language: index == 0 ? null : languages[index - 1].$1,
+            ),
+          ),
         ),
       ),
       ...engine.gameRows(game),
@@ -6218,14 +7184,26 @@ class AppModel extends ChangeNotifier {
             }),
           ),
         ),
-        PanelRow(id: 'log', title: T.text('openLog'), kind: ActionRow(() => open(Layer.log))),
+        PanelRow(
+          id: 'log',
+          title: T.text('openLog'),
+          kind: ActionRow(() => open(Layer.log)),
+        ),
         ..._reportRows(game, settings, change),
         PanelRow(
           id: 'folder',
           title: T.text('showInFinder'),
-          kind: ActionRow(() => services.openFolder?.call(Installer.installedFolder(game, rootOf(game)!))),
+          kind: ActionRow(
+            () => services.openFolder?.call(
+              Installer.installedFolder(game, rootOf(game)!),
+            ),
+          ),
         ),
-        PanelRow(id: 'cache', title: T.text('clearShaderCache'), kind: ActionRow(() => clearShaderCache(game))),
+        PanelRow(
+          id: 'cache',
+          title: T.text('clearShaderCache'),
+          kind: ActionRow(() => clearShaderCache(game)),
+        ),
         PanelRow(
           id: 'backup',
           title: T.text('backUpSaves'),
@@ -6259,11 +7237,18 @@ class AppModel extends ChangeNotifier {
           () => PanelRow(
             id: 'uninstall',
             title: T.text('uninstall'),
-            kind: ActionRow(() => open(Layer.confirmUninstall), destructive: true),
+            kind: ActionRow(
+              () => open(Layer.confirmUninstall),
+              destructive: true,
+            ),
           ),
         ),
       ] else ...[
-        PanelRow(id: 'log', title: T.text('openLog'), kind: ActionRow(() => open(Layer.log))),
+        PanelRow(
+          id: 'log',
+          title: T.text('openLog'),
+          kind: ActionRow(() => open(Layer.log)),
+        ),
         ..._reportRows(game, settings, change),
       ],
     ];
@@ -6277,7 +7262,8 @@ class AppModel extends ChangeNotifier {
       PanelRow(
         id: 'cancelJob',
         title: T.text(updating ? 'cancelUpdate' : 'cancelUnlock'),
-        detail: '${InstallSpan.title(step)} · ${T.percent((overall * 100).round())}',
+        detail:
+            '${InstallSpan.title(step)} · ${T.percent((overall * 100).round())}',
         kind: ActionRow(() => cancelUnlock(game), destructive: true),
       ),
     ],
@@ -6291,7 +7277,11 @@ class AppModel extends ChangeNotifier {
     ],
     // Looking at the remote takes a moment and changes nothing: there is nothing to stop yet.
     WaitingForEngine(job: EngineJob(checking: true)) => [
-      PanelRow(id: 'engineJob', title: T.text('engineGitChecking'), kind: const InfoRow('')),
+      PanelRow(
+        id: 'engineJob',
+        title: T.text('engineGitChecking'),
+        kind: const InfoRow(''),
+      ),
     ],
     WaitingForEngine() => [
       PanelRow(
@@ -6316,7 +7306,11 @@ class AppModel extends ChangeNotifier {
   };
 
   /// The last start's crash report, detailed logging, and (installed) one start with it.
-  List<PanelRow> _reportRows(Game game, GameSettings settings, void Function(GameSettings) change) => [
+  List<PanelRow> _reportRows(
+    Game game,
+    GameSettings settings,
+    void Function(GameSettings) change,
+  ) => [
     PanelRow(
       id: 'report',
       title: T.text('lastSessionReport'),
@@ -6330,7 +7324,10 @@ class AppModel extends ChangeNotifier {
       id: 'trace',
       title: T.text('traceTitle'),
       detail: T.text('traceDetail'),
-      kind: ToggleRow(settings.trace == true, (value) => change(settings.copyWith(trace: value ? true : null))),
+      kind: ToggleRow(
+        settings.trace == true,
+        (value) => change(settings.copyWith(trace: value ? true : null)),
+      ),
     ),
     if (stateOf(game) is Installed)
       PanelRow(
@@ -6348,14 +7345,19 @@ class AppModel extends ChangeNotifier {
   /// sensitivity, when it aims, invert and its dead zone (GyroAiming).
   List<PanelRow> _gyroRows(Game game, GameSettings settings) {
     final aim = settings.gyro ?? const GyroAiming();
-    void change(GyroAiming changed) =>
-        saveSettings(game, settings.copyWith(gyro: changed == const GyroAiming() ? null : changed));
+    void change(GyroAiming changed) => saveSettings(
+      game,
+      settings.copyWith(gyro: changed == const GyroAiming() ? null : changed),
+    );
     return [
       PanelRow(
         id: 'gyro',
         title: T.text('gyro'),
         detail: T.text('gyroDetail'),
-        kind: ToggleRow(aim.enabled, (value) => change(aim.copyWith(enabled: value))),
+        kind: ToggleRow(
+          aim.enabled,
+          (value) => change(aim.copyWith(enabled: value)),
+        ),
       ),
       if (aim.enabled) ...[
         PanelRow(
@@ -6376,16 +7378,23 @@ class AppModel extends ChangeNotifier {
           title: T.text('gyroActivation'),
           detail: T.text('gyroActivationDetail'),
           kind: ChoiceRow(
-            [for (final activation in GyroActivation.values) T.text('gyro_${activation.name}')],
+            [
+              for (final activation in GyroActivation.values)
+                T.text('gyro_${activation.name}'),
+            ],
             aim.activation.index,
-            (index) => change(aim.copyWith(activation: GyroActivation.values[index])),
+            (index) =>
+                change(aim.copyWith(activation: GyroActivation.values[index])),
           ),
         ),
         PanelRow(
           id: 'gyroInvert',
           title: T.text('gyroInvert'),
           kind: ChoiceRow(
-            [for (final invert in GyroInvert.values) T.text('gyroInvert_${invert.name}')],
+            [
+              for (final invert in GyroInvert.values)
+                T.text('gyroInvert_${invert.name}'),
+            ],
             aim.invert.index,
             (index) => change(aim.copyWith(invert: GyroInvert.values[index])),
           ),
@@ -6414,7 +7423,12 @@ class AppModel extends ChangeNotifier {
     final actions = gameControls[game.id] ?? const <PadAction, List<String>>{};
     return [
       ..._gyroRows(game, settings),
-      if (actions.isNotEmpty) PanelRow(id: 'fromGame', title: T.text('controlsFromGame'), kind: const InfoRow('')),
+      if (actions.isNotEmpty)
+        PanelRow(
+          id: 'fromGame',
+          title: T.text('controlsFromGame'),
+          kind: const InfoRow(''),
+        ),
       for (final action in PadAction.values)
         PanelRow(
           id: action.key,
@@ -6440,7 +7454,10 @@ class AppModel extends ChangeNotifier {
       PanelRow(
         id: 'reset',
         title: T.text('resetControls'),
-        kind: ActionRow(() => saveSettings(game, settings.copyWith(controls: null)), destructive: true),
+        kind: ActionRow(
+          () => saveSettings(game, settings.copyWith(controls: null)),
+          destructive: true,
+        ),
       ),
     ];
   }
@@ -6457,7 +7474,13 @@ class AppModel extends ChangeNotifier {
     sounds.play(Cue.move);
     saveSettings(
       game,
-      settings.copyWith(controls: Controls.assign('KEY:$name', action, settings.controls ?? const {})),
+      settings.copyWith(
+        controls: Controls.assign(
+          'KEY:$name',
+          action,
+          settings.controls ?? const {},
+        ),
+      ),
     );
     return true;
   }
@@ -6476,14 +7499,22 @@ class AppModel extends ChangeNotifier {
       PadAction.down => '${T.text('dpad')} · ${direction('directionDown')}',
       PadAction.left => '${T.text('dpad')} · ${direction('directionLeft')}',
       PadAction.right => '${T.text('dpad')} · ${direction('directionRight')}',
-      PadAction.leftStickUp => '${T.text('leftStick')} · ${direction('directionUp')}',
-      PadAction.leftStickDown => '${T.text('leftStick')} · ${direction('directionDown')}',
-      PadAction.leftStickLeft => '${T.text('leftStick')} · ${direction('directionLeft')}',
-      PadAction.leftStickRight => '${T.text('leftStick')} · ${direction('directionRight')}',
-      PadAction.rightStickUp => '${T.text('rightStick')} · ${direction('directionUp')}',
-      PadAction.rightStickDown => '${T.text('rightStick')} · ${direction('directionDown')}',
-      PadAction.rightStickLeft => '${T.text('rightStick')} · ${direction('directionLeft')}',
-      PadAction.rightStickRight => '${T.text('rightStick')} · ${direction('directionRight')}',
+      PadAction.leftStickUp =>
+        '${T.text('leftStick')} · ${direction('directionUp')}',
+      PadAction.leftStickDown =>
+        '${T.text('leftStick')} · ${direction('directionDown')}',
+      PadAction.leftStickLeft =>
+        '${T.text('leftStick')} · ${direction('directionLeft')}',
+      PadAction.leftStickRight =>
+        '${T.text('leftStick')} · ${direction('directionRight')}',
+      PadAction.rightStickUp =>
+        '${T.text('rightStick')} · ${direction('directionUp')}',
+      PadAction.rightStickDown =>
+        '${T.text('rightStick')} · ${direction('directionDown')}',
+      PadAction.rightStickLeft =>
+        '${T.text('rightStick')} · ${direction('directionLeft')}',
+      PadAction.rightStickRight =>
+        '${T.text('rightStick')} · ${direction('directionRight')}',
       PadAction.stickModifier => T.text('padStickModifier'),
       _ => action.key,
     };
@@ -6524,7 +7555,9 @@ class AppModel extends ChangeNotifier {
     // destructive one, from the keys and the pad alike.
     if (twoChoice && (command == Command.left || command == Command.right)) {
       final target = rows.indexWhere(
-        (row) => row.kind is ActionRow && (row.kind as ActionRow).destructive == (command == Command.right),
+        (row) =>
+            row.kind is ActionRow &&
+            (row.kind as ActionRow).destructive == (command == Command.right),
       );
       if (target >= 0 && target != panelRow) {
         panelRow = target;
@@ -6539,8 +7572,11 @@ class AppModel extends ChangeNotifier {
       panelSections = false;
       editingValue = null;
     }
-    if (row?.kind case ShortcutRow(:final capture) when command == Command.select) return capture();
-    if (row?.id case final String id when command == Command.options && id.startsWith('shortcut-')) {
+    if (row?.kind case ShortcutRow(:final capture)
+        when command == Command.select)
+      return capture();
+    if (row?.id case final String id
+        when command == Command.options && id.startsWith('shortcut-')) {
       final action = LauncherAction.byName(id.substring('shortcut-'.length));
       if (action != null) return clearShortcut(action);
     }
@@ -6548,7 +7584,9 @@ class AppModel extends ChangeNotifier {
       case Command.up || Command.down:
         final next = nextFocusable(panelRow, command == Command.down ? 1 : -1);
         // ↑ on Settings' first row: onto the search field.
-        if (command == Command.up && overlay == Layer.settings && nextFocusable(panelRow, -1) == panelRow) {
+        if (command == Command.up &&
+            overlay == Layer.settings &&
+            nextFocusable(panelRow, -1) == panelRow) {
           return _toSearch();
         }
         if (next != panelRow) sounds.play(Cue.move);
@@ -6570,7 +7608,11 @@ class AppModel extends ChangeNotifier {
             // A held arrow (a key, the pad or the mouse on − +) speeds up on this row.
             final id = row!.id;
             final hold = _stepHold;
-            final repeats = _repeatingNow && hold != null && hold.row == id && hold.delta == delta
+            final repeats =
+                _repeatingNow &&
+                    hold != null &&
+                    hold.row == id &&
+                    hold.delta == delta
                 ? hold.repeats + 1
                 : 0;
             _stepHold = (row: id, delta: delta, repeats: repeats);
@@ -6584,7 +7626,10 @@ class AppModel extends ChangeNotifier {
             sounds.play(Cue.move);
           default:
             if (overlay == Layer.settings && categories.length > 1) {
-              final next = (panelCategory + delta).clamp(0, categories.length - 1);
+              final next = (panelCategory + delta).clamp(
+                0,
+                categories.length - 1,
+              );
               if (next != panelCategory) sounds.play(Cue.move);
               panelCategory = next;
               panelRow = 0;
@@ -6625,7 +7670,11 @@ class AppModel extends ChangeNotifier {
 
   /// A controller's command in a panel: the sections' column and edit mode (the keys and the
   /// mouse keep the old ways). True when it was handled here.
-  bool _padPanelCommand(Command command, PanelRow? row, List<PanelCategory> categories) {
+  bool _padPanelCommand(
+    Command command,
+    PanelRow? row,
+    List<PanelCategory> categories,
+  ) {
     final sections = overlay == Layer.settings && categories.length > 1;
     if (panelSections && sections) {
       switch (command) {
@@ -6647,7 +7696,9 @@ class AppModel extends ChangeNotifier {
       return true;
     }
     final editable = row?.kind is ChoiceRow || row?.kind is StepperRow;
-    if (editingValue != null && (row == null || row.id != editingValue || !editable)) editingValue = null;
+    if (editingValue != null &&
+        (row == null || row.id != editingValue || !editable))
+      editingValue = null;
     if (editingValue != null) {
       switch (command) {
         case Command.left || Command.right:
@@ -6740,7 +7791,10 @@ class AppModel extends ChangeNotifier {
   /// The pointer moved over a row: the focus follows it, quietly, and the list stays put.
   void hoverRow(int index) {
     final rows = _currentRows;
-    if ((index == panelRow && !settingsSearchFocused) || index < 0 || index >= rows.length || !rows[index].focusable) {
+    if ((index == panelRow && !settingsSearchFocused) ||
+        index < 0 ||
+        index >= rows.length ||
+        !rows[index].focusable) {
       return;
     }
     panelRow = index;
@@ -6803,7 +7857,8 @@ class AppModel extends ChangeNotifier {
   int onboardingStep = 0;
   final Map<int, int> _onboardingChoices = {};
 
-  int get onboardingChoice => _onboardingChoices[onboardingStep] ?? _defaultChoice(onboardingStep);
+  int get onboardingChoice =>
+      _onboardingChoices[onboardingStep] ?? _defaultChoice(onboardingStep);
   set onboardingChoice(int value) => _onboardingChoices[onboardingStep] = value;
 
   int _defaultChoice(int step) => switch (step) {
@@ -6824,7 +7879,9 @@ class AppModel extends ChangeNotifier {
   void _onboardingCommand(Command command) {
     // The last step: the cards, or the sign-in they lead to.
     if (onboardingStep == 4) {
-      overlay == Layer.signIn ? _signInCommand(command) : modeChoiceCommand(command);
+      overlay == Layer.signIn
+          ? _signInCommand(command)
+          : modeChoiceCommand(command);
       return;
     }
     switch (command) {
@@ -6840,7 +7897,9 @@ class AppModel extends ChangeNotifier {
         }
       // The languages are rows of cards: up and down move a row.
       case Command.up || Command.down when onboardingStep == 0:
-        final next = onboardingChoice + (command == Command.down ? languageColumns : -languageColumns);
+        final next =
+            onboardingChoice +
+            (command == Command.down ? languageColumns : -languageColumns);
         if (next >= 0 && next < _onboardingCount) {
           onboardingChoice = next;
           _previewChoice();
@@ -6891,7 +7950,8 @@ class AppModel extends ChangeNotifier {
           case 1:
             unawaited(
               chooseToolkit().then((_) {
-                if (toolkit != null && onboardingStep == 3) onboardingChoice = 2;
+                if (toolkit != null && onboardingStep == 3)
+                  onboardingChoice = 2;
                 notifyListeners();
               }),
             );
@@ -6987,7 +8047,11 @@ class AppModel extends ChangeNotifier {
       final devices = PairedDevices(paths.pairedDevicesFile);
       final RemoteServer server;
       if (services.preferredPorts) {
-        server = await RemoteServer.startPreferred(name: name, devices: devices, events: events);
+        server = await RemoteServer.startPreferred(
+          name: name,
+          devices: devices,
+          events: events,
+        );
       } else {
         server = RemoteServer(name: name, devices: devices, events: events);
         await server.start();
@@ -6999,7 +8063,8 @@ class AppModel extends ChangeNotifier {
       remoteError = null;
       if (services.cable) {
         final adb = await AdbTunnel.locate();
-        if (adb != null) _adb = AdbTunnel(adb: adb, targetPort: server.port!)..start();
+        if (adb != null)
+          _adb = AdbTunnel(adb: adb, targetPort: server.port!)..start();
         _usb = UsbTunnel(targetPort: server.port!)..start();
       }
       if (!services.advertise) {
@@ -7007,8 +8072,16 @@ class AppModel extends ChangeNotifier {
         return;
       }
       final advertiser = await AvahiAdvertiser.available()
-          ? AvahiAdvertiser(instance: name, serviceType: RemoteServer.serviceType, port: server.port!)
-          : MdnsResponder(instance: name, serviceType: RemoteServer.serviceType, port: server.port!);
+          ? AvahiAdvertiser(
+              instance: name,
+              serviceType: RemoteServer.serviceType,
+              port: server.port!,
+            )
+          : MdnsResponder(
+              instance: name,
+              serviceType: RemoteServer.serviceType,
+              port: server.port!,
+            );
       try {
         await advertiser.start();
         _advertiser = advertiser;
@@ -7069,7 +8142,8 @@ class AppModel extends ChangeNotifier {
       case RemoteCommand(name: 'capture'):
         // Create on the phone's pad: a clip (or a picture) of the game, the game staying in front.
         unawaited(saveClip());
-      case RemoteCommand(:final name) when name == 'broadcastStart' || name == 'broadcastStop':
+      case RemoteCommand(:final name)
+          when name == 'broadcastStart' || name == 'broadcastStop':
         // Go Live and End Broadcast on the phone.
         media.phoneBroadcast(name == 'broadcastStart');
       case RemoteCommand(:final name):
@@ -7105,10 +8179,21 @@ class AppModel extends ChangeNotifier {
             return null;
           }
         }
-        remote?.tell(RemoteArt(id: id, icon: encode(game.icon), background: encode(game.background)), deviceId);
+        remote?.tell(
+          RemoteArt(
+            id: id,
+            icon: encode(game.icon),
+            background: encode(game.background),
+          ),
+          deviceId,
+        );
       case RemoteSaveLayout(:final id, :final layout):
         final game = games.where((game) => game.id == id).firstOrNull;
-        if (game != null) saveSettings(game, currentSettings(game).copyWith(phoneLayout: layout));
+        if (game != null)
+          saveSettings(
+            game,
+            currentSettings(game).copyWith(phoneLayout: layout),
+          );
       case RemoteTogetherHandoff() || RemoteTogetherHandoffAnswer():
         together.phoneMessage(message, deviceId);
       default:
@@ -7126,16 +8211,20 @@ class AppModel extends ChangeNotifier {
             id: game.id,
             name: game.name,
             state: switch (stateOf(game)) {
-              Installed(:final outdated) => outdated ? RemoteGameState.update : RemoteGameState.installed,
+              Installed(:final outdated) =>
+                outdated ? RemoteGameState.update : RemoteGameState.installed,
               Locked() || Failed() || FamilyLocked() => RemoteGameState.locked,
               // The phone has no word for the engine's build: busy with the game, as an unlock is.
-              Queued() || Installing() || WaitingForEngine() => RemoteGameState.installing,
+              Queued() ||
+              Installing() ||
+              WaitingForEngine() => RemoteGameState.installing,
               Starting() => RemoteGameState.starting,
               Running() || Stopping() => RemoteGameState.running,
               Unreadable() => RemoteGameState.unavailable,
             },
             trophies: switch (trophies[game.id]) {
-              final TrophySet set => '${set.unlockedCount}/${set.trophies.length}',
+              final TrophySet set =>
+                '${set.unlockedCount}/${set.trophies.length}',
               null => null,
             },
             art:

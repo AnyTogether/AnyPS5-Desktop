@@ -5,6 +5,11 @@ release when it is made.
 
 ## Next release
 
+- **The replay buffer, Remote Play and broadcasting can record under Wayland on Linux.** Your
+  desktop asks which window to share, and you choose the game. The launcher says so when you turn the
+  replay buffer on, and the desktop can remember the window next time. It needs PipeWire,
+  xdg-desktop-portal and GStreamer's tools with its PipeWire plugin. The launcher names what is
+  missing. Not yet tested on a real Wayland desktop. X11 records as before.
 - **Send a picture in any chat**, as on the Mac: a conversation's options (△) have Send a photo, for
   several files at once, in conversations that aren't encrypted too. Each one is drawn again here,
   so no location or camera data goes along.

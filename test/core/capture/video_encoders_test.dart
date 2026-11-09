@@ -71,7 +71,7 @@ void main() {
     expect(ScreenGrab.input(system: HostSystem.linux, environment: const {'DISPLAY': ':0'}, framesPerSecond: 30).last, ':0');
   });
 
-  test('Wayland cannot be recorded, X11 and Windows can', () {
+  test('X11 and Windows have a screen input; Wayland has the portal instead', () {
     expect(ScreenGrab.supported(HostSystem.windows, const {}), isTrue);
     expect(ScreenGrab.supported(HostSystem.linux, const {'DISPLAY': ':0', 'XDG_SESSION_TYPE': 'x11'}), isTrue);
     expect(ScreenGrab.supported(HostSystem.linux, const {'DISPLAY': ':0', 'XDG_SESSION_TYPE': 'wayland'}), isFalse);

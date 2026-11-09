@@ -3,11 +3,13 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart' show RTCVideoView, RTCVideoViewObjectFit;
+import 'package:flutter_webrtc/flutter_webrtc.dart'
+    show RTCVideoView, RTCVideoViewObjectFit;
 
 import '../core/capture/game_sound.dart';
 import '../core/capture/stream_packet.dart';
 import '../core/capture/video_encoders.dart';
+import '../core/capture/wayland_capture.dart';
 import '../core/controllers/pad_info.dart';
 import '../core/desktop/desktop.dart';
 import '../core/remote/remote_server.dart';
@@ -56,7 +58,8 @@ class SharePlayModel {
   PadState? Function()? padOverride;
   SharePlayClient? clientOverride;
 
-  SharePlayClient get _client => clientOverride ?? SharePlayClient(app.together.account);
+  SharePlayClient get _client =>
+      clientOverride ?? SharePlayClient(app.together.account);
 
   /// What the server holds (a media server or not, and how many it lets watch); the mesh's four
   /// until it answers.
@@ -95,9 +98,21 @@ class SharePlayModel {
   /// Why share play cannot start here, or null when it can.
   String? get unavailable {
     if (!app.together.signedIn) return T.text('sharePlaySignInFirst');
-    if (!(app.together.family.rules?.sharePlay ?? true)) return T.text('familyNoSharePlay');
-    if (engineOverride == null && !ScreenGrab.supported(app.system, app.services.environment ?? Platform.environment)) {
-      return T.text('replayNoScreen');
+    if (!(app.together.family.rules?.sharePlay ?? true))
+      return T.text('familyNoSharePlay');
+    if (engineOverride == null &&
+        !ScreenGrab.supported(
+          app.system,
+          app.services.environment ?? Platform.environment,
+        )) {
+      return T.text(
+        WaylandCapture.applies(
+              app.system,
+              app.services.environment ?? Platform.environment,
+            )
+            ? 'sharePlayNoWayland'
+            : 'replayNoScreen',
+      );
     }
     return null;
   }
@@ -108,7 +123,9 @@ class SharePlayModel {
     final reason = unavailable;
     if (reason != null) return app.show(reason);
     final desktop = app.desktop;
-    final title = desktop is GameAreas ? (desktop as GameAreas).gameTitle(playing.$2.pid) : null;
+    final title = desktop is GameAreas
+        ? (desktop as GameAreas).gameTitle(playing.$2.pid)
+        : null;
     starting = true;
     app.refresh();
     final engine = engineOverride?.call() ?? WebRtcShare();
@@ -139,25 +156,39 @@ class SharePlayModel {
         iceServers: started.iceServers,
         router: SharePadRouter(bridges),
         signal: (to, device, kind, data) => app.together.hub.socket.send(
-          ShareSignal.frame(to: to, device: device, share: started.sharePlay.id, kind: kind, data: data),
+          ShareSignal.frame(
+            to: to,
+            device: device,
+            share: started.sharePlay.id,
+            kind: kind,
+            data: data,
+          ),
         ),
         changed: app.refresh,
       );
       _session = session;
       remote?.padOutput = session.padOutput;
       _renew(started.expiresAt);
-      _measure = Timer.periodic(const Duration(seconds: 2), (_) => unawaited(session.measure()));
+      _measure = Timer.periodic(
+        const Duration(seconds: 2),
+        (_) => unawaited(session.measure()),
+      );
       await _apply(started.sharePlay, access: started.sfu);
       app.show(T.format('sharePlayStarted', [game.name]));
       await _startSound(session, playing.$2.pid);
       final opus = engine.hasSound ? 'Opus track on request' : 'no Opus track';
-      app.addRecentLine('${DateTime.now().toIso8601String()} share play: $opus, PCM ${_sound?.reach.name ?? 'none'}');
+      app.addRecentLine(
+        '${DateTime.now().toIso8601String()} share play: $opus, PCM ${_sound?.reach.name ?? 'none'}',
+      );
     } on Object catch (error) {
       await engine.stop();
       // More viewers than this server takes without a media server: said on its own, as the Mac.
-      final serverOff = error is TogetherProblem && error.code == 'media_server_off';
+      final serverOff =
+          error is TogetherProblem && error.code == 'media_server_off';
       final message = app.together.message(error);
-      app.show(serverOff ? message : '${T.text('sharePlayCouldNotStart')}: $message');
+      app.show(
+        serverOff ? message : '${T.text('sharePlayCouldNotStart')}: $message',
+      );
     } finally {
       starting = false;
       app.refresh();
@@ -208,9 +239,13 @@ class SharePlayModel {
           : await MediaServerClient(app.together.account).sharePlay(session.id);
       if (_session != session) return unawaited(publisher.close());
       await publisher.start(given);
-      app.addRecentLine('${DateTime.now().toIso8601String()} share play: published to the media server');
+      app.addRecentLine(
+        '${DateTime.now().toIso8601String()} share play: published to the media server',
+      );
     } on Object catch (error) {
-      app.addRecentLine('${DateTime.now().toIso8601String()} share play: media server: $error');
+      app.addRecentLine(
+        '${DateTime.now().toIso8601String()} share play: media server: $error',
+      );
       if (_session != session) return;
       _publisher = null;
       app.show(T.text('sharePlayMediaServerFailed'));
@@ -222,18 +257,22 @@ class SharePlayModel {
   void _renew(DateTime? expiresAt) {
     _renewal?.cancel();
     if (expiresAt == null) return;
-    final wait = expiresAt.difference(DateTime.now()) - const Duration(minutes: 10);
-    _renewal = Timer(wait.isNegative ? const Duration(seconds: 1) : wait, () async {
-      final session = _session;
-      if (session == null) return;
-      try {
-        final renewed = await _client.iceServers(session.id);
-        await session.renew(renewed.iceServers);
-        _renew(renewed.expiresAt);
-      } on Object {
-        // The connections keep their relays until they run out.
-      }
-    });
+    final wait =
+        expiresAt.difference(DateTime.now()) - const Duration(minutes: 10);
+    _renewal = Timer(
+      wait.isNegative ? const Duration(seconds: 1) : wait,
+      () async {
+        final session = _session;
+        if (session == null) return;
+        try {
+          final renewed = await _client.iceServers(session.id);
+          await session.renew(renewed.iceServers);
+          _renew(renewed.expiresAt);
+        } on Object {
+          // The connections keep their relays until they run out.
+        }
+      },
+    );
   }
 
   /// The gateway's share play events (from TogetherModel), for the share play hosted and the
@@ -248,9 +287,15 @@ class SharePlayModel {
       case 'share_play.invite':
         final invite = ShareInvite.fromJson(data);
         if (invite == null) return;
-        invites = [...invites.where((known) => known.sharePlayId != invite.sharePlayId), invite];
+        invites = [
+          ...invites.where((known) => known.sharePlayId != invite.sharePlayId),
+          invite,
+        ];
         app.show(
-          T.format('sharePlayInvitedYou', [invite.from?.displayName ?? '', _gameName(invite.titleId, invite.title)]),
+          T.format('sharePlayInvitedYou', [
+            invite.from?.displayName ?? '',
+            _gameName(invite.titleId, invite.title),
+          ]),
         );
         app.refresh();
       case 'share_play.updated' when session != null:
@@ -259,7 +304,8 @@ class SharePlayModel {
         } on Object {
           // Not a share play: nothing to follow.
         }
-      case 'share_play.request' when session != null && data['sharePlayId'] == session.id:
+      case 'share_play.request'
+          when session != null && data['sharePlayId'] == session.id:
         // Someone asked to watch, from the public list or with the code: said, and listed.
         final from = data['from'];
         if (from is! Map<String, dynamic> || from['userId'] is! String) return;
@@ -267,9 +313,16 @@ class SharePlayModel {
         if (data['via'] == 'code') codeAskers.add(person.id);
         final current = hosting;
         if (current != null) {
-          hosting = current.copyWith(requests: [...current.requests.where((known) => known.id != person.id), person]);
+          hosting = current.copyWith(
+            requests: [
+              ...current.requests.where((known) => known.id != person.id),
+              person,
+            ],
+          );
         }
-        app.show(T.format('discoverAsksWatch', [TogetherModel.shown(person).name]));
+        app.show(
+          T.format('discoverAsksWatch', [TogetherModel.shown(person).name]),
+        );
         app.refresh();
       case 'share_play.signal' when session != null:
         final signal = ShareSignal.fromJson(data);
@@ -301,7 +354,8 @@ class SharePlayModel {
     _publisher = null;
     _publisherTried = false;
     codeAskers.clear();
-    if (publisher != null) unawaited(publisher.close().catchError((Object _) {}));
+    if (publisher != null)
+      unawaited(publisher.close().catchError((Object _) {}));
     _renewal?.cancel();
     _measure?.cancel();
     _measure = null;
@@ -342,7 +396,8 @@ class SharePlayModel {
     );
   }
 
-  void stopPlaying(ShareViewer viewer) => unawaited(_call((id) => _client.setPad(id, viewer.user.id, null)));
+  void stopPlaying(ShareViewer viewer) =>
+      unawaited(_call((id) => _client.setPad(id, viewer.user.id, null)));
 
   void remove(ShareViewer viewer) => unawaited(
     _call((id) async {
@@ -373,12 +428,17 @@ class SharePlayModel {
   // Listing in public, people asking to watch, the code.
 
   /// Lists the share play in public, or takes it off (null).
-  void list(ShareListing? listing) => unawaited(_call((id) => _client.setListing(id, listing)));
+  void list(ShareListing? listing) =>
+      unawaited(_call((id) => _client.setListing(id, listing)));
 
   /// Lets someone who asked to watch in, or not.
   void answer(Person person, {required bool accept}) => unawaited(
     _call((id) async {
-      final updated = await _client.answerRequest(id, person.id, accept: accept);
+      final updated = await _client.answerRequest(
+        id,
+        person.id,
+        accept: accept,
+      );
       codeAskers.remove(person.id);
       if (accept) app.show(T.format('sharePlayInvited', [person.displayName]));
       return updated;
@@ -418,7 +478,10 @@ class SharePlayModel {
       PanelRow(
         id: 'share-request-accept-${person.id}',
         title: T.format('discoverLetWatch', [TogetherModel.shown(person).name]),
-        detail: ['@${person.handle}', if (codeAskers.contains(person.id)) T.text('partyRequestWithCode')].join(' · '),
+        detail: [
+          '@${person.handle}',
+          if (codeAskers.contains(person.id)) T.text('partyRequestWithCode'),
+        ].join(' · '),
         person: TogetherModel.card(person),
         kind: ActionRow(() => answer(person, accept: true)),
       ),
@@ -434,21 +497,42 @@ class SharePlayModel {
   /// stopping it; making one where the family lets the user be found.
   List<PanelRow> codeRows(SharePlay sharing) {
     final code = sharing.joinCode;
-    if (code != null && (code.expiresAt == null || code.expiresAt!.isAfter(DateTime.now()))) {
+    if (code != null &&
+        (code.expiresAt == null || code.expiresAt!.isAfter(DateTime.now()))) {
       return [
-        PanelRow(id: 'share-code', title: code.shown, detail: T.text('partyCodeDetail'), kind: const InfoRow('')),
+        PanelRow(
+          id: 'share-code',
+          title: code.shown,
+          detail: T.text('partyCodeDetail'),
+          kind: const InfoRow(''),
+        ),
         PanelRow(
           id: 'share-code-copy',
           title: T.text('partyCodeCopy'),
-          kind: ActionRow(() => app.together.copy(code.shown, T.text('partyCodeCopied'))),
+          kind: ActionRow(
+            () => app.together.copy(code.shown, T.text('partyCodeCopied')),
+          ),
         ),
         PanelRow(
           id: 'share-code-link',
           title: T.text('partyCodeCopyLink'),
-          kind: ActionRow(() => app.together.copy(code.url.toString(), T.text('partyLinkCopied'))),
+          kind: ActionRow(
+            () => app.together.copy(
+              code.url.toString(),
+              T.text('partyLinkCopied'),
+            ),
+          ),
         ),
-        PanelRow(id: 'share-code-new', title: T.text('partyCodeNew'), kind: ActionRow(makeCode)),
-        PanelRow(id: 'share-code-stop', title: T.text('partyCodeStop'), kind: ActionRow(stopCode, destructive: true)),
+        PanelRow(
+          id: 'share-code-new',
+          title: T.text('partyCodeNew'),
+          kind: ActionRow(makeCode),
+        ),
+        PanelRow(
+          id: 'share-code-stop',
+          title: T.text('partyCodeStop'),
+          kind: ActionRow(stopCode, destructive: true),
+        ),
       ];
     }
     if (!app.together.matchmakingAllowed) return const [];
@@ -474,7 +558,11 @@ class SharePlayModel {
         title: T.text('discoverListPublic'),
         detail: T.text('discoverListPublicDetail'),
         kind: ChoiceRow(
-          [T.text('discoverListOff'), T.text('discoverListAsk'), T.text('discoverListOpenWatch')],
+          [
+            T.text('discoverListOff'),
+            T.text('discoverListAsk'),
+            T.text('discoverListOpenWatch'),
+          ],
           joins.indexOf(listing?.join).clamp(0, joins.length - 1),
           (index) {
             final join = joins[index];
@@ -500,7 +588,13 @@ class SharePlayModel {
           detail: T.text('discoverLiveToggleDetail'),
           kind: ToggleRow(
             listing.live,
-            (value) => list(ShareListing(join: listing.join, language: listing.language, live: value)),
+            (value) => list(
+              ShareListing(
+                join: listing.join,
+                language: listing.language,
+                live: value,
+              ),
+            ),
           ),
         ),
       );
@@ -511,9 +605,20 @@ class SharePlayModel {
         id: 'share-language',
         title: T.text('discoverListLanguage'),
         kind: ChoiceRow(
-          [for (final code in languages) code == null ? T.text('discoverAnyLanguage') : DiscoverLanguages.name(code)],
+          [
+            for (final code in languages)
+              code == null
+                  ? T.text('discoverAnyLanguage')
+                  : DiscoverLanguages.name(code),
+          ],
           languages.indexOf(listing.language).clamp(0, languages.length - 1),
-          (index) => list(ShareListing(join: listing.join, language: languages[index], live: listing.live)),
+          (index) => list(
+            ShareListing(
+              join: listing.join,
+              language: languages[index],
+              live: listing.live,
+            ),
+          ),
         ),
       ),
     );
@@ -529,7 +634,9 @@ class SharePlayModel {
       return [
         PanelRow(
           id: 'share-start',
-          title: starting ? T.text('sharePlayStarting') : T.format('sharePlayStart', [playing.$1.name]),
+          title: starting
+              ? T.text('sharePlayStarting')
+              : T.format('sharePlayStart', [playing.$1.name]),
           detail: T.text('sharePlayStartDetail'),
           kind: ActionRow(() => unawaited(start())),
         ),
@@ -540,8 +647,15 @@ class SharePlayModel {
     final rows = <PanelRow>[
       PanelRow(
         id: 'share-on',
-        title: T.format('sharePlaySharing', [sharing.title ?? playing?.$1.name ?? sharing.titleId]),
-        kind: InfoRow(T.format('sharePlayWatching', [sharing.viewers.length, sharing.maxViewers])),
+        title: T.format('sharePlaySharing', [
+          sharing.title ?? playing?.$1.name ?? sharing.titleId,
+        ]),
+        kind: InfoRow(
+          T.format('sharePlayWatching', [
+            sharing.viewers.length,
+            sharing.maxViewers,
+          ]),
+        ),
       ),
       ...requestRows(sharing),
       ...codeRows(sharing),
@@ -549,7 +663,10 @@ class SharePlayModel {
     for (final viewer in sharing.viewers) {
       final name = viewer.user.displayName;
       // Watching from the media server: no connection here to show.
-      final viaServer = sharing.media == MediaRoute.sfu && !links.containsKey(viewer.user.id) && viewer.slot == null;
+      final viaServer =
+          sharing.media == MediaRoute.sfu &&
+          !links.containsKey(viewer.user.id) &&
+          viewer.slot == null;
       final detail = linkText(
         connected: links[viewer.user.id] == 'connected',
         stats: stats[viewer.user.id],
@@ -562,7 +679,11 @@ class SharePlayModel {
             id: 'share-stop-${viewer.user.id}',
             title: T.format('sharePlayStopPlaying', [name]),
             detail: detail,
-            person: PanelPerson(name: name, avatar: viewer.user.avatar, status: PersonStatus.playing),
+            person: PanelPerson(
+              name: name,
+              avatar: viewer.user.avatar,
+              status: PersonStatus.playing,
+            ),
             kind: ActionRow(() => stopPlaying(viewer)),
           ),
         );
@@ -570,9 +691,16 @@ class SharePlayModel {
         rows.add(
           PanelRow(
             id: 'share-play-${viewer.user.id}',
-            title: T.format('sharePlayLetPlay', [name, ShareRoster.freePad(sharing.viewers) ?? 0]),
+            title: T.format('sharePlayLetPlay', [
+              name,
+              ShareRoster.freePad(sharing.viewers) ?? 0,
+            ]),
             detail: detail,
-            person: PanelPerson(name: name, avatar: viewer.user.avatar, status: PersonStatus.online),
+            person: PanelPerson(
+              name: name,
+              avatar: viewer.user.avatar,
+              status: PersonStatus.online,
+            ),
             kind: ActionRow(() => letPlay(viewer)),
           ),
         );
@@ -604,7 +732,9 @@ class SharePlayModel {
           id: 'share-max',
           title: T.text('sharePlayMaxViewers'),
           detail: T.text(
-            choices.max > ShareRoster.maxViewers ? 'sharePlayMaxViewersServerDetail' : 'sharePlayMaxViewersDetail',
+            choices.max > ShareRoster.maxViewers
+                ? 'sharePlayMaxViewersServerDetail'
+                : 'sharePlayMaxViewersDetail',
           ),
           kind: StepperRow(
             value: sharing.maxViewers,
@@ -620,17 +750,22 @@ class SharePlayModel {
     final watching = {for (final viewer in sharing.viewers) viewer.user.id};
     final invited = {for (final person in sharing.invited) person.id};
     for (final friend in app.together.hub.friends.friends) {
-      if (!friend.presence.online || watching.contains(friend.person.id)) continue;
+      if (!friend.presence.online || watching.contains(friend.person.id))
+        continue;
       final name = friend.person.displayName;
       rows.add(
         PanelRow(
           id: 'share-invite-${friend.person.id}',
           title: T.format('sharePlayInvite', [name]),
-          detail: invited.contains(friend.person.id) ? T.text('sharePlayInvitedAlready') : null,
+          detail: invited.contains(friend.person.id)
+              ? T.text('sharePlayInvitedAlready')
+              : null,
           person: PanelPerson(
             name: name,
             avatar: friend.person.avatar,
-            status: friend.presence.playing ? PersonStatus.playing : PersonStatus.online,
+            status: friend.presence.playing
+                ? PersonStatus.playing
+                : PersonStatus.online,
           ),
           kind: ActionRow(() => invite(friend.person.id, name)),
         ),
@@ -648,22 +783,38 @@ class SharePlayModel {
 
   /// A viewer's line, as the Mac writes it: player or watching, then the path, its round trip
   /// and the picture once connected.
-  static String linkText({required bool connected, ShareLinkStats? stats, int? pad, bool viaServer = false}) {
+  static String linkText({
+    required bool connected,
+    ShareLinkStats? stats,
+    int? pad,
+    bool viaServer = false,
+  }) {
     final parts = [
-      if (pad != null) T.format('sharePlayPlayer', [pad]) else T.text('sharePlayOnlyWatches'),
+      if (pad != null)
+        T.format('sharePlayPlayer', [pad])
+      else
+        T.text('sharePlayOnlyWatches'),
     ];
     if (viaServer) return [...parts, T.text('mediaViaServer')].join(' · ');
-    if (!connected) return [...parts, T.text('sharePlayConnecting')].join(' · ');
-    if (stats?.relayed case final relayed?) parts.add(T.text(relayed ? 'sharePlayRelayed' : 'sharePlayDirect'));
-    if (stats?.roundTripMs case final roundTrip?) parts.add(T.format('sharePlayRoundTrip', [roundTrip.round()]));
-    if ((stats?.framesPerSecond, stats?.frameHeight) case (final fps?, final height?)) {
+    if (!connected)
+      return [...parts, T.text('sharePlayConnecting')].join(' · ');
+    if (stats?.relayed case final relayed?)
+      parts.add(T.text(relayed ? 'sharePlayRelayed' : 'sharePlayDirect'));
+    if (stats?.roundTripMs case final roundTrip?)
+      parts.add(T.format('sharePlayRoundTrip', [roundTrip.round()]));
+    if ((stats?.framesPerSecond, stats?.frameHeight) case (
+      final fps?,
+      final height?,
+    )) {
       parts.add('${height}p${fps.round()}');
     }
     return parts.join(' · ');
   }
 
   String _gameName(String titleId, String? title) =>
-      app.games.where((game) => game.titleId == titleId).firstOrNull?.name ?? title ?? titleId;
+      app.games.where((game) => game.titleId == titleId).firstOrNull?.name ??
+      title ??
+      titleId;
 
   // Watching.
 
@@ -689,7 +840,8 @@ class SharePlayModel {
   PanelSpot? _watchReturn;
 
   bool get isWatching => _watch != null;
-  bool get watchConnected => (_watch?.connected ?? false) || (_route?.hasPicture ?? false);
+  bool get watchConnected =>
+      (_watch?.connected ?? false) || (_route?.hasPicture ?? false);
 
   /// Watching from the media server now.
   bool get watchViaServer => _route?.path == ShareWatchPath.sfu;
@@ -697,7 +849,10 @@ class SharePlayModel {
   /// The pad the host handed the user, null while they only watch.
   int? get watchSlot {
     final me = app.together.user?.id;
-    return watching?.viewers.where((viewer) => viewer.user.id == me).firstOrNull?.slot;
+    return watching?.viewers
+        .where((viewer) => viewer.user.id == me)
+        .firstOrNull
+        ?.slot;
   }
 
   /// The host's picture, drawn by flutter_webrtc; nothing in tests.
@@ -705,11 +860,18 @@ class SharePlayModel {
     final route = _route;
     final host = watching?.host?.id;
     if (route != null && route.path == ShareWatchPath.sfu && host != null) {
-      return ServerPicture(room: route.server, host: host, placeholder: const SizedBox.shrink());
+      return ServerPicture(
+        room: route.server,
+        host: host,
+        placeholder: const SizedBox.shrink(),
+      );
     }
     final engine = _watchEngine;
     if (engine is! WebRtcWatch) return null;
-    return RTCVideoView(engine.renderer, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain);
+    return RTCVideoView(
+      engine.renderer,
+      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+    );
   }
 
   /// Invites waiting, and a share play a launcher that quit left behind (ended).
@@ -720,7 +882,8 @@ class SharePlayModel {
       final mine = await _client.mine();
       invites = mine.invites;
       final stale = mine.hosting;
-      if (stale != null && stale.id != _session?.id) unawaited(_client.end(stale.id).catchError((Object _) {}));
+      if (stale != null && stale.id != _session?.id)
+        unawaited(_client.end(stale.id).catchError((Object _) {}));
       app.refresh();
     } on Object {
       // Offline: the invites come with the next connection.
@@ -728,14 +891,17 @@ class SharePlayModel {
   }
 
   void decline(ShareInvite invite) {
-    invites = [...invites.where((known) => known.sharePlayId != invite.sharePlayId)];
+    invites = [
+      ...invites.where((known) => known.sharePlayId != invite.sharePlayId),
+    ];
     app.refresh();
     unawaited(_client.decline(invite.sharePlayId).catchError((Object _) {}));
   }
 
   /// Watches [id] here, full screen.
   Future<void> watch(String id) async {
-    if (!(app.together.family.rules?.sharePlay ?? true)) return app.show(T.text('familyNoSharePlay'));
+    if (!(app.together.family.rules?.sharePlay ?? true))
+      return app.show(T.text('familyNoSharePlay'));
     final me = app.together.user;
     if (me == null) return app.show(T.text('sharePlaySignInFirst'));
     if (_watch?.id == id) return app.open(Layer.shareWatch);
@@ -755,8 +921,15 @@ class SharePlayModel {
         hostDevice: joined.sharePlay.hostDevice,
         engine: engine,
         iceServers: joined.iceServers,
-        signal: (to, device, kind, data) =>
-            app.together.hub.socket.send(ShareSignal.frame(to: to, device: device, share: id, kind: kind, data: data)),
+        signal: (to, device, kind, data) => app.together.hub.socket.send(
+          ShareSignal.frame(
+            to: to,
+            device: device,
+            share: id,
+            kind: kind,
+            data: data,
+          ),
+        ),
         onSound: speaker.push,
         changed: app.refresh,
       );
@@ -776,7 +949,8 @@ class SharePlayModel {
       final route = ShareWatch(
         me: me.id,
         room: app.services.sfuRoom ?? LiveKitRoom.new,
-        access: (shareId) => MediaServerClient(app.together.account).sharePlay(shareId),
+        access: (shareId) =>
+            MediaServerClient(app.together.account).sharePlay(shareId),
         onMesh: (on) {
           final current = _watch;
           if (current == null || current.id != id) return;
@@ -814,7 +988,9 @@ class SharePlayModel {
             : '${T.text('sharePlayCouldNotWatch')}: ${app.together.message(problem)}',
       );
     } on Object catch (error) {
-      app.show('${T.text('sharePlayCouldNotWatch')}: ${app.together.message(error)}');
+      app.show(
+        '${T.text('sharePlayCouldNotWatch')}: ${app.together.message(error)}',
+      );
     } finally {
       joining = false;
       app.refresh();
@@ -830,7 +1006,8 @@ class SharePlayModel {
       _pump = null;
       return;
     }
-    _pump ??= SharePadPump(read: padOverride ?? _readPad, send: session.sendPad)..start();
+    _pump ??= SharePadPump(read: padOverride ?? _readPad, send: session.sendPad)
+      ..start();
   }
 
   /// Player 1's controller now, as the controller test reads it.
@@ -859,7 +1036,8 @@ class SharePlayModel {
     watchStats = null;
     await session.close();
     if (engine is WebRtcWatch) unawaited(engine.dispose());
-    if (tellServer) unawaited(_client.leave(session.id).catchError((Object _) {}));
+    if (tellServer)
+      unawaited(_client.leave(session.id).catchError((Object _) {}));
     if (app.overlay == Layer.shareWatch) app.returnTo(_watchReturn);
     app.refresh();
   }
@@ -881,12 +1059,21 @@ class SharePlayModel {
         final before = watchSlot;
         watching = sharePlay;
         final now = watchSlot;
-        if (now != before) app.show(now == null ? T.text('sharePlayYouWatch') : T.format('sharePlayYouPlay', [now]));
+        if (now != before)
+          app.show(
+            now == null
+                ? T.text('sharePlayYouWatch')
+                : T.format('sharePlayYouPlay', [now]),
+          );
         // The route follows: a pad handed over moves to the host's connection, taken back to the
         // media server.
         final route = _route;
         if (route != null) {
-          unawaited(route.apply(sharePlay).then((_) => _followSlot(), onError: (Object _) {}));
+          unawaited(
+            route
+                .apply(sharePlay)
+                .then((_) => _followSlot(), onError: (Object _) {}),
+          );
         } else {
           _followSlot();
         }
@@ -899,7 +1086,14 @@ class SharePlayModel {
       case 'share_play.ended' when data['sharePlayId'] == session.id:
         final host = watching?.host?.displayName ?? '';
         unawaited(leaveWatching(tellServer: false));
-        app.show(T.format(data['reason'] == 'removed' ? 'sharePlayTookYouOut' : 'sharePlayHostStopped', [host]));
+        app.show(
+          T.format(
+            data['reason'] == 'removed'
+                ? 'sharePlayTookYouOut'
+                : 'sharePlayHostStopped',
+            [host],
+          ),
+        );
         return true;
     }
     return false;
@@ -909,7 +1103,8 @@ class SharePlayModel {
   /// or without a controller) leaves.
   void watchCommand(Command command) {
     final noPad = app.controllers.playerOne == null && padOverride == null;
-    if (command == Command.home || (command == Command.back && (watchSlot == null || noPad))) {
+    if (command == Command.home ||
+        (command == Command.back && (watchSlot == null || noPad))) {
       unawaited(leaveWatching());
     }
   }
@@ -925,11 +1120,18 @@ class SharePlayModel {
         ..add(
           PanelRow(
             id: 'share-watch-${invite.sharePlayId}',
-            title: T.format('sharePlayWatchFriend', [from, _gameName(invite.titleId, invite.title)]),
+            title: T.format('sharePlayWatchFriend', [
+              from,
+              _gameName(invite.titleId, invite.title),
+            ]),
             detail: T.text('sharePlayWatchDetail'),
             person: invite.from == null
                 ? null
-                : PanelPerson(name: from, avatar: invite.from!.avatar, status: PersonStatus.playing),
+                : PanelPerson(
+                    name: from,
+                    avatar: invite.from!.avatar,
+                    status: PersonStatus.playing,
+                  ),
             kind: ActionRow(() => unawaited(watch(invite.sharePlayId))),
           ),
         )
@@ -943,14 +1145,27 @@ class SharePlayModel {
     }
     for (final friend in app.together.hub.friends.friends) {
       final shared = friend.presence.share;
-      if (shared == null || !shared.open || invites.any((invite) => invite.sharePlayId == shared.sharePlayId)) continue;
+      if (shared == null ||
+          !shared.open ||
+          invites.any((invite) => invite.sharePlayId == shared.sharePlayId))
+        continue;
       final name = friend.person.displayName;
       rows.add(
         PanelRow(
           id: 'share-friend-${shared.sharePlayId}',
-          title: T.format('sharePlayWatchFriend', [name, _gameName(shared.titleId, shared.title)]),
-          detail: T.format('sharePlayWatching', [shared.viewers, shared.maxViewers]),
-          person: PanelPerson(name: name, avatar: friend.person.avatar, status: PersonStatus.playing),
+          title: T.format('sharePlayWatchFriend', [
+            name,
+            _gameName(shared.titleId, shared.title),
+          ]),
+          detail: T.format('sharePlayWatching', [
+            shared.viewers,
+            shared.maxViewers,
+          ]),
+          person: PanelPerson(
+            name: name,
+            avatar: friend.person.avatar,
+            status: PersonStatus.playing,
+          ),
           kind: ActionRow(() => unawaited(watch(shared.sharePlayId))),
         ),
       );

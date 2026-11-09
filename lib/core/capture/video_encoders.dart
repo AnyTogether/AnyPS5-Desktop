@@ -3,6 +3,7 @@ import 'dart:async';
 import '../desktop/desktop.dart';
 import '../host.dart';
 import '../replay_buffer.dart' show ProcessRunner;
+import 'wayland_capture.dart' show WaylandFeed;
 
 /// What the picture is encoded for: each wants its own trade between delay and quality.
 enum EncodeUse {
@@ -55,7 +56,8 @@ enum VideoEncoder {
   static const vaapiDevice = '/dev/dri/renderD128';
 
   /// Arguments before the inputs (VA-API's device).
-  List<String> get deviceArguments => this == vaapi ? const ['-vaapi_device', vaapiDevice] : const [];
+  List<String> get deviceArguments =>
+      this == vaapi ? const ['-vaapi_device', vaapiDevice] : const [];
 
   /// The end of the filter chain: the pixel format the encoder takes, uploaded to the graphics
   /// card for VA-API.
@@ -66,7 +68,11 @@ enum VideoEncoder {
   };
 
   /// The encoder's arguments: [bitRate] in bit/s, a key frame every [keyEvery] frames.
-  List<String> arguments({required EncodeUse use, required int bitRate, required int keyEvery}) {
+  List<String> arguments({
+    required EncodeUse use,
+    required int bitRate,
+    required int keyEvery,
+  }) {
     final live = use == EncodeUse.live;
     final buffer = switch (use) {
       // Half a second: frames stay even in size, so none waits behind a large one.
@@ -74,7 +80,16 @@ enum VideoEncoder {
       EncodeUse.broadcast => bitRate * 2,
       EncodeUse.replay => bitRate * 2,
     };
-    final rate = ['-b:v', '$bitRate', '-maxrate', '$bitRate', '-bufsize', '$buffer', '-g', '$keyEvery'];
+    final rate = [
+      '-b:v',
+      '$bitRate',
+      '-maxrate',
+      '$bitRate',
+      '-bufsize',
+      '$buffer',
+      '-g',
+      '$keyEvery',
+    ];
     return switch (this) {
       nvenc => [
         '-c:v',
@@ -90,7 +105,16 @@ enum VideoEncoder {
         '0',
         ...rate,
       ],
-      qsv => ['-c:v', codec, '-preset', 'veryfast', '-bf', '0', if (live) ...['-async_depth', '1'], ...rate],
+      qsv => [
+        '-c:v',
+        codec,
+        '-preset',
+        'veryfast',
+        '-bf',
+        '0',
+        if (live) ...['-async_depth', '1'],
+        ...rate,
+      ],
       amf => [
         '-c:v',
         codec,
@@ -155,7 +179,11 @@ enum VideoEncoder {
 
 /// The first encoder that works with this ffmpeg on this computer, asked once and kept.
 class EncoderChoice {
-  EncoderChoice({required this.ffmpeg, required this.system, required this.run});
+  EncoderChoice({
+    required this.ffmpeg,
+    required this.system,
+    required this.run,
+  });
 
   final String ffmpeg;
   final HostSystem system;
@@ -170,8 +198,13 @@ class EncoderChoice {
   Future<VideoEncoder?> _choose() async {
     for (final candidate in VideoEncoder.candidates(system)) {
       try {
-        final result = await run(ffmpeg, candidate.probeArguments()).timeout(const Duration(seconds: 10));
-        tried.add('${candidate.codec}: ${result.exitCode == 0 ? 'works' : 'exit ${result.exitCode}'}');
+        final result = await run(
+          ffmpeg,
+          candidate.probeArguments(),
+        ).timeout(const Duration(seconds: 10));
+        tried.add(
+          '${candidate.codec}: ${result.exitCode == 0 ? 'works' : 'exit ${result.exitCode}'}',
+        );
         if (result.exitCode == 0) return candidate;
       } on Object catch (error) {
         tried.add('${candidate.codec}: $error');
@@ -182,8 +215,8 @@ class EncoderChoice {
 }
 
 /// ffmpeg's screen input for the game's picture: gdigrab on Windows (the desktop's pixels in the
-/// game's area, the composited picture whatever draws it), x11grab on X11. Wayland lets no
-/// program read the screen without asking each time: not offered there.
+/// game's area, the composited picture whatever draws it), x11grab on X11. Wayland has no such
+/// input: its picture comes through [WaylandCapture] as a [WaylandFeed].
 abstract final class ScreenGrab {
   static bool supported(HostSystem system, Map<String, String> environment) {
     if (system == HostSystem.windows) return true;
@@ -199,7 +232,9 @@ abstract final class ScreenGrab {
     required Map<String, String> environment,
     required int framesPerSecond,
     ScreenArea? area,
+    WaylandFeed? wayland,
   }) {
+    if (wayland != null) return wayland.input;
     // Even sizes: the encoders take nothing else, and the filter keeps them so after scaling.
     final width = area == null ? null : area.width & ~1;
     final height = area == null ? null : area.height & ~1;
