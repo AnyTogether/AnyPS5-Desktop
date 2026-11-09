@@ -5,6 +5,14 @@ release when it is made.
 
 ## Next release
 
+- **While a game runs, the main button brings it to the front**, as on the Mac. Stopping it stays in
+  the game's menu and the quick menu.
+- **With the family media setting off, no trophy picture is taken**, as on the Mac.
+- **Noise suppression has its own switch** beside the microphone in voice settings, on by default.
+- **Public profile switch** in AnyTogether settings, as on the website.
+- **Lower resolution applies at each start** on Windows and Linux, as on the Mac, when the toolkit's
+  output can take it. Otherwise the game keeps the resolution it was installed with.
+- **Choose the broadcast microphone on Windows** in Settings › Broadcasting.
 - **The replay buffer, Remote Play and broadcasting can record under Wayland on Linux.** Your
   desktop asks which window to share, and you choose the game. The launcher says so when you turn the
   replay buffer on, and the desktop can remember the window next time. It needs PipeWire,

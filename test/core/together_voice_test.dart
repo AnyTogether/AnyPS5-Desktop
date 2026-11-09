@@ -98,12 +98,17 @@ class FakeEngine implements VoiceEngine {
   bool talking = true;
   bool started = false;
   bool stopped = false;
+  final noise = <bool>[];
 
   @override
-  Future<void> start() async {
+  Future<void> start({bool noiseSuppression = true}) async {
     if (deny) throw const VoiceDenied();
     started = true;
+    noise.add(noiseSuppression);
   }
+
+  @override
+  Future<void> setNoiseSuppression(bool on) async => noise.add(on);
 
   @override
   Future<VoiceLink> link(List<Map<String, dynamic>> iceServers) async {
@@ -396,6 +401,39 @@ void main() {
       await voice.join();
       expect(voice.active, isTrue);
       expect(voice.movedTo, isNull);
+    });
+
+    test('noise suppression opens the microphone as set and changes the call without reconnecting', () async {
+      voice.noiseSuppression = false;
+      await voice.join();
+      expect(engine.noise, [false]);
+      await server.nextFrame('signal');
+      final callsBefore = server.callsTo('calls').length;
+      await voice.setNoiseSuppression(true);
+      expect(voice.noiseSuppression, isTrue);
+      expect(engine.noise, [false, true]);
+      // The same connection, no new offer, no new call.
+      expect(engine.links, hasLength(1));
+      expect(engine.links.single.closed, isFalse);
+      expect(engine.links.single.calls.where((call) => call.startsWith('offer')), hasLength(1));
+      expect(server.callsTo('calls'), hasLength(callsBefore));
+      // The same value again changes nothing.
+      await voice.setNoiseSuppression(true);
+      expect(engine.noise, [false, true]);
+      await voice.leave();
+      // Out of voice it is only kept for the next call.
+      await voice.setNoiseSuppression(false);
+      expect(engine.noise, [false, true]);
+    });
+
+    test('the microphone keeps echo cancellation and gain whichever way noise suppression is', () {
+      expect(voiceAudioConstraints(noiseSuppression: true), {
+        'echoCancellation': true,
+        'noiseSuppression': true,
+        'autoGainControl': true,
+      });
+      expect(voiceAudioConstraints(noiseSuppression: false)['noiseSuppression'], isFalse);
+      expect(voiceAudioConstraints(noiseSuppression: false)['echoCancellation'], isTrue);
     });
 
     test('call.updated marks who muted themselves in the party', () async {

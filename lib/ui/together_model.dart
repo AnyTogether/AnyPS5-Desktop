@@ -185,6 +185,7 @@ class TogetherModel {
       ..onSendFailed = partySendFailed;
     hub.voice
       ..pushToTalk = app.preferences.pushToTalk
+      ..noiseSuppression = app.preferences.noiseSuppression
       ..onMoved = (client) {
         app.show(T.text(client == 'phone' ? 'voiceMovedPhone' : 'voiceMovedAway'));
       }
@@ -648,6 +649,20 @@ class TogetherModel {
 
   /// Read receipts on or off: shown at once, turned back with a word when the server cannot; the
   /// others' receipts change with it, so the conversations are read again.
+  Future<void> setPublicProfile(bool on) async {
+    if (on == hub.self.publicProfile) return;
+    try {
+      await hub.self.setPublicProfile(on);
+    } on Object catch (error) {
+      app.show(
+        error is TogetherProblem && error.code == 'restricted_by_family'
+            ? T.text('publicProfileFamily')
+            : message(error),
+      );
+    }
+    app.refresh();
+  }
+
   Future<void> setReadReceipts(bool on) async {
     if (on == hub.self.readReceipts) return;
     try {
@@ -1148,6 +1163,15 @@ class TogetherModel {
         ),
         ...profileEditRows(),
         ...privateIdentityRows(),
+        if (hub.self.loaded)
+          PanelRow(
+            id: 'together-public-profile',
+            title: T.text('publicProfile'),
+            detail: hub.self.publicProfile
+                ? T.text('publicProfileHint')
+                : '${T.text('publicProfileHint')} ${T.text('publicProfileOffNote')}',
+            kind: ToggleRow(hub.self.publicProfile, (value) => unawaited(setPublicProfile(value))),
+          ),
         ...privacyRows(),
         ...discoveryRows(),
         PanelRow(

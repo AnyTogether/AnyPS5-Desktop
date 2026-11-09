@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:anyps5_desktop/core/game_library.dart';
 import 'package:anyps5_desktop/core/game_process.dart';
 import 'package:anyps5_desktop/core/host.dart';
+import 'package:anyps5_desktop/core/installer.dart';
 import 'package:anyps5_desktop/core/power_profiles.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
@@ -171,6 +173,37 @@ value = 1080
     (row('batteryResolution').kind as ToggleRow).set(false);
     model.unlock(neon);
     await until(() => !model.unlocking && model.records[neon.id]?.resolution == null);
+
+    // At each start, as on the Mac: written into the executable, and back with the profile off.
+    final executable = p.join(Installer.installedFolder(neon, model.root!), model.system.executableName);
+    File(executable).writeAsBytesSync(_linuxExecutable(width: 1920, height: 1080));
+    (row('batteryResolution').kind as ToggleRow).set(true);
+    late FakeGameProcess process;
+    model.startGame =
+        ({
+          required String installed,
+          required Map<String, String> environment,
+          required String logFile,
+          HostSystem? system,
+          bool traced = false,
+          List<String> notes = const [],
+        }) async {
+          process = FakeGameProcess();
+          return RunningGame(process, process.exitCode, DateTime(2026, 11, 1));
+        };
+    Future<void> start() async {
+      final playing = model.play(neon);
+      await until(() => model.running != null);
+      process.quit();
+      await playing;
+      await until(() => model.running == null);
+    }
+
+    await start();
+    expect(_widthHeight(executable), (1600, 900));
+    (row('batteryResolution').kind as ToggleRow).set(false);
+    await start();
+    expect(_widthHeight(executable), (1920, 1080));
   });
 
   test('where the heat cannot be read, only the battery profile is offered, and that is said', () {
@@ -264,3 +297,30 @@ value = 1080
 
 /// The environment the last fake start was given.
 Map<String, String>? seen;
+
+/// A relinked Linux game: its code placed at 0x400000, width and height at the patch file's
+/// addresses (0x1234 and 0x1240), one load segment from file offset 0x1000.
+Uint8List _linuxExecutable({required int width, required int height}) {
+  final bytes = ByteData(0x3000);
+  bytes
+    ..setUint8(0, 0x7f)
+    ..setUint8(1, 0x45)
+    ..setUint8(2, 0x4c)
+    ..setUint8(3, 0x46)
+    ..setUint16(0x10, 2, Endian.little)
+    ..setUint64(0x20, 0x40, Endian.little)
+    ..setUint16(0x36, 56, Endian.little)
+    ..setUint16(0x38, 1, Endian.little)
+    ..setUint32(0x40, 1, Endian.little)
+    ..setUint64(0x48, 0x1000, Endian.little)
+    ..setUint64(0x50, 0x400000, Endian.little)
+    ..setUint64(0x60, 0x2000, Endian.little)
+    ..setUint32(0x2234, width, Endian.little)
+    ..setUint32(0x2240, height, Endian.little);
+  return bytes.buffer.asUint8List();
+}
+
+(int, int) _widthHeight(String executable) {
+  final bytes = ByteData.sublistView(File(executable).readAsBytesSync());
+  return (bytes.getUint32(0x2234, Endian.little), bytes.getUint32(0x2240, Endian.little));
+}
