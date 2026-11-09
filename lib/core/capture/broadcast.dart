@@ -68,6 +68,7 @@ class BroadcastSettings {
     this.quality = BroadcastQuality.hd720p60,
     this.microphone = false,
     this.microphoneLevel = 80,
+    this.microphoneDevice,
     this.liveBadge = true,
     this.viewerLink = '',
   });
@@ -82,6 +83,7 @@ class BroadcastSettings {
         BroadcastQuality.hd720p60,
     microphone: json['microphone'] == true,
     microphoneLevel: json['microphoneLevel'] is num ? (json['microphoneLevel'] as num).toInt().clamp(10, 100) : 80,
+    microphoneDevice: json['microphoneDevice'] is String ? json['microphoneDevice'] as String : null,
     liveBadge: json['liveBadge'] is bool ? json['liveBadge'] as bool : true,
     viewerLink: json['viewerLink'] is String ? json['viewerLink'] as String : '',
   );
@@ -95,6 +97,9 @@ class BroadcastSettings {
   /// The microphone mixed into the game's sound, at [microphoneLevel] percent.
   bool microphone;
   int microphoneLevel;
+
+  /// Windows: the DirectShow device picked for the microphone; null finds one.
+  String? microphoneDevice;
 
   /// A small LIVE badge over the game while it is broadcast (not in the broadcast itself).
   bool liveBadge;
@@ -119,6 +124,7 @@ class BroadcastSettings {
     'quality': quality.name,
     'microphone': microphone,
     'microphoneLevel': microphoneLevel,
+    'microphoneDevice': ?microphoneDevice,
     'liveBadge': liveBadge,
     'viewerLink': viewerLink,
   };
@@ -142,28 +148,36 @@ class BroadcastSettings {
   }
 }
 
-/// The microphone as ffmpeg's input: PulseAudio's default source on Linux, on Windows the first
-/// DirectShow device ffmpeg lists with "mic" in its name (else the first); null where none is
-/// found.
+/// The microphone as ffmpeg's input: PulseAudio's default source on Linux, on Windows the device
+/// picked in Settings › Broadcasting while ffmpeg still lists it, else the first DirectShow
+/// device with "mic" in its name (else the first); null where none is found.
 abstract final class BroadcastMicrophone {
   static Future<List<String>?> input({
     required HostSystem system,
     required String ffmpeg,
     required ProcessRunner run,
+    String? device,
   }) async {
     if (system == HostSystem.linux) {
       return const ['-thread_queue_size', '1024', '-f', 'pulse', '-ar', '48000', '-ac', '2', '-i', 'default'];
     }
+    final names = await devices(ffmpeg: ffmpeg, run: run);
+    // A microphone before anything else Windows records (Stereo Mix).
+    final name = names.contains(device)
+        ? device
+        : names.where((name) => name.toLowerCase().contains('mic')).firstOrNull ?? names.firstOrNull;
+    return name == null ? null : ['-thread_queue_size', '1024', '-f', 'dshow', '-i', 'audio=$name'];
+  }
+
+  /// The audio devices ffmpeg lists on Windows; none when it cannot be asked.
+  static Future<List<String>> devices({required String ffmpeg, required ProcessRunner run}) async {
     final ProcessResult listing;
     try {
       listing = await run(ffmpeg, const ['-hide_banner', '-list_devices', 'true', '-f', 'dshow', '-i', 'dummy']);
     } on Object {
-      return null;
+      return const [];
     }
-    final names = audioDevices('${listing.stdout}\n${listing.stderr}');
-    // A microphone before anything else Windows records (Stereo Mix).
-    final name = names.where((name) => name.toLowerCase().contains('mic')).firstOrNull ?? names.firstOrNull;
-    return name == null ? null : ['-thread_queue_size', '1024', '-f', 'dshow', '-i', 'audio=$name'];
+    return audioDevices('${listing.stdout}\n${listing.stderr}');
   }
 
   /// The audio devices in `ffmpeg -list_devices true -f dshow`'s listing, either way it prints
@@ -364,6 +378,7 @@ class Broadcaster {
     ProcessStarter? start,
     ProcessRunner? run,
     this.microphoneLevel,
+    this.microphoneDevice,
     this.noMicrophone,
     this.retryDelays = const [
       Duration(seconds: 2),
@@ -393,6 +408,9 @@ class Broadcaster {
   /// The microphone's level now in percent, 0 when it is off; null keeps the broadcast silent of
   /// it.
   final int Function()? microphoneLevel;
+
+  /// The microphone picked (Windows), null to find one.
+  final String? Function()? microphoneDevice;
 
   /// The microphone asked for could not be used: the broadcast goes on without it.
   final void Function()? noMicrophone;
@@ -439,7 +457,12 @@ class Broadcaster {
   /// Finds the microphone for ffmpeg when it is wanted and not known yet; says when there is none.
   Future<void> _findMicrophone() async {
     if (!_microphoneOn || _microphone != null || _microphoneFailed) return;
-    _microphone = await BroadcastMicrophone.input(system: system, ffmpeg: ffmpeg, run: _runTool);
+    _microphone = await BroadcastMicrophone.input(
+      system: system,
+      ffmpeg: ffmpeg,
+      run: _runTool,
+      device: microphoneDevice?.call(),
+    );
     if (_microphone == null && !_microphoneFailed) {
       _microphoneFailed = true;
       noMicrophone?.call();
@@ -456,6 +479,12 @@ class Broadcaster {
     _microphoneRestart?.cancel();
     if (wanted == (current != null) && !wanted) return;
     _microphoneRestart = Timer(const Duration(milliseconds: 900), () => unawaited(_restartWithMicrophone()));
+  }
+
+  /// Another microphone picked during the broadcast: ffmpeg starts again with it.
+  void microphoneDeviceChanged() {
+    _microphone = null;
+    microphoneChanged();
   }
 
   Future<void> _restartWithMicrophone() async {

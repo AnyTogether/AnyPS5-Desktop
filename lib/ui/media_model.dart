@@ -195,6 +195,7 @@ class MediaModel {
       start: startOverride,
       run: runOverride,
       microphoneLevel: () => settings.microphone ? settings.microphoneLevel : 0,
+      microphoneDevice: () => settings.microphoneDevice,
       noMicrophone: () => unawaited(app.notice(T.text('broadcastMicrophone'), detail: T.text('broadcastNoMicrophone'))),
       log: _log,
     );
@@ -422,6 +423,52 @@ class MediaModel {
     return rows;
   }
 
+  /// Tests: the devices the picker lists, standing in for asking ffmpeg.
+  List<String>? micDevicesOverride;
+
+  /// What ffmpeg lists once it has been asked this session (Windows); null until then.
+  List<String>? _micDevices;
+  bool _askingMicDevices = false;
+
+  /// Which DirectShow device is the microphone (Windows): Automatic, or one ffmpeg lists. The
+  /// Mac always takes macOS's default input, and Linux PulseAudio's, which has no such row.
+  PanelRow? _micDeviceRow() {
+    final tool = ffmpeg;
+    final devices = micDevicesOverride ?? _micDevices;
+    if (devices == null) {
+      if (tool != null && !_askingMicDevices) {
+        _askingMicDevices = true;
+        unawaited(
+          BroadcastMicrophone.devices(
+            ffmpeg: tool,
+            run: runOverride ?? ((executable, arguments) => Process.run(executable, arguments)),
+          ).then((found) {
+            _micDevices = found;
+            _askingMicDevices = false;
+            app.refresh();
+          }),
+        );
+      }
+      return null;
+    }
+    if (devices.isEmpty) return null;
+    final picked = settings.microphoneDevice;
+    return PanelRow(
+      id: 'broadcast-mic-device',
+      title: T.text('broadcastMicrophoneDevice'),
+      kind: ChoiceRow(
+        [T.text('broadcastMicrophoneAuto'), ...devices],
+        picked == null ? 0 : devices.indexOf(picked) + 1,
+        (index) {
+          settings.microphoneDevice = index == 0 ? null : devices[index - 1];
+          _saveSettings();
+          _broadcaster?.microphoneDeviceChanged();
+          app.refresh();
+        },
+      ),
+    );
+  }
+
   void _setMicrophone(bool on) {
     settings.microphone = on;
     _saveSettings();
@@ -517,6 +564,7 @@ class MediaModel {
             },
           ),
         ),
+      if (settings.microphone && (micDevicesOverride != null || app.system == HostSystem.windows)) ?_micDeviceRow(),
       if (badgeOverride ?? app.system == HostSystem.windows)
         PanelRow(
           id: 'broadcast-badge',
