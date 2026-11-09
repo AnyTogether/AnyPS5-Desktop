@@ -347,7 +347,7 @@ class TopBar extends StatelessWidget {
     // The status the user chose, when it is not plain online: its dot and its word.
     final ownDot = together.signedIn ? TogetherModel.ownDot(together.myStatus) : null;
     final glass = LookScope.isGlass(context);
-    Widget iconButton(IconData icon, int index, VoidCallback action, {int badge = 0}) {
+    Widget iconButton(IconData icon, int index, VoidCallback action, {int badge = 0, bool dot = false}) {
       final focused = model.focus == HomeFocus.top(index) && model.overlay == null;
       return Pressable(
         onTap: action,
@@ -387,6 +387,22 @@ class TopBar extends StatelessWidget {
                     icon,
                     size: 20 * scale,
                     color: focused ? Colors.black : Colors.white.withValues(alpha: 0.9),
+                  ),
+                ),
+              // Something unread that is not worth a number (the party chat), as on the Mac.
+              if (dot && badge == 0)
+                PositionedDirectional(
+                  end: 0,
+                  top: 0,
+                  child: Container(
+                    key: ValueKey('home-dot-$index'),
+                    width: 12 * scale,
+                    height: 12 * scale,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.black.withValues(alpha: 0.5), width: 1.5 * scale),
+                    ),
                   ),
                 ),
               if (badge > 0)
@@ -473,6 +489,7 @@ class TopBar extends StatelessWidget {
           4,
           () => model.open(Layer.party),
           badge: together.partyBadge,
+          dot: together.partyChatUnread > 0,
         ),
         SizedBox(width: 22 * scale),
         // AnyTogether's notifications, while signed in: the bell with the unread count.

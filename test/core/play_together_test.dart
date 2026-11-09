@@ -263,6 +263,10 @@ void main() {
       ]);
       expect(fromParty.hostName, 'Mira');
       expect(fromParty.players, 2);
+      final named = PlayTogetherOffer.fromParty(together, const [
+        Person(id: 'u1', handle: 'mira', displayName: 'Mira'),
+      ], name: (person) => 'Mira T.');
+      expect(named.hostName, 'Mira T.', reason: "the friend's private name, as shown here");
     });
   });
 

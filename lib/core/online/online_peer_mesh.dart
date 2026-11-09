@@ -36,7 +36,59 @@ abstract class GameLink {
   /// The connection's state as the W3C names it: new, connecting, connected, disconnected, failed,
   /// closed.
   set onState(void Function(String state) handler);
+
+  /// The connection's statistics as W3C reports (their `type` and values as text). Empty, or
+  /// throwing, when the platform gives none: the launcher then says only what it knows.
+  Future<List<GameLinkStat>> stats();
+
   Future<void> close();
+}
+
+/// One entry of a connection's statistics.
+class GameLinkStat {
+  const GameLinkStat(this.id, this.type, this.values);
+
+  final String id;
+  final String type;
+  final Map<String, String> values;
+}
+
+/// How another player is reached: straight (host or STUN candidates), through a TURN relay, up
+/// without the statistics saying how ([connected]), still coming up, or not at all.
+enum PeerRoute { connecting, connected, direct, relay, failed }
+
+/// A route and, once there is one, the round trip in milliseconds.
+class PeerPath {
+  const PeerPath(this.route, [this.rttMs]);
+
+  final PeerRoute route;
+  final int? rttMs;
+
+  /// The route a statistics report shows: the transport's selected candidate pair (or the
+  /// nominated pair that succeeded), relayed when either end is a relay candidate. Without those
+  /// entries, as with empty statistics, it stays [PeerRoute.connected]: nothing is guessed.
+  static PeerPath of(List<GameLinkStat> stats) {
+    final byId = {for (final entry in stats) entry.id: entry};
+    final selectedId = stats.where((entry) => entry.type == 'transport').firstOrNull?.values['selectedCandidatePairId'];
+    final pair =
+        (selectedId == null ? null : byId[selectedId]) ??
+        stats
+            .where(
+              (entry) =>
+                  entry.type == 'candidate-pair' &&
+                  entry.values['state'] == 'succeeded' &&
+                  const {'1', 'true', 'YES'}.contains(entry.values['nominated']),
+            )
+            .firstOrNull;
+    if (pair == null) return const PeerPath(PeerRoute.connected);
+    final ends = [pair.values['localCandidateId'], pair.values['remoteCandidateId']];
+    final types = [for (final id in ends) byId[id]?.values['candidateType']];
+    final rtt = double.tryParse(pair.values['currentRoundTripTime'] ?? '');
+    final millis = rtt == null ? null : (rtt * 1000).round();
+    if (types.contains('relay')) return PeerPath(PeerRoute.relay, millis);
+    if (types.contains(null)) return const PeerPath(PeerRoute.connected);
+    return PeerPath(PeerRoute.direct, millis);
+  }
 }
 
 /// Makes peer connections with the session's STUN and TURN servers.
@@ -115,6 +167,27 @@ class OnlinePeerMesh implements OnlinePeerTransport {
 
   /// Each player's connection, by user ID.
   Map<String, PeerState> get states => {for (final entry in _peers.entries) entry.key: entry.value.state};
+
+  /// How each other player is reached now, by user ID.
+  Future<Map<String, PeerPath>> links() async {
+    final peers = _peers.entries.toList();
+    final paths = await Future.wait([for (final entry in peers) _path(entry.value)]);
+    return {for (var index = 0; index < peers.length; index++) peers[index].key: paths[index]};
+  }
+
+  Future<PeerPath> _path(_Peer peer) async {
+    return switch (peer.state) {
+      PeerState.failed || PeerState.closed => const PeerPath(PeerRoute.failed),
+      PeerState.connecting => const PeerPath(PeerRoute.connecting),
+      PeerState.connected => await () async {
+        try {
+          return PeerPath.of(await peer.link.stats());
+        } on Object {
+          return const PeerPath(PeerRoute.connected);
+        }
+      }(),
+    };
+  }
 
   /// Datagrams sent, received and dropped (no open channel to their player, or too large) so far.
   /// A broadcast counts once for each player it goes to.

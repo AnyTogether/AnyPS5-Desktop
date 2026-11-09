@@ -109,7 +109,9 @@ class TogetherModel {
     hub.games.onInvite = (invite) {
       _noticeSound();
       app.vibrate(HapticCue.ring);
-      app.show(T.format('gameInvitedYou', [invite.from?.displayName ?? '', gameName(invite.titleId)]));
+      final text = T.format('gameInvitedYou', [invite.from?.displayName ?? '', gameName(invite.titleId)]);
+      app.show(text);
+      if (!doNotDisturb) unawaited(app.noticeOverGame(text, detail: T.text('friendsTitle')));
     };
     hub.games.onEnded = (host) => app.show(
       T.format(hub.games.ended?.together == true ? 'togetherEnded' : 'sessionEnded', [host?.displayName ?? '']),
@@ -607,6 +609,13 @@ class TogetherModel {
 
   /// What this user chose to show friends.
   PresenceStatus get myStatus => hub.self.status;
+
+  /// The user's own Do Not Disturb: no word over a game for what comes in.
+  bool get doNotDisturb => myStatus == PresenceStatus.dnd;
+
+  /// How each other player in the Play Together session is reached ([TogetherPlay.linkText]).
+  Map<String, PeerPath> togetherLinks = const {};
+  Timer? _linkPoll;
 
   /// The dot for a status this user chose; null for online, which needs none on their own rows.
   static PersonStatus? ownDot(PresenceStatus status) => switch (status) {
@@ -1625,6 +1634,8 @@ class TogetherModel {
   }
 
   void dispose() {
+    _linkPoll?.cancel();
+    _linkPoll = null;
     stopRinging();
     calls.noAnswer?.cancel();
     unawaited(voiceNotes.dispose());

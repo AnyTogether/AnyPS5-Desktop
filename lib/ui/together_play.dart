@@ -62,6 +62,7 @@ extension TogetherPlay on TogetherModel {
   /// a session still held ends.
   void _enterTogether(GameSession session, Game game) {
     togetherSession = session.id;
+    pollTogetherLinks();
     togetherOffers = togetherOffers.where((offer) => offer.sessionId != session.id).toList();
     if (app.overlay != null) app.closeOverlay();
     app.select(app.games.indexOf(game));
@@ -218,16 +219,47 @@ extension TogetherPlay on TogetherModel {
 
   // Peers.
 
-  /// How another player is reached: the mesh's connection to them. (The PC's mesh does not hand
-  /// out WebRTC statistics, so no direct/relay route or round trip here, unlike the Mac.)
+  /// How each other player is reached, every few seconds while the user plays together.
+  void pollTogetherLinks() {
+    _linkPoll?.cancel();
+    _linkPoll = Timer.periodic(const Duration(seconds: 3), (_) => unawaited(_readTogetherLinks()));
+    unawaited(_readTogetherLinks());
+  }
+
+  Future<void> _readTogetherLinks() async {
+    if (hub.games.session?.together != true) {
+      _linkPoll?.cancel();
+      _linkPoll = null;
+      togetherLinks = const {};
+      return;
+    }
+    final transport = online.running?.transport;
+    if (transport is! OnlinePeerMesh) return;
+    final links = await transport.links();
+    if (_linkPoll == null) return;
+    togetherLinks = links;
+    if (app.overlay == Layer.party) app.refresh();
+  }
+
+  /// "Direct · 23 ms", "Relay · 80 ms", "Connecting…": how another player is reached. Where the
+  /// statistics do not say how (see [PeerPath.of]), "Connected" and no number.
   String linkText(String userId) {
     final transport = online.running?.transport;
     final state = transport is OnlinePeerMesh ? transport.states[userId] : null;
-    return switch (state) {
-      PeerState.connected => T.text('playTogetherConnected'),
-      PeerState.failed || PeerState.closed => T.text('playTogetherUnreachable'),
-      _ => T.text('playTogetherConnecting'),
+    if (state == null || state == PeerState.connecting) return T.text('playTogetherConnecting');
+    if (state != PeerState.connected) return T.text('playTogetherUnreachable');
+    return linkWords(togetherLinks[userId]);
+  }
+
+  /// A connected player's route in words; only what the statistics said.
+  static String linkWords(PeerPath? path) {
+    final route = switch (path?.route) {
+      PeerRoute.direct => T.text('playTogetherDirect'),
+      PeerRoute.relay => T.text('playTogetherRelay'),
+      _ => T.text('playTogetherConnected'),
     };
+    final millis = path?.rttMs;
+    return millis == null ? route : '$route · ${T.format('playTogetherMs', [millis])}';
   }
 
   // Rows.
@@ -253,7 +285,11 @@ extension TogetherPlay on TogetherModel {
         ),
       ];
     }
-    final offer = PlayTogetherOffer.fromParty(together, party.members);
+    final offer = PlayTogetherOffer.fromParty(
+      together,
+      party.members,
+      name: (person) => TogetherModel.shown(person).name,
+    );
     final mine = hub.games.session?.id == together.sessionId;
     final hosting = together.hostId == me;
     final people = {for (final person in party.members) person.id: person};
@@ -346,7 +382,10 @@ extension TogetherPlay on TogetherModel {
     togetherOffers = [...togetherOffers.where((known) => known.sessionId != offer.sessionId), offer];
     _noticeSound();
     app.vibrate(HapticCue.ring);
-    app.show(T.format('togetherOffer', [offer.hostName, gameName(offer.titleId)]));
+    final text = T.format('togetherOffer', [offer.hostName, gameName(offer.titleId)]);
+    app.show(text);
+    // A game in front hears of it over the game, unless the user asked not to be disturbed.
+    if (!doNotDisturb) unawaited(app.noticeOverGame(text, detail: T.text('togetherOfferDetail')));
     unawaited(hub.parties.refresh().catchError((Object _) {}));
   }
 

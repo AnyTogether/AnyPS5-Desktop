@@ -5,6 +5,14 @@ release when it is made.
 
 ## Next release
 
+- **Play Together player rows say how each player is reached** (Direct or Relay, with the round
+  trip in ms), as on the Mac. Where the system cannot say, the row stays at Connected.
+- **A Play Together offer or a game invite is said over the game** in a desktop notice, as on the
+  Mac, unless you're on Do Not Disturb. The party offer shows a friend's private name.
+- **Party chat has quick replies**, as on the Mac: Hello, GG and the others, sent with one press.
+  The Party tile gets a dot when someone writes while the party screen is closed, a parent's rule
+  against messages hides the chat, and after a lost connection the chat reads every page it
+  missed.
 - **Join with a code works for watching a share play too**, as on the Mac: Party › Join with a
   code looks a code up as you type it (a party's or a share play's), even while you're in a party,
   and asks to join or to watch. A yes shows up as an invite.

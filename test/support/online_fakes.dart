@@ -223,6 +223,9 @@ Future<bool> eventually(bool Function() condition, {Duration timeout = const Dur
 /// a message sent on one arrives on the other a moment later. Candidates are made up and checked
 /// for arriving at the right link.
 class FakeGameNetwork {
+  /// What every link's statistics answer; null throws, as a platform without statistics may.
+  List<GameLinkStat>? stats = const [];
+
   final _links = <String, FakeGameLink>{};
   int _next = 0;
 
@@ -268,6 +271,13 @@ class FakeGameLink implements GameLink {
   void Function(Uint8List)? _onMessage;
   void Function(Uint8List)? _onStreamMessage;
   void Function(String)? _onState;
+
+  @override
+  Future<List<GameLinkStat>> stats() async {
+    final answer = network.stats;
+    if (answer == null) throw StateError('no statistics');
+    return answer;
+  }
 
   /// Messages sent on the stream channel (reliable: never lost).
   int streamMessages = 0;
