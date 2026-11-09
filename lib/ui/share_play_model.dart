@@ -8,6 +8,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart' show RTCVideoView, RTCVideoV
 import '../core/capture/game_sound.dart';
 import '../core/capture/stream_packet.dart';
 import '../core/capture/video_encoders.dart';
+import '../core/capture/wayland_capture.dart';
 import '../core/controllers/pad_info.dart';
 import '../core/desktop/desktop.dart';
 import '../core/remote/remote_server.dart';
@@ -97,7 +98,11 @@ class SharePlayModel {
     if (!app.together.signedIn) return T.text('sharePlaySignInFirst');
     if (!(app.together.family.rules?.sharePlay ?? true)) return T.text('familyNoSharePlay');
     if (engineOverride == null && !ScreenGrab.supported(app.system, app.services.environment ?? Platform.environment)) {
-      return T.text('replayNoScreen');
+      return T.text(
+        WaylandCapture.applies(app.system, app.services.environment ?? Platform.environment)
+            ? 'sharePlayNoWayland'
+            : 'replayNoScreen',
+      );
     }
     return null;
   }

@@ -9,6 +9,7 @@ import '../core/capture/broadcast.dart';
 import '../core/capture/game_sound.dart';
 import '../core/capture/remote_play.dart';
 import '../core/capture/video_encoders.dart';
+import '../core/capture/wayland_capture.dart';
 import '../core/desktop/desktop.dart';
 import '../core/host.dart';
 import '../core/remote/remote_protocol.dart';
@@ -41,8 +42,12 @@ class MediaModel {
   /// Tests: whether the LIVE badge shows, whatever the system.
   bool? badgeOverride;
 
-  /// Whether this desktop can be recorded at all (Windows, X11).
-  bool get screenRecordable => ScreenGrab.supported(app.system, _environment) || areaOverride != null;
+  /// Under Wayland, what records through the desktop's portal; null elsewhere.
+  WaylandCapture? get wayland => app.waylandCapture;
+
+  /// Whether this desktop can be recorded at all (Windows, X11, Wayland through its portal).
+  bool get screenRecordable =>
+      ScreenGrab.supported(app.system, _environment) || wayland != null || areaOverride != null;
 
   /// Why nothing can be recorded here, or null when it can.
   String? get unavailable {
@@ -64,6 +69,8 @@ class MediaModel {
 
   ScreenArea? areaOf(int pid) {
     if (areaOverride != null) return areaOverride!(pid);
+    // Wayland reveals no window's position: the shared window's size is what there is.
+    if (wayland case final capture?) return capture.area;
     final desktop = app.desktop;
     return desktop is GameAreas ? (desktop as GameAreas).gameArea(pid) : null;
   }
@@ -110,6 +117,13 @@ class MediaModel {
       }
       return;
     }
+    if (wayland case final capture?) {
+      if (await choice.encoder == null) return _refuseRemotePlay(tell, T.text('waylandNoEncoder'));
+      // The desktop's dialog, when it has not been answered for this game.
+      if (await capture.share() == null) {
+        return _refuseRemotePlay(tell, T.text((capture.problem ?? WaylandProblem.failed).textKey));
+      }
+    }
     // The phone's long side across: the size it asked for, no more than 1280 x 720.
     final height = min(720, wishes.map((wish) => min(wish.$2, wish.$3)).reduce(max));
     final width = min(1280, wishes.map((wish) => max(wish.$2, wish.$3)).reduce(max));
@@ -120,6 +134,7 @@ class MediaModel {
       encoders: choice,
       areaOf: areaOf,
       soundOf: soundOf,
+      wayland: wayland,
       start: startOverride,
       log: _log,
     );
@@ -129,6 +144,14 @@ class MediaModel {
     if (result == RemotePlayStart.noGame && app.running != null) {
       _remoteRetry = Timer(const Duration(seconds: 2), () => unawaited(updateRemotePlay()));
     }
+  }
+
+  Future<void> _refuseRemotePlay(void Function(String state) tell, String reason) async {
+    await _stopRemotePlay();
+    tell('noGame');
+    if (_toldNoTool) return;
+    _toldNoTool = true;
+    app.show(reason);
   }
 
   /// The phone lost part of the picture.
@@ -191,6 +214,7 @@ class MediaModel {
       encoders: choice,
       areaOf: areaOf,
       soundOf: soundOf,
+      wayland: wayland,
       changed: _broadcastChanged,
       start: startOverride,
       run: runOverride,
@@ -221,6 +245,8 @@ class MediaModel {
 
   /// The game ended: so does its broadcast.
   void gameEnded() {
+    // Under Wayland each game is asked for its own window, so each may have its own reason.
+    if (wayland != null) _toldNoTool = false;
     _broadcaster?.stop();
     unawaited(updateRemotePlay());
   }
@@ -297,7 +323,10 @@ class MediaModel {
     await app.desktop.showBadge(image, pid: running);
   }
 
-  static String failureText(String reason) => reason == Broadcaster.noEncoder ? T.text('broadcastNoEncoder') : reason;
+  static String failureText(String reason) {
+    if (reason == Broadcaster.noEncoder) return T.text('broadcastNoEncoder');
+    return WaylandProblem.values.any((problem) => problem.textKey == reason) ? T.text(reason) : reason;
+  }
 
   /// The phone's Go Live and End Broadcast: what it asks for, then what the launcher does now,
   /// in case it showed the wrong one.

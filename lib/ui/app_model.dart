@@ -12,7 +12,9 @@ import 'package:path/path.dart' as p;
 
 import '../core/audio/atrac9.dart';
 import '../core/capture/game_sound.dart';
+import '../core/capture/screen_cast_portal.dart';
 import '../core/capture/video_encoders.dart';
+import '../core/capture/wayland_capture.dart';
 import '../core/audio/audio_out.dart';
 import '../core/audio/interface_sounds.dart';
 import '../core/audio/theme_music.dart';
@@ -195,6 +197,7 @@ class Preferences {
     ..hideWhilePlaying = json['hideWhilePlaying'] == true
     ..checkUpdates = json['checkUpdates'] as bool? ?? true
     ..replayBuffer = json['replayBuffer'] == true
+    ..waylandRestoreToken = json['waylandRestoreToken'] as String? ?? ''
     ..replaySeconds = switch (json['replaySeconds']) {
       final num seconds when ReplayBuffer.lengths.contains(seconds.toInt()) => seconds.toInt(),
       _ => ReplayBuffer.defaultLength,
@@ -386,6 +389,9 @@ class Preferences {
   bool replayBuffer = false;
   int replaySeconds = ReplayBuffer.defaultLength;
 
+  /// Under Wayland: brings back the window shared last time without the desktop's dialog.
+  String waylandRestoreToken = '';
+
   /// Settings › Shortcuts.
   ShortcutMap shortcuts = ShortcutMap();
 
@@ -458,6 +464,7 @@ class Preferences {
     if (hideWhilePlaying) 'hideWhilePlaying': true,
     if (!checkUpdates) 'checkUpdates': false,
     'replayBuffer': replayBuffer,
+    if (waylandRestoreToken.isNotEmpty) 'waylandRestoreToken': waylandRestoreToken,
     'replaySeconds': replaySeconds,
     if (!shortcuts.isDefault) 'shortcuts': shortcuts.toJson(),
     if (compatNever) 'compatNever': true,
@@ -1076,6 +1083,7 @@ class LauncherServices {
     this.quit,
     this.window,
     this.replay,
+    this.waylandCapture,
     this.folderSize,
     this.gameControls,
     this.commands,
@@ -1107,6 +1115,10 @@ class LauncherServices {
   /// The replay buffer for a game about to start, [seconds] long; ffmpeg found on this system by
   /// default (null: none, or a desktop it cannot record).
   final ReplayBuffer? Function(int seconds)? replay;
+
+  /// Recording through the desktop's portal under Wayland; made for a real Wayland session by
+  /// default, and null elsewhere.
+  final WaylandCapture? waylandCapture;
 
   /// Starts a program that outlives the launcher (an update's installer, the new AppImage);
   /// Process.start detached by default.
@@ -3736,6 +3748,7 @@ class AppModel extends ChangeNotifier {
       }
       starting = null;
       running = (game, run);
+      _gameBegan = DateTime.now();
       _stopped = false;
       stopping = false;
       _checkPhoneReach(game);
@@ -3767,6 +3780,7 @@ class AppModel extends ChangeNotifier {
       _stopTimer = null;
       unawaited(_stopReplay());
       media.gameEnded();
+      unawaited(waylandCapture?.end());
       sharePlay.gameEnded();
       // Minimized for the game: back in front now it has closed, as on the Mac.
       if (hiddenForGame) {
@@ -4633,7 +4647,8 @@ class AppModel extends ChangeNotifier {
   ReplayBuffer? _defaultReplay(int seconds, {VideoEncoder? encoder, GameSound? sound}) {
     final environment = services.environment ?? Platform.environment;
     final ffmpeg = replayFfmpeg;
-    if (ffmpeg == null || !ReplayBuffer.supported(system, environment)) return null;
+    final wayland = waylandCapture;
+    if (ffmpeg == null || (wayland == null && !ReplayBuffer.supported(system, environment))) return null;
     return ReplayBuffer(
       ffmpeg: ffmpeg,
       folder: p.join(Directory.systemTemp.path, 'anyps5-replay-$pid'),
@@ -4642,7 +4657,61 @@ class AppModel extends ChangeNotifier {
       environment: environment,
       encoder: encoder,
       sound: sound,
+      wayland: wayland,
     );
+  }
+
+  /// Under Wayland, the desktop's portal and what it needs; null on every other desktop.
+  late final WaylandCapture? waylandCapture =
+      services.waylandCapture ??
+      (WaylandCapture.applies(system, services.environment ?? Platform.environment)
+          ? WaylandCapture(
+              portal: DbusScreenCastPortal(),
+              environment: services.environment ?? Platform.environment,
+              readToken: () => preferences.waylandRestoreToken,
+              saveToken: (token) {
+                preferences.waylandRestoreToken = token;
+                savePreferences();
+              },
+              beforeAsking: _gameWindowOpen,
+              log: (line) => addRecentLine('${DateTime.now().toIso8601String()} $line'),
+            )
+          : null);
+
+  DateTime? _gameBegan;
+
+  /// How long a game gets to open its window before the desktop is asked for it anyway: a
+  /// window drawn natively for Wayland cannot be seen from here.
+  static const _gameWindowWait = Duration(seconds: 8);
+
+  /// Returns once the game's window is open, as far as can be told: the desktop's dialog lists
+  /// open windows, and bringing a window back needs it there.
+  Future<void> _gameWindowOpen() async {
+    final deadline = (_gameBegan ?? DateTime.now()).add(_gameWindowWait);
+    while (DateTime.now().isBefore(deadline)) {
+      final playing = running;
+      if (playing == null) return;
+      final desktop = this.desktop;
+      if (desktop is GameAreas && (desktop as GameAreas).gameArea(playing.$2.pid) != null) return;
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+  }
+
+  /// Turns the replay buffer on under Wayland: says now what is missing, and asks the desktop
+  /// now when a game is open. Without a game there is no window to choose yet, so the user is
+  /// told the desktop will ask when one opens.
+  Future<void> _turnOnReplayUnderWayland(WaylandCapture capture) async {
+    final problem = await capture.check();
+    if (problem != null) return show(T.text(problem.textKey));
+    if (services.replay == null && await media.encoders?.encoder == null) return show(T.text('waylandNoEncoder'));
+    preferences.replayBuffer = true;
+    savePreferences();
+    if (running == null) {
+      unawaited(notice(T.text('waylandAskTitle'), detail: T.text('waylandAskDetail')));
+      return _changed();
+    }
+    await _startReplay();
+    _changed();
   }
 
   /// ffmpeg for the replay buffer: beside the launcher or on the PATH.
@@ -4652,10 +4721,11 @@ class AppModel extends ChangeNotifier {
     launcherFolder: p.dirname(Platform.resolvedExecutable),
   );
 
-  /// Why the replay buffer cannot record here (no ffmpeg, Wayland), or null when it can.
+  /// Why the replay buffer cannot record here (no ffmpeg, no desktop to record), or null when it
+  /// can. What the Wayland portal needs is checked when the buffer is turned on.
   String? get replayUnavailable {
     if (services.replay != null) return null;
-    if (!ReplayBuffer.supported(system, services.environment ?? Platform.environment)) {
+    if (waylandCapture == null && !ReplayBuffer.supported(system, services.environment ?? Platform.environment)) {
       return T.text('replayNoScreen');
     }
     return replayFfmpeg == null ? T.text('replayNoFfmpeg') : null;
@@ -4671,13 +4741,17 @@ class AppModel extends ChangeNotifier {
       final encoder = await media.encoders?.encoder;
       final playing = running;
       if (playing == null || !preferences.replayBuffer || _replay != null) return;
+      if (waylandCapture != null && encoder == null) return show(T.text('waylandNoEncoder'));
       buffer = _defaultReplay(preferences.replaySeconds, encoder: encoder, sound: media.soundOf(playing.$2.pid));
     }
     if (buffer == null) return;
     _replay = buffer;
     if (!await buffer.start()) {
+      // Stopped meanwhile (the game ended during the desktop's dialog): nothing to say.
+      if (_replay != buffer) return;
       _replay = null;
-      show(T.text('replayFailed'));
+      final problem = waylandCapture?.problem;
+      show(T.text(problem?.textKey ?? 'replayFailed'));
     }
     notifyListeners();
   }
@@ -5688,6 +5762,7 @@ class AppModel extends ChangeNotifier {
         detail: unavailable ?? T.text('replayBufferDetail'),
         kind: ToggleRow(preferences.replayBuffer && unavailable == null, (value) {
           if (unavailable != null) return show(unavailable);
+          if (value && waylandCapture != null) return unawaited(_turnOnReplayUnderWayland(waylandCapture!));
           preferences.replayBuffer = value;
           savePreferences();
           unawaited(value ? _startReplay() : _stopReplay());

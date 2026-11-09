@@ -10,6 +10,7 @@ import '../host.dart';
 import '../replay_buffer.dart' show ProcessRunner, ProcessStarter;
 import 'game_sound.dart';
 import 'video_encoders.dart';
+import 'wayland_capture.dart';
 
 /// Where a broadcast goes: Twitch's and YouTube's own ingest over TLS, or the user's server.
 enum BroadcastService {
@@ -365,6 +366,7 @@ class Broadcaster {
     ProcessRunner? run,
     this.microphoneLevel,
     this.noMicrophone,
+    this.wayland,
     this.retryDelays = const [
       Duration(seconds: 2),
       Duration(seconds: 5),
@@ -396,6 +398,9 @@ class Broadcaster {
 
   /// The microphone asked for could not be used: the broadcast goes on without it.
   final void Function()? noMicrophone;
+
+  /// Under Wayland, where the picture comes from; null on X11 and Windows.
+  final WaylandCapture? wayland;
 
   /// The failure when ffmpeg has no H.264 encoder that works on this computer.
   static const noEncoder = 'no-encoder';
@@ -473,6 +478,7 @@ class Broadcaster {
     RtmpEndpoint endpoint,
     BroadcastQuality quality, {
     ({List<String> input, int level})? microphone,
+    WaylandFeed? feed,
   }) {
     final width = quality.width;
     final height = quality.height;
@@ -482,7 +488,13 @@ class Broadcaster {
       'error',
       '-nostdin',
       ...encoder.deviceArguments,
-      ...ScreenGrab.input(system: system, environment: environment, framesPerSecond: quality.frameRate, area: area),
+      ...ScreenGrab.input(
+        system: system,
+        environment: environment,
+        framesPerSecond: quality.frameRate,
+        area: area,
+        wayland: feed,
+      ),
       '-thread_queue_size',
       '1024',
       '-f',
@@ -550,20 +562,37 @@ class Broadcaster {
     final endpoint = _endpoint;
     final pid = this.pid;
     if (encoder == null || endpoint == null || pid == null || !phase.active) return;
+    WaylandFeed? feed;
+    if (wayland case final capture?) {
+      feed = await capture.openFeed(
+        maxWidth: _quality.width,
+        maxHeight: _quality.height,
+        framesPerSecond: _quality.frameRate,
+      );
+      if (!phase.active) {
+        await feed?.close();
+        return;
+      }
+      if (feed == null) return _fail((capture.problem ?? WaylandProblem.failed).textKey);
+    }
     final area = areaOf(pid);
     _area = area;
     final microphone = _liveMicrophone;
     final Process process;
     try {
-      process = await _start(ffmpeg, arguments(encoder, area, endpoint, _quality, microphone: microphone));
+      process = await _start(ffmpeg, arguments(encoder, area, endpoint, _quality, microphone: microphone, feed: feed));
     } on Object catch (error) {
+      await feed?.close();
       return _fail('$error');
     }
     if (!phase.active) {
       process.kill();
+      await feed?.close();
       return;
     }
     _process = process;
+    // GStreamer gone: ffmpeg would wait on the pipe for ever.
+    if (feed != null) unawaited(feed.ended.then((_) => process.kill()));
     final steady = SteadyPcm((samples) {
       try {
         process.stdin.add(samples);
@@ -595,6 +624,7 @@ class Broadcaster {
       if (errors.length < 4000) errors.write(text);
     }, onError: (_) {});
     final code = await process.exitCode;
+    await feed?.close();
     if (_process != process) return;
     _process = null;
     _tick?.cancel();
