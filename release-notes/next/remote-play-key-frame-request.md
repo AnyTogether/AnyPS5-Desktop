@@ -1,0 +1,1 @@
+- **Remote Play recovers faster on Windows and Linux**: when the phone loses part of the picture and asks for a key frame, ffmpeg now makes one on request instead of the phone waiting for the next regular key frame, up to a second away. An older ffmpeg without this ability keeps the once-a-second key frame.

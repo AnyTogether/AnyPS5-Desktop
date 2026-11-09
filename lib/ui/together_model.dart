@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:flutter/painting.dart' show Color;
+import 'package:flutter/material.dart' show Color, Icons;
 
 import '../core/audio/tones.dart';
 import '../core/game_library.dart';
@@ -111,7 +111,9 @@ class TogetherModel {
       app.vibrate(HapticCue.ring);
       final text = T.format('gameInvitedYou', [invite.from?.displayName ?? '', gameName(invite.titleId)]);
       app.show(text);
-      if (!doNotDisturb) unawaited(app.noticeOverGame(text, detail: T.text('friendsTitle')));
+      if (!doNotDisturb) {
+        unawaited(app.noticeOverGame(text, detail: T.text('friendsTitle'), symbol: Icons.sports_esports_rounded));
+      }
     };
     hub.games.onEnded = (host) => app.show(
       T.format(hub.games.ended?.together == true ? 'togetherEnded' : 'sessionEnded', [host?.displayName ?? '']),
@@ -1063,7 +1065,7 @@ class TogetherModel {
         PanelRow(
           id: 'friend-game',
           title: T.format('gameJoin', [friend.person.displayName, gameName(game.titleId)]),
-          detail: T.format('gamePlayers', [game.players, game.capacity]),
+          detail: T.format(game.capacity == 1 ? 'gamePlayersOne' : 'gamePlayers', [game.players, game.capacity]),
           kind: ActionRow(
             () => unawaited(joinFriendGame(game.sessionId, titleId: game.titleId, host: friend.person.displayName)),
           ),

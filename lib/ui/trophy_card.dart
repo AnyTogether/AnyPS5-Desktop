@@ -105,6 +105,70 @@ abstract final class TrophyCard {
     }
   }
 
+  /// A short message over the game, in the same card (the Mac's NoticeToast): the [symbol] on a
+  /// tile, the [title] and under it the [detail], up to two lines.
+  static Future<RgbaImage> renderNotice(
+    String title, {
+    String? detail,
+    IconData symbol = Icons.notifications_rounded,
+    double scale = 1,
+    bool glass = false,
+  }) async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.scale(scale);
+    final card = RRect.fromRectAndRadius(
+      const Rect.fromLTWH(_margin, _margin * 0.6, width - _margin * 2, height - _margin * 1.6),
+      const Radius.circular(20),
+    );
+    canvas.drawRRect(
+      card.shift(const Offset(0, 6)),
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.5)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+    );
+    if (glass) {
+      _ice(canvas, card, GlassRecipe.cyan);
+    } else {
+      canvas.drawRRect(card, Paint()..color = const Color(0xF0121212));
+      canvas.drawRRect(
+        card.deflate(0.5),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = Colors.white.withValues(alpha: 0.1),
+      );
+    }
+    final iconRect = Rect.fromLTWH(card.left + 16, card.center.dy - 30, 60, 60);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(iconRect, const Radius.circular(14)),
+      Paint()..color = Colors.white.withValues(alpha: 0.1),
+    );
+    _icon(canvas, symbol, iconRect.center, 26, Colors.white);
+    final left = iconRect.right + 16;
+    final textWidth = card.right - 20 - left;
+    final hasDetail = detail != null && detail.isNotEmpty;
+    _text(
+      canvas,
+      title,
+      Offset(left, hasDetail ? card.top + 22 : card.center.dy - 12),
+      textWidth,
+      17,
+      FontWeight.w600,
+      Colors.white,
+    );
+    if (hasDetail) {
+      _text(canvas, detail, Offset(left, card.top + 46), textWidth, 13, FontWeight.w400, Colors.white60, maxLines: 2);
+    }
+    final image = await recorder.endRecording().toImage((width * scale).ceil(), (height * scale).ceil());
+    try {
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.rawStraightRgba);
+      return RgbaImage(image.width, image.height, bytes!.buffer.asUint8List());
+    } finally {
+      image.dispose();
+    }
+  }
+
   /// The card as Glass's ice: navy deepening downwards with a cold light in the top corner,
   /// the sheen, a faint wash of the grade's colour by the picture, the frost, and the rim.
   static void _ice(Canvas canvas, RRect card, Color grade) {
@@ -196,14 +260,23 @@ abstract final class TrophyCard {
     }
   }
 
-  static void _text(Canvas canvas, String text, Offset at, double width, double size, FontWeight weight, Color color) {
+  static void _text(
+    Canvas canvas,
+    String text,
+    Offset at,
+    double width,
+    double size,
+    FontWeight weight,
+    Color color, {
+    int maxLines = 1,
+  }) {
     final painter = TextPainter(
       text: TextSpan(
         text: text,
         style: AppText.display(size, weight: weight, color: color),
       ),
       textDirection: TextDirection.ltr,
-      maxLines: 1,
+      maxLines: maxLines,
       ellipsis: '…',
     )..layout(maxWidth: width);
     painter.paint(canvas, at);

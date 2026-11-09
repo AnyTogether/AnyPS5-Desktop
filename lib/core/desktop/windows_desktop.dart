@@ -584,6 +584,9 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
   }
 
   @override
+  bool get canShowCard => true;
+
+  @override
   Future<bool> showCard(RgbaImage card, {int? pid}) async {
     if (_card != 0) return false;
     final game = pid == null ? 0 : windowOf(pid);
