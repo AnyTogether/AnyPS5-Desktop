@@ -614,7 +614,9 @@ extension TogetherCaptures on TogetherModel {
       captures
         ..failed = false
         ..index = captures.index.clamp(0, items.isEmpty ? 0 : items.length - 1);
-    } on Object {
+    } on Object catch (error) {
+      // A server that keeps no files says so; the Captures screen says that instead of a failure.
+      if (PostRefusal.of(error) == PostRefusal.storageDisabled) app.saveSync.info = StorageInfo.disabled;
       captures.failed = !captures.feed.loaded;
     }
     app.refresh();

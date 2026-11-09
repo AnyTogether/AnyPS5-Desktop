@@ -14,10 +14,15 @@ import 'socket.dart';
 
 /// The four reactions an activity item can get, one per person.
 enum Reaction {
-  fire,
-  clap,
-  wow,
-  heart;
+  fire('🔥'),
+  clap('👏'),
+  wow('😮'),
+  heart('❤️');
+
+  const Reaction(this.emoji);
+
+  /// The mark the launcher draws it as, the server's own.
+  final String emoji;
 
   static Reaction? named(Object? name) => values.where((reaction) => reaction.name == name).firstOrNull;
 }
@@ -587,6 +592,10 @@ class Social with Notifier {
   /// profile showing it takes it.
   void Function(Activity item)? onActivity;
 
+  /// Runs a new item's change of the feed with the focus held on the item it is on (the launcher
+  /// sets it: a new item coming in above must not move what the keys are on).
+  void Function(void Function() change)? holdFeedFocus;
+
   // The feed.
 
   /// Friends' activity, newest first; [before] an item's ID reads the page after it.
@@ -725,7 +734,12 @@ class Social with Notifier {
         final item = Activity.fromJson(data);
         if (item != null) onActivity?.call(item);
         if (item == null || !feed.loaded) return;
-        feed.upsert(item);
+        final hold = holdFeedFocus;
+        if (hold != null) {
+          hold(() => feed.upsert(item));
+        } else {
+          feed.upsert(item);
+        }
         notifyListeners();
       case 'notification':
         final notice = Notice.fromJson(data['notification']);

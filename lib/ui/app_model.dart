@@ -4368,7 +4368,12 @@ class AppModel extends ChangeNotifier {
             _changed();
           case Command.select:
             final trophy = trophies[selectedGame?.id]?.trophies.elementAtOrNull(trophyIndex);
-            if (trophyShots[trophy?.id] case final String shot) openGallery(shot: shot);
+            // The moment the focused trophy was earned, without one the game's leaderboard.
+            if (trophyShots[trophy?.id] case final String shot) {
+              openGallery(shot: shot);
+            } else if (together.signedIn) {
+              together.openLeaderboard(selectedGame);
+            }
           // △ (Triangle, Y, O) on a hidden trophy shows it, and hides it again.
           case Command.options when focusedTrophy != null && canReveal(focusedTrophy!):
             toggleReveal(trophyIndex);

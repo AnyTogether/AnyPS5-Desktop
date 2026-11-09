@@ -308,6 +308,14 @@ void main() {
     expect(model.overlay, Layer.captures);
   });
 
+  test('a server that keeps no files: Captures says so, not that it failed to read', () async {
+    final together = model.together;
+    server.answers['me/captures'] = FakeTogether.problem(503, 'storage_disabled');
+    together.openCaptures();
+    await until(() => together.captures.failed);
+    expect(model.saveSync.info?.enabled, isFalse);
+  });
+
   test('a clip longer than a post takes is said before anything goes up', () async {
     final together = model.together;
     model.saveSync.info = const StorageInfo(enabled: true);
