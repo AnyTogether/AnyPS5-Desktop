@@ -12,6 +12,11 @@ release when it is made.
 - **A game's options lead to its hub**, as on the Mac.
 - **Family notifications say what they're about**, as on the Mac: who asks for more time or a
   game, what a parent answered, and family alerts and invites.
+- **The replay buffer, Remote Play and broadcasting can record under Wayland on Linux.** Your
+  desktop asks which window to share, and you choose the game. The launcher says so when you turn the
+  replay buffer on, and the desktop can remember the window next time. It needs PipeWire,
+  xdg-desktop-portal and GStreamer's tools with its PipeWire plugin. The launcher names what is
+  missing. Not yet tested on a real Wayland desktop. X11 records as before.
 - **Join with a code works for watching a share play too**, as on the Mac: Party › Join with a
   code looks a code up as you type it (a party's or a share play's), even while you're in a party,
   and asks to join or to watch. A yes shows up as an invite.
@@ -20,6 +25,9 @@ release when it is made.
 - **A friend's trophy level and the party's lead now say so**, as on the Mac: a word when a friend
   levels up (not while you're in a game), when you lead the party, and when you hand it over or
   remove someone.
+- **Nightly now updates the launcher too**, as on the Mac. On the Nightly channel the launcher
+  offers the newest build of main for itself, once it is signed, beside the engine in the engine
+  picker. Going back to Stable keeps that build until a newer release comes out.
 - **Send a picture in any chat**, as on the Mac: a conversation's options (△) have Send a photo, for
   several files at once, in conversations that aren't encrypted too. Each one is drawn again here,
   so no location or camera data goes along.

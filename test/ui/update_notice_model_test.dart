@@ -93,6 +93,24 @@ void main() {
       expect(started, isEmpty);
     });
 
+    test('on Nightly the newest signed build is offered, not one CI has just published unsigned', () async {
+      final model = launcher();
+      model.preferences.updateChannel = 'nightly';
+      const offered = '9.0.1-nightly.20261109.1', waiting = '9.0.1-nightly.20261110.1';
+      github.releases
+        ..clear()
+        ..add(FakeRelease('v$waiting', release(waiting).files, prerelease: true))
+        ..add(signed(FakeRelease('v$offered', release(offered).files, prerelease: true), [key]))
+        ..add(signed(release(newer), [key]));
+      await model.updates.check(quiet: true);
+      expect(model.updates.latest!.version, offered);
+      expect(model.updates.available, isTrue);
+      expect(model.updates.asset!.name, 'AnyPS5-Desktop-Setup-$offered-x64.exe');
+      await model.updates.download(quiet: true);
+      expect(model.updates.state, const UpdateReady(offered));
+      expect(github.downloads.where((path) => path.contains(waiting)), isEmpty);
+    });
+
     test('Restart now with a game starting waits for it', () async {
       final model = launcher();
       await model.updates.startupCheck();

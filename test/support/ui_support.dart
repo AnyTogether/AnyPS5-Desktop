@@ -18,6 +18,7 @@ import 'package:anyps5_desktop/core/gamepad/pad_navigation.dart';
 import 'package:anyps5_desktop/core/host.dart';
 import 'package:anyps5_desktop/core/power.dart';
 import 'package:anyps5_desktop/core/release_signing.dart';
+import 'package:anyps5_desktop/core/capture/wayland_capture.dart';
 import 'package:anyps5_desktop/core/replay_buffer.dart';
 import 'package:anyps5_desktop/core/trophies.dart';
 import 'package:anyps5_desktop/core/installer.dart';
@@ -173,6 +174,7 @@ Fixture makeFixture({
   int? Function(String folder)? freeSpace,
   LauncherWindow? window,
   ReplayBuffer? Function(int seconds)? replay,
+  WaylandCapture? waylandCapture,
   Future<int> Function(String folder)? folderSize,
   Future<Map<PadAction, List<String>>?> Function(String folder)? gameControls,
   Future<String?> Function(String title)? pickFolder,
@@ -265,6 +267,7 @@ Fixture makeFixture({
       quit: quit,
       window: window,
       replay: replay,
+      waylandCapture: waylandCapture,
       // The size at once, as a finished measurement: the screens and goldens show it.
       folderSize: folderSize ?? (folder) => SynchronousFuture(GameLibrary.size(folder)),
       // An Unreal game's own controls at once, read from its paks.
