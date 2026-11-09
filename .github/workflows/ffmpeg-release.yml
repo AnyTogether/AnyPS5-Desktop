@@ -1,0 +1,95 @@
+# Publishes the one ffmpeg build the launcher can download (lib/core/ffmpeg_download.dart,
+# packaging/ffmpeg/pinned.env): run by hand, it fetches the pinned builds, checks their SHA-256,
+# keeps ffmpeg with its licences and a link to its exact source, proves on each system that it has
+# what the launcher asks for (packaging/ffmpeg/check.sh), and publishes them as a pre-release of
+# this repository.
+#
+# A pre-release is never Latest, and Stable and Nightly only read tags that are versions
+# (lib/core/update_channel.dart), so this tag reaches no update check. CI has no signing key: the
+# launcher offers nothing from it until the release Mac has signed it
+# (tools/release/sign_nightly.sh -R AnyTogether/AnyPS5-Desktop <tag>, AnyPS5-ARM).
+name: Publish ffmpeg
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ffmpeg-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare and check (${{ matrix.system }})
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - system: windows
+            runner: windows-latest
+          # The oldest system the launcher is built for.
+          - system: linux
+            runner: ubuntu-22.04
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Fetch, check and pack the pinned build
+        shell: bash
+        run: bash packaging/ffmpeg/prepare.sh "${{ matrix.system }}" dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ffmpeg-${{ matrix.system }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish the pre-release
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: ffmpeg-*
+          path: dist
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          . packaging/ffmpeg/pinned.env
+          for wanted in anyps5-ffmpeg-windows-x64.zip anyps5-ffmpeg-linux-x64.tar.gz; do
+            [ -f "dist/$wanted" ] || { echo "::error::no $wanted"; exit 1; }
+          done
+          if gh release view "$FFMPEG_TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "::error::$FFMPEG_TAG exists already; bump the pin to publish another build"
+            exit 1
+          fi
+          cat >notes.md <<EOF
+          FFmpeg $FFMPEG_VERSION for AnyPS5 Desktop: the ffmpeg the launcher offers to download when a feature needs it and none is found. Not a launcher release: no update channel reads this tag.
+
+          This is $FFMPEG_DESCRIBE as built by BtbN/FFmpeg-Builds ($BTBN_RELEASE), unmodified, licensed under the GNU GPL version 3. LICENSE.txt and SOURCE.txt in each archive give the licence and the link to the exact source: https://github.com/FFmpeg/FFmpeg/commit/$FFMPEG_COMMIT and https://github.com/BtbN/FFmpeg-Builds/tree/$BTBN_COMMIT
+
+          Unsigned until it is signed on the release Mac. The launcher does not offer it until then.
+          EOF
+          gh release create "$FFMPEG_TAG" dist/* --repo "$REPO" --target "$SHA" --prerelease --latest=false \
+            --title "FFmpeg $FFMPEG_VERSION for AnyPS5 Desktop" --notes-file notes.md
+          # Latest must never be this.
+          [ "$(gh release view "$FFMPEG_TAG" --repo "$REPO" --json isPrerelease --jq .isPrerelease)" = true ] ||
+            { echo "::error::$FFMPEG_TAG is not a pre-release"; exit 1; }
+          [ "$(gh api "repos/$REPO/releases/latest" --jq .tag_name)" != "$FFMPEG_TAG" ] ||
+            { echo "::error::$FFMPEG_TAG became the latest release"; exit 1; }
+          echo "published https://github.com/$REPO/releases/tag/$FFMPEG_TAG; sign it on the release Mac"

@@ -20,6 +20,7 @@ import 'core/desktop/windows_desktop.dart';
 import 'core/controllers/pad_reader.dart';
 import 'core/controllers/troubleshooter.dart';
 import 'core/app_update.dart';
+import 'core/ffmpeg_download.dart' show FfmpegBuild;
 import 'core/host.dart';
 import 'core/opened_files.dart';
 import 'core/launcher_health.dart';
@@ -150,6 +151,7 @@ Future<void> main(List<String> arguments) async {
         repository: ArmToolkitPackage.repository,
         signingKeys: ReleaseSigning.trustedKeys,
       ),
+      ffmpegReleases: GitHubReleases(repository: FfmpegBuild.repository, signingKeys: ReleaseSigning.trustedKeys),
       // SDL2 (beside the launcher on Windows, the system's on Linux), else XInput and winmm or evdev.
       pads: () => PadReader.open(arguments: arguments),
       systemProbe: () => HostProbe(HostSystem.current),

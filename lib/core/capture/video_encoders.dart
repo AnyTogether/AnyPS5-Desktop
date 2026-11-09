@@ -165,11 +165,14 @@ enum VideoEncoder {
 
 /// The first encoder that works with this ffmpeg on this computer, asked once and kept.
 class EncoderChoice {
-  EncoderChoice({required this.ffmpeg, required this.system, required this.run});
+  EncoderChoice({required this.ffmpeg, required this.system, required this.run, this.onNone});
 
   final String ffmpeg;
   final HostSystem system;
   final ProcessRunner run;
+
+  /// Called once when no encoder at all works with this ffmpeg.
+  final void Function()? onNone;
   Future<VideoEncoder?>? _chosen;
 
   /// What was tried and how it went, for the game log.
@@ -187,6 +190,7 @@ class EncoderChoice {
         tried.add('${candidate.codec}: $error');
       }
     }
+    onNone?.call();
     return null;
   }
 }

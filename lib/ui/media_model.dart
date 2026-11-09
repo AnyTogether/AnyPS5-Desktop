@@ -60,10 +60,13 @@ class MediaModel {
     if (encodersOverride != null) return encodersOverride;
     final tool = ffmpeg;
     if (tool == null) return null;
+    // Asked again for another ffmpeg: one just downloaded works where the old one did not.
+    if (_encoders?.ffmpeg != tool) _encoders = null;
     return _encoders ??= EncoderChoice(
       ffmpeg: tool,
       system: app.system,
       run: (executable, arguments) => Process.run(executable, arguments),
+      onNone: () => app.ffmpegTool.noteNoEncoder(tool),
     );
   }
 
@@ -113,7 +116,11 @@ class MediaModel {
       // A game plays but nothing can record it: said once, so the empty phone has a reason.
       if (playing != null && !_toldNoTool) {
         _toldNoTool = true;
-        app.show(T.text(screenRecordable ? 'remotePlayNoFfmpeg' : 'remotePlayNoScreen'));
+        if (screenRecordable && app.ffmpegTool.offered) {
+          app.show(T.text('remotePlayGetFfmpeg'), onTap: () => app.openSettingsCategory('captures'));
+        } else {
+          app.show(T.text(screenRecordable ? 'remotePlayNoFfmpeg' : 'remotePlayNoScreen'));
+        }
       }
       return;
     }
@@ -232,7 +239,9 @@ class MediaModel {
     final playing = app.running;
     if (playing == null) return app.show(T.text('broadcastGoLiveNoGame'));
     final reason = unavailable;
-    if (reason != null) return app.show(reason);
+    if (reason != null) {
+      return app.show(reason, onTap: app.ffmpegTool.offered ? () => app.openSettingsCategory('broadcast') : null);
+    }
     final (target, problem) = endpoint();
     if (target == null) {
       unawaited(app.notice(T.text('broadcastSetUpFirst'), detail: problem == null ? null : problemText(problem)));
@@ -516,6 +525,7 @@ class MediaModel {
       else
         // The microphone has its own row below.
         ...gameRows().where((row) => row.id != 'broadcast-live-mic'),
+      ...app.ffmpegTool.rows(),
       PanelRow(
         id: 'broadcast-service',
         title: T.text('broadcastService'),

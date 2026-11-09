@@ -8,6 +8,11 @@ release when it is made.
 - **A game in one .ffpfsc file installs like a zip**, as on the Mac: drop it in a games folder or
   use Add game file in Settings. AnyPS5 unpacks it into a normal game folder with its name, title
   ID and icon, and says so plainly when a file is compressed or of a kind it cannot unpack.
+- **ffmpeg can be downloaded with one press** when Replay, Remote Play, Go Live, a video background
+  or clip tools need it and none is found: progress, Stop and a true error message, from a signed
+  build this project publishes, kept beside the toolkits. An ffmpeg already beside the launcher or
+  on the PATH keeps being used. Until that build is published the launcher says it is not
+  available yet.
 - **The activity feed reads as on the Mac**: game icons from the server, a new friend's picture
   and milestone signs when a game isn't in your library, the rarity on trophies, hidden trophies
   labelled instead of left out, and the four reactions as emoji, shown on the focused item and
