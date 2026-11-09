@@ -66,7 +66,7 @@ class GameAction {
       tone: ActionTone.busy,
       indeterminate: true,
     ),
-    Running() => GameAction(T.text('actionStop'), Icons.stop_rounded, tone: ActionTone.danger),
+    Running() => GameAction(T.text('running'), Icons.play_circle_outline_rounded),
     Stopping() => GameAction(
       T.text('actionStopping'),
       Icons.stop_circle_outlined,

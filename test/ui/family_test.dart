@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:anyps5_desktop/core/family/family_cache.dart';
 import 'package:anyps5_desktop/core/installer.dart';
+import 'package:anyps5_desktop/core/desktop/desktop.dart';
 import 'package:anyps5_desktop/core/together/account.dart';
+import 'package:anyps5_desktop/core/trophies.dart';
 import 'package:anyps5_desktop/ui/app_model.dart' hide Command, GameState;
 import 'package:anyps5_desktop/ui/family_gate.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
@@ -85,6 +88,25 @@ void main() {
     await server.close();
     T.language = Language.english;
     fixture.dispose();
+  });
+
+  test('with the family media setting off, no picture is taken for a trophy, as on the Mac', () async {
+    model.dispose();
+    fixture.dispose();
+    final desktop = _CountingDesktop();
+    fixture = makeFixture(
+      together: server.base,
+      desktop: desktop,
+      renderTrophyCard: (trophy, scale) async => RgbaImage(1, 1, Uint8List.fromList([1, 2, 3, 4])),
+    );
+    model = fixture.model;
+    await signIn();
+    expect(model.together.family.mediaAllowed, isFalse);
+    final orbit = model.games.firstWhere((game) => game.titleId == 'PPSA01001');
+    const trophy = Trophy(serviceLabel: 0, number: 3, grade: TrophyGrade.bronze, hidden: false, name: 'A', detail: '');
+    await model.celebrate(orbit, trophy, 1);
+    expect(desktop.captures, 0);
+    expect(model.trophyShots, isEmpty);
   });
 
   test('a game rated above the limit is locked; asking a parent teaches its rating first', () async {
@@ -221,4 +243,14 @@ void main() {
     expect(changed.lockedOut, isTrue);
     expect(changed.voiceAllowed, isFalse);
   });
+}
+
+class _CountingDesktop extends NoDesktop {
+  var captures = 0;
+
+  @override
+  Future<RgbaImage?> captureGame(int pid) async {
+    captures++;
+    return null;
+  }
 }

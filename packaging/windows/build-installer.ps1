@@ -22,6 +22,8 @@ $iscc = @(
 ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $iscc) { throw "Inno Setup 6 not found: winget install JRSoftware.InnoSetup" }
 
-& $iscc /Q "/DAppVersion=$version" "/DSourceDir=$release" "/DOutputDir=$(Join-Path $root 'build\installer')" (Join-Path $PSScriptRoot "AnyPS5-Desktop.iss")
+# A nightly's version (0.1.21-nightly.20261109.1): the file's version property takes numbers only.
+$numbers = ($version -split '-')[0]
+& $iscc /Q "/DAppVersion=$version" "/DFileVersion=$numbers" "/DSourceDir=$release" "/DOutputDir=$(Join-Path $root 'build\installer')" (Join-Path $PSScriptRoot "AnyPS5-Desktop.iss")
 if ($LASTEXITCODE) { throw "ISCC failed ($LASTEXITCODE)" }
 Get-Item (Join-Path $root "build\installer\AnyPS5-Desktop-Setup-$version-x64.exe")

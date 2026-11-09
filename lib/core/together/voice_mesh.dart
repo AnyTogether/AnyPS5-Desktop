@@ -24,11 +24,19 @@ abstract class VoiceLink {
   Future<void> close();
 }
 
+/// The microphone's processing as WebRTC takes it: echo cancellation and gain always, noise
+/// suppression as the person set it (on unless turned off).
+Map<String, dynamic> voiceAudioConstraints({required bool noiseSuppression}) => {
+  'echoCancellation': true,
+  'noiseSuppression': noiseSuppression,
+  'autoGainControl': true,
+};
+
 /// The microphone and the connections to the others.
 abstract class VoiceEngine {
-  /// Asks for the microphone, with the platform's voice processing; [VoiceDenied] when the
-  /// person or the system says no.
-  Future<void> start();
+  /// Asks for the microphone, with the platform's voice processing ([voiceAudioConstraints]);
+  /// [VoiceDenied] when the person or the system says no.
+  Future<void> start({bool noiseSuppression = true});
   Future<VoiceLink> link(List<Map<String, dynamic>> iceServers);
 
   /// Sends the microphone or not (muted).
@@ -36,6 +44,10 @@ abstract class VoiceEngine {
 
   /// The others heard or not (deafened), on every connection made and made from now on.
   void setHearing(bool on);
+
+  /// Noise suppression on or off in the call as it is: the microphone's track is replaced on
+  /// every connection with one processed the other way, without a new offer.
+  Future<void> setNoiseSuppression(bool on);
   Future<void> stop();
 }
 

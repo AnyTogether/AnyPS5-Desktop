@@ -403,6 +403,12 @@ extension TogetherParty on TogetherModel {
           kind: ToggleRow(!voice.muted, (value) => voice.setMuted(!value)),
         ),
       PanelRow(
+        id: 'voice-noise',
+        title: T.text('noiseSuppression'),
+        detail: T.text(voice.noiseSuppression ? 'noiseSuppressionOn' : 'noiseSuppressionOff'),
+        kind: ToggleRow(voice.noiseSuppression, setNoiseSuppression),
+      ),
+      PanelRow(
         id: 'voice-deafen',
         title: T.text('joinDeafen'),
         detail: T.text('joinDeafenDetail'),
@@ -598,6 +604,13 @@ extension TogetherParty on TogetherModel {
       case null:
         if (hub.voice.active) app.show(T.text('voiceJoined'));
     }
+  }
+
+  /// Noise suppression on or off, in the call now too (nothing reconnects).
+  void setNoiseSuppression(bool on) {
+    app.preferences.noiseSuppression = on;
+    unawaited(hub.voice.setNoiseSuppression(on));
+    app.savePreferences();
   }
 
   void setPushToTalk(bool on) {

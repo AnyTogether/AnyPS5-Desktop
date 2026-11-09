@@ -2,9 +2,10 @@ import 'toolkit_download.dart';
 
 /// Settings › About › Update Channel, as the macOS launcher's (Updates.swift): Stable follows the
 /// releases, Nightly the newest build including pre-releases. Nightly builds of AnyPS5-ARM are
-/// tagged `v<next release>-arm-nightly.<YYYYMMDD>.<n>`, the next release being the last one with
-/// its last number raised and n counting the day's builds from 1, so that they sort after the
-/// release before them and before the release they lead to.
+/// tagged `v<next release>-arm-nightly.<YYYYMMDD>.<n>` and this launcher's own
+/// `v<next release>-nightly.<YYYYMMDD>.<n>` (.github/workflows/nightly.yml), the next release
+/// being the last one with its last number raised and n counting the day's builds from 1, so that
+/// they sort after the release before them and before the release they lead to.
 enum UpdateChannel {
   stable,
   nightly;
@@ -100,6 +101,11 @@ abstract final class ChannelReleases {
     final offered = ReleaseVersion.parse(tag), running = ReleaseVersion.parse(current);
     return offered != null && running != null && running < offered;
   }
+
+  /// A nightly [current] on Stable, with nothing newer on offer: it stays as it is until a newer
+  /// release comes out, as on the Mac.
+  static bool stays(UpdateChannel channel, String current) =>
+      channel == UpdateChannel.stable && (ReleaseVersion.parse(current)?.isNightly ?? false);
 
   /// The releases [channel] offers, newest first: pre-releases only on Nightly, tags that are no
   /// version left out; the later published first when two tie.
