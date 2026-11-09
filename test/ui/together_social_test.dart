@@ -275,6 +275,8 @@ void main() {
     });
 
     test('one player reads in the singular, and the count stays plural from two up', () {
+      fixture = makeFixture();
+      model = fixture.model;
       expect(T.format('socialBoardPlayers', [2]), '2 players');
       expect(T.format('socialBoardPlayersOne', [1]), '1 player');
       expect(T.format('discoverPlayersOne', [1]), '1 player on AnyTogether');
