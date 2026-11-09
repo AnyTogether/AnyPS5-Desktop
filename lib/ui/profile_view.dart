@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../core/together/levels.dart';
+import '../core/together/posts.dart' show MediaItem;
 import '../core/together/profile_look.dart';
 import '../core/together/profiles.dart';
 import '../core/trophies.dart';
 import 'app_model.dart';
+import 'captures_view.dart' show CaptureViewer, RemotePicture;
 import 'components.dart';
 import 'feed_view.dart';
 import 'glass.dart';
@@ -199,6 +201,10 @@ class ProfileView extends StatelessWidget {
               ],
             ),
           ),
+          if (together.captures.viewing case final viewing?)
+            Positioned.fill(
+              child: CaptureViewer(model: model, media: viewing),
+            ),
         ],
       ),
     );
@@ -396,6 +402,8 @@ class _Sections extends StatelessWidget {
       child: Text(text, style: AppText.display(15 * scale, color: Colors.white.withValues(alpha: 0.55))),
     );
     final from = together.profileGamesFrom;
+    final gallery = together.profileGallery;
+    final galleryItems = gallery?.value;
     final showcase = page.showcase;
     // Six pins at most, trophies first, as the server shows them (one saved before the shared
     // limit may hold more).
@@ -459,6 +467,34 @@ class _Sections extends StatelessWidget {
             heading(T.text('showcaseTitle')),
             note(T.text('showcaseEmpty')),
           ],
+          // The pinned gallery, under the showcase, as the owner's setting shows it.
+          if (gallery is SectionPrivate<List<MediaItem>>) ...[
+            heading(T.text('cloudProfileGallery')),
+            note(T.text('cloudProfileGalleryPrivate')),
+          ] else if (galleryItems != null && galleryItems.isNotEmpty) ...[
+            heading(T.text('cloudProfileGallery')),
+            Wrap(
+              spacing: 12 * scale,
+              runSpacing: 12 * scale,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                for (final media in galleryItems.take(8)) _GalleryTile(model: model, media: media),
+                if (galleryItems.length > 8)
+                  Text(
+                    '+${galleryItems.length - 8}',
+                    style: AppText.display(
+                      17 * scale,
+                      weight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.7),
+                    ),
+                  ),
+              ],
+            ),
+            SizedBox(height: 18 * scale),
+          ] else if (galleryItems != null && page.profile.isMe) ...[
+            heading(T.text('cloudProfileGallery')),
+            note(T.text('cloudProfileGalleryEmpty')),
+          ],
           heading(T.text('profileGamesTitle')),
           if (games.isEmpty) note(closed(page.library, T.text('profileNoGames'))),
           for (var index = 0; index < games.length; index++)
@@ -500,6 +536,44 @@ class _Sections extends StatelessWidget {
               ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// One pinned photo or clip; pressed, over the whole screen.
+class _GalleryTile extends StatelessWidget {
+  const _GalleryTile({required this.model, required this.media});
+
+  final AppModel model;
+  final MediaItem media;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = LayoutScale.of(context);
+    return Pressable(
+      onTap: () => model.together.viewProfileMedia(media),
+      builder: (context, hovering) => ClipRRect(
+        borderRadius: BorderRadius.circular(10 * scale),
+        child: SizedBox(
+          width: 150 * scale,
+          height: 84 * scale,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              RemotePicture(model: model, link: media.still),
+              if (media.clip)
+                Center(
+                  child: Container(
+                    padding: EdgeInsets.all(8 * scale),
+                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.5), shape: BoxShape.circle),
+                    child: Icon(Icons.play_arrow_rounded, size: 18 * scale, color: Colors.white),
+                  ),
+                ),
+              if (hovering) ColoredBox(color: Colors.white.withValues(alpha: 0.08)),
+            ],
+          ),
+        ),
       ),
     );
   }

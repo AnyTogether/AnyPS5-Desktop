@@ -408,10 +408,40 @@ void main() {
       model.selected = model.games.indexWhere((game) => game.titleId == 'PPSA02002');
       model.open(Layer.gameSettings);
       final rows = model.panelCategories().single.rows.map((row) => row.id).toList();
-      expect(rows, containsAll(['leaderboard', 'compat']));
+      expect(rows, containsAll(['leaderboard', 'compat', 'game-hub']));
+      // The game's hub, from its options, as on the Mac.
+      final hubRow = model.panelCategories().single.rows.firstWhere((row) => row.id == 'game-hub');
+      expect(hubRow.title, 'Neon Alley hub');
+      (hubRow.kind as ActionRow).run();
+      expect(model.overlay, Layer.gameHub);
+      expect(model.together.findState.hubTitle, 'PPSA02002');
+      model.open(Layer.gameSettings);
       // Signed out: neither.
       model.together.account.user = null;
       expect(model.panelCategories().single.rows.map((row) => row.id), isNot(contains('compat')));
+    });
+
+    test("a family notification says what it's about, as on the Mac", () {
+      fixture = makeFixture();
+      model = fixture.model;
+      signedIn();
+      final together = model.together;
+      String text(String kind, Map<String, dynamic> data) =>
+          together.noticeText(Notice.fromJson(notice('a', kind, const Duration(minutes: 1), data: data))!);
+
+      expect(text('family_request', {'kind': 'more_time', 'minutes': 15}), 'Bora asks for 15 more minutes');
+      expect(text('family_request', {'kind': 'play_game', 'gameName': 'Neon Alley'}), 'Bora asks to play Neon Alley');
+      expect(text('family_request', {'kind': 'friend'}), 'Bora asks to add a friend');
+      expect(text('family_answer', {'kind': 'more_time', 'approved': true, 'minutes': 15}), 'A parent gave you 15 more minutes');
+      expect(text('family_answer', {'kind': 'play_game', 'approved': true}), 'A parent said yes: the game is open');
+      expect(text('family_answer', {'kind': 'friend', 'approved': true}), 'A parent said yes to your new friend');
+      expect(text('family_answer', {'approved': false}), 'A parent said no this time');
+      expect(text('family_alert', {'event': 'limit_reached'}), "Bora reached today's play time");
+      expect(text('family_alert', {'event': 'child_declined'}), 'Bora did not join your family');
+      expect(text('family_alert', {'event': 'joined'}), 'Bora joined your family');
+      expect(text('family_invite', {'familyName': 'Yılmaz'}), 'Bora invites you to the family Yılmaz');
+      expect(text('family_summary', {}), "Your family's week in games");
+      expect(text('something_new', {}), T.text('socialNotifOther'));
     });
 
     testWidgets('the bell shows only while signed in, with the unread count', (tester) async {

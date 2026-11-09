@@ -183,6 +183,13 @@ release when it is made.
   second press, and a bar shows how much saves and media take.
 - **Restore saves… restores the backup you choose**, as on the Mac. The latest backup can still
   be restored in one press.
+- **A profile shows its pinned gallery**, as on the Mac: the photos and clips someone pinned, as
+  their privacy setting shows them, open over the whole screen.
+- **The community's verdict is on the home screen**, as on the Mac: how the game runs on this
+  platform, once people have said so.
+- **A game's options lead to its hub**, as on the Mac.
+- **Family notifications say what they're about**, as on the Mac: who asks for more time or a
+  game, what a parent answered, and family alerts and invites.
 
 ## 0.1.20
 
