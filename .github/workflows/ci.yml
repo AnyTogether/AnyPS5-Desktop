@@ -223,6 +223,9 @@ jobs:
           ls build/linux/x64/release/bundle/lib/libmpv.so.*
           ls build/linux/x64/release/bundle/lib/licenses/ | grep -c . | xargs echo "licence files in lib/licenses/:"
           ls build/linux/x64/release/bundle/lib/licenses/libmpv*.txt
+          ls build/linux/x64/release/bundle/lib/licenses/common-licenses/ | grep -c . | xargs echo "long licences in lib/licenses/common-licenses/:"
+          test -f build/linux/x64/release/bundle/lib/licenses/common-licenses/LGPL-2.1
+          test -f build/linux/x64/release/bundle/lib/licenses/common-licenses/GPL-3
       # Ubuntu 24.04 has libmpv.so.2, not the 22.04 build machine's libmpv.so.1: the clip player's
       # plugin and the libmpv it carries have to find everything they link in lib/ or in what a
       # GTK desktop has.
