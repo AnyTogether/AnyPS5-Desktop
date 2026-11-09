@@ -5,6 +5,11 @@ release when it is made.
 
 ## Next release
 
+- **The replay buffer, Remote Play and broadcasting can record under Wayland on Linux.** Your
+  desktop asks which window to share, and you choose the game. The launcher says so when you turn the
+  replay buffer on, and the desktop can remember the window next time. It needs PipeWire,
+  xdg-desktop-portal and GStreamer's tools with its PipeWire plugin. The launcher names what is
+  missing. Not yet tested on a real Wayland desktop. X11 records as before.
 - **Join with a code works for watching a share play too**, as on the Mac: Party › Join with a
   code looks a code up as you type it (a party's or a share play's), even while you're in a party,
   and asks to join or to watch. A yes shows up as an invite.

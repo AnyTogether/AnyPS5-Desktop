@@ -94,7 +94,7 @@ void main() {
     await linux.stop();
   });
 
-  test('X11 and Windows can record; Wayland and no display cannot', () {
+  test('X11 and Windows record directly; Wayland goes through the portal, no display cannot', () {
     expect(ReplayBuffer.supported(HostSystem.windows, const {}), isTrue);
     expect(ReplayBuffer.supported(HostSystem.linux, const {'DISPLAY': ':0', 'XDG_SESSION_TYPE': 'x11'}), isTrue);
     expect(ReplayBuffer.supported(HostSystem.linux, const {'DISPLAY': ':0', 'XDG_SESSION_TYPE': 'wayland'}), isFalse);
