@@ -34,21 +34,26 @@ class OnboardingView extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                for (var index = 0; index < AppModel.onboardingSteps; index++)
-                  AnimatedContainer(
-                    duration: Motion.layout,
-                    curve: Motion.settle,
-                    margin: EdgeInsetsDirectional.only(end: 10 * scale),
-                    width: (index == step ? 46 : 18) * scale,
-                    height: 5 * scale,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(5 * scale),
-                      color: Colors.white.withValues(alpha: index <= step ? 0.95 : 0.22),
+            Semantics(
+              container: true,
+              label: T.format('onboardingStep', [step + 1, AppModel.onboardingSteps]),
+              excludeSemantics: true,
+              child: Row(
+                children: [
+                  for (var index = 0; index < AppModel.onboardingSteps; index++)
+                    AnimatedContainer(
+                      duration: Motion.layout,
+                      curve: Motion.settle,
+                      margin: EdgeInsetsDirectional.only(end: 10 * scale),
+                      width: (index == step ? 46 : 18) * scale,
+                      height: 5 * scale,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(5 * scale),
+                        color: Colors.white.withValues(alpha: index <= step ? 0.95 : 0.22),
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
             SizedBox(height: 54 * scale),
             Expanded(
@@ -125,6 +130,7 @@ class _StepTitle extends StatelessWidget {
 class _ChoiceCard extends StatelessWidget {
   const _ChoiceCard({
     required this.focused,
+    required this.label,
     required this.onTap,
     required this.child,
     this.width,
@@ -133,6 +139,9 @@ class _ChoiceCard extends StatelessWidget {
   });
 
   final bool focused;
+
+  /// What a screen reader says for the card.
+  final String label;
   final VoidCallback onTap;
   final Widget child;
   final double? width;
@@ -142,30 +151,38 @@ class _ChoiceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scale = LayoutScale.of(context);
-    return GestureDetector(
+    return Semantics(
+      container: true,
+      button: true,
+      selected: focused,
+      label: label,
       onTap: onTap,
-      child: AnimatedScale(
-        scale: focused ? 1.04 : 1,
-        duration: Motion.focus,
-        curve: Motion.settle,
-        child: AnimatedContainer(
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedScale(
+          scale: focused ? 1.04 : 1,
           duration: Motion.focus,
           curve: Motion.settle,
-          width: width,
-          height: height,
-          padding: EdgeInsets.all(padding * scale),
-          decoration: BoxDecoration(
-            color: focused ? Colors.white : Colors.white.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(20 * scale),
-            border: Border.all(color: Colors.white.withValues(alpha: focused ? 0 : 0.14)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.white.withValues(alpha: focused ? 0.3 : 0),
-                blurRadius: 20 * scale,
-              ),
-            ],
+          child: AnimatedContainer(
+            duration: Motion.focus,
+            curve: Motion.settle,
+            width: width,
+            height: height,
+            padding: EdgeInsets.all(padding * scale),
+            decoration: BoxDecoration(
+              color: focused ? Colors.white : Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20 * scale),
+              border: Border.all(color: Colors.white.withValues(alpha: focused ? 0 : 0.14)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: focused ? 0.3 : 0),
+                  blurRadius: 20 * scale,
+                ),
+              ],
+            ),
+            child: child,
           ),
-          child: child,
         ),
       ),
     );
@@ -219,6 +236,7 @@ class _LanguageStep extends StatelessWidget {
                       width: width,
                       height: height,
                       padding: height >= 96 * scale ? 18 : 12,
+                      label: language.displayName,
                       onTap: () {
                         model.onboardingChoice = index;
                         model.onboardingConfirm();
@@ -288,55 +306,68 @@ class _ThemeStep extends StatelessWidget {
             return Row(
               children: [
                 for (final style in LookStyle.values) ...[
-                  GestureDetector(
+                  Semantics(
+                    container: true,
+                    button: true,
+                    selected: model.onboardingChoice == style.index,
+                    label: style.title,
                     onTap: () => model.previewTheme(style.index),
-                    child: AnimatedScale(
-                      scale: model.onboardingChoice == style.index ? 1.04 : 0.97,
-                      duration: Motion.focus,
-                      curve: Motion.settle,
-                      child: AnimatedOpacity(
-                        opacity: model.onboardingChoice == style.index ? 1 : 0.72,
+                    excludeSemantics: true,
+                    child: GestureDetector(
+                      onTap: () => model.previewTheme(style.index),
+                      child: AnimatedScale(
+                        scale: model.onboardingChoice == style.index ? 1.04 : 0.97,
                         duration: Motion.focus,
-                        child: SizedBox(
-                          width: card,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              FocusRing(
-                                focused: model.onboardingChoice == style.index,
-                                radius: 18 * scale,
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(18 * scale),
-                                  child: SizedBox(
-                                    width: card,
-                                    height: card * 186 / 330,
-                                    child: ThemeBackground(
-                                      style: style,
-                                      paused: model.onboardingChoice != style.index,
-                                      time: time,
+                        curve: Motion.settle,
+                        child: AnimatedOpacity(
+                          opacity: model.onboardingChoice == style.index ? 1 : 0.72,
+                          duration: Motion.focus,
+                          child: SizedBox(
+                            width: card,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                FocusRing(
+                                  focused: model.onboardingChoice == style.index,
+                                  radius: 18 * scale,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(18 * scale),
+                                    child: SizedBox(
+                                      width: card,
+                                      height: card * 186 / 330,
+                                      child: ThemeBackground(
+                                        style: style,
+                                        paused: model.onboardingChoice != style.index,
+                                        time: time,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              SizedBox(height: 14 * scale),
-                              Row(
-                                children: [
-                                  Text(
-                                    style.title,
-                                    style: AppText.display(
-                                      22 * scale,
-                                      weight: model.onboardingChoice == style.index ? FontWeight.w600 : FontWeight.w400,
+                                SizedBox(height: 14 * scale),
+                                Row(
+                                  children: [
+                                    Text(
+                                      style.title,
+                                      style: AppText.display(
+                                        22 * scale,
+                                        weight: model.onboardingChoice == style.index
+                                            ? FontWeight.w600
+                                            : FontWeight.w400,
+                                      ),
                                     ),
-                                  ),
-                                  const Spacer(),
-                                  Container(
-                                    width: 12 * scale,
-                                    height: 12 * scale,
-                                    decoration: BoxDecoration(shape: BoxShape.circle, color: style.defaultAccent.color),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                    const Spacer(),
+                                    Container(
+                                      width: 12 * scale,
+                                      height: 12 * scale,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: style.defaultAccent.color,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -476,6 +507,7 @@ class _ToolkitStep extends StatelessWidget {
               focused: model.onboardingChoice == 0,
               width: 470 * scale,
               height: 196 * scale,
+              label: T.text('engineDownload'),
               onTap: () {
                 model.onboardingChoice = 0;
                 model.onboardingConfirm();
@@ -554,6 +586,7 @@ class _ToolkitStep extends StatelessWidget {
               focused: model.onboardingChoice == 1,
               width: 320 * scale,
               height: 196 * scale,
+              label: T.text('engineOwnFolder'),
               onTap: () {
                 model.onboardingChoice = 1;
                 model.onboardingConfirm();
