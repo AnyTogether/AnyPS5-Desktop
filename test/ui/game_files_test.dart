@@ -9,6 +9,7 @@ import 'package:archive/archive_io.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
+import '../support/ffpfsc_builder.dart';
 import '../support/fixtures.dart';
 import '../support/ui_support.dart';
 
@@ -91,6 +92,101 @@ void main() {
       await pumpLauncher(tester, launcher);
       expect(find.text('Çıkarılıyor… %41'), findsOneWidget);
       await expectLater(find.byType(LauncherShell), matchesGoldenFile('goldens/unpack_progress_tr.png'));
+    });
+  });
+
+  test('a .ffpfsc is offered with its game name and ID, unpacked beside it and read as a game', () async {
+    TestFfpfsc(TestFfpfsc.game()).write(p.join(root, 'Small.ffpfsc'));
+    model.rescan();
+    await until(() => model.overlay == Layer.gameFiles);
+    expect(model.panelCategories().single.title, 'Unpack game');
+    expect(row('files-about').title, 'Small Quest (PPSA07007)');
+    expect(row('files-about').picture, isNotNull);
+    expect(
+      (row('files-about').kind as InfoRow).text,
+      startsWith('A game is inside. It unpacks into the folder Small next to it.'),
+    );
+    (row('files-go').kind as ActionRow).run();
+    await until(() => model.games.any((game) => game.titleId == 'PPSA07007'));
+    expect(File(p.join(root, 'Small', 'eboot.bin')).existsSync(), isTrue);
+    expect(model.toast, 'Small.ffpfsc is unpacked. The game file can be deleted now.');
+    // Unpacked: not offered again.
+    model.rescan();
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(model.overlay, isNull);
+  });
+
+  test('a compressed .ffpfsc says so and offers no Unpack', () async {
+    final image = TestFfpfsc(TestFfpfsc.game());
+    final table = image.pfscStart + 0x400;
+    final first = image.get64(table);
+    for (var index = 1; index <= image.blocks; index++) {
+      image.set(first + index * 0x8000, table + index * 8, 8);
+    }
+    image.write(p.join(root, 'Packed.ffpfsc'));
+    model.rescan();
+    await until(() => model.overlay == Layer.gameFiles);
+    expect(rowIds(), ['files-about', 'files-later']);
+    expect((row('files-about').kind as InfoRow).text, T.text('ffpfscCompressed'));
+    expect(Directory(p.join(root, 'Packed')).existsSync(), isFalse);
+  });
+
+  group('Add game file', () {
+    String? picked;
+    late Fixture fixture2;
+    late AppModel launcher;
+    late String games;
+
+    setUp(() {
+      picked = null;
+      fixture2 = makeFixture(pickFile: (label, extensions) async => picked);
+      launcher = fixture2.model;
+      games = launcher.preferences.gamesFolders.single;
+    });
+
+    tearDown(() {
+      launcher.dispose();
+      fixture2.dispose();
+    });
+
+    test('a game file outside the library unpacks into the first games folder', () async {
+      final elsewhere = Directory(p.join(fixture2.temp.path, 'Elsewhere'))..createSync();
+      TestFfpfsc(TestFfpfsc.game()).write(p.join(elsewhere.path, 'Small.ffpfsc'));
+      picked = p.join(elsewhere.path, 'Small.ffpfsc');
+      await launcher.files.addGameFile();
+      expect(launcher.overlay, Layer.gameFiles);
+      final ask = launcher.files.asked! as UnpackAsk;
+      expect(ask.into, p.join(games, 'Small'));
+      expect(
+        (launcher.panelCategories().single.rows.first.kind as InfoRow).text,
+        startsWith('A game is inside. It unpacks into the folder Small in your games folder.'),
+      );
+      await launcher.files.start();
+      expect(File(p.join(games, 'Small', 'eboot.bin')).existsSync(), isTrue);
+      expect(File(p.join(elsewhere.path, 'Small', 'eboot.bin')).existsSync(), isFalse);
+    });
+
+    test('a folder of its name is never written over, and a damaged file is said', () async {
+      TestFfpfsc(TestFfpfsc.game()).write(p.join(games, 'Small.ffpfsc'));
+      Directory(p.join(games, 'Small')).createSync();
+      File(p.join(games, 'Small', 'mine.txt')).writeAsStringSync('keep');
+      picked = p.join(games, 'Small.ffpfsc');
+      await launcher.files.addGameFile();
+      expect(launcher.toast, T.format('addGameFileThere', ['Small']));
+      expect(launcher.files.asked, isNull);
+      expect(File(p.join(games, 'Small', 'mine.txt')).readAsStringSync(), 'keep');
+
+      File(p.join(games, 'Bad.ffpfsc')).writeAsBytesSync(List.filled(100, 1));
+      picked = p.join(games, 'Bad.ffpfsc');
+      await launcher.files.addGameFile();
+      expect(launcher.toast, T.text('ffpfscDamaged'));
+      expect(launcher.files.asked, isNull);
+    });
+
+    test('without a games folder it says to add one first', () async {
+      launcher.preferences.gamesFolders = const [];
+      await launcher.files.addGameFile();
+      expect(launcher.toast, T.text('addGameFileNoFolder'));
     });
   });
 

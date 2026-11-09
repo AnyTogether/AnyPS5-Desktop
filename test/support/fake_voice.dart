@@ -13,11 +13,18 @@ class FakeVoiceEngine implements VoiceEngine {
   final List<FakeLink> links = [];
   List<Map<String, dynamic>>? iceServers;
 
+  /// The noise suppression the microphone opened with, then each change in the call.
+  final List<bool> noiseSuppression = [];
+
   @override
-  Future<void> start() async {
+  Future<void> start({bool noiseSuppression = true}) async {
     if (deny) throw const VoiceDenied();
     started = true;
+    this.noiseSuppression.add(noiseSuppression);
   }
+
+  @override
+  Future<void> setNoiseSuppression(bool on) async => noiseSuppression.add(on);
 
   @override
   Future<VoiceLink> link(List<Map<String, dynamic>> iceServers) async {

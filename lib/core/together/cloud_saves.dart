@@ -166,7 +166,7 @@ class SaveSlot {
 
 /// The usage and every save slot (GET /me/storage).
 class StorageOverview {
-  const StorageOverview({required this.enabled, this.usage, this.saves = const []});
+  const StorageOverview({required this.enabled, this.usage, this.saves = const [], this.media = const []});
 
   factory StorageOverview.fromJson(Map<String, dynamic> json) => StorageOverview(
     enabled: json['enabled'] as bool? ?? true,
@@ -175,11 +175,39 @@ class StorageOverview {
       for (final slot in json['saves'] as List<dynamic>? ?? const [])
         if (slot is Map<String, dynamic>) SaveSlot.fromJson(slot),
     ],
+    media: [
+      for (final item in json['media'] as List<dynamic>? ?? const [])
+        if (item is Map<String, dynamic>) StoredMedia.fromJson(item),
+    ],
   );
 
   final bool enabled;
   final StorageUsage? usage;
   final List<SaveSlot> saves;
+  final List<StoredMedia> media;
+}
+
+/// A photo, clip or voice note on AnyTogether, as Cloud Storage lists them.
+class StoredMedia {
+  const StoredMedia({required this.id, required this.kind, this.size = 0, this.createdAt, this.gallery});
+
+  factory StoredMedia.fromJson(Map<String, dynamic> json) => StoredMedia(
+    id: json['id'] as String,
+    kind: json['kind'] as String? ?? 'image',
+    size: _int(json['size']),
+    createdAt: json['createdAt'] is String ? DateTime.tryParse(json['createdAt'] as String) : null,
+    gallery: json['gallery'] is num ? (json['gallery'] as num).toInt() : null,
+  );
+
+  final String id;
+
+  /// "image", "clip" or "voice".
+  final String kind;
+  final int size;
+  final DateTime? createdAt;
+
+  /// Its place in the owner's gallery when pinned, null otherwise.
+  final int? gallery;
 }
 
 /// What AnyTogether's problems say about storage.
@@ -217,6 +245,11 @@ class CloudStorage {
   }
 
   Future<StorageOverview> overview() async => StorageOverview.fromJson(await account.call('GET', 'me/storage'));
+
+  /// Removes one photo, clip or voice note from the user's storage.
+  Future<void> deleteMedia(String id) async {
+    await account.call('DELETE', 'me/media/${Uri.encodeComponent(id)}');
+  }
 
   /// The game's slots (GET /me/saves?titleId=).
   Future<List<SaveSlot>> slots(String titleId) async {

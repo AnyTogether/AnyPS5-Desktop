@@ -114,7 +114,7 @@ class CapturesView extends StatelessWidget {
           ),
         if (captures.viewing case final viewing?)
           Positioned.fill(
-            child: _Viewer(model: model, media: viewing),
+            child: CaptureViewer(model: model, media: viewing),
           ),
       ],
     );
@@ -133,7 +133,13 @@ class _PostList extends StatelessWidget {
     final captures = together.captures;
     final feed = captures.feed;
     final note = !feed.loaded
-        ? T.text(captures.failed ? 'capturesFailed' : 'capturesLoading')
+        ? T.text(
+            !captures.failed
+                ? 'capturesLoading'
+                : model.saveSync.info?.enabled == false
+                ? 'capturesRefusedStorage'
+                : 'capturesFailed',
+          )
         : feed.items.isEmpty
         ? T.text('capturesEmpty')
         : null;
@@ -638,8 +644,8 @@ class _CommentRow extends StatelessWidget {
 
 /// A post's picture or clip over the whole screen: a click on the picture, or around the clip,
 /// closes it; a clip plays in the launcher.
-class _Viewer extends StatelessWidget {
-  const _Viewer({required this.model, required this.media});
+class CaptureViewer extends StatelessWidget {
+  const CaptureViewer({super.key, required this.model, required this.media});
 
   final AppModel model;
   final MediaItem media;

@@ -350,7 +350,12 @@ void main() {
       await messages.show('c-ana');
       await until(() => messages.lockOf('c-ana')?.state == EncryptionState.on);
       final photo = Uint8List.fromList(List<int>.generate(5000, (i) => i * 7 % 256));
-      await messages.sendPhoto(photo, type: 'image/png', width: 64, height: 48);
+      await messages.sendMedia(
+        'c-ana',
+        kind: 'image',
+        plain: () async => fail('a sealed conversation never uploads in the clear'),
+        sealed: () => messages.e2ee!.uploadSealed(file: photo, kind: 'image', type: 'image/png', width: 64, height: 48),
+      );
       await until(() => server.threads['c-ana']!.length == 1);
       final uploaded = e2eeServer.media.values.single;
       expect(uploaded.length, photo.length + 16);

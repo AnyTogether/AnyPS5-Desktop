@@ -15,10 +15,39 @@ import 'package:flutter_test/flutter_test.dart';
 /// HttpClient answers every request with a 400 in the files that talk to fake servers.
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   await T.load(bundle: _NoAssets(), tryOut: Directory('assets/l10n'));
-  if (Platform.environment['ANYPS5_SKIP_GOLDENS'] == '1' && !autoUpdateGoldenFiles) {
-    goldenFileComparator = _SkippedGoldens();
+  if (!autoUpdateGoldenFiles) {
+    final comparator = goldenFileComparator;
+    if (Platform.environment['ANYPS5_SKIP_GOLDENS'] == '1') {
+      goldenFileComparator = _SkippedGoldens();
+    } else if (comparator is LocalFileComparator) {
+      goldenFileComparator = _KeptNewGoldens(comparator);
+    }
   }
   await testMain();
+}
+
+/// Compares as usual. A golden with no file yet has nothing to compare with, so flutter_test
+/// fails it without an image: this leaves the new picture where a mismatch leaves its own
+/// (`failures/<name>_testImage.png`), for CI's golden-failures-macos artifact.
+class _KeptNewGoldens extends GoldenFileComparator {
+  _KeptNewGoldens(this._comparator);
+
+  final LocalFileComparator _comparator;
+
+  @override
+  Future<bool> compare(Uint8List imageBytes, Uri golden) async {
+    final goldenFile = File.fromUri(_comparator.basedir.resolveUri(golden));
+    if (!goldenFile.existsSync()) {
+      final name = golden.pathSegments.last.replaceAll(RegExp(r'\.png$'), '');
+      final made = File.fromUri(_comparator.basedir.resolve('failures/${name}_testImage.png'));
+      made.parent.createSync(recursive: true);
+      made.writeAsBytesSync(imageBytes);
+    }
+    return _comparator.compare(imageBytes, golden);
+  }
+
+  @override
+  Future<void> update(Uri golden, Uint8List imageBytes) => _comparator.update(golden, imageBytes);
 }
 
 class _SkippedGoldens extends GoldenFileComparator {

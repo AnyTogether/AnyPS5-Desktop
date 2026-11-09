@@ -1,10 +1,98 @@
 # Release notes
 
-Notes for the next GitHub release, written as changes land; the section is copied into the
-release when it is made.
+Notes for the next GitHub release, written as changes land. Each change adds one file,
+`release-notes/next/<date>-<topic>.md`, holding its bullet (`- **What changed**, ...`), so that
+pull requests do not conflict here. Do not add to the list under Next release below.
+`bash packaging/release-notes.sh` prints the next release's notes: that list, then the files by
+name. When a release is made, they go under its own heading here, the files are deleted, and the
+section is copied into the release.
 
 ## Next release
 
+- **A game in one .ffpfsc file installs like a zip**, as on the Mac: drop it in a games folder or
+  use Add game file in Settings. AnyPS5 unpacks it into a normal game folder with its name, title
+  ID and icon, and says so plainly when a file is compressed or of a kind it cannot unpack.
+- **ffmpeg can be downloaded with one press** when Replay, Remote Play, Go Live, a video background
+  or clip tools need it and none is found: progress, Stop and a true error message, from a signed
+  build this project publishes, kept beside the toolkits. An ffmpeg already beside the launcher or
+  on the PATH keeps being used. Until that build is published the launcher says it is not
+  available yet.
+- **The activity feed reads as on the Mac**: game icons from the server, a new friend's picture
+  and milestone signs when a game isn't in your library, the rarity on trophies, hidden trophies
+  labelled instead of left out, and the four reactions as emoji, shown on the focused item and
+  where someone chose them. A new item coming in no longer moves the focus.
+- **Captures says when this server keeps no files** instead of a read failure.
+- **Leaderboards**: the number of players next to the board, and Enter (or the new chip) on a
+  game's trophies opens its board.
+- **Challenges**: the page shows who is leading before it is final, says "Score" and a plain
+  number for a metric this launcher doesn't know, says when a challenge was deleted, and reads
+  it again after a conflict on Join or Leave.
+- **Play Together player rows say how each player is reached** (Direct or Relay, with the round
+  trip in ms), as on the Mac. Where the system cannot say, the row stays at Connected.
+- **A Play Together offer or a game invite is said over the game** in a desktop notice, as on the
+  Mac, unless you're on Do Not Disturb. The party offer shows a friend's private name.
+- **Party chat has quick replies**, as on the Mac: Hello, GG and the others, sent with one press.
+  The Party tile gets a dot when someone writes while the party screen is closed, a parent's rule
+  against messages hides the chat, and after a lost connection the chat reads every page it
+  missed.
+- **Play on a second game from the phone switches games**, as on the Mac. The game playing closes
+  and the one you picked starts once it has gone and its saves have synced. Before, the first game
+  closed and nothing else happened.
+- **The phone sees a game starting**, as on the Mac: its activity card says when a game is waiting
+  or starting, counts the time from when the launcher began, and shows on a phone that connects
+  later. Close on the phone gives a game's start up.
+- **The phone's D-pad brings the launcher forward**, and a phone pairing or connecting while a game
+  is in front is said in a desktop notice, as on the Mac.
+- **Game art and trophy icons reach the phone smaller**, as on the Mac: 256 pixels for icons, 1280
+  for backgrounds and 160 for trophy icons, kept after the first time.
+- **While a game runs, the main button brings it to the front**, as on the Mac. Stopping it stays in
+  the game's menu and the quick menu.
+- **With the family media setting off, no trophy picture is taken**, as on the Mac.
+- **Noise suppression has its own switch** beside the microphone in voice settings, on by default.
+- **Public profile switch** in AnyTogether settings, as on the website.
+- **Lower resolution applies at each start** on Windows and Linux, as on the Mac, when the toolkit's
+  output can take it. Otherwise the game keeps the resolution it was installed with.
+- **Choose the broadcast microphone on Windows** in Settings › Broadcasting.
+- **The replay buffer, Remote Play and broadcasting can record under Wayland on Linux.** Your
+  desktop asks which window to share, and you choose the game. The launcher says so when you turn the
+  replay buffer on, and the desktop can remember the window next time. It needs PipeWire,
+  xdg-desktop-portal and GStreamer's tools with its PipeWire plugin. The launcher names what is
+  missing. Not yet tested on a real Wayland desktop. X11 records as before.
+- **Join with a code works for watching a share play too**, as on the Mac: Party › Join with a
+  code looks a code up as you type it (a party's or a share play's), even while you're in a party,
+  and asks to join or to watch. A yes shows up as an invite.
+- **A share play guest can help player 1** instead of playing their own, as on the Mac: Assist
+  Player 1 in the share play's quick menu rows.
+- **A friend's trophy level and the party's lead now say so**, as on the Mac: a word when a friend
+  levels up (not while you're in a game), when you lead the party, and when you hand it over or
+  remove someone.
+- **Nightly now updates the launcher too**, as on the Mac. On the Nightly channel the launcher
+  offers the newest build of main for itself, once it is signed, beside the engine in the engine
+  picker. Going back to Stable keeps that build until a newer release comes out.
+- **Send a picture in any chat**, as on the Mac: a conversation's options (△) have Send a photo, for
+  several files at once, in conversations that aren't encrypted too. Each one is drawn again here,
+  so no location or camera data goes along.
+- **Drop pictures on an open chat** to send them, as on the Mac.
+- **Voice notes play inside the launcher**, as on the Mac: play and pause in the bubble, bars and
+  the time as it goes, one at a time. One the launcher cannot open goes to the system's player,
+  as before.
+- **The typing line names everyone who is typing** in a group, as on the Mac.
+- **Update from Git sets up the build folder itself**, as on the Mac. An engine folder that is a
+  git checkout without a build folder no longer stops at "no build folder yet". With Git, CMake,
+  Ninja and a C++ compiler (g++) on PATH, the launcher runs the CMake setup the build guide
+  shows, with its progress, then pulls and builds. When a tool is missing it names it and opens
+  the right guide: upstream AnyPS5's build guide for an upstream checkout, AnyPS5-ARM's for its own.
+- **A new install gets the AnyPS5-ARM engine.** On a first start the welcome downloads
+  AnyPS5-ARM's engine, which reads the phone controller and opens games full screen or at the
+  window size you chose. If you already use upstream's engine, nothing changes on its own.
+- **Switch to the AnyPS5-ARM engine in one press when your phone can't reach a game.** With
+  upstream's engine in use, connecting a phone or a browser pad, or ending a game that ran with
+  one, offers the switch. It downloads the engine and uses it, and Update and play unlocks each
+  game with it. Settings › Phones offers the same.
+- **A dump without PlayGo chunk files no longer ends at a dead end.** When a game stops because
+  sce_sys/playgo-chunk.dat and playgo-scenario.json are missing, the crash report offers to
+  switch to the AnyPS5-ARM engine and play again, or to play once more with the missing chunks
+  counted as installed (that start only).
 - **Quit AnyPS5? is a small yes or no**, as on the Mac: Cancel and Quit side by side, ← and →
   between them, Esc still cancels, Quit in red. Close the game? asks the same way.
 - **Linked profiles show it on Who's playing?**: AnyTogether's mark on the tile of a profile
@@ -104,6 +192,34 @@ release when it is made.
 - **Deafen in party voice**, as on the Mac: hear nobody, with your microphone off, and the others
   see you deafened. Turning it off puts your microphone back as it was, and turning the
   microphone on hears everyone again.
+- **Each game can have its own engine**, as on the Mac: Game Settings › Engine picks the default
+  or any downloaded engine, of either source, with what unlocked the game under it. A game whose
+  chosen engine is not on this computer says so before unlocking and offers the download.
+- **Delete one engine version**: a row for each downloaded version in Settings › AnyPS5 Engine,
+  as on the Mac. An engine a game or the default is using stays.
+- **Battery & heat can lower the resolution**, the row the Mac already had: a game with a
+  resolution option is installed one step lower while the profile holds. On Windows and Linux the
+  resolution is written when a game is installed, so it takes effect at the next install.
+- **About has What's new, Made by, GitHub and the upstream project**, as on the Mac. What's new
+  shows while an update is on offer and opens that release's page.
+- **Settings › Fonts lists Latin Italic**, the row the Mac has, beside Latin.
+- **Settings › Phones says which paired phone is connected now**: the count at the top and
+  Connected beside the phone's name, as on the Mac.
+- **Broadcasting has a microphone**, as on the Mac: Settings › Broadcasting mixes your commentary
+  over the game's sound at the level you set, and it can be switched while you are live. Windows
+  shows a small LIVE badge over the game that viewers do not see. Linux has no badge, because
+  anything drawn over the game would be recorded too.
+- **Cloud storage lists your photos, clips and voice notes**, as on the Mac: delete one with a
+  second press, and a bar shows how much saves and media take.
+- **Restore saves… restores the backup you choose**, as on the Mac. The latest backup can still
+  be restored in one press.
+- **A profile shows its pinned gallery**, as on the Mac: the photos and clips someone pinned, as
+  their privacy setting shows them, open over the whole screen.
+- **The community's verdict is on the home screen**, as on the Mac: how the game runs on this
+  platform, once people have said so.
+- **A game's options lead to its hub**, as on the Mac.
+- **Family notifications say what they're about**, as on the Mac: who asks for more time or a
+  game, what a parent answered, and family alerts and invites.
 
 ## 0.1.20
 

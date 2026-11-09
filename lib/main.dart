@@ -20,6 +20,7 @@ import 'core/desktop/windows_desktop.dart';
 import 'core/controllers/pad_reader.dart';
 import 'core/controllers/troubleshooter.dart';
 import 'core/app_update.dart';
+import 'core/ffmpeg_download.dart' show FfmpegBuild;
 import 'core/host.dart';
 import 'core/opened_files.dart';
 import 'core/launcher_health.dart';
@@ -32,6 +33,8 @@ import 'ui/crash_model.dart';
 import 'ui/launcher.dart';
 import 'ui/launcher_window_channel.dart';
 import 'ui/profile_picture.dart';
+import 'ui/sealed_photo.dart';
+import 'ui/voice_note_player.dart';
 import 'ui/sharing_model.dart';
 import 'ui/strings.dart';
 import 'ui/together_model.dart' show launcherVersion;
@@ -113,10 +116,17 @@ Future<void> main(List<String> arguments) async {
       ),
       // Clips play inside the launcher (libmpv); the system's player when one cannot be opened.
       clipPlayback: MediaKitClipPlayback.new,
+      voicePlayback: MediaKitVoicePlayback.new,
       copyText: (text) => unawaited(Clipboard.setData(ClipboardData(text: text))),
       pickImage: () async => (await openFile(
         acceptedTypeGroups: const [XTypeGroup(label: 'Pictures', extensions: ProfilePicture.extensions)],
       ))?.path,
+      pickPictures: () async => [
+        for (final file in await openFiles(
+          acceptedTypeGroups: const [XTypeGroup(label: 'Pictures', extensions: SealedPhoto.extensions)],
+        ))
+          file.path,
+      ],
       saveFile: (name) async => (await getSaveLocation(
         suggestedName: name,
         acceptedTypeGroups: const [
@@ -130,6 +140,10 @@ Future<void> main(List<String> arguments) async {
       pickFile: (label, extensions) async => (await openFile(
         acceptedTypeGroups: extensions.isEmpty ? const [] : [XTypeGroup(label: label, extensions: extensions)],
       ))?.path,
+      pickFileAt: (label, extensions, folder) async => (await openFile(
+        initialDirectory: folder,
+        acceptedTypeGroups: [XTypeGroup(label: label, extensions: extensions)],
+      ))?.path,
       engineReleases: GitHubReleases(),
       launcherReleases: LauncherUpdates.source(),
       audio: SoloudAudio.new,
@@ -137,6 +151,7 @@ Future<void> main(List<String> arguments) async {
         repository: ArmToolkitPackage.repository,
         signingKeys: ReleaseSigning.trustedKeys,
       ),
+      ffmpegReleases: GitHubReleases(repository: FfmpegBuild.repository, signingKeys: ReleaseSigning.trustedKeys),
       // SDL2 (beside the launcher on Windows, the system's on Linux), else XInput and winmm or evdev.
       pads: () => PadReader.open(arguments: arguments),
       systemProbe: () => HostProbe(HostSystem.current),

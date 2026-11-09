@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:anyps5_desktop/core/discord_presence.dart';
+import 'package:anyps5_desktop/core/ffmpeg_download.dart';
 import 'package:anyps5_desktop/core/engine_checkout.dart';
 import 'package:anyps5_desktop/core/audio/atrac9.dart';
 import 'package:anyps5_desktop/core/audio/audio_out.dart';
@@ -18,6 +19,7 @@ import 'package:anyps5_desktop/core/gamepad/pad_navigation.dart';
 import 'package:anyps5_desktop/core/host.dart';
 import 'package:anyps5_desktop/core/power.dart';
 import 'package:anyps5_desktop/core/release_signing.dart';
+import 'package:anyps5_desktop/core/capture/wayland_capture.dart';
 import 'package:anyps5_desktop/core/replay_buffer.dart';
 import 'package:anyps5_desktop/core/trophies.dart';
 import 'package:anyps5_desktop/core/installer.dart';
@@ -31,6 +33,7 @@ import 'package:anyps5_desktop/main.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/background.dart';
 import 'package:anyps5_desktop/ui/clip_player.dart';
+import 'package:anyps5_desktop/ui/voice_note_player.dart';
 import 'package:anyps5_desktop/ui/components.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:anyps5_desktop/ui/theme_hub_model.dart';
@@ -150,10 +153,14 @@ Fixture makeFixture({
   Uri? engine,
   Uri? armEngine,
   List<ReleaseKey>? armKeys,
+  Uri? ffmpegApi,
+  List<ReleaseKey>? ffmpegKeys,
+  ProcessRunner? ffmpegRun,
   DesktopWindows? desktop,
   WindowBackdrop? backdrop,
   PadSource Function()? pads,
   Future<RgbaImage> Function(Trophy trophy, double scale)? renderTrophyCard,
+  Future<RgbaImage> Function(bool live, String time, double scale)? renderLiveBadge,
   String? glibc,
   AudioOut? audio,
   Future<PlayableSong?> Function(String path)? decodeSong,
@@ -171,13 +178,16 @@ Fixture makeFixture({
   int? Function(String folder)? freeSpace,
   LauncherWindow? window,
   ReplayBuffer? Function(int seconds)? replay,
+  WaylandCapture? waylandCapture,
   Future<int> Function(String folder)? folderSize,
   Future<Map<PadAction, List<String>>?> Function(String folder)? gameControls,
   Future<String?> Function(String title)? pickFolder,
   Future<String?> Function()? pickImage,
+  Future<List<String>?> Function()? pickPictures,
   CommandRunner? commands,
   DiscordPresence Function()? discord,
   ClipPlayback Function()? clipPlayback,
+  VoicePlayback Function()? voicePlayback,
 }) {
   final opened = <Uri>[];
   final copied = <String>[];
@@ -222,11 +232,13 @@ Fixture makeFixture({
       computerName: 'Desk',
       pickFolder: pickFolder ?? (_) async => root,
       pickImage: pickImage,
+      pickPictures: pickPictures,
       advertise: false,
       preferredPorts: false,
       cable: false,
       openUrl: opened.add,
       clipPlayback: clipPlayback,
+      voicePlayback: voicePlayback,
       copyText: copied.add,
       openFolder: (folder) => shown?.call(folder),
       environment: environment,
@@ -241,10 +253,15 @@ Fixture makeFixture({
       armEngineReleases: armEngine == null
           ? null
           : GitHubReleases(api: armEngine, repository: ArmToolkitPackage.repository, signingKeys: armKeys),
+      ffmpegReleases: ffmpegApi == null
+          ? null
+          : GitHubReleases(api: ffmpegApi, repository: FfmpegBuild.repository, signingKeys: ffmpegKeys),
+      ffmpegRun: ffmpegRun,
       desktop: desktop,
       backdrop: backdrop,
       pads: pads,
       renderTrophyCard: renderTrophyCard,
+      renderLiveBadge: renderLiveBadge,
       hostGlibc: () => glibc,
       audio: audio == null ? null : () => audio,
       decodeSong: decodeSong,
@@ -258,6 +275,7 @@ Fixture makeFixture({
       quit: quit,
       window: window,
       replay: replay,
+      waylandCapture: waylandCapture,
       // The size at once, as a finished measurement: the screens and goldens show it.
       folderSize: folderSize ?? (folder) => SynchronousFuture(GameLibrary.size(folder)),
       // An Unreal game's own controls at once, read from its paks.

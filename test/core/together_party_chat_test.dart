@@ -198,8 +198,44 @@ void main() {
     await chat.show();
     await server.dropSockets();
     server.threads['chat-1']!.add({...server.threads['chat-1']!.last, 'id': 'm-46', 'seq': 46, 'text': 'While away'});
-    await until(() => server.callsTo('conversations/chat-1/messages?limit=100&after=45').isNotEmpty);
+    await until(() => server.callsTo('conversations/chat-1/messages?limit=40&after=45').isNotEmpty);
     await until(() => chat.thread.last.text == 'While away');
+  });
+
+  test('a reconnect reads every page that came while away, up to ten, as on the Mac', () async {
+    shown = true;
+    await chat.show();
+    await server.dropSockets();
+    final last = server.threads['chat-1']!.last;
+    server.threads['chat-1']!.addAll([
+      for (var seq = 46; seq <= 130; seq++) {...last, 'id': 'm-$seq', 'seq': seq, 'text': 'Line $seq'},
+    ]);
+    await until(() => chat.thread.last.text == 'Line 130');
+    expect(server.callsTo('conversations/chat-1/messages?limit=40&after=45'), hasLength(1));
+    expect(server.callsTo('conversations/chat-1/messages?limit=40&after=85'), hasLength(1));
+    expect(server.callsTo('conversations/chat-1/messages?limit=40&after=125'), hasLength(1));
+  });
+
+  test('others\' messages count as unread unless the chat is shown, and unsending takes one back', () async {
+    expect(chat.unread, 0);
+    server.receive('chat-1', 'u-ana', 'One');
+    server.receive('chat-1', 'u-cem', 'Two');
+    await until(() => chat.unread == 2);
+    expect(chat.loaded, isFalse, reason: 'counted before the history was ever read');
+    await chat.show();
+    expect(chat.unread, 0, reason: 'shown: read');
+    shown = true;
+    server.receive('chat-1', 'u-ana', 'Seen');
+    await until(() => chat.thread.last.text == 'Seen');
+    expect(chat.unread, 0);
+    shown = false;
+    server.receive('chat-1', 'u-ana', 'Gone soon');
+    await until(() => chat.unread == 1);
+    server.push('message.deleted', {
+      ...server.threads['chat-1']!.last,
+      'deletedAt': DateTime.now().toUtc().toIso8601String(),
+    });
+    await until(() => chat.unread == 0);
   });
 
   test('stays out of the inbox: no unread, no list read again, whatever comes', () async {
@@ -288,5 +324,4 @@ void main() {
   test('the reasons a message can be reported are the server\'s', () {
     expect(messageReportReasons, ['spam', 'harassment', 'hate', 'sexual', 'other']);
   });
-
 }

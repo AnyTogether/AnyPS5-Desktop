@@ -175,6 +175,7 @@ class PanelView extends StatelessWidget {
       Layer.confirmUninstall,
       Layer.updateChoice,
       Layer.updateRequired,
+      Layer.phoneEngine,
       Layer.friendOptions,
       Layer.copyWarning,
       Layer.gameFiles,
@@ -590,6 +591,8 @@ class PanelRows extends StatelessWidget {
 }
 
 class _RowView extends StatelessWidget {
+  static const _labelledMenus = {Layer.quickMenu, Layer.homeMenu, Layer.launcherReport, Layer.profileMenu};
+
   const _RowView({
     super.key,
     required this.model,
@@ -804,7 +807,20 @@ class _RowView extends StatelessWidget {
     final info = kind is InfoRow && kind.text.isNotEmpty ? kind.text : null;
     Widget content() => Row(
       children: [
-        if (row.person != null) ...[
+        if (row.picture != null) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8 * scale),
+            child: Image.memory(
+              row.picture!,
+              width: 44 * scale,
+              height: 44 * scale,
+              fit: BoxFit.cover,
+              cacheWidth: 132,
+              errorBuilder: (_, _, _) => SizedBox(width: 44 * scale, height: 44 * scale),
+            ),
+          ),
+          SizedBox(width: 16 * scale),
+        ] else if (row.person != null) ...[
           PersonAvatar(person: row.person!, size: 44 * scale, focused: focused),
           SizedBox(width: 16 * scale),
         ] else if (row.icon != null) ...[
@@ -855,6 +871,10 @@ class _RowView extends StatelessWidget {
                   style: AppText.display(13 * scale, color: detailColor),
                 ),
               ],
+              if (row.meter case final PanelMeter meter) ...[
+                SizedBox(height: 10 * scale),
+                _MeterBar(meter: meter, color: model.accentChoice.color, scale: scale),
+              ],
             ],
           ),
         ),
@@ -863,7 +883,7 @@ class _RowView extends StatelessWidget {
       ],
     );
 
-    return Pressable(
+    final view = Pressable(
       onTap: row.focusable ? onTap : null,
       onHover: row.focusable ? onHover : null,
       pressScale: 0.99,
@@ -912,6 +932,15 @@ class _RowView extends StatelessWidget {
           );
         },
       ),
+    );
+    // The menus over the game and Home are read by their rows' names, as on the Mac.
+    if (!_labelledMenus.contains(model.overlay)) return view;
+    return Semantics(
+      button: true,
+      label: row.title,
+      excludeSemantics: true,
+      onTap: row.focusable ? onTap : null,
+      child: view,
     );
   }
 }
@@ -1499,6 +1528,16 @@ class TrophyView extends StatelessWidget {
                         action: HintAction.options,
                       ),
                     ],
+                    // The game's leaderboard from here, as on the Mac: click it, or Enter where the
+                    // focused trophy has no picture.
+                    if (model.together.signedIn) ...[
+                      SizedBox(height: 22 * scale),
+                      _BoardChip(
+                        key: const ValueKey('trophy-leaderboard'),
+                        keys: model.trophyShots[model.focusedTrophy?.id] == null,
+                        onTap: () => model.together.openLeaderboard(model.selectedGame),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1634,6 +1673,45 @@ class TrophyView extends StatelessWidget {
   }
 }
 
+/// The game's leaderboard, from its trophies: for the pointer, and with the key when Enter
+/// reaches it too.
+class _BoardChip extends StatelessWidget {
+  const _BoardChip({super.key, required this.keys, required this.onTap});
+
+  final bool keys;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = LayoutScale.of(context);
+    return Pressable(
+      onTap: onTap,
+      pressScale: 0.96,
+      builder: (context, hovering) => AnimatedContainer(
+        duration: Motion.focus,
+        curve: Motion.settle,
+        padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 8 * scale),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: hovering ? 0.14 : 0.08),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.leaderboard_rounded, size: 17 * scale, color: Colors.white),
+            SizedBox(width: 8 * scale),
+            if (keys)
+              Hint(keys: 'Enter', glyph: PadGlyph.cross, label: T.text('socialBoardTitle'))
+            else
+              Text(T.text('socialBoardTitle'), style: AppText.display(15 * scale, weight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// A hidden trophy's Show (or, once shown, Hide), for the pointer: the same as △ on it.
 class _RevealChip extends StatelessWidget {
   const _RevealChip({super.key, required this.shown, required this.focused, required this.onTap});
@@ -1691,26 +1769,30 @@ class SettingsSearchField extends StatelessWidget {
     final row = model.settingsSearchField;
     final typing = model.editingRow == SettingsSearch.searchRow;
     final color = Colors.white.withValues(alpha: typing || model.searchingSettings ? 0.9 : 0.55);
-    return FocusRing(
-      key: const ValueKey('settings-search'),
-      focused: model.settingsSearchFocused && !typing,
-      radius: 12 * scale,
-      child: RowTextField(
-        model: model,
-        row: row,
-        kind: row.kind as TextRow,
-        focused: false,
-        leading: Icon(Icons.search_rounded, size: 20 * scale, color: color),
-        trailing: model.searchingSettings
-            ? MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: GestureDetector(
-                  key: const ValueKey('settings-search-clear'),
-                  onTap: model.clearSettingsSearch,
-                  child: Icon(Icons.close_rounded, size: 18 * scale, color: color),
-                ),
-              )
-            : null,
+    return Semantics(
+      container: true,
+      label: T.text('settingsSearchPrompt'),
+      child: FocusRing(
+        key: const ValueKey('settings-search'),
+        focused: model.settingsSearchFocused && !typing,
+        radius: 12 * scale,
+        child: RowTextField(
+          model: model,
+          row: row,
+          kind: row.kind as TextRow,
+          focused: false,
+          leading: Icon(Icons.search_rounded, size: 20 * scale, color: color),
+          trailing: model.searchingSettings
+              ? MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    key: const ValueKey('settings-search-clear'),
+                    onTap: model.clearSettingsSearch,
+                    child: Icon(Icons.close_rounded, size: 18 * scale, color: color),
+                  ),
+                )
+              : null,
+        ),
       ),
     );
   }
@@ -2262,6 +2344,40 @@ class _ClipTile extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The thin bar a row can carry: two parts of the width, the second fainter, over a dim track.
+class _MeterBar extends StatelessWidget {
+  const _MeterBar({required this.meter, required this.color, required this.scale});
+
+  final PanelMeter meter;
+  final Color color;
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) {
+    final height = 6 * scale;
+    final radius = BorderRadius.circular(height);
+    return ClipRRect(
+      borderRadius: radius,
+      child: SizedBox(
+        height: height,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            Widget part(double fraction, Color tint) => SizedBox(
+              width: (fraction.clamp(0.0, 1.0)) * width,
+              child: ColoredBox(color: tint),
+            );
+            return ColoredBox(
+              color: Colors.white.withValues(alpha: 0.1),
+              child: Row(children: [part(meter.first, color), part(meter.second, color.withValues(alpha: 0.45))]),
+            );
+          },
+        ),
+      ),
     );
   }
 }

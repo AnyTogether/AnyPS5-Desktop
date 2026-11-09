@@ -123,17 +123,25 @@ class PlayTogetherOffer {
     capacity: session.capacity,
   );
 
-  factory PlayTogetherOffer.fromParty(PartyTogether together, List<Person> members) => PlayTogetherOffer(
-    sessionId: together.sessionId,
-    hostId: together.hostId,
-    hostName: members.where((person) => person.id == together.hostId).firstOrNull?.displayName ?? '',
-    titleId: together.titleId,
-    gameVersion: together.gameVersion,
-    engineBuild: together.engineBuild,
-    versionRule: together.versionRule,
-    players: together.players.length,
-    capacity: together.capacity,
-  );
+  /// [name]: how a person is shown here (a friend's private name); their public name without it.
+  factory PlayTogetherOffer.fromParty(
+    PartyTogether together,
+    List<Person> members, {
+    String Function(Person person)? name,
+  }) {
+    final host = members.where((person) => person.id == together.hostId).firstOrNull;
+    return PlayTogetherOffer(
+      sessionId: together.sessionId,
+      hostId: together.hostId,
+      hostName: host == null ? '' : (name?.call(host) ?? host.displayName),
+      titleId: together.titleId,
+      gameVersion: together.gameVersion,
+      engineBuild: together.engineBuild,
+      versionRule: together.versionRule,
+      players: together.players.length,
+      capacity: together.capacity,
+    );
+  }
 
   final String sessionId;
   final String hostId;

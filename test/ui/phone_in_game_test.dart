@@ -232,7 +232,8 @@ void main() {
         .firstWhere((category) => category.id == 'phone')
         .rows
         .firstWhere((row) => row.id == 'phoneUpstream');
-    expect(row.detail, T.text('phoneUpstreamDetail'));
+    expect(row.detail, T.text('phoneUpstreamSwitchDetail'));
+    expect(row.kind, isA<ActionRow>(), reason: 'one press switches to AnyPS5-ARM\'s engine');
     model.preferences.toolkitFolder = makeFakeToolkit(p.join(fixture.temp.path, 'arm'), version: 'arm-5ca076a87');
     expect(phoneRows(), isNot(contains('phoneUpstream')));
   });

@@ -83,6 +83,10 @@ abstract class DesktopWindows {
   /// [notify] is the way).
   Future<bool> showCard(RgbaImage card, {int? pid});
 
+  /// The small badge over the game (the top left of its screen, clicks passing through), drawn
+  /// over and over as it changes; null takes it away. False where there is no such window.
+  Future<bool> showBadge(RgbaImage? badge, {int? pid});
+
   /// A system notification, where a card cannot be shown (Wayland); [icon] is a PNG file.
   Future<bool> notify(String title, String body, {String? icon});
 
@@ -139,6 +143,8 @@ class NoDesktop implements DesktopWindows {
   double cardScale(int? pid) => 1;
   @override
   Future<bool> showCard(RgbaImage card, {int? pid}) async => false;
+  @override
+  Future<bool> showBadge(RgbaImage? badge, {int? pid}) async => false;
   @override
   Future<bool> notify(String title, String body, {String? icon}) async => false;
   @override

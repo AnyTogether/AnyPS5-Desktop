@@ -1,15 +1,18 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:anyps5_desktop/core/engine_checkout.dart';
 import 'package:anyps5_desktop/core/game_library.dart';
 import 'package:anyps5_desktop/core/installer.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
-import 'package:anyps5_desktop/ui/engine_git_model.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 import '../support/fake_commands.dart';
+import '../support/fake_process.dart';
+import '../support/phone/fake_phone.dart' show FakePhone;
+import '../support/phone/messages.dart' show Launch, Pairing, Welcome;
 import '../support/ui_support.dart';
 
 /// Settings › AnyPS5 engine › Update from Git, for an engine folder that is a git checkout.
@@ -159,16 +162,50 @@ void main() {
     expect(fixture.copied.single, contains('FAILED: relinker.cpp.o'));
   });
 
-  test('git missing, and no build folder: said; the guide opens', () async {
+  test('git missing: said, with the guide of this tree to open', () async {
     commands.results['git --version'] = const FakeResult(missing: true);
     choose('engineGitUpdate');
     await until(() => !model.engine.git.running);
     expect(model.toast, T.format('engineGitFailed', [T.text('engineGitNoGit')]));
+    expect(row('engineGitGuide')?.title, T.text('engineGitGuideUpstream'));
+    choose('engineGitGuide');
+    expect(fixture.opened.single, EngineCheckout.upstreamLinuxGuide);
+    expect(model.engine.git.guide, EngineCheckout.upstreamLinuxGuide, reason: 'upstream\'s tree: upstream\'s guide');
+  });
+
+  test('no build folder: Update from Git sets one up with CMake, then pulls and builds', () async {
     final bare = makeFakeCheckout(p.join(fixture.temp.path, 'Bare'), configured: false);
     model.useOwnFolder(bare);
-    expect(row('engineGitUpdate')?.detail, T.text('engineGitNoBuild'));
+    expect(row('engineGitUpdate')?.detail, T.text('engineGitSetUpDetail'));
+    final hold = Completer<void>();
+    commands.results['cmake -S'] = FakeResult(
+      lines: const ['-- Configuring done'],
+      hold: hold,
+      effect: () => configureFakeCheckout(bare),
+    );
+    commands.results['cmake --build'] = FakeResult(effect: () => buildFakeCheckout(bare));
     choose('engineGitUpdate');
-    expect(fixture.opened.single, EngineGitModel.guide);
+    await until(() => row('engineGitUpdate')!.title.endsWith(T.text('engineGitStepConfiguring')));
+    hold.complete();
+    await until(() => !model.engine.git.running);
+    expect(model.engine.git.failure, isNull);
+    expect(commands.lines, contains(startsWith('cmake -S . -B build -G Ninja')));
+    expect(model.toolkit?.root, bare, reason: 'the build it set up is the engine now');
+    expect(row('engineGitUpdate')?.detail, T.format('engineGitUpdateDetail', ['build']));
+    expect(row('engineGitGuide'), isNull);
+  });
+
+  test('no build folder and no compiler: says which, and opens AnyPS5-ARM\'s guide for its tree', () async {
+    final bare = makeFakeCheckout(p.join(fixture.temp.path, 'Arm'), configured: false, arm: true);
+    model.useOwnFolder(bare);
+    commands.results['g++ --version'] = const FakeResult(missing: true);
+    choose('engineGitUpdate');
+    await until(() => !model.engine.git.running);
+    expect(model.toast, T.format('engineGitFailed', [T.text('engineGitNoCompiler')]));
+    expect(commands.lines.where((line) => line.startsWith('git pull')), isEmpty);
+    expect(row('engineGitGuide')?.title, T.text('engineGitGuideArm'));
+    choose('engineGitGuide');
+    expect(fixture.opened.single, EngineCheckout.armGuide);
   });
 
   group('before playing', () {
@@ -202,6 +239,45 @@ void main() {
         reason: 'unlocked again with the new build, to play after',
       );
       model.cancelUnlock(orbit());
+    });
+
+    test('a phone switching games: the check runs for the new one once the first has gone', () async {
+      final starts = FakeGameStarts();
+      model.startGame = starts.call;
+      commands.results['git fetch'] = const FakeResult(code: 128, lines: ['fatal: unable to access']);
+      final neon = model.games.firstWhere((game) => game.titleId == 'PPSA02002');
+      final neonFolder = Installer.installedFolder(neon, model.root!);
+      Directory(neonFolder).createSync(recursive: true);
+      File(p.join(neonFolder, 'app.elf')).writeAsStringSync('#!/bin/sh\n');
+      File(p.join(neonFolder, Installer.recordName)).writeAsStringSync(
+        '{"date":"2026-10-24T12:00:00Z","source":"${neon.folder}","system":"linux","titleID":"PPSA02002",'
+        '"toolkit":"${model.toolkitVersion}"}',
+      );
+      model.rescan();
+      await model.startPhoneServer();
+      addTearDown(model.stopPhoneServer);
+      final phone = await FakePhone.connect(model.remote!.port!);
+      phone.hello('phone-1', 'Pixel');
+      await phone.next<Pairing>();
+      await until(() => model.pairing != null);
+      model.answerPairing(true);
+      await phone.next<Welcome>();
+      await until(() => model.remote!.connectedDevices.isNotEmpty);
+      phone.send(Launch(orbit().id));
+      await until(() => model.running?.$1 == orbit());
+      final fetches = commands.lines.where((line) => line.startsWith('git fetch')).length;
+      phone.send(Launch(neon.id));
+      await until(() => model.running?.$1 == neon);
+      expect(starts.started, hasLength(2));
+      expect(starts.processes.first.ended, isTrue);
+      expect(
+        commands.lines.where((line) => line.startsWith('git fetch')).length,
+        greaterThan(fetches),
+        reason: 'the new game goes through Update from Git Before Playing',
+      );
+      await phone.close();
+      model.stopGame();
+      await until(() => model.running == null);
     });
 
     test('offline: nothing is said and the game starts', () async {

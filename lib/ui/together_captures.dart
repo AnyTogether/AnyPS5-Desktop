@@ -121,6 +121,9 @@ extension TogetherCaptures on TogetherModel {
   /// Captures need a server that keeps files (or one not asked yet).
   bool get capturesOffered => signedIn && storage?.enabled != false;
 
+  /// A clip too big to send that only ffmpeg could make smaller.
+  static const _ffmpegNeeded = 'ffmpeg_needed';
+
   ClipTools? get clipTools => clipToolsOverride ?? app.replayFfmpeg?.let(FfmpegClipTools.new);
 
   String? get _shot {
@@ -225,6 +228,61 @@ extension TogetherCaptures on TogetherModel {
     }
   }
 
+  /// Picture files of the user's own (picked or dropped) into [conversation], one after the
+  /// other, as on the Mac. Each is drawn again from its pixels first, sealed or not, so no
+  /// location or camera data goes along.
+  Future<void> sendPictures(List<String> files, Conversation conversation) async {
+    if (files.isEmpty || !_mediaAllowed() || captures.working) return;
+    captures.working = true;
+    app.show(T.text('cloudSending'));
+    final limits = storage?.media ?? const MediaLimits();
+    try {
+      for (final file in files) {
+        await hub.messages.sendMedia(
+          conversation.id,
+          kind: 'image',
+          plain: () async {
+            final photo = await _ownPicture(file, limits.image);
+            return (await mediaFiles.upload('image', photo.bytes, photo.type)).id;
+          },
+          sealed: () async {
+            final e2ee = hub.messages.e2ee;
+            if (e2ee == null) throw const E2eeUnavailable();
+            final photo = await _ownPicture(file, SealedPhoto.maxBytes);
+            return e2ee.uploadSealed(
+              file: photo.bytes,
+              kind: 'image',
+              type: photo.type,
+              width: photo.width,
+              height: photo.height,
+            );
+          },
+        );
+        app.sounds.play(Cue.select);
+        app.show(T.format('cloudSentTo', [conversation.name(user?.id)]));
+      }
+    } on FormatException catch (error) {
+      app.show(T.text(error.message == 'too big' ? 'cloudMediaTooBig' : 'cloudBadMedia'));
+    } on E2eeUnavailable {
+      app.show(T.format('e2eeNoDevice', [conversation.name(user?.id)]));
+    } on FileSystemException {
+      app.show(T.text('cloudBadMedia'));
+    } on Object catch (error) {
+      app.show(cloudMessage(error));
+    } finally {
+      captures.working = false;
+      app.refresh();
+    }
+  }
+
+  /// A picture file of the user's own made ready to go: drawn again from its pixels (as a PNG,
+  /// smaller until it fits [limit]), so nothing of the file but the picture goes along.
+  Future<SealedPhoto> _ownPicture(String file, int limit) async {
+    final source = File(file);
+    if (source.lengthSync() > SealedPhoto.maxSourceBytes) throw const FormatException('too big');
+    return SealedPhoto.clean(source.readAsBytesSync(), limit: limit);
+  }
+
   /// A screenshot or clip pinned to the end of the user's profile gallery.
   Future<void> shareShotToGallery(String file) async {
     if (!_mediaAllowed() || captures.working) return;
@@ -288,12 +346,19 @@ extension TogetherCaptures on TogetherModel {
     if (size <= maxBytes) return (file, null);
     final tools = clipTools;
     final ms = await tools?.durationMs(file);
-    if (tools == null || ms == null) throw const TogetherProblem(413, 'payload_too_large', 'The file is too big');
+    if (tools == null || ms == null) {
+      if (tools == null && app.ffmpegTool.offered) throw const TogetherProblem(413, _ffmpegNeeded, 'ffmpeg is needed');
+      throw const TogetherProblem(413, 'payload_too_large', 'The file is too big');
+    }
     final temp = Directory.systemTemp.createTempSync('anyps5_share');
     try {
       return (await tools.shrink(file, maxBytes: maxBytes, durationMs: ms, folder: temp.path), temp);
     } on Object {
       temp.deleteSync(recursive: true);
+      // An ffmpeg on this computer that lacks x264: the download can do what it cannot.
+      if (await app.ffmpegTool.systemLacksX264()) {
+        throw const TogetherProblem(413, _ffmpegNeeded, 'ffmpeg cannot make the clip smaller');
+      }
       throw const TogetherProblem(413, 'payload_too_large', 'The file is too big');
     }
   }
@@ -337,7 +402,9 @@ extension TogetherCaptures on TogetherModel {
         case 'quota_exceeded':
           return T.text('cloudQuotaFull');
         case 'payload_too_large':
-          return T.text('cloudTooBig');
+          return T.text('cloudMediaTooBig');
+        case _ffmpegNeeded:
+          return T.text('clipNeedsFfmpeg');
         case 'bad_media' || 'bad_image':
           return T.text('cloudBadMedia');
         case 'storage_disabled':
@@ -547,7 +614,9 @@ extension TogetherCaptures on TogetherModel {
       captures
         ..failed = false
         ..index = captures.index.clamp(0, items.isEmpty ? 0 : items.length - 1);
-    } on Object {
+    } on Object catch (error) {
+      // A server that keeps no files says so; the Captures screen says that instead of a failure.
+      if (PostRefusal.of(error) == PostRefusal.storageDisabled) app.saveSync.info = StorageInfo.disabled;
       captures.failed = !captures.feed.loaded;
     }
     app.refresh();

@@ -675,6 +675,10 @@ class FakeTogether {
         if (call.body['readReceipts'] is! bool) return problem(400, 'bad_request');
         me['readReceipts'] = call.body['readReceipts'];
         return (200, {'readReceipts': me['readReceipts']});
+      case ('PATCH', 'me/public-profile'):
+        if (call.body['publicProfile'] is! bool) return problem(400, 'bad_request');
+        me['publicProfile'] = call.body['publicProfile'];
+        return (200, {'publicProfile': me['publicProfile']});
       case ('POST', 'conversations') when call.body['group'] == true:
         // A group: always a new one, with its name when it has one.
         final members = [

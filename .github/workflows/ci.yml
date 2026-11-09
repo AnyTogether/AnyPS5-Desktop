@@ -13,12 +13,26 @@ on:
         description: Remake the golden files and upload them as an artifact
         type: boolean
         default: false
+  # Called by nightly.yml for a nightly: the same checks and packages, of that commit, named
+  # after that version.
+  workflow_call:
+    inputs:
+      ref:
+        description: The commit to build
+        type: string
+        required: true
+      version:
+        description: The version the build calls itself (packaging/set-version.sh)
+        type: string
+        required: true
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  # A nightly is in a group of its own, so that it neither waits for main's pushes nor is
+  # replaced by the next one.
+  group: ci-${{ inputs.version || github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -31,15 +45,50 @@ env:
   CLIP_PLAYER_PACKAGES: libmpv-dev patchelf
 
 jobs:
-  test:
-    name: flutter analyze and test (Linux)
+  # Whether this run has to compare goldens. On a pull request: what the merge changes against its
+  # base. Anything else (main, a nightly, update_goldens or any run by hand) always does.
+  changes:
+    name: what the goldens depend on
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
+    outputs:
+      goldens: ${{ steps.goldens.outputs.run }}
+    steps:
+      # The merge commit and its parents: its first parent is the base it is compared with.
+      - uses: actions/checkout@v7
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      # What can change a golden, or break the job on the macOS runner: the launcher and its tests,
+      # assets (the fonts are in assets/fonts and assets/system-fonts), the shader, the
+      # dependencies, the native hook macOS builds for flutter test, and this workflow. A rename
+      # counts for both its old and its new path (--no-renames).
+      - id: goldens
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          decide() { echo "run=$1" >> "$GITHUB_OUTPUT"; echo "### Goldens: $2" >> "$GITHUB_STEP_SUMMARY"; echo "goldens run: $1 ($2)"; }
+          if [ "$EVENT" != pull_request ]; then decide true "always on a $EVENT run"; exit 0; fi
+          if ! changed="$(git diff --no-renames --name-only HEAD^1 HEAD)"; then decide true "could not read the changes"; exit 0; fi
+          printf '%s\n' "$changed"
+          if grep -Eq '^(lib/|test/|assets/|shaders/|hook/|native/|pubspec\.(yaml|lock)$|\.github/workflows/ci\.yml$)' <<<"$changed"; then
+            decide true "something they depend on changed"
+          else
+            decide false "skipped, nothing they depend on changed"
+          fi
+
+  analyze:
+    name: flutter analyze and the language files (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.ref }}
           persist-credentials: false
-      # The native hook builds the ATRAC9 decoder with the system compiler for flutter test too.
+      # The native hook builds the ATRAC9 decoder with the system compiler.
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends $LINUX_PACKAGES
       - uses: subosito/flutter-action@v2
         with:
@@ -53,24 +102,47 @@ jobs:
       # language's code and no Turkish words outside the files.
       - name: Check the language files in assets/l10n and the texts in lib
         run: dart run tool/check_translations.dart
+      # One bullet per file in release-notes/next (packaging/release-notes.sh).
+      - name: Check the next release's notes
+        run: bash packaging/release-notes.sh > /dev/null
+
+  test:
+    name: flutter test (Linux, shard ${{ matrix.shard }} of 2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      # One shard's failure stops nothing: the run shows all the failing tests at once.
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      # The native hook builds the ATRAC9 decoder with the system compiler for flutter test too.
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends $LINUX_PACKAGES
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
       # The goldens are made on macOS and compared in the goldens job (test/flutter_test_config.dart).
-      - run: flutter test
+      - run: flutter test --total-shards 2 --shard-index ${{ matrix.shard }}
         env:
           ANYPS5_SKIP_GOLDENS: 1
-      - uses: actions/upload-artifact@v7
-        if: failure()
-        with:
-          name: golden-failures-linux
-          path: test/**/failures/
-          if-no-files-found: ignore
 
   goldens:
     name: golden tests and the recursive watcher (macOS)
+    needs: changes
+    if: needs.changes.outputs.goldens == 'true'
     runs-on: macos-26
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.ref }}
           persist-credentials: false
       - uses: subosito/flutter-action@v2
         with:
@@ -93,12 +165,30 @@ jobs:
           path: test/**/goldens/**
           if-no-files-found: error
           retention-days: 7
+      # The images the run made, beside what they were compared with: <name>_testImage.png is
+      # the new picture, also for a golden with no file yet (test/flutter_test_config.dart). To
+      # commit new goldens, the update_goldens run above still makes them all.
       - uses: actions/upload-artifact@v7
+        id: failed-goldens
         if: failure()
         with:
           name: golden-failures-macos
           path: test/**/failures/
           if-no-files-found: ignore
+          retention-days: 7
+      - name: Say where the failed goldens' images are
+        if: failure()
+        env:
+          ARTIFACT_URL: ${{ steps.failed-goldens.outputs.artifact-url }}
+        run: |
+          made=$(find test -path '*/failures/*_testImage.png' | sort)
+          if [ -z "$made" ]; then echo "No golden images from this run."; exit 0; fi
+          {
+            echo "### Goldens that did not match: $(echo "$made" | wc -l | tr -d ' ')"
+            echo "Images: ${ARTIFACT_URL:-the golden-failures-macos artifact}"
+            echo
+            echo "$made" | sed -E 's#.*/failures/(.*)_testImage\.png#- \1#'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
   linux:
     name: flutter build linux (Ubuntu 22.04)
@@ -108,6 +198,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.ref }}
           persist-credentials: false
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends $LINUX_PACKAGES $CLIP_PLAYER_PACKAGES
       - uses: subosito/flutter-action@v2
@@ -115,6 +206,12 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+      - name: Name the build after the nightly
+        if: ${{ inputs.version }}
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: bash packaging/set-version.sh "$VERSION"
       - run: flutter build linux --release
         env:
           # The bundle has to carry libmpv here: no patchelf or no libmpv fails the build.
@@ -159,16 +256,64 @@ jobs:
     name: flutter build windows
     runs-on: windows-latest
     timeout-minutes: 45
+    env:
+      # What the Windows build downloads into its build folder from GitHub releases: libmpv and
+      # ANGLE (media_kit_libs_windows_video's CMake) and SDL2 (windows/CMakeLists.txt).
+      WINDOWS_ARCHIVES: |
+        build/windows/x64/mpv-dev-*.7z
+        build/windows/x64/ANGLE.7z
+        build/windows/x64/SDL2-*-win32-x64.zip
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.ref }}
           persist-credentials: false
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+      - name: Name the build after the nightly
+        if: ${{ inputs.version }}
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: bash packaging/set-version.sh "$VERSION"
+      # The versions that fix what those archives are. The scripts that use them still check each
+      # one against its own hash, and fetch it again if it does not match.
+      - name: Name the downloaded archives' cache
+        id: archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          media_kit=$(tr -d '\r' < pubspec.lock | awk '$1 == "media_kit_libs_windows_video:" { found = 1 } found && $1 == "version:" { gsub(/"/, "", $2); print $2; exit }')
+          sdl2=$(tr -d '\r' < windows/CMakeLists.txt | sed -n 's/^set(SDL2_VERSION "\(.*\)")$/\1/p')
+          [ -n "$media_kit" ] && [ -n "$sdl2" ] || { echo "::error::no version for the archives' cache"; exit 1; }
+          echo "key=windows-archives-media_kit-$media_kit-sdl2-$sdl2" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v5
+        id: archives-restore
+        with:
+          key: ${{ steps.archives.outputs.key }}
+          path: ${{ env.WINDOWS_ARCHIVES }}
       - run: flutter build windows --release
+      # SDL2 failing to download is only a warning to the build, so keep the archives only when
+      # all of them arrived: a cache without one would stay that way until the versions change.
+      - name: See whether every archive arrived
+        id: archives-whole
+        if: steps.archives-restore.outputs.cache-hit != 'true'
+        shell: bash
+        working-directory: build/windows/x64
+        run: |
+          if ls mpv-dev-*.7z ANGLE.7z SDL2-*-win32-x64.zip SDL2-*/SDL2.dll; then
+            echo "whole=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::An archive did not arrive: not caching them"
+          fi
+      - uses: actions/cache/save@v5
+        if: steps.archives-whole.outputs.whole == 'true'
+        with:
+          key: ${{ steps.archives.outputs.key }}
+          path: ${{ env.WINDOWS_ARCHIVES }}
       # The clip player's libmpv and ANGLE (media_kit_libs_windows_video) beside the launcher: the
       # installer and the .zip take the whole folder.
       - name: Check the clip player's libraries are beside the launcher
@@ -199,13 +344,21 @@ jobs:
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [test, goldens, linux, windows]
+    needs: [changes, analyze, test, goldens, linux, windows]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # Every job has to have passed. The one exception is goldens, skipped only because the
+      # changes job ran and said nothing they depend on changed. test is both shards: it passes
+      # only if each did.
       - env:
           NEEDS: ${{ toJSON(needs) }}
+          GOLDENS: ${{ needs.changes.outputs.goldens }}
         run: |
           echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
-          bad=$(echo "$NEEDS" | jq -r '[to_entries[] | select(.value.result != "success" and .value.result != "skipped") | .key] | join(", ")')
+          bad=$(echo "$NEEDS" | jq -r --arg goldens "$GOLDENS" '[to_entries[]
+            | select(.value.result != "success")
+            | select(.key != "goldens" or .value.result != "skipped" or $goldens != "false")
+            | "\(.key) (\(.value.result))"] | join(", ")')
           if [ -n "$bad" ]; then echo "::error::Not passed: $bad"; exit 1; fi
+          echo "ci-ok (goldens: ${GOLDENS:-unknown})"

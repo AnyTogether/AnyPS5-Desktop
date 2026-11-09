@@ -420,6 +420,11 @@ use those once changed in the game.
   already into the bundle's `lib/`, with their packages' copyright files in `lib/licenses/`, so
   the bundle, the AppImage and the .deb start on systems with another libmpv or none.
 
+- Nightly builds: `.github/workflows/nightly.yml` builds main once a day when the launcher
+  changed and publishes an unsigned pre-release, `v<next>-nightly.<YYYYMMDD>.<n>`. The launcher's
+  Nightly channel offers it once it is signed on the release Mac (`tools/release/sign_nightly.sh`
+  in AnyPS5-ARM). It never reaches Stable.
+
 ## Credits
 
 **The core**
@@ -452,6 +457,9 @@ under the zlib license (`third_party/SDL2/LICENSE.txt`, shipped as `SDL2-LICENSE
 play through [media_kit](https://github.com/media-kit/media-kit) (MIT) and
 [libmpv](https://mpv.io) with FFmpeg (mpv is GPL-2.0-or-later, LGPL-2.1-or-later when built
 for it); the Linux bundle carries the Ubuntu packages' copyright files for the libraries it
-copies, in `lib/licenses/`. The
+copies, in `lib/licenses/`. The optional ffmpeg the launcher offers to download is FFmpeg
+built by [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds) under the GPL version 3,
+not shipped with the launcher; what it downloads carries the licence and a link to the exact
+source (`packaging/ffmpeg/pinned.env`, `.github/workflows/ffmpeg-release.yml`). The
 padlock on locked games (`lib/ui/padlock.dart`) is drawn after Hugeicons' `square-lock-02` from
 the Hugeicons Free set, MIT licensed.

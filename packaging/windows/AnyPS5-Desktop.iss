@@ -9,6 +9,10 @@
 #ifndef AppVersion
   #define AppVersion "0.0.0"
 #endif
+; The file's version property: numbers only, so a nightly's passes its numbers alone.
+#ifndef FileVersion
+  #define FileVersion AppVersion
+#endif
 #ifndef SourceDir
   #define SourceDir "..\..\build\windows\x64\runner\Release"
 #endif
@@ -29,7 +33,7 @@ AppPublisher=Utku Halis
 AppPublisherURL=https://github.com/AnyTogether/AnyPS5-Desktop
 AppSupportURL=https://github.com/AnyTogether/AnyPS5-Desktop/issues
 AppUpdatesURL=https://github.com/AnyTogether/AnyPS5-Desktop/releases
-VersionInfoVersion={#AppVersion}
+VersionInfoVersion={#FileVersion}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes

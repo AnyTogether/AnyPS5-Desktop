@@ -37,6 +37,7 @@ class PowerModel {
       return null;
     }
   }
+
   late DateTime Function() now = DateTime.now;
 
   PowerReading reading = const PowerReading(hasBattery: false, onBattery: false);
@@ -273,9 +274,8 @@ class PowerModel {
     // Up to the display's own rate: a fast laptop on battery is the user's call.
     final hertz = displayHertz();
     final caps = PowerProfile.frameCapsFor(hertz, kept: profile.frameCap);
-    String label(int cap) => cap == 0
-        ? T.text('off')
-        : (cap == hertz ? T.format('powerFpsDisplay', [cap]) : T.format('powerFps', [cap]));
+    String label(int cap) =>
+        cap == 0 ? T.text('off') : (cap == hertz ? T.format('powerFpsDisplay', [cap]) : T.format('powerFps', [cap]));
     return [
       PanelRow(
         id: '${id}On',
@@ -289,12 +289,16 @@ class PowerModel {
           title: T.text('powerFrameCap'),
           detail: T.text('powerFrameCapDetail'),
           kind: ChoiceRow(
-            [
-              for (final cap in caps) label(cap),
-            ],
+            [for (final cap in caps) label(cap)],
             caps.contains(profile.frameCap) ? caps.indexOf(profile.frameCap) : 0,
             (index) => set(profile.copyWith(frameCap: caps[index])),
           ),
+        ),
+        PanelRow(
+          id: '${id}Resolution',
+          title: T.text('powerLowerResolution'),
+          detail: T.text('powerLowerResolutionDetail'),
+          kind: ToggleRow(profile.lowerResolution, (value) => set(profile.copyWith(lowerResolution: value))),
         ),
         PanelRow(
           id: '${id}FrameGeneration',
