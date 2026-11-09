@@ -479,6 +479,7 @@ extension ReportSettings on GameSettings {
       'Controls ${(controls ?? const {}).isEmpty ? 'default' : '${controls!.length} changed'}',
       if (tuning != null) 'Stick and mouse tuning changed',
       'Detailed logging ${trace == true ? 'on' : 'off'}',
+      if (chosenRelinkerFlags.isNotEmpty) 'Relinker flags ${chosenRelinkerFlags.map((flag) => flag.option).join(' ')}',
     ].join(' · ');
   }
 }
@@ -499,6 +500,7 @@ class SessionReport {
     DateTime? created,
     this.unlockedWith,
     this.engineNow,
+    this.relinkerFlags = const [],
     this.exitCode,
     this.stoppedByUser = false,
     this.traced = false,
@@ -528,6 +530,9 @@ class SessionReport {
   /// The engine toolkit the game was unlocked with, and the one chosen now (version.txt).
   final String? unlockedWith;
   final String? engineNow;
+
+  /// The relinker options the game was unlocked with ([RelinkerFlag]).
+  final List<String> relinkerFlags;
 
   /// The game's exit code; null when the launcher no longer knows it.
   final int? exitCode;
@@ -651,6 +656,7 @@ class SessionReport {
       'Launcher: AnyPS5 Desktop $launcherLine',
       'Engine the game was unlocked with: ${unlockedWith ?? 'unknown'}',
       'Engine chosen for it now: ${engineNow ?? 'unknown'}',
+      if (relinkerFlags.isNotEmpty) 'Relinker flags the game was unlocked with: ${relinkerFlags.join(' ')}',
       '',
       'Settings: ${settings.reportSummary}',
       if (traced) 'Detailed logging: ${TraceMode.environment.entries.map((e) => '${e.key}=${e.value}').join(' ')}',
