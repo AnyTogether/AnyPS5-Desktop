@@ -3950,6 +3950,11 @@ class AppModel extends ChangeNotifier {
     if (starting == null) return;
     _startTurn++;
     sounds.play(Cue.back);
+    if (starting?.retro != null) {
+      // The retro start owns this slot until its process has drained.
+      if (running != null) stopGame();
+      return;
+    }
     starting = null;
     _changed();
   }
