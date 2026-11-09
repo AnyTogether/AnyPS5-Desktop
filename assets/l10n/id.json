@@ -494,6 +494,8 @@
   "askEndTogether": "Akhiri Bermain Bersama untuk semua orang? Yang lain tetap dalam permainan mereka, sendirian.",
   "askLeaveTogether": "Keluar dari permainan? Game Anda tetap berjalan, tanpa yang lain.",
   "askRemoveFriend": "Hapus %@ dari teman Anda? Anda memerlukan permintaan baru untuk berteman lagi.",
+  "askRemoveViewer": "Keluarkan %@? Mereka memerlukan undangan baru untuk menonton lagi.",
+  "askStopShare": "Hentikan Share Play? Semua penonton akan dikeluarkan.",
   "requiredTitle": "Diperlukan Pembaruan",
   "requiredTooOld": "AnyPS5 ini terlalu tua untuk AnyTogether",
   "requiredTooOldVersion": "AnyPS5 %@ terlalu tua untuk AnyTogether",

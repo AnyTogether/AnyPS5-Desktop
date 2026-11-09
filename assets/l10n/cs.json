@@ -494,6 +494,8 @@
   "askEndTogether": "Ukončit funkci „Hrát společně“ (Play Together) pro všechny? Ostatní zůstanou ve své hře, ale sami.",
   "askLeaveTogether": "Opustit hru? Vaše hra poběží dál, ale bez ostatních.",
   "askRemoveFriend": "Odebrat uživatele %@ ze seznamu přátel? Pro opětovné navázání přátelství bude nutná nová žádost.",
+  "askRemoveViewer": "Odebrat uživatele %@? Aby mohl znovu sledovat, potřebuje novou pozvánku.",
+  "askStopShare": "Ukončit sdílené hraní? Všichni diváci budou odpojeni.",
   "requiredTitle": "Je vyžadována aktualizace",
   "requiredTooOld": "Tato verze AnyPS5 je pro AnyTogether příliš stará",
   "requiredTooOldVersion": "AnyPS5 %@ je pro AnyTogether příliš starý",

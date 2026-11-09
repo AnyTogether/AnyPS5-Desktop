@@ -494,6 +494,8 @@
   "askEndTogether": "要為所有人結束「一起遊玩」嗎？其他人會獨自留在遊戲中。",
   "askLeaveTogether": "要離開遊戲嗎？遊戲仍會繼續執行，但其他人會離開。",
   "askRemoveFriend": "要將 %@ 從好友中移除嗎？如要再次成為好友，需要重新傳送邀請。",
+  "askRemoveViewer": "要將 %@ 移出嗎？對方需要新的邀請才能再次觀看。",
+  "askStopShare": "要停止共享遊玩嗎？所有觀看者都會被移出。",
   "requiredTitle": "需要更新",
   "requiredTooOld": "此 AnyPS5 版本過舊，無法使用 AnyTogether",
   "requiredTooOldVersion": "AnyPS5 %@ 版本過舊，無法使用 AnyTogether",

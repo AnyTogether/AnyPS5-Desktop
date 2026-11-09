@@ -494,6 +494,8 @@
   "askEndTogether": "Vil ​​du avslutte «Spill sammen» for alle? De andre blir værende i spillet sitt, alene.",
   "askLeaveTogether": "Vil ​​du forlate spillet? Spillet ditt fortsetter, uten de andre.",
   "askRemoveFriend": "Vil ​​du fjerne %@ fra vennelisten din? Dere må sende en ny venneforespørsel for å bli venner igjen.",
+  "askRemoveViewer": "Fjerne %@? Vedkommende trenger en ny invitasjon for å se på igjen.",
+  "askStopShare": "Stoppe delt spilling? Alle som ser på, blir koblet fra.",
   "requiredTitle": "Oppdatering kreves",
   "requiredTooOld": "Denne AnyPS5-versjonen er for gammel for AnyTogether",
   "requiredTooOldVersion": "AnyPS5 %@ er for gammel for AnyTogether",

@@ -494,6 +494,8 @@
   "askEndTogether": "Befejezed a „Közös játék” (Play Together) munkamenetet mindenki számára? A többiek egyedül folytatják a játékot.",
   "askLeaveTogether": "Kilépsz a játékból? A játékod tovább fut, a többiek nélkül.",
   "askRemoveFriend": "Eltávolítod %@-t a barátaid közül? Az ismételt barátkozáshoz új jelölésre lesz szükség.",
+  "askRemoveViewer": "Eltávolítod őt: %@? Újabb meghívó kell, hogy újra nézhesse.",
+  "askStopShare": "Leállítod a Share Play funkciót? Mindenki, aki nézi, kilép.",
   "requiredTitle": "Frissítés szükséges",
   "requiredTooOld": "Ez az AnyPS5 túl régi az AnyTogether-hez",
   "requiredTooOldVersion": "Az AnyPS5 %@ túl régi az AnyTogether-hez",

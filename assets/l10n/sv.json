@@ -494,6 +494,8 @@
   "askEndTogether": "Avsluta ”Spela tillsammans” för alla? De andra stannar kvar i spelet, men på egen hand.",
   "askLeaveTogether": "Lämna spelet? Ditt spel fortsätter, men utan de andra.",
   "askRemoveFriend": "Ta bort %@ från din vänlista? Ni behöver skicka en ny vänförfrågan för att bli vänner igen.",
+  "askRemoveViewer": "Ta bort %@? Hen behöver en ny inbjudan för att titta igen.",
+  "askStopShare": "Avsluta share play? Alla som tittar kopplas bort.",
   "requiredTitle": "Uppdatering krävs",
   "requiredTooOld": "Denna AnyPS5 är för gammal för AnyTogether",
   "requiredTooOldVersion": "AnyPS5 %@ är för gammal för AnyTogether",

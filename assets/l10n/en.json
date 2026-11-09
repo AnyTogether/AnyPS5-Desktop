@@ -522,6 +522,8 @@
   "askEndTogether": "End Play Together for everyone? The others stay in their game, alone.",
   "askLeaveTogether": "Leave the game? Your game keeps running, without the others.",
   "askRemoveFriend": "Remove %@ from your friends? You need a new request to be friends again.",
+  "askRemoveViewer": "Take %@ out? They need a new invite to watch again.",
+  "askStopShare": "Stop share play? Everyone watching is let go.",
   "requiredTitle": "Update required",
   "requiredTooOld": "This AnyPS5 is too old for AnyTogether",
   "requiredTooOldVersion": "AnyPS5 %@ is too old for AnyTogether",

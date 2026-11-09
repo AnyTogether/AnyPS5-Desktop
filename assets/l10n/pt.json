@@ -494,6 +494,8 @@
   "askEndTogether": "Encerrar Jogar Juntos para todos? Os outros continuarão no jogo, mas sozinhos.",
   "askLeaveTogether": "Sair do jogo? Ele continuará em execução sem os outros.",
   "askRemoveFriend": "Remover %@ dos seus amigos? Será necessário enviar uma nova solicitação para voltarem a ser amigos.",
+  "askRemoveViewer": "Remover %@? Será preciso um novo convite para assistir novamente.",
+  "askStopShare": "Parar o Share Play? Todos que estão assistindo serão desconectados.",
   "requiredTitle": "Atualização necessária",
   "requiredTooOld": "Esta versão do AnyPS5 é antiga demais para o AnyTogether",
   "requiredTooOldVersion": "O AnyPS5 %@ é antigo demais para o AnyTogether",

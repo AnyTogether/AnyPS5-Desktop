@@ -522,6 +522,8 @@
   "askEndTogether": "Birlikte Oyna herkes için bitsin mi? Diğerleri oyunlarında yalnız kalır.",
   "askLeaveTogether": "Oyundan ayrılınsın mı? Oyunun diğerleri olmadan çalışmaya devam eder.",
   "askRemoveFriend": "%@ arkadaşlarından çıkarılsın mı? Yeniden arkadaş olmak için yeni bir istek gerekir.",
+  "askRemoveViewer": "%@ çıkarılsın mı? Yeniden izlemek için yeni bir davet gerekir.",
+  "askStopShare": "Paylaşım durdurulsun mu? İzleyen herkesin bağlantısı kesilir.",
   "requiredTitle": "Güncelleme gerekli",
   "requiredTooOld": "Bu AnyPS5, AnyTogether için çok eski",
   "requiredTooOldVersion": "AnyPS5 %@, AnyTogether için çok eski",
