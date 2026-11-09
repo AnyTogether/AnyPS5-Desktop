@@ -5,6 +5,16 @@ release when it is made.
 
 ## Next release
 
+- **Play on a second game from the phone switches games**, as on the Mac. The game playing closes
+  and the one you picked starts once it has gone and its saves have synced. Before, the first game
+  closed and nothing else happened.
+- **The phone sees a game starting**, as on the Mac: its activity card says when a game is waiting
+  or starting, counts the time from when the launcher began, and shows on a phone that connects
+  later. Close on the phone gives a game's start up.
+- **The phone's D-pad brings the launcher forward**, and a phone pairing or connecting while a game
+  is in front is said in a desktop notice, as on the Mac.
+- **Game art and trophy icons reach the phone smaller**, as on the Mac: 256 pixels for icons, 1280
+  for backgrounds and 160 for trophy icons, kept after the first time.
 - **Send a picture in any chat**, as on the Mac: a conversation's options (△) have Send a photo, for
   several files at once, in conversations that aren't encrypted too. Each one is drawn again here,
   so no location or camera data goes along.
