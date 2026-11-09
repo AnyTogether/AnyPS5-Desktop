@@ -74,7 +74,7 @@ class TestFfpfsc {
         }),
       ),
     ),
-    FfpfscItem('sce_sys/icon0.png', data: pngStub),
+    const FfpfscItem('sce_sys/icon0.png', data: pngStub),
     const FfpfscItem('sce_sys/empty.dat'),
   ];
 

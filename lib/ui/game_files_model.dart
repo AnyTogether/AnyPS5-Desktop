@@ -211,8 +211,9 @@ class GameFilesModel {
     }
     if (_disposed) return;
     if (plan == null) return app.show(T.text('ffpfscDamaged'));
-    if (plan.problem == null && !plan.looksLikeGame && plan.refused.isEmpty)
+    if (plan.problem == null && !plan.looksLikeGame && plan.refused.isEmpty) {
       return app.show(T.text('addGameFileNoGame'));
+    }
     final UnpackAsk ask;
     if (plan.problem != null) {
       ask = UnpackAsk(archive, plan, into: target);
