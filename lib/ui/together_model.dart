@@ -107,7 +107,7 @@ class TogetherModel {
       bridgeFile: GameSessions.defaultBridgeFile(app.paths.config),
     );
     hub.games.onInvite = (invite) {
-      _noticeSound();
+      disturbingSound();
       app.vibrate(HapticCue.ring);
       final text = T.format('gameInvitedYou', [invite.from?.displayName ?? '', gameName(invite.titleId)]);
       app.show(text);
@@ -150,7 +150,7 @@ class TogetherModel {
     // A friend request: over a game the card with the handle, unless the user asked not to be
     // disturbed, as on the Mac.
     hub.friends.onRequest = (person) {
-      _noticeSound();
+      disturbingSound();
       final text = T.format('friendsAsked', [person.displayName]);
       app.show(text);
       if (!doNotDisturb) {
@@ -764,6 +764,12 @@ class TogetherModel {
   /// (the Mac shows it over the other window with the same sound).
   void _noticeSound() {
     if (!app.active) app.sounds.play(Cue.unlocked);
+  }
+
+  /// [_noticeSound] for a request, an invite or a message: none on Do Not Disturb, as the Mac
+  /// keeps its notice over the other window, and so its sound, off then.
+  void disturbingSound() {
+    if (!doNotDisturb) _noticeSound();
   }
 
   void _welcome(TogetherUser user) {
@@ -1422,7 +1428,7 @@ class TogetherModel {
         _messageArrived(data);
       case 'party.invite':
         final from = data['from'];
-        _noticeSound();
+        disturbingSound();
         app.vibrate(HapticCue.ring);
         final text = T.format('partyInvitedYou', [
           from is Map<String, dynamic> ? (from['displayName'] as String?) ?? '' : '',

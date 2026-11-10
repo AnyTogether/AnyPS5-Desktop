@@ -259,6 +259,9 @@ class SharePlayModel {
           invite.from?.displayName ?? '',
           _gameName(invite.titleId, invite.title),
         ]);
+        // Behind another window the notice's sound, as for any other invite (none on Do Not
+        // Disturb), as on the Mac.
+        app.together.disturbingSound();
         app.show(text);
         // Over a game the card, unless the user asked not to be disturbed, as on the Mac.
         if (!app.together.doNotDisturb) {

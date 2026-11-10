@@ -833,8 +833,9 @@ extension TogetherMessages on TogetherModel {
         hub.messages.byId(conversation)?.author(author as String?)?.displayName ??
         hub.friends.byId(author as String)?.person.displayName ??
         '';
-    app.sounds.play(Cue.move);
-    _noticeSound();
+    // Its sounds, unless the user asked not to be disturbed, as on the Mac.
+    if (!doNotDisturb) app.sounds.play(Cue.move);
+    disturbingSound();
     // A click on it opens the conversation.
     app.show(
       T.format('messagesFrom', [name, text.length > 80 ? '${text.substring(0, 80)}…' : text]),
