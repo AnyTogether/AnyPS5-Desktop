@@ -39,7 +39,9 @@ depends="$depends, xdg-utils"
 # The launcher's own font has Latin letters only. Flutter draws every other script with a
 # system font that has it (fontconfig), so the Noto fonts are recommended: Khmer, Lao, Ethiopic,
 # Devanagari, Bengali and Arabic in fonts-noto-core, Chinese, Japanese and Korean in fonts-noto-cjk.
-recommends="libsecret-tools, libsdl2-2.0-0, fonts-noto-core | fonts-noto, fonts-noto-cjk"
+# gtk-layer-shell puts cards and the LIVE badge over the game under Wayland (KDE Plasma, Sway,
+# Hyprland); the launcher loads it when it is there and keeps the system notice when it is not.
+recommends="libsecret-tools, libsdl2-2.0-0, libgtk-layer-shell0, fonts-noto-core | fonts-noto, fonts-noto-cjk"
 
 # A nightly (0.1.21-nightly.20261109.1) comes before its release: dpkg sorts ~ before nothing.
 DEB_VERSION="$(printf '%s' "$VERSION" | sed 's/-/~/')"

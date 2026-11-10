@@ -303,7 +303,8 @@ class MediaModel {
   }
 
   // The LIVE badge over the game, kept out of what viewers see: Windows leaves its window out of
-  // every capture, as the Mac does. On X11 the broadcast records the game's window by itself, which
+  // every capture, as the Mac does, and under Wayland the portal shares the game's window alone
+  // (the badge is a layer-shell surface over it). On X11 the broadcast records the game's window by itself, which
   // leaves it out under a compositing manager (LinuxDesktop shows it only then); a recording of the
   // screen would take it, so it stays hidden while the replay buffer or Remote Play records.
 
