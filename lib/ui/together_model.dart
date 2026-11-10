@@ -107,8 +107,8 @@ class TogetherModel {
       bridgeFile: GameSessions.defaultBridgeFile(app.paths.config),
     );
     hub.games.onInvite = (invite) {
-      _noticeSound();
-      app.vibrate(HapticCue.ring);
+      disturbingSound();
+      inviteRing();
       final text = T.format('gameInvitedYou', [invite.from?.displayName ?? '', gameName(invite.titleId)]);
       app.show(text);
       if (!doNotDisturb) {
@@ -122,11 +122,13 @@ class TogetherModel {
     hub.games.onAnyEnded = togetherEnded;
     hub.games.onPlayersChanged = () => unawaited(hub.parties.refresh().catchError((Object _) {}));
     app.onUnlocked = togetherUnlockDone;
+    // Someone asks to join the party led here: the Mac's words, and over a game its card (Do
+    // Not Disturb or not, as on the Mac). The party's row says whether they asked with the code.
     hub.parties.onRequest = (person, via) {
       _noticeSound();
-      app.show(
-        via == 'code' ? T.format('partyAsksCode', [person.displayName]) : T.format('partyAsks', [person.displayName]),
-      );
+      final text = T.format('discoverAsksParty', [person.displayName]);
+      app.show(text);
+      unawaited(app.noticeOverGame(text, detail: T.text('partyTitle'), symbol: Icons.back_hand_rounded));
     };
     // Handed the lead, as the Mac says it.
     hub.parties.onBecameLeader = () => app.show(T.text('partyYouLead'));
@@ -145,9 +147,15 @@ class TogetherModel {
       ..onFamilyNotice = (_) => unawaited(family.refresh());
     // The friends-only names and pictures the friends list brought, for every card shown.
     identities = hub.friends.identities;
+    // A friend request: over a game the card with the handle, unless the user asked not to be
+    // disturbed, as on the Mac.
     hub.friends.onRequest = (person) {
-      _noticeSound();
-      app.show(T.format('friendsAsked', [person.displayName]));
+      disturbingSound();
+      final text = T.format('friendsAsked', [person.displayName]);
+      app.show(text);
+      if (!doNotDisturb) {
+        unawaited(app.noticeOverGame(text, detail: '@${person.handle}', symbol: Icons.person_add_alt_1_rounded));
+      }
     };
     hub.friends.onAccepted = (person) => app.show(T.format('friendsNowFriends', [person.displayName]));
     // A friend went up a trophy level: only while the launcher is in front and no game runs, as
@@ -756,6 +764,20 @@ class TogetherModel {
   /// (the Mac shows it over the other window with the same sound).
   void _noticeSound() {
     if (!app.active) app.sounds.play(Cue.unlocked);
+  }
+
+  /// [_noticeSound] for a request, an invite or a message: none on Do Not Disturb, as the Mac
+  /// keeps its notice over the other window, and so its sound, off then.
+  void disturbingSound() {
+    if (!doNotDisturb) _noticeSound();
+  }
+
+  /// A game invite, a party invite or a Play Together offer: the ring on the controller, none on
+  /// Do Not Disturb, as on the Mac. Asked whether or not the launcher is in front: the pulse
+  /// itself stays still behind a game or another window, and with Controller Vibration off
+  /// (the haptics' own gate), as every pulse does. A call rings on its own, as before.
+  void inviteRing() {
+    if (!doNotDisturb) app.vibrate(HapticCue.ring);
   }
 
   void _welcome(TogetherUser user) {
@@ -1414,11 +1436,16 @@ class TogetherModel {
         _messageArrived(data);
       case 'party.invite':
         final from = data['from'];
-        _noticeSound();
-        app.vibrate(HapticCue.ring);
-        app.show(
-          T.format('partyInvitedYou', [from is Map<String, dynamic> ? (from['displayName'] as String?) ?? '' : '']),
-        );
+        disturbingSound();
+        inviteRing();
+        final text = T.format('partyInvitedYou', [
+          from is Map<String, dynamic> ? (from['displayName'] as String?) ?? '' : '',
+        ]);
+        app.show(text);
+        // Over a game the card, unless the user asked not to be disturbed, as on the Mac.
+        if (!doNotDisturb) {
+          unawaited(app.noticeOverGame(text, detail: T.text('partyTitle'), symbol: Icons.groups_rounded));
+        }
       case 'party.member_joined' when data['partyId'] == hub.parties.party?.id:
         final member = data['member'];
         if (member is Map<String, dynamic> && member['userId'] != user?.id) {

@@ -50,8 +50,10 @@ import '../core/gyro_aiming.dart';
 import '../core/host.dart';
 import '../core/installer.dart';
 import '../core/library_watch.dart';
+import '../core/package_install.dart';
 import '../core/power.dart';
 import '../core/prepare_queue.dart';
+import '../core/relinker_flags.dart';
 import '../core/remote/adb_tunnel.dart';
 import '../core/remote/assist.dart';
 import '../core/remote/mdns.dart';
@@ -196,6 +198,7 @@ class Preferences {
     ..powerProfiles = json['powerProfiles'] is Map<String, dynamic>
         ? json['powerProfiles'] as Map<String, dynamic>
         : null
+    ..heatReader = json['heatReader'] == true
     ..screenshotsFolder = json['screenshotsFolder'] as String?
     ..showHiddenTrophies = json['showHiddenTrophies'] as bool? ?? false
     ..controllerVibration = json['controllerVibration'] as bool? ?? true
@@ -362,6 +365,10 @@ class Preferences {
   /// "powerProfiles"); null for the defaults.
   Map<String, dynamic>? powerProfiles;
 
+  /// Settings › Battery & Heat › Read the processor's temperature (Windows): the reader with
+  /// administrator rights starts with the launcher. Off again when Windows' prompt is turned down.
+  bool heatReader = false;
+
   /// Settings › Captures › Screenshots Folder: where F12 screenshots, trophy pictures and clips
   /// go; null for Pictures/AnyPS5 (AppPaths.pictures).
   String? screenshotsFolder;
@@ -486,6 +493,7 @@ class Preferences {
     'syncFolder': syncFolder,
     'syncThrough': syncThrough,
     'powerProfiles': powerProfiles,
+    if (heatReader) 'heatReader': true,
     'screenshotsFolder': screenshotsFolder,
     'showHiddenTrophies': showHiddenTrophies,
     'controllerVibration': controllerVibration,
@@ -1110,6 +1118,7 @@ class LauncherServices {
     this.talkKeys,
     this.engineReleases,
     this.launcherReleases,
+    this.packageManager,
     this.hostGlibc,
     this.audio,
     this.decodeSong,
@@ -1267,6 +1276,10 @@ class LauncherServices {
   /// Where AnyPS5 Desktop's own releases are read from (GitHub, signed); none in tests without a
   /// fake.
   final GitHubReleases? launcherReleases;
+
+  /// The package manager that installed this copy (Scoop, pacman) or null; looked for on the
+  /// computer by default (PackageInstall.detect).
+  final PackageManager? Function()? packageManager;
 
   /// Party voice's microphone and connections; flutter_webrtc by default.
   final VoiceEngine Function()? voiceEngine;
@@ -2083,6 +2096,10 @@ class AppModel extends ChangeNotifier {
   /// Called once that report was sent or put aside (problem.json goes).
   void Function()? onLauncherProblemDone;
 
+  /// The problem with what Windows or Linux kept of how that run ended (LauncherHealth.lookAgain),
+  /// read when the report is sent.
+  Future<LauncherProblem> Function(LauncherProblem problem)? lookAgainLauncherProblem;
+
   /// The first error this run's code did not catch, with its stack, for a report.
   String? firstError;
 
@@ -2107,9 +2124,10 @@ class AppModel extends ChangeNotifier {
 
   /// Opens the pre-filled GitHub issue; nothing is sent until the user submits it there.
   Future<void> sendLauncherReport() async {
-    final problem = launcherProblem;
-    if (problem == null) return;
+    final unread = launcherProblem;
+    if (unread == null) return;
     _launcherProblemDone();
+    final problem = await lookAgainLauncherProblem?.call(unread) ?? unread;
     final system = await crash.systemInfo();
     final privacy = crash.privacy();
     final draft = IssueDraft.launcherProblem(problem, system: system, privacy: privacy);
@@ -2886,7 +2904,8 @@ class AppModel extends ChangeNotifier {
     for (final game in games) {
       if (game.retro != null) continue;
       final installed = Installer.installedFolder(game, rootOf(game)!);
-      final record = Installer.record(installed, system: system);
+      // Being uninstalled: not installed, whatever is left of it on the disk.
+      final record = _removals.containsKey(game.id) ? null : Installer.record(installed, system: system);
       if (record != null) records[game.id] = record;
       _loadTrophies(game);
     }
@@ -3251,6 +3270,7 @@ class AppModel extends ChangeNotifier {
           knownSize: sizes[game.id],
           toolkit: kit,
           resolution: _unlockResolution(game, kit),
+          relinkerFlags: currentSettings(game).chosenRelinkerFlags,
         );
       } on FileSystemException {
         plan = null; // The install says what is wrong.
@@ -3377,6 +3397,7 @@ class AppModel extends ChangeNotifier {
       toolkit: kit,
       root: folder,
       resolution: _unlockResolution(game, kit),
+      relinkerFlags: currentSettings(game).chosenRelinkerFlags,
       freeSpace: freeSpace,
       onProgress: (step, fraction) {
         progress[id] = (step, fraction);
@@ -3391,6 +3412,9 @@ class AppModel extends ChangeNotifier {
     unawaited(() async {
       Object? failure;
       try {
+        // Uninstalled a moment ago: its old files go first (one that could not be renamed aside
+        // is still being removed where the new one goes).
+        await _removals[id];
         final installed = await installer.run();
         GameLog.writeUnlockLog(unlockLog, unlockLines);
         final record = Installer.record(installed, system: system);
@@ -3507,6 +3531,7 @@ class AppModel extends ChangeNotifier {
               knownSize: sizes[game.id],
               toolkit: toolkitFor(game) ?? kit,
               resolution: _unlockResolution(game, toolkitFor(game) ?? kit),
+              relinkerFlags: currentSettings(game).chosenRelinkerFlags,
             );
             return plan.space?.shortage(free: freeSpace(folder), folder: folder);
           } on FileSystemException {
@@ -3655,13 +3680,25 @@ class AppModel extends ChangeNotifier {
     return one ? T.format('newGame', [names.first]) : T.format('newGames', [names.length]);
   }
 
-  void uninstall(Game game) {
+  /// The games whose files are being removed (Uninstall), by id, until they are gone.
+  final Map<String, Future<void>> _removals = {};
+
+  /// Uninstalls [game] at once: its folders are renamed aside and go after, off the screen's
+  /// thread, so the launcher keeps answering while a big game goes. A second Uninstall meanwhile
+  /// does nothing, and an unlock of the game waits until its old files are gone. Completes then.
+  Future<void> uninstall(Game game) async {
     final folder = rootOf(game);
-    if (folder == null) return;
-    Installer.uninstall(game, folder);
+    if (folder == null || _removals.containsKey(game.id)) return;
+    final gone = Installer.uninstall(game, folder);
+    _removals[game.id] = gone;
     records.remove(game.id);
     show(T.text('uninstallDone'));
     _changed();
+    try {
+      await gone;
+    } finally {
+      _removals.removeWhere((id, _) => id == game.id);
+    }
   }
 
   void clearShaderCache(Game game) {
@@ -4889,6 +4926,9 @@ class AppModel extends ChangeNotifier {
   /// Whether the replay buffer is recording now.
   bool get replayRecording => _replay?.running ?? false;
 
+  /// Whether the replay buffer is recording or starting to.
+  bool get replayStarted => _replay != null;
+
   ReplayBuffer? _defaultReplay(int seconds, {VideoEncoder? encoder, GameSound? sound}) {
     final environment = services.environment ?? Platform.environment;
     final ffmpeg = replayFfmpeg;
@@ -4990,6 +5030,9 @@ class AppModel extends ChangeNotifier {
     }
     if (buffer == null) return;
     _replay = buffer;
+    // On X11 it records the screen: the LIVE badge goes first.
+    await media.badgeCheck();
+    if (_replay != buffer) return;
     if (!await buffer.start()) {
       // Stopped meanwhile (the game ended during the desktop's dialog): nothing to say.
       if (_replay != buffer) return;
@@ -5323,7 +5366,7 @@ class AppModel extends ChangeNotifier {
                 title: T.text('uninstall'),
                 detail: T.text('uninstallConfirm'),
                 kind: ActionRow(() {
-                  uninstall(game);
+                  unawaited(uninstall(game));
                   closeOverlay();
                 }, destructive: true),
               ),
@@ -6009,7 +6052,7 @@ class AppModel extends ChangeNotifier {
             kind: InfoRow(kit == null ? '—' : EngineModel.label(kit)),
           ),
           ...updates.aboutRows(),
-          updates.channelRow(),
+          ?updates.channelRow(),
           PanelRow(id: 'author', title: T.text('madeBy'), kind: const InfoRow('Utku Halis')),
           PanelRow(
             id: 'github',
@@ -6390,6 +6433,8 @@ class AppModel extends ChangeNotifier {
           (value) => change(settings.copyWith(shaderCache: value ? null : false)),
         ),
       ),
+      section('relinkerSection', 'sectionRelinker'),
+      ..._relinkerRows(game, settings, change),
       section('shareSection', 'sectionShare'),
       PanelRow(
         id: 'export',
@@ -6406,10 +6451,41 @@ class AppModel extends ChangeNotifier {
       PanelRow(
         id: 'resetAdvanced',
         title: T.text('resetAdvanced'),
-        kind: ActionRow(() => change(settings.copyWith(tuning: null, shaderCache: null))),
+        kind: ActionRow(() => change(settings.copyWith(tuning: null, shaderCache: null, relinkerFlags: null))),
       ),
     ];
   }
+
+  /// The relinker options a player can choose for this game, used by its next rebuild. An engine
+  /// that lacks one shows why instead of the switch; the rebuild leaves it out either way
+  /// (Installer).
+  List<PanelRow> _relinkerRows(Game game, GameSettings settings, void Function(GameSettings) change) {
+    final kit = toolkitFor(game);
+    return [
+      for (final flag in RelinkerFlag.values)
+        if (kit != null && !kit.supports(flag))
+          PanelRow(
+            id: 'relinker-${flag.option}',
+            title: T.text(_relinkerFlagText(flag).title),
+            detail: T.text('relinkerFlagUnavailableDetail'),
+            kind: InfoRow(T.text('relinkerFlagUnavailable')),
+          )
+        else
+          PanelRow(
+            id: 'relinker-${flag.option}',
+            title: T.text(_relinkerFlagText(flag).title),
+            detail: T.text(_relinkerFlagText(flag).detail),
+            kind: ToggleRow(
+              settings.chosenRelinkerFlags.contains(flag),
+              (value) => change(settings.withRelinkerFlag(flag, value)),
+            ),
+          ),
+    ];
+  }
+
+  static ({String title, String detail}) _relinkerFlagText(RelinkerFlag flag) => switch (flag) {
+    RelinkerFlag.traceImports => (title: 'relinkerTraceImports', detail: 'relinkerTraceImportsDetail'),
+  };
 
   List<PanelRow> _gameRows(Game game) {
     final session = embeddedGame;

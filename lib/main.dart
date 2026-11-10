@@ -165,7 +165,8 @@ Future<void> main(List<String> arguments) async {
   if (await model.updates.applyPendingAtLaunch()) exit(0);
   model
     ..launcherProblem = health.start()
-    ..onLauncherProblemDone = health.forget;
+    ..onLauncherProblemDone = health.forget
+    ..lookAgainLauncherProblem = health.lookAgain;
   // The runner takes this run's marker away once the window has closed and Flutter has shut
   // down: a crash while closing still leaves it for the next start to report.
   health.runnerRemovesMarker = await window.removeAfterClose(health.markerPath);

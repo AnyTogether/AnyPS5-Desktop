@@ -36,7 +36,9 @@ class ShareWatchView extends StatelessWidget {
             AnimatedOpacity(
               duration: Motion.fade,
               opacity: connected ? 1 : 0,
-              child: Center(child: AspectRatio(aspectRatio: 16 / 9, child: video)),
+              child: Center(
+                child: AspectRatio(aspectRatio: 16 / 9, child: video),
+              ),
             ),
           if (!connected)
             Center(
@@ -51,10 +53,17 @@ class ShareWatchView extends StatelessWidget {
                   SizedBox(height: 22 * scale),
                   Text(
                     T.text('sharePlayConnecting'),
-                    style: AppText.display(20 * scale, weight: FontWeight.w500, color: Colors.white.withValues(alpha: 0.78)),
+                    style: AppText.display(
+                      20 * scale,
+                      weight: FontWeight.w500,
+                      color: Colors.white.withValues(alpha: 0.78),
+                    ),
                   ),
                   SizedBox(height: 16 * scale),
-                  SizedBox(width: 180 * scale, child: IndeterminateLine(color: accent, height: 3 * scale)),
+                  SizedBox(
+                    width: 180 * scale,
+                    child: IndeterminateLine(color: accent, height: 3 * scale),
+                  ),
                 ],
               ),
             ),
@@ -118,46 +127,52 @@ class _Chip extends StatelessWidget {
       if (stats?.roundTripMs case final roundTrip?) T.format('sharePlayRoundTrip', [roundTrip.round()]),
       if ((stats?.framesPerSecond, stats?.height) case (final fps?, final height?)) '${height}p${fps.round()}',
     ];
-    return IceSurface(
-      radius: 22 * scale,
-      opacity: 0.5,
-      padding: EdgeInsetsDirectional.fromSTEB(10 * scale, 10 * scale, 18 * scale, 10 * scale),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          PersonAvatar(
-            person: PanelPerson(name: name, avatar: host?.avatar, status: PersonStatus.playing),
-            size: 36 * scale,
-          ),
-          SizedBox(width: 12 * scale),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _LiveDot(color: share.watchConnected ? const Color(0xFFFF4D5E) : Colors.white38, size: 8 * scale),
-                  SizedBox(width: 8 * scale),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: 420 * scale),
-                    child: Text(
-                      game.isEmpty ? name : '$name · $game',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppText.display(15 * scale, weight: FontWeight.w600),
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: [game.isEmpty ? name : '$name, $game', ...parts].join(', '),
+      excludeSemantics: true,
+      child: IceSurface(
+        radius: 22 * scale,
+        opacity: 0.5,
+        padding: EdgeInsetsDirectional.fromSTEB(10 * scale, 10 * scale, 18 * scale, 10 * scale),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PersonAvatar(
+              person: PanelPerson(name: name, avatar: host?.avatar, status: PersonStatus.playing),
+              size: 36 * scale,
+            ),
+            SizedBox(width: 12 * scale),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _LiveDot(color: share.watchConnected ? const Color(0xFFFF4D5E) : Colors.white38, size: 8 * scale),
+                    SizedBox(width: 8 * scale),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: 420 * scale),
+                      child: Text(
+                        game.isEmpty ? name : '$name · $game',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.display(15 * scale, weight: FontWeight.w600),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 3 * scale),
-              Text(
-                parts.join(' · '),
-                style: AppText.display(13 * scale, color: Colors.white.withValues(alpha: 0.72)),
-              ),
-            ],
-          ),
-        ],
+                  ],
+                ),
+                SizedBox(height: 3 * scale),
+                Text(
+                  parts.join(' · '),
+                  style: AppText.display(13 * scale, color: Colors.white.withValues(alpha: 0.72)),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -173,36 +188,38 @@ class _SeatBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scale = LayoutScale.of(context);
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 10 * scale),
-      decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.22),
-        borderRadius: BorderRadius.circular(22 * scale),
-        border: Border.all(color: accent.withValues(alpha: 0.6), width: 1.5 * scale),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.sports_esports_rounded, size: 18 * scale, color: Colors.white),
-          SizedBox(width: 10 * scale),
-          // The player lights: the host's seat first, this one lit.
-          for (var pad = 1; pad <= 4; pad++) ...[
-            Container(
-              width: 6 * scale,
-              height: 14 * scale,
-              decoration: BoxDecoration(
-                color: pad == slot ? Colors.white : Colors.white.withValues(alpha: 0.22),
-                borderRadius: BorderRadius.circular(3 * scale),
+    return Semantics(
+      container: true,
+      label: T.format('sharePlayPlayer', [slot]),
+      excludeSemantics: true,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 10 * scale),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.22),
+          borderRadius: BorderRadius.circular(22 * scale),
+          border: Border.all(color: accent.withValues(alpha: 0.6), width: 1.5 * scale),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.sports_esports_rounded, size: 18 * scale, color: Colors.white),
+            SizedBox(width: 10 * scale),
+            // The player lights: the host's seat first, this one lit.
+            for (var pad = 1; pad <= 4; pad++) ...[
+              Container(
+                width: 6 * scale,
+                height: 14 * scale,
+                decoration: BoxDecoration(
+                  color: pad == slot ? Colors.white : Colors.white.withValues(alpha: 0.22),
+                  borderRadius: BorderRadius.circular(3 * scale),
+                ),
               ),
-            ),
-            SizedBox(width: 4 * scale),
+              SizedBox(width: 4 * scale),
+            ],
+            SizedBox(width: 6 * scale),
+            Text(T.format('sharePlayPlayer', [slot]), style: AppText.display(14 * scale, weight: FontWeight.w600)),
           ],
-          SizedBox(width: 6 * scale),
-          Text(
-            T.format('sharePlayPlayer', [slot]),
-            style: AppText.display(14 * scale, weight: FontWeight.w600),
-          ),
-        ],
+        ),
       ),
     );
   }

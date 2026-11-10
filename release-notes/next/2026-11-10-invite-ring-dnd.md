@@ -1,0 +1,1 @@
+- **Do Not Disturb keeps the controller still for invites**, as on the Mac: a game invite, a party invite and a Play Together offer no longer ring on the controller while you are on Do Not Disturb. Off Do Not Disturb they ring as before, and a call still rings either way.

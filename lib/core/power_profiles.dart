@@ -5,13 +5,17 @@ import 'dart:math' as math;
 import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
 
+import 'windows_heat.dart';
+
 // Battery and heat profiles (Settings › Battery & Heat): what a laptop on battery, or a computer
 // running hot, does to the game playing. On battery the game can be held to 30 fps or more, up to
 // the display's refresh rate, its frame generation paused and the launcher's heavy effects dimmed; running hot the same, with a
 // note that can be undone from the quick menu. Plugged in and cool nothing changes. The macOS
 // launcher's PowerProfiles.swift, rule for rule and with its settings keys; the readings come
-// from GetSystemPowerStatus on Windows and /sys on Linux. Where the heat cannot be read (Windows
-// gives programs without administrator rights no temperature), only the battery profile works.
+// from GetSystemPowerStatus on Windows and /sys on Linux. The heat on Windows comes from the
+// graphics card's library and the thermal zones (windows_heat.dart), the processor's zones through
+// a reader with administrator rights where Windows gives them no other way. Where the heat cannot
+// be read, only the battery profile works.
 
 /// How warm the computer is, comparable.
 enum ThermalLevel { nominal, fair, serious, critical }
@@ -399,9 +403,10 @@ class BatteryEstimate {
 
 /// Reads the power on Windows and Linux.
 abstract final class PowerReader {
-  static PowerReading current() {
+  /// [gaming]: a game runs, so a laptop's graphics card is awake and asking it wakes nothing.
+  static PowerReading current({bool gaming = false}) {
     try {
-      if (Platform.isWindows) return _windows();
+      if (Platform.isWindows) return _windows(gaming: gaming);
       if (Platform.isLinux) {
         return fromSysfs(
           powerSupply: '/sys/class/power_supply',
@@ -418,14 +423,14 @@ abstract final class PowerReader {
 
   /// SYSTEM_POWER_STATUS: ACLineStatus (0 offline, 1 online, 255 unknown), BatteryFlag (128 no
   /// battery, 255 unknown), BatteryLifePercent (255 unknown), SystemStatusFlag (1 battery saver),
-  /// BatteryLifeTime in seconds (0xFFFFFFFF unknown). Windows has no temperature for programs
-  /// without administrator rights: the heat is not read.
+  /// BatteryLifeTime in seconds (0xFFFFFFFF unknown). The heat, [thermal], is WindowsHeat's.
   static PowerReading fromWindowsStatus({
     required int acLine,
     required int batteryFlag,
     required int percent,
     int systemStatus = 0,
     int lifeSeconds = 0xFFFFFFFF,
+    ThermalLevel? thermal,
   }) {
     final hasBattery = batteryFlag != 128 && batteryFlag != 255;
     final onBattery = hasBattery && acLine == 0;
@@ -434,11 +439,12 @@ abstract final class PowerReader {
       onBattery: onBattery,
       batteryPercent: hasBattery && percent != 255 ? percent.clamp(0, 100) : null,
       minutesToEmpty: onBattery && lifeSeconds != 0xFFFFFFFF && lifeSeconds > 0 ? lifeSeconds ~/ 60 : null,
+      thermal: thermal,
       lowPowerMode: systemStatus == 1,
     );
   }
 
-  static PowerReading _windows() {
+  static PowerReading _windows({required bool gaming}) {
     final kernel = DynamicLibrary.open('kernel32.dll');
     final status = kernel.lookupFunction<Int32 Function(Pointer<Uint8>), int Function(Pointer<Uint8>)>(
       'GetSystemPowerStatus',
@@ -447,12 +453,21 @@ abstract final class PowerReader {
     try {
       if (status(buffer) == 0) return const PowerReading(hasBattery: false, onBattery: false);
       final life = buffer[4] | buffer[5] << 8 | buffer[6] << 16 | buffer[7] << 24;
+      final hasBattery = buffer[1] != 128 && buffer[1] != 255;
+      ThermalLevel? thermal;
+      try {
+        // A desktop's card is always awake; a laptop's is asked only while a game runs.
+        thermal = WindowsHeat.instance.level(graphics: gaming || !hasBattery);
+      } on Object {
+        // Not read.
+      }
       return fromWindowsStatus(
         acLine: buffer[0],
         batteryFlag: buffer[1],
         percent: buffer[2],
         systemStatus: buffer[3],
         lifeSeconds: life,
+        thermal: thermal,
       );
     } finally {
       calloc.free(buffer);
@@ -549,18 +564,43 @@ abstract final class PowerReader {
     if (readings.isEmpty) return null;
     var level = ThermalLevel.nominal;
     for (final (celsius, critical) in readings) {
-      final seriousAt = critical == null ? 85.0 : math.min(85.0, critical - 15);
-      final criticalAt = critical == null ? 95.0 : math.min(95.0, critical - 5);
-      final here = celsius >= criticalAt
-          ? ThermalLevel.critical
-          : celsius >= seriousAt
-          ? ThermalLevel.serious
-          : celsius >= 75
-          ? ThermalLevel.fair
-          : ThermalLevel.nominal;
+      final here = processorLevel(celsius, critical: critical);
       if (here.index > level.index) level = here;
     }
     return level;
+  }
+
+  /// A processor or a board's thermal zone: fair from 75 °C, serious from 85 °C (or 15° below
+  /// the zone's [critical] trip, whichever is lower), critical from 95 °C (or 5° below it). A
+  /// laptop's processor works at 80 to 90 °C under load and its makers set it to slow itself at
+  /// about 100 °C: serious is where that is near, critical where it is close.
+  static ThermalLevel processorLevel(double celsius, {double? critical}) {
+    final seriousAt = critical == null ? 85.0 : math.min(85.0, critical - 15);
+    final criticalAt = critical == null ? 95.0 : math.min(95.0, critical - 5);
+    return celsius >= criticalAt
+        ? ThermalLevel.critical
+        : celsius >= seriousAt
+        ? ThermalLevel.serious
+        : celsius >= 75
+        ? ThermalLevel.fair
+        : ThermalLevel.nominal;
+  }
+
+  /// A graphics card's temperature, which runs cooler than a processor's: fair from 75 °C,
+  /// serious from 85 °C (or 5° below the card's own [slowdown] temperature, whichever is lower),
+  /// critical from 92 °C (or at the slowdown). A card in a game runs at 65 to 80 °C; GeForce
+  /// cards' boost aims at about 83 °C and gives up clocks above it, and the slowdown temperature
+  /// NVML reports, where the card cuts its clocks hard, lies above that.
+  static ThermalLevel graphicsLevel(double celsius, {double? slowdown}) {
+    final seriousAt = slowdown == null ? 85.0 : math.min(85.0, slowdown - 5);
+    final criticalAt = slowdown == null ? 92.0 : math.min(92.0, slowdown);
+    return celsius >= criticalAt
+        ? ThermalLevel.critical
+        : celsius >= seriousAt
+        ? ThermalLevel.serious
+        : celsius >= 75
+        ? ThermalLevel.fair
+        : ThermalLevel.nominal;
   }
 
   static String _read(String path) {

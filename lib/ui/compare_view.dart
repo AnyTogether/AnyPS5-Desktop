@@ -339,57 +339,75 @@ class _ComparedGameRow extends StatelessWidget {
         ],
       ),
     );
-    return Pressable(
+    String spoken(String label, CompareSide? side) =>
+        side == null ? '$label, ${T.text('compareNotPlayed')}' : '$label, ${side.earned}/${side.total}';
+    return Semantics(
+      container: true,
+      button: true,
+      selected: focused,
+      label: [
+        local?.nameFor([T.language.code]) ?? game.name(T.language.code),
+        spoken(T.text('profileYou'), game.mine),
+        spoken(them, game.theirs),
+      ].join(', '),
       onTap: onTap,
-      pressScale: 0.99,
-      builder: (context, hovering) => AnimatedContainer(
-        duration: Motion.focus,
-        curve: Motion.settle,
-        margin: EdgeInsets.only(bottom: 8 * scale),
-        padding: EdgeInsets.all(12 * scale),
-        decoration: BoxDecoration(
-          color: focused ? Colors.white : Colors.white.withValues(alpha: hovering ? 0.1 : 0.06),
-          borderRadius: BorderRadius.circular(14 * scale),
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10 * scale),
-              child: SizedBox.square(
-                dimension: 56 * scale,
-                child: local?.icon != null
-                    ? ArtworkImage(path: local!.icon!, cacheWidth: 160)
-                    : ColoredBox(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        child: Icon(Icons.sports_esports_rounded, size: 26 * scale, color: ink.withValues(alpha: 0.5)),
-                      ),
+      excludeSemantics: true,
+      child: Pressable(
+        onTap: onTap,
+        pressScale: 0.99,
+        builder: (context, hovering) => AnimatedContainer(
+          duration: Motion.focus,
+          curve: Motion.settle,
+          margin: EdgeInsets.only(bottom: 8 * scale),
+          padding: EdgeInsets.all(12 * scale),
+          decoration: BoxDecoration(
+            color: focused ? Colors.white : Colors.white.withValues(alpha: hovering ? 0.1 : 0.06),
+            borderRadius: BorderRadius.circular(14 * scale),
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10 * scale),
+                child: SizedBox.square(
+                  dimension: 56 * scale,
+                  child: local?.icon != null
+                      ? ArtworkImage(path: local!.icon!, cacheWidth: 160)
+                      : ColoredBox(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          child: Icon(
+                            Icons.sports_esports_rounded,
+                            size: 26 * scale,
+                            color: ink.withValues(alpha: 0.5),
+                          ),
+                        ),
+                ),
               ),
-            ),
-            SizedBox(width: 16 * scale),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    local?.nameFor([T.language.code]) ?? game.name(T.language.code),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppText.display(17 * scale, weight: FontWeight.w600, color: ink),
-                  ),
-                  SizedBox(height: 8 * scale),
-                  Row(
-                    children: [
-                      side(T.text('profileYou'), game.mine, model.accentChoice.color),
-                      SizedBox(width: 22 * scale),
-                      side(them, game.theirs, focused ? const Color(0xFF59647A) : CompareView.theirColor),
-                    ],
-                  ),
-                ],
+              SizedBox(width: 16 * scale),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      local?.nameFor([T.language.code]) ?? game.name(T.language.code),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.display(17 * scale, weight: FontWeight.w600, color: ink),
+                    ),
+                    SizedBox(height: 8 * scale),
+                    Row(
+                      children: [
+                        side(T.text('profileYou'), game.mine, model.accentChoice.color),
+                        SizedBox(width: 22 * scale),
+                        side(them, game.theirs, focused ? const Color(0xFF59647A) : CompareView.theirColor),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-            SizedBox(width: 12 * scale),
-            Icon(Icons.chevron_right_rounded, size: 24 * scale, color: ink.withValues(alpha: 0.5)),
-          ],
+              SizedBox(width: 12 * scale),
+              Icon(Icons.chevron_right_rounded, size: 24 * scale, color: ink.withValues(alpha: 0.5)),
+            ],
+          ),
         ),
       ),
     );

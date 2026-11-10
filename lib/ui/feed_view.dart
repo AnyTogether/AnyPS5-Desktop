@@ -185,105 +185,115 @@ class _ActivityCard extends StatelessWidget {
       'rare' => (T.text('socialFeedRare'), const Color(0xFFB79CFF)),
       _ => null,
     };
-    return Pressable(
+    // The card is read by its words; the reactions are their own buttons inside it.
+    return Semantics(
+      container: true,
+      button: true,
       onTap: onTap,
-      pressScale: 0.99,
-      builder: (context, hovering) => AnimatedContainer(
-        duration: Motion.focus,
-        curve: Motion.settle,
-        margin: EdgeInsets.only(bottom: 10 * scale),
-        padding: EdgeInsets.fromLTRB(16 * scale, 16 * scale, 16 * scale, 14 * scale),
-        decoration: BoxDecoration(
-          color: focused ? Colors.white : Colors.white.withValues(alpha: hovering ? 0.1 : 0.06),
-          borderRadius: BorderRadius.circular(16 * scale),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox.square(
-              dimension: 52 * scale,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  PersonAvatar(person: TogetherModel.card(item.actor), size: 48 * scale),
-                  if (item.kind == ActivityKind.levelUp && item.level != null)
-                    PositionedDirectional(
-                      end: -4 * scale,
-                      bottom: -4 * scale,
-                      child: LevelBadgeView(level: item.level!, size: 24 * scale),
-                    ),
-                ],
-              ),
-            ),
-            SizedBox(width: 16 * scale),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ActivityLine(model: model, item: item, name: name, size: 17 * scale, ink: ink),
-                  SizedBox(height: 6 * scale),
-                  Row(
-                    children: [
-                      Text(
-                        TogetherSocial.ago(item.createdAt),
-                        style: AppText.display(13 * scale, weight: FontWeight.w500, color: ink.withValues(alpha: 0.55)),
+      child: Pressable(
+        onTap: onTap,
+        pressScale: 0.99,
+        builder: (context, hovering) => AnimatedContainer(
+          duration: Motion.focus,
+          curve: Motion.settle,
+          margin: EdgeInsets.only(bottom: 10 * scale),
+          padding: EdgeInsets.fromLTRB(16 * scale, 16 * scale, 16 * scale, 14 * scale),
+          decoration: BoxDecoration(
+            color: focused ? Colors.white : Colors.white.withValues(alpha: hovering ? 0.1 : 0.06),
+            borderRadius: BorderRadius.circular(16 * scale),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox.square(
+                dimension: 52 * scale,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    PersonAvatar(person: TogetherModel.card(item.actor), size: 48 * scale),
+                    if (item.kind == ActivityKind.levelUp && item.level != null)
+                      PositionedDirectional(
+                        end: -4 * scale,
+                        bottom: -4 * scale,
+                        child: LevelBadgeView(level: item.level!, size: 24 * scale),
                       ),
-                      if (highlight != null) ...[
-                        SizedBox(width: 10 * scale),
-                        _Chip(text: highlight.$1, color: highlight.$2, focused: focused),
-                      ],
-                    ],
-                  ),
-                  if (trophies.isNotEmpty) ...[
-                    SizedBox(height: 10 * scale),
-                    Wrap(
-                      spacing: 8 * scale,
-                      runSpacing: 6 * scale,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+                  ],
+                ),
+              ),
+              SizedBox(width: 16 * scale),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ActivityLine(model: model, item: item, name: name, size: 17 * scale, ink: ink),
+                    SizedBox(height: 6 * scale),
+                    Row(
                       children: [
-                        for (final trophy in trophies) _TrophyChip(trophy: trophy, ink: ink, focused: focused),
-                        if (more > 0)
-                          Text(
-                            T.format('socialFeedAndMore', [more]),
-                            style: AppText.display(
-                              13 * scale,
-                              weight: FontWeight.w500,
-                              color: ink.withValues(alpha: 0.55),
-                            ),
+                        Text(
+                          TogetherSocial.ago(item.createdAt),
+                          style: AppText.display(
+                            13 * scale,
+                            weight: FontWeight.w500,
+                            color: ink.withValues(alpha: 0.55),
                           ),
+                        ),
+                        if (highlight != null) ...[
+                          SizedBox(width: 10 * scale),
+                          _Chip(text: highlight.$1, color: highlight.$2, focused: focused),
+                        ],
                       ],
+                    ),
+                    if (trophies.isNotEmpty) ...[
+                      SizedBox(height: 10 * scale),
+                      Wrap(
+                        spacing: 8 * scale,
+                        runSpacing: 6 * scale,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          for (final trophy in trophies) _TrophyChip(trophy: trophy, ink: ink, focused: focused),
+                          if (more > 0)
+                            Text(
+                              T.format('socialFeedAndMore', [more]),
+                              style: AppText.display(
+                                13 * scale,
+                                weight: FontWeight.w500,
+                                color: ink.withValues(alpha: 0.55),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                    SizedBox(height: 12 * scale),
+                    // As tall on every item, so moving the focus moves nothing.
+                    SizedBox(
+                      height: 32 * scale,
+                      child: Row(
+                        children: [
+                          // All four on the focused item; elsewhere only the ones someone chose.
+                          for (final choice in Reaction.values)
+                            if (focused || item.reactions.count(choice) > 0) ...[
+                              _ReactionPill(
+                                reaction: choice,
+                                count: item.reactions.count(choice),
+                                mine: item.reactions.mine == choice,
+                                // The keys' choice shows on the focused item only.
+                                chosen: focused && reaction == choice.index,
+                                focused: focused,
+                                accent: model.accentChoice.color,
+                                onTap: () => unawaited(together.react(item, choice)),
+                              ),
+                              SizedBox(width: 8 * scale),
+                            ],
+                        ],
+                      ),
                     ),
                   ],
-                  SizedBox(height: 12 * scale),
-                  // As tall on every item, so moving the focus moves nothing.
-                  SizedBox(
-                    height: 32 * scale,
-                    child: Row(
-                      children: [
-                        // All four on the focused item; elsewhere only the ones someone chose.
-                        for (final choice in Reaction.values)
-                          if (focused || item.reactions.count(choice) > 0) ...[
-                            _ReactionPill(
-                              reaction: choice,
-                              count: item.reactions.count(choice),
-                              mine: item.reactions.mine == choice,
-                              // The keys' choice shows on the focused item only.
-                              chosen: focused && reaction == choice.index,
-                              focused: focused,
-                              accent: model.accentChoice.color,
-                              onTap: () => unawaited(together.react(item, choice)),
-                            ),
-                            SizedBox(width: 8 * scale),
-                          ],
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-            SizedBox(width: 16 * scale),
-            ActivityPicture(model: model, item: item, size: 64 * scale),
-          ],
+              SizedBox(width: 16 * scale),
+              ActivityPicture(model: model, item: item, size: 64 * scale),
+            ],
+          ),
         ),
       ),
     );
@@ -341,33 +351,39 @@ class _TrophyChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scale = LayoutScale.of(context);
     final grade = TrophyGrade.values.where((grade) => grade.name == trophy.grade).firstOrNull ?? TrophyGrade.bronze;
-    return Container(
-      padding: EdgeInsetsDirectional.fromSTEB(7 * scale, 4 * scale, 10 * scale, 4 * scale),
-      decoration: BoxDecoration(color: ink.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(8 * scale)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.emoji_events_rounded, size: 15 * scale, color: TrophyView.gradeColor(grade)),
-          SizedBox(width: 5 * scale),
-          ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: 240 * scale),
-            child: Text(
-              trophy.name(T.language.code) ?? T.text('trophyHidden'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppText.display(13 * scale, weight: FontWeight.w500, color: ink.withValues(alpha: 0.85)),
-            ),
-          ),
-          // Its share of players, on all but the common ones, as the Mac has it.
-          if (trophy.rarityLabel case final label? when label != 'common')
-            if (trophy.rarity case final share?) ...[
-              SizedBox(width: 6 * scale),
-              Text(
-                _percent(share),
-                style: AppText.display(13 * scale, weight: FontWeight.w600, color: _rarityColor(label, ink, focused)),
+    final name = trophy.name(T.language.code) ?? T.text('trophyHidden');
+    final share = trophy.rarityLabel != 'common' ? trophy.rarity : null;
+    return Semantics(
+      label: [TrophyView.gradeName(grade), name, if (share != null) _percent(share)].join(', '),
+      excludeSemantics: true,
+      child: Container(
+        padding: EdgeInsetsDirectional.fromSTEB(7 * scale, 4 * scale, 10 * scale, 4 * scale),
+        decoration: BoxDecoration(color: ink.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(8 * scale)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.emoji_events_rounded, size: 15 * scale, color: TrophyView.gradeColor(grade)),
+            SizedBox(width: 5 * scale),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: 240 * scale),
+              child: Text(
+                trophy.name(T.language.code) ?? T.text('trophyHidden'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.display(13 * scale, weight: FontWeight.w500, color: ink.withValues(alpha: 0.85)),
               ),
-            ],
-        ],
+            ),
+            // Its share of players, on all but the common ones, as the Mac has it.
+            if (trophy.rarityLabel case final label? when label != 'common')
+              if (trophy.rarity case final share?) ...[
+                SizedBox(width: 6 * scale),
+                Text(
+                  _percent(share),
+                  style: AppText.display(13 * scale, weight: FontWeight.w600, color: _rarityColor(label, ink, focused)),
+                ),
+              ],
+          ],
+        ),
       ),
     );
   }
@@ -398,32 +414,46 @@ class _ReactionPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final scale = LayoutScale.of(context);
     final ink = focused ? LookScope.focusedInk(context) : Colors.white;
-    return Pressable(
+    final name = T.text(switch (reaction) {
+      Reaction.fire => 'reactionFire',
+      Reaction.clap => 'reactionClap',
+      Reaction.wow => 'reactionWow',
+      Reaction.heart => 'reactionLove',
+    });
+    return Semantics(
+      container: true,
+      button: true,
+      selected: mine,
+      label: count > 0 ? '$name, ${T.number(count)}' : name,
       onTap: onTap,
-      builder: (context, hovering) => AnimatedContainer(
-        duration: Motion.focus,
-        curve: Motion.settle,
-        height: 32 * scale,
-        padding: EdgeInsets.symmetric(horizontal: 11 * scale),
-        decoration: BoxDecoration(
-          color: mine
-              ? accent.withValues(alpha: focused ? 0.55 : 0.45)
-              : ink.withValues(alpha: hovering ? 0.14 : (focused ? 0.06 : 0.08)),
-          borderRadius: BorderRadius.circular(16 * scale),
-          border: Border.all(color: chosen ? ink : Colors.transparent, width: chosen ? 2 * scale : 1 * scale),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(reaction.emoji, style: AppText.display(17 * scale, color: ink)),
-            if (count > 0) ...[
-              SizedBox(width: 6 * scale),
-              Text(
-                T.number(count),
-                style: AppText.display(13 * scale, weight: FontWeight.w600, color: ink.withValues(alpha: 0.85)),
-              ),
+      excludeSemantics: true,
+      child: Pressable(
+        onTap: onTap,
+        builder: (context, hovering) => AnimatedContainer(
+          duration: Motion.focus,
+          curve: Motion.settle,
+          height: 32 * scale,
+          padding: EdgeInsets.symmetric(horizontal: 11 * scale),
+          decoration: BoxDecoration(
+            color: mine
+                ? accent.withValues(alpha: focused ? 0.55 : 0.45)
+                : ink.withValues(alpha: hovering ? 0.14 : (focused ? 0.06 : 0.08)),
+            borderRadius: BorderRadius.circular(16 * scale),
+            border: Border.all(color: chosen ? ink : Colors.transparent, width: chosen ? 2 * scale : 1 * scale),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(reaction.emoji, style: AppText.display(17 * scale, color: ink)),
+              if (count > 0) ...[
+                SizedBox(width: 6 * scale),
+                Text(
+                  T.number(count),
+                  style: AppText.display(13 * scale, weight: FontWeight.w600, color: ink.withValues(alpha: 0.85)),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

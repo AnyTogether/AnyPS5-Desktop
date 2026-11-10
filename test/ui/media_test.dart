@@ -12,6 +12,7 @@ import 'package:anyps5_desktop/core/host.dart';
 import 'package:anyps5_desktop/core/installer.dart';
 import 'package:anyps5_desktop/ui/app_model.dart' hide Command, GameState;
 import 'package:anyps5_desktop/ui/app_model.dart' as launcher show Command;
+import 'package:anyps5_desktop/ui/media_model.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -220,8 +221,14 @@ void main() {
     expect(model.media.settings.microphoneDevice, isNull);
     final badge = row('broadcast-badge').kind;
     expect(badge, isA<InfoRow>());
-    expect((badge as InfoRow).text, T.text('broadcastBadgeLinux'));
+    expect((badge as InfoRow).text, T.text('broadcastBadgeNoOverlay'));
+    // X11: a switch, saying when it shows.
+    (model.desktop as FakeDesktop).reach = BadgeReach.windowRecordingOnly;
+    expect(row('broadcast-badge').kind, isA<ToggleRow>());
+    expect(row('broadcast-badge').detail, T.text('broadcastBadgeDetailX11'));
+    (model.desktop as FakeDesktop).reach = BadgeReach.none;
     model.media.badgeOverride = true;
+    expect(row('broadcast-badge').detail, T.text('broadcastBadgeDetail'));
     final toggle = row('broadcast-badge').kind as ToggleRow;
     expect(toggle.value, isTrue);
     toggle.set(false);
@@ -256,6 +263,67 @@ void main() {
     await until(() => desktop.calls.contains('badge-off'));
     model.stopGame();
     await playing;
+  }, skip: Platform.isWindows ? 'the stand-in game is a shell script' : false);
+
+  test('the badge is kept out of what is recorded: always on Windows, on X11 only with the game\'s window alone', () {
+    expect(MediaModel.badgeKeptOut(BadgeReach.none, windowOnly: true, screenRecorded: false), isFalse);
+    expect(MediaModel.badgeKeptOut(BadgeReach.excluded, windowOnly: false, screenRecorded: true), isTrue);
+    expect(MediaModel.badgeKeptOut(BadgeReach.windowRecordingOnly, windowOnly: true, screenRecorded: false), isTrue);
+    expect(
+      MediaModel.badgeKeptOut(BadgeReach.windowRecordingOnly, windowOnly: false, screenRecorded: false),
+      isFalse,
+      reason: 'the broadcast records the screen',
+    );
+    expect(
+      MediaModel.badgeKeptOut(BadgeReach.windowRecordingOnly, windowOnly: true, screenRecorded: true),
+      isFalse,
+      reason: 'the replay buffer or Remote Play records the screen',
+    );
+  });
+
+  Future<void> goLiveOnX11({required bool windowGrab}) async {
+    final desktop = model.desktop as FakeDesktop..reach = BadgeReach.windowRecordingOnly;
+    final probes = <List<String>>[];
+    model.media
+      ..areaOverride = ((_) => const ScreenArea(0, 0, 1920, 1080, window: 0x4200007))
+      ..runOverride = (executable, arguments) async {
+        probes.add(arguments);
+        return ProcessResult(1, 0, windowGrab ? '  -window_id         <int>  .D......... Window to capture.' : '', '');
+      }
+      ..setKey('live_key');
+    final playing = (await play()).done;
+    model.media.toggleBroadcast();
+    await until(() => processes.isNotEmpty);
+    expect(probes, [ScreenGrab.windowGrabProbe]);
+    final arguments = started.single.join(' ');
+    if (windowGrab) {
+      expect(
+        arguments,
+        contains('-f x11grab -framerate 60 -draw_mouse 0 -window_id ${0x4200007} -video_size 1920x1080 -i'),
+      );
+    } else {
+      expect(arguments, contains('-video_size 1920x1080 -i :'));
+      expect(arguments, isNot(contains('-window_id')));
+    }
+    processes.single.write(utf8.encode('frame=30\nbitrate=3000.0kbits/s\nprogress=continue\n'));
+    await until(() => model.media.phase is BroadcastLive);
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    if (windowGrab) {
+      await until(() => desktop.calls.contains('badge'));
+    } else {
+      expect(desktop.calls, isNot(contains('badge')), reason: 'a recording of the screen would take it');
+    }
+    model.media.toggleBroadcast();
+    model.stopGame();
+    await playing;
+  }
+
+  test('on X11 the badge shows while the broadcast records the game\'s window by itself', () async {
+    await goLiveOnX11(windowGrab: true);
+  }, skip: Platform.isWindows ? 'the stand-in game is a shell script' : false);
+
+  test('on X11 with an ffmpeg without window_id the screen is recorded and no badge shows', () async {
+    await goLiveOnX11(windowGrab: false);
   }, skip: Platform.isWindows ? 'the stand-in game is a shell script' : false);
 
   test('Go Live with no key asks to set up first', () async {

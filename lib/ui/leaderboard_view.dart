@@ -210,22 +210,30 @@ class _Tab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scale = LayoutScale.of(context);
-    return Pressable(
+    return Semantics(
+      container: true,
+      button: true,
+      selected: selected,
+      label: text,
       onTap: onTap,
-      builder: (context, hovering) => AnimatedContainer(
-        duration: Motion.focus,
-        curve: Motion.settle,
-        padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 8 * scale),
-        decoration: BoxDecoration(
-          color: selected ? Colors.white : Colors.white.withValues(alpha: hovering ? 0.16 : 0.08),
-          borderRadius: BorderRadius.circular(20 * scale),
-        ),
-        child: Text(
-          text,
-          style: AppText.display(
-            15 * scale,
-            weight: FontWeight.w600,
-            color: selected ? LookScope.focusedInk(context) : Colors.white.withValues(alpha: 0.85),
+      excludeSemantics: true,
+      child: Pressable(
+        onTap: onTap,
+        builder: (context, hovering) => AnimatedContainer(
+          duration: Motion.focus,
+          curve: Motion.settle,
+          padding: EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 8 * scale),
+          decoration: BoxDecoration(
+            color: selected ? Colors.white : Colors.white.withValues(alpha: hovering ? 0.16 : 0.08),
+            borderRadius: BorderRadius.circular(20 * scale),
+          ),
+          child: Text(
+            text,
+            style: AppText.display(
+              15 * scale,
+              weight: FontWeight.w600,
+              color: selected ? LookScope.focusedInk(context) : Colors.white.withValues(alpha: 0.85),
+            ),
           ),
         ),
       ),
@@ -246,24 +254,32 @@ class _ScopeSwitch extends StatelessWidget {
     final current = together.screens.boardScope;
     Widget side(BoardScope scope, String text) {
       final selected = current == scope;
-      return Pressable(
+      return Semantics(
+        container: true,
+        button: true,
+        selected: selected,
+        label: text,
         onTap: () => together.setBoardScope(scope),
-        builder: (context, hovering) => AnimatedContainer(
-          duration: Motion.focus,
-          curve: Motion.settle,
-          padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 6 * scale),
-          decoration: BoxDecoration(
-            color: selected
-                ? model.accentChoice.color.withValues(alpha: 0.9)
-                : Colors.white.withValues(alpha: hovering ? 0.12 : 0),
-            borderRadius: BorderRadius.circular(16 * scale),
-          ),
-          child: Text(
-            text,
-            style: AppText.display(
-              14 * scale,
-              weight: FontWeight.w600,
-              color: Colors.white.withValues(alpha: selected ? 1 : 0.7),
+        excludeSemantics: true,
+        child: Pressable(
+          onTap: () => together.setBoardScope(scope),
+          builder: (context, hovering) => AnimatedContainer(
+            duration: Motion.focus,
+            curve: Motion.settle,
+            padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 6 * scale),
+            decoration: BoxDecoration(
+              color: selected
+                  ? model.accentChoice.color.withValues(alpha: 0.9)
+                  : Colors.white.withValues(alpha: hovering ? 0.12 : 0),
+              borderRadius: BorderRadius.circular(16 * scale),
+            ),
+            child: Text(
+              text,
+              style: AppText.display(
+                14 * scale,
+                weight: FontWeight.w600,
+                color: Colors.white.withValues(alpha: selected ? 1 : 0.7),
+              ),
             ),
           ),
         ),
@@ -382,80 +398,96 @@ class _EntryRow extends StatelessWidget {
     final accent = model.accentChoice.color;
     final medal = LeaderboardView.medal(entry.rank);
     final identity = TogetherModel.shown(entry.user);
-    return Pressable(
+    return Semantics(
+      container: true,
+      button: true,
+      selected: focused,
+      label: [
+        '${entry.rank}',
+        identity.name,
+        if (me) T.text('socialBoardYou'),
+        TogetherSocial.boardValue(entry.value, board),
+      ].join(', '),
       onTap: onTap,
-      pressScale: 0.99,
-      builder: (context, hovering) => AnimatedContainer(
-        duration: Motion.focus,
-        curve: Motion.settle,
-        margin: EdgeInsets.only(bottom: 6 * scale),
-        padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
-        decoration: BoxDecoration(
-          color: focused
-              ? Colors.white
-              : me
-              ? accent.withValues(alpha: hovering ? 0.3 : 0.2)
-              : Colors.white.withValues(alpha: hovering ? 0.1 : 0.05),
-          borderRadius: BorderRadius.circular(14 * scale),
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 58 * scale,
-              child: Text(
-                '${entry.rank}',
-                style: AppText.display(
-                  22 * scale,
-                  weight: FontWeight.w700,
-                  color: medal == null || focused ? ink.withValues(alpha: medal == null ? 0.55 : 1) : medal,
+      excludeSemantics: true,
+      child: Pressable(
+        onTap: onTap,
+        pressScale: 0.99,
+        builder: (context, hovering) => AnimatedContainer(
+          duration: Motion.focus,
+          curve: Motion.settle,
+          margin: EdgeInsets.only(bottom: 6 * scale),
+          padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 10 * scale),
+          decoration: BoxDecoration(
+            color: focused
+                ? Colors.white
+                : me
+                ? accent.withValues(alpha: hovering ? 0.3 : 0.2)
+                : Colors.white.withValues(alpha: hovering ? 0.1 : 0.05),
+            borderRadius: BorderRadius.circular(14 * scale),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 58 * scale,
+                child: Text(
+                  '${entry.rank}',
+                  style: AppText.display(
+                    22 * scale,
+                    weight: FontWeight.w700,
+                    color: medal == null || focused ? ink.withValues(alpha: medal == null ? 0.55 : 1) : medal,
+                  ),
                 ),
               ),
-            ),
-            PersonAvatar(person: TogetherModel.card(entry.user), size: 40 * scale),
-            SizedBox(width: 14 * scale),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          identity.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppText.display(17 * scale, weight: FontWeight.w600, color: ink),
-                        ),
-                      ),
-                      if (entry.level case final level?) ...[
-                        SizedBox(width: 8 * scale),
-                        LevelBadgeView(level: level, size: 22 * scale),
-                      ],
-                      if (me) ...[
-                        SizedBox(width: 8 * scale),
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 7 * scale, vertical: 2 * scale),
-                          decoration: BoxDecoration(
-                            color: focused ? accent.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(6 * scale),
-                          ),
+              PersonAvatar(person: TogetherModel.card(entry.user), size: 40 * scale),
+              SizedBox(width: 14 * scale),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
                           child: Text(
-                            T.upper(T.text('socialBoardYou')),
-                            style: AppText.display(10 * scale, weight: FontWeight.w700, color: ink),
+                            identity.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.display(17 * scale, weight: FontWeight.w600, color: ink),
                           ),
                         ),
+                        if (entry.level case final level?) ...[
+                          SizedBox(width: 8 * scale),
+                          LevelBadgeView(level: level, size: 22 * scale),
+                        ],
+                        if (me) ...[
+                          SizedBox(width: 8 * scale),
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 7 * scale, vertical: 2 * scale),
+                            decoration: BoxDecoration(
+                              color: focused ? accent.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(6 * scale),
+                            ),
+                            child: Text(
+                              T.upper(T.text('socialBoardYou')),
+                              style: AppText.display(10 * scale, weight: FontWeight.w700, color: ink),
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
-                  Text('@${entry.user.handle}', style: AppText.display(13 * scale, color: ink.withValues(alpha: 0.55))),
-                ],
+                    ),
+                    Text(
+                      '@${entry.user.handle}',
+                      style: AppText.display(13 * scale, color: ink.withValues(alpha: 0.55)),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Text(
-              TogetherSocial.boardValue(entry.value, board),
-              style: AppText.display(17 * scale, weight: FontWeight.w600, color: ink),
-            ),
-          ],
+              Text(
+                TogetherSocial.boardValue(entry.value, board),
+                style: AppText.display(17 * scale, weight: FontWeight.w600, color: ink),
+              ),
+            ],
+          ),
         ),
       ),
     );

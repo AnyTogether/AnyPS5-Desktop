@@ -113,6 +113,7 @@ Future<int> runCli(
         toolkit: toolkit,
         root: arguments[2],
         resolution: settings.resolution,
+        relinkerFlags: settings.chosenRelinkerFlags,
         onProgress: (step, fraction) {
           final percent = (fraction * 100).round();
           if (lastShown[step] == percent) return;
