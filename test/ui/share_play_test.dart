@@ -209,6 +209,7 @@ void main() {
 
   test('someone asking to watch, with the game in front, is the card over it as on the Mac', () async {
     final playing = (await play()).done;
+    expect(quickRows(), contains('share-start'));
     server.answers['POST share-plays'] = (201, {'sharePlay': sharePlay([]), 'iceServers': <Object>[], 'expiresAt': null});
     choose('share-start');
     await until(() => model.sharePlay.active);
