@@ -10,6 +10,7 @@ class StreamingProcess implements Process {
   final int pid;
 
   final _out = StreamController<List<int>>();
+  final _err = StreamController<List<int>>.broadcast();
   final _exit = Completer<int>();
   final stdinBytes = BytesBuilder(copy: true);
   final killed = <ProcessSignal>[];
@@ -18,9 +19,13 @@ class StreamingProcess implements Process {
 
   void write(List<int> bytes) => _out.add(bytes);
 
+  /// What the process says on its standard error.
+  void writeError(String text) => _err.add(text.codeUnits);
+
   void end([int code = 0]) {
     if (!_exit.isCompleted) _exit.complete(code);
     unawaited(_out.close());
+    unawaited(_err.close());
   }
 
   @override
@@ -37,7 +42,7 @@ class StreamingProcess implements Process {
   Stream<List<int>> get stdout => _out.stream;
 
   @override
-  Stream<List<int>> get stderr => const Stream.empty();
+  Stream<List<int>> get stderr => _err.stream;
 
   @override
   IOSink get stdin {

@@ -47,6 +47,7 @@ void main() {
   late AppModel model;
   late FakeEngine engine;
   late List<FakeSfuRoom> rooms;
+  late TitledDesktop desktop;
 
   Future<void> until(bool Function() condition) async {
     for (var tries = 0; tries < 500 && !condition(); tries++) {
@@ -74,9 +75,14 @@ void main() {
     server = await FakeTogether.start();
     server.friend('u-ana', 'ana', 'Ana', presence: {'state': 'online'});
     rooms = [];
+    desktop = TitledDesktop();
     fixture = makeFixture(
       together: server.base,
-      desktop: TitledDesktop(),
+      desktop: desktop,
+      renderNoticeCard: (title, detail, symbol, scale) async {
+        desktop.noticeCards.add((title, detail));
+        return RgbaImage(1, 1, Uint8List.fromList([1, 2, 3, 4]));
+      },
       sfuRoom: () {
         final room = FakeSfuRoom();
         rooms.add(room);
@@ -197,6 +203,31 @@ void main() {
     expect(engine.links.single.closed, isTrue);
     expect(server.frames.where((frame) => frame['op'] == 'signal').last['kind'], 'bye');
     expect(quickRows(), contains('share-start'));
+    model.stopGame();
+    await playing;
+  }, skip: Platform.isWindows ? 'the stand-in game is a shell script' : false);
+
+  test('someone asking to watch, with the game in front, is the card over it as on the Mac', () async {
+    final playing = (await play()).done;
+    expect(quickRows(), contains('share-start'));
+    server.answers['POST share-plays'] = (201, {'sharePlay': sharePlay([]), 'iceServers': <Object>[], 'expiresAt': null});
+    choose('share-start');
+    await until(() => model.sharePlay.active);
+    desktop.focused = false;
+    server.push('share_play.request', {
+      'sharePlayId': 'sp-1',
+      'from': {'userId': 'u-gu', 'handle': 'gu', 'displayName': 'Gu'},
+      'via': 'list',
+    });
+    await until(() => desktop.noticeCards.contains((T.format('discoverAsksWatch', ['Gu']), T.text('friendsTitle'))));
+    expect(model.toast, T.format('discoverAsksWatch', ['Gu']));
+    expect(desktop.calls.where((call) => call.startsWith('notify')), isEmpty, reason: 'the card, no desktop notice as well');
+    desktop.focused = null;
+    server.answers['DELETE share-plays/sp-1'] = (204, null);
+    expect(quickRows(), contains('share-stop'));
+    choose('share-stop');
+    choose('share-stop-yes');
+    await until(() => engine.stopped);
     model.stopGame();
     await playing;
   }, skip: Platform.isWindows ? 'the stand-in game is a shell script' : false);

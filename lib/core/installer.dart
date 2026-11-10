@@ -15,6 +15,7 @@ import 'game_library.dart';
 import 'game_settings.dart';
 import 'host.dart';
 import 'process_control.dart';
+import 'relinker_flags.dart';
 import 'self_unwrap.dart';
 import 'toolkit.dart';
 import 'unlock_space.dart';
@@ -29,6 +30,7 @@ class InstallRecord {
     required this.date,
     this.resolution,
     this.update,
+    this.relinkerFlags = const [],
   });
 
   factory InstallRecord.fromJson(Map<String, dynamic> json) => InstallRecord(
@@ -39,6 +41,9 @@ class InstallRecord {
     date: DateTime.parse(json['date'] as String),
     resolution: json['resolution'] as String?,
     update: json['update'] as String?,
+    relinkerFlags: json['relinkerFlags'] is List<dynamic>
+        ? (json['relinkerFlags'] as List<dynamic>).whereType<String>().toList()
+        : const [],
   );
 
   final String source;
@@ -53,9 +58,13 @@ class InstallRecord {
   /// The version of the update the game was unlocked with ([GameUpdate]), null without one.
   final String? update;
 
+  /// The relinker options the game was unlocked with ([RelinkerFlag]).
+  final List<String> relinkerFlags;
+
   Map<String, Object> toJson() => {
     'resolution': ?resolution,
     'update': ?update,
+    if (relinkerFlags.isNotEmpty) 'relinkerFlags': relinkerFlags,
     'date': date.toUtc().toIso8601String(),
     'source': source,
     'system': system,
@@ -224,6 +233,7 @@ class Installer {
     this.onLog,
     this.linkMode,
     this.resolution,
+    this.relinkerFlags = const [],
     DateTime Function()? clock,
     int? Function(String folder)? freeSpace,
   }) : _clock = clock ?? DateTime.now,
@@ -242,6 +252,10 @@ class Installer {
 
   /// The WIDTHxHEIGHT to write through the title's resolution patch, null for the title's own.
   final String? resolution;
+
+  /// The relinker options asked for this game: the ones this toolkit lacks or its relinker
+  /// refuses are left out, and the record says which were used.
+  final List<RelinkerFlag> relinkerFlags;
   final DateTime Function() _clock;
 
   /// The free bytes where the games folder is (FreeSpace.of); replaceable in tests.
@@ -334,16 +348,67 @@ class Installer {
   }
 
   /// Removes an installed game and everything it wrote; links to the dump go, never what they
-  /// point to. The relinker's kept output goes too.
-  static void uninstall(Game game, String root) {
-    _delete(installedFolder(game, root));
-    _delete(keptRelink(game, root));
+  /// point to. The relinker's kept output goes too. Both are moved into the store's Removing
+  /// folder at once, so the game is no longer installed when this returns, and removed from there
+  /// by [removeAside]: a game of tens of thousands of files deleted on the screen's thread kept the
+  /// launcher from answering until it was gone. What an uninstall left there (the launcher closed
+  /// before it was done) goes too. A folder that cannot be moved is removed where it is. The
+  /// future completes when everything is gone.
+  static Future<void> uninstall(Game game, String root) {
+    final removing = Directory(removingFolder(root));
+    final left = <String>{
+      if (removing.existsSync())
+        for (final entry in removing.listSync(followLinks: false)) entry.path,
+    };
+    final going = [
+      _setAside(installedFolder(game, root), root, 'game'),
+      _setAside(keptRelink(game, root), root, 'relinked'),
+    ];
+    return Future.wait([
+      for (final path in {...going.nonNulls, ...left}) removeAside(path),
+    ]);
+  }
+
+  /// Where [uninstall] puts what it removes until it is gone, in the store of the games folder
+  /// [root].
+  static String removingFolder(String root) => p.join(root, GameLibrary.storeName, 'Removing');
+
+  /// How [uninstall] removes what it set aside: on the system's file threads, off the screen's
+  /// thread. Replaceable in tests (a removal that takes its time).
+  static Future<void> Function(String path) removeAside = _deleteAway;
+
+  /// [path] moved into the Removing folder, null when there is nothing there; [path] itself when
+  /// it cannot be moved (a file in it held open).
+  static String? _setAside(String path, String root, String label) {
+    switch (FileSystemEntity.typeSync(path, followLinks: false)) {
+      case FileSystemEntityType.notFound:
+        return null;
+      case FileSystemEntityType.directory:
+        break;
+      default:
+        return path;
+    }
+    final aside = p.join(removingFolder(root), '${p.basename(path)}-$label-${DateTime.now().microsecondsSinceEpoch}');
+    try {
+      Directory(p.dirname(aside)).createSync(recursive: true);
+      Directory(path).renameSync(aside);
+      return aside;
+    } on FileSystemException {
+      return path;
+    }
   }
 
   /// How [game]'s files will reach app0 in the games folder [root], tried the way the install
   /// tries it, and their size when they will be copied. With [toolkit], also what the whole
   /// unlock writes on the drive ([InstallPlan.space]).
-  static InstallPlan plan(Game game, String root, {int? knownSize, Toolkit? toolkit, String? resolution}) {
+  static InstallPlan plan(
+    Game game,
+    String root, {
+    int? knownSize,
+    Toolkit? toolkit,
+    String? resolution,
+    List<RelinkerFlag> relinkerFlags = const [],
+  }) {
     final games = p.join(root, GameLibrary.storeName, 'Games');
     final mode = FileLinks.probe(p.join(game.folder, 'eboot.bin'), games);
     final bytes = mode == LinkMode.copy ? knownSize ?? payloadSize(game.folder) : 0;
@@ -351,13 +416,20 @@ class Installer {
     return InstallPlan(
       mode,
       bytes,
-      space: space(game, root, toolkit, copied: bytes, resolution: resolution),
+      space: space(game, root, toolkit, copied: bytes, resolution: resolution, relinkerFlags: relinkerFlags),
     );
   }
 
   /// What unlocking [game] with [toolkit] writes on the drive of the games folder [root] (see
   /// UnlockSpace); [copied] is the size of the game's files when they are copied.
-  static UnlockSpace space(Game game, String root, Toolkit toolkit, {int copied = 0, String? resolution}) {
+  static UnlockSpace space(
+    Game game,
+    String root,
+    Toolkit toolkit, {
+    int copied = 0,
+    String? resolution,
+    List<RelinkerFlag> relinkerFlags = const [],
+  }) {
     int size(String path) {
       try {
         return File(path).lengthSync();
@@ -377,7 +449,13 @@ class Installer {
     final links = keepsOutput(root);
     int? kept;
     if (links) {
-      final key = relinkKey(game, toolkit, found, _patchText(toolkit, game, resolution).$1);
+      final key = relinkKey(
+        game,
+        toolkit,
+        found,
+        _patchText(toolkit, game, resolution).$1,
+        flags: relinkerFlags.where(toolkit.supports).toList(),
+      );
       final reusable = reusableRelink(game, root, key);
       if (reusable != null) kept = GameLibrary.size(reusable);
     }
@@ -414,11 +492,17 @@ class Installer {
   /// What the relinker's output depends on: the toolkit, the system, the patches (with the
   /// resolution in them), the module folders, and the dump's executable and modules (path, size
   /// and modification time of each). Unlocking again with the same key reuses the kept output.
-  static String relinkKey(Game game, Toolkit toolkit, List<String> found, String? patches) {
+  static String relinkKey(
+    Game game,
+    Toolkit toolkit,
+    List<String> found,
+    String? patches, {
+    List<RelinkerFlag> flags = const [],
+  }) {
     final lines = <String>[
       'toolkit ${toolkit.version}',
       'relinker ${toolkit.relinker}',
-      'system ${toolkit.system.name} ${toolkit.system.relinkerOptions.join(' ')}',
+      'system ${toolkit.system.name} ${[...toolkit.system.relinkerOptions, ...flags.map((flag) => flag.option)].join(' ')}',
       'modules ${moduleDirectories(found).join(' ')}',
       'patches ${patches == null ? '-' : sha256.convert(utf8.encode(patches))}',
     ];
@@ -574,13 +658,20 @@ class Installer {
     await _gate();
     final mode = linkMode ?? FileLinks.probe(p.join(game.folder, 'eboot.bin'), p.join(store, 'Games'));
     final copied = mode == LinkMode.copy ? await measurePayload(game.folder) : 0;
-    final needs = space(game, root, toolkit, copied: copied, resolution: resolution);
+    final needs = space(game, root, toolkit, copied: copied, resolution: resolution, relinkerFlags: relinkerFlags);
     final shortage = needs.shortage(free: freeSpace(root), folder: root);
     if (shortage != null) throw shortage;
     try {
       final found = modulesOf(game);
       final (patchText, appliedResolution) = _patchText(toolkit, game, resolution);
-      final key = relinkKey(game, toolkit, found, patchText);
+      // An option this engine lacks is left out; one it refuses is dropped below.
+      var flags = relinkerFlags.where(toolkit.supports).toList();
+      for (final flag in relinkerFlags) {
+        if (!flags.contains(flag)) {
+          _log('${game.titleId}: this engine does not support ${flag.option}, the game is rebuilt without it');
+        }
+      }
+      var key = relinkKey(game, toolkit, found, patchText, flags: flags);
       final keeps = needs.linksOutput;
       String relinked;
       final reusable = keeps ? reusableRelink(game, root, key) : null;
@@ -633,6 +724,7 @@ class Installer {
               toolkit.relinker,
               [
                 ...system.relinkerOptions,
+                for (final flag in flags) flag.option,
                 ...patchOptions,
                 for (final directory in moduleDirectories(found)) ...['--module-dir', directory],
                 'eboot.bin',
@@ -647,16 +739,29 @@ class Installer {
             break;
           } on ToolFailed catch (failure) {
             final module = failedModule(failure, source, placed);
-            if (module == null) rethrow;
-            placed.remove(module);
-            _delete(p.join(source, p.joinAll(module.split('/'))));
+            if (module != null) {
+              placed.remove(module);
+              _delete(p.join(source, p.joinAll(module.split('/'))));
+              _delete(output);
+              Directory(output).createSync(recursive: true);
+              leftOut.add(LeftOutModule(module, LeftOutReason.notRelinked, failure.reason));
+              _log(
+                '$module: the relinker could not convert it (${failure.reason}); '
+                'it is left out and the relink runs again without it',
+              );
+              continue;
+            }
+            if (flags.isEmpty) rethrow;
+            // A saved option never costs the game its unlock: it runs again without them, and
+            // the kept output is filed under what it was really made with.
+            _log(
+              '${game.titleId}: the relinker stopped with ${flags.map((flag) => flag.option).join(' ')} '
+              '(${failure.reason}); the game is rebuilt without it',
+            );
+            flags = [];
+            key = relinkKey(game, toolkit, found, patchText);
             _delete(output);
             Directory(output).createSync(recursive: true);
-            leftOut.add(LeftOutModule(module, LeftOutReason.notRelinked, failure.reason));
-            _log(
-              '$module: the relinker could not convert it (${failure.reason}); '
-              'it is left out and the relink runs again without it',
-            );
           }
         }
         if (!File(executable).existsSync()) throw InstallError('relinker wrote no executable');
@@ -711,6 +816,7 @@ class Installer {
         date: _clock(),
         resolution: appliedResolution,
         update: game.update?.version,
+        relinkerFlags: [for (final flag in flags) flag.option],
       );
       File(p.join(partial, recordName)).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(record.toJson()));
       _progress(InstallStep.layout, 1);

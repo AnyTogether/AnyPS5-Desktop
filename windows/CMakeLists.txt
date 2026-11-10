@@ -140,6 +140,13 @@ install(FILES "${SDL2_DIR}/SDL2.dll" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COM
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/SDL2/LICENSE.txt" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   RENAME "SDL2-LICENSE.txt" COMPONENT Runtime)
 
+# The clip player's libraries, which media_kit_libs_windows_video downloads, with their licences
+# (third_party/libmpv/README.md).
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/libmpv/LICENSE.txt" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+  RENAME "libmpv-LICENSE.txt" COMPONENT Runtime)
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/angle/LICENSE.txt" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+  RENAME "ANGLE-LICENSE.txt" COMPONENT Runtime)
+
 # The MSVC runtime (msvcp140.dll, vcruntime140.dll, vcruntime140_1.dll) beside the executable,
 # so the launcher starts on a PC without the Visual C++ Redistributable. The UCRT is part of
 # Windows 10 and later and stays out.

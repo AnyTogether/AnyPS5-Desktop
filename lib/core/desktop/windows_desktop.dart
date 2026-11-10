@@ -670,6 +670,10 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
 
   int _badge = 0;
 
+  // The badge's window is left out of every capture (WDA_EXCLUDEFROMCAPTURE, below).
+  @override
+  BadgeReach get badgeReach => BadgeReach.excluded;
+
   @override
   Future<bool> showBadge(RgbaImage? badge, {int? pid}) async {
     if (badge == null) {

@@ -171,6 +171,7 @@ class CrashModel {
       privacy: privacy(),
       unlockedWith: app.records[game.id]?.toolkit,
       engineNow: app.toolkitVersion,
+      relinkerFlags: app.records[game.id]?.relinkerFlags ?? const [],
       exitCode: last?.exitCode,
       stoppedByUser: last?.stoppedByUser ?? false,
       traced: last?.traced,
@@ -400,6 +401,7 @@ class _ReportInput {
     required this.privacy,
     required this.unlockedWith,
     required this.engineNow,
+    this.relinkerFlags = const [],
     required this.exitCode,
     required this.stoppedByUser,
     required this.traced,
@@ -424,6 +426,7 @@ class _ReportInput {
   final ReportPrivacy privacy;
   final String? unlockedWith;
   final String? engineNow;
+  final List<String> relinkerFlags;
   final int? exitCode;
   final bool stoppedByUser;
   final bool? traced;
@@ -473,6 +476,7 @@ _Built _build(_ReportInput input) {
     privacy: input.privacy,
     unlockedWith: input.unlockedWith,
     engineNow: input.engineNow,
+    relinkerFlags: input.relinkerFlags,
     exitCode: code,
     stoppedByUser: input.stoppedByUser,
     traced: input.traced ?? GameLog.tracedStart(session),

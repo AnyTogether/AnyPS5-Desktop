@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/material.dart' show Icons;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' show RTCVideoView, RTCVideoViewObjectFit;
 
@@ -254,9 +255,18 @@ class SharePlayModel {
         final invite = ShareInvite.fromJson(data);
         if (invite == null) return;
         invites = [...invites.where((known) => known.sharePlayId != invite.sharePlayId), invite];
-        app.show(
-          T.format('sharePlayInvitedYou', [invite.from?.displayName ?? '', _gameName(invite.titleId, invite.title)]),
-        );
+        final text = T.format('sharePlayInvitedYou', [
+          invite.from?.displayName ?? '',
+          _gameName(invite.titleId, invite.title),
+        ]);
+        // Behind another window the notice's sound, as for any other invite (none on Do Not
+        // Disturb), as on the Mac.
+        app.together.disturbingSound();
+        app.show(text);
+        // Over a game the card, unless the user asked not to be disturbed, as on the Mac.
+        if (!app.together.doNotDisturb) {
+          unawaited(app.noticeOverGame(text, detail: T.text('friendsTitle'), symbol: Icons.screen_share_rounded));
+        }
         app.refresh();
       case 'share_play.updated' when session != null:
         try {
@@ -274,7 +284,10 @@ class SharePlayModel {
         if (current != null) {
           hosting = current.copyWith(requests: [...current.requests.where((known) => known.id != person.id), person]);
         }
-        app.show(T.format('discoverAsksWatch', [TogetherModel.shown(person).name]));
+        final text = T.format('discoverAsksWatch', [TogetherModel.shown(person).name]);
+        app.show(text);
+        // Over the game being shared, the card (Do Not Disturb or not, as on the Mac).
+        unawaited(app.noticeOverGame(text, detail: T.text('friendsTitle'), symbol: Icons.back_hand_rounded));
         app.refresh();
       case 'share_play.signal' when session != null:
         final signal = ShareSignal.fromJson(data);

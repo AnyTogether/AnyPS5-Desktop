@@ -8,6 +8,8 @@ import 'dart:io' as io show pid;
 import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
 
+import 'system_crash_report.dart';
+
 /// What went wrong with the launcher itself (not a game) in an earlier run, offered as a report
 /// at the next start.
 enum LauncherProblemKind {
@@ -30,6 +32,8 @@ class LauncherProblem {
     this.whileClosing = false,
     this.error,
     this.lines = const [],
+    this.pid,
+    this.started,
   });
 
   factory LauncherProblem.fromJson(Map<String, dynamic> json) => LauncherProblem(
@@ -45,6 +49,11 @@ class LauncherProblem {
     whileClosing: json['whileClosing'] == true,
     error: json['error'] as String?,
     lines: [for (final line in json['lines'] as List<dynamic>? ?? const []) '$line'],
+    pid: switch (json['pid']) {
+      final num pid => pid.toInt(),
+      _ => null,
+    },
+    started: DateTime.tryParse(json['started'] as String? ?? ''),
   );
 
   final LauncherProblemKind kind;
@@ -71,6 +80,29 @@ class LauncherProblem {
   /// and what was on screen (FrameLog's lines).
   final List<String> lines;
 
+  /// The process of the run that ended, and when it started: what the system's report of it is
+  /// found by.
+  final int? pid;
+  final DateTime? started;
+
+  /// A run that ended without closing (a crash, or a stall it never came out of): the system may
+  /// have a report of how it ended.
+  bool get endedUnclosed => kind == LauncherProblemKind.crash || !recovered;
+
+  LauncherProblem copyWith({String? error, int? pid, DateTime? started}) => LauncherProblem(
+    kind: kind,
+    at: at,
+    version: version,
+    platform: platform,
+    stalledFor: stalledFor,
+    recovered: recovered,
+    whileClosing: whileClosing,
+    error: error ?? this.error,
+    lines: lines,
+    pid: pid ?? this.pid,
+    started: started ?? this.started,
+  );
+
   Map<String, dynamic> toJson() => {
     'kind': kind.name,
     'at': at.toUtc().toIso8601String(),
@@ -81,6 +113,8 @@ class LauncherProblem {
     if (whileClosing) 'whileClosing': true,
     if (error != null) 'error': error,
     'lines': lines,
+    'pid': ?pid,
+    if (started != null) 'started': started!.toUtc().toIso8601String(),
   };
 }
 
@@ -96,15 +130,26 @@ class LauncherProblem {
 ///
 /// Nothing leaves the computer: the report is a GitHub issue the user opens and sends.
 class LauncherHealth {
-  LauncherHealth(this.folder, {required this.version, required this.platform, int? pid, bool Function(int pid)? alive})
-    : pid = pid ?? io.pid,
-      _alive = alive ?? processAlive;
+  LauncherHealth(
+    this.folder, {
+    required this.version,
+    required this.platform,
+    int? pid,
+    bool Function(int pid)? alive,
+    Future<String> Function(DateTime started, int pid)? systemReport,
+  }) : pid = pid ?? io.pid,
+       _alive = alive ?? processAlive,
+       _systemReport = systemReport ?? ((started, pid) => SystemCrashReport.find(since: started, pid: pid));
 
   final String folder;
   final String version;
   final String platform;
   final int pid;
   final bool Function(int pid) _alive;
+
+  /// What the system kept of how the run `pid` ended, or a line saying it kept nothing
+  /// (SystemCrashReport.find).
+  final Future<String> Function(DateTime started, int pid) _systemReport;
 
   /// A stall this long is a problem worth a report.
   static const stall = Duration(seconds: 5);
@@ -139,7 +184,17 @@ class LauncherHealth {
         if (other == pid || _alive(other)) continue;
         final marker = _readJson(entity);
         entity.deleteSync();
-        // A stall the watchdog wrote is the same run, told better.
+        final markerStarted = DateTime.tryParse(marker?['started'] as String? ?? '');
+        // A stall the watchdog wrote is the same run, told better; one it never came out of keeps
+        // the process, for the system's report of how it ended.
+        if (found case final stall?
+            when stall.pid == null &&
+                stall.endedUnclosed &&
+                markerStarted != null &&
+                !stall.at.isBefore(markerStarted)) {
+          found = stall.copyWith(pid: other, started: markerStarted);
+          _write(problemFile, found.toJson());
+        }
         if (found != null || marker == null) continue;
         final closing = marker['closing'] as String?;
         found = LauncherProblem(
@@ -150,6 +205,8 @@ class LauncherHealth {
           platform: marker['platform'] as String? ?? platform,
           error: marker['error'] as String?,
           lines: [for (final line in marker['lines'] as List<dynamic>? ?? const []) '$line'],
+          pid: other,
+          started: markerStarted,
         );
         _write(problemFile, found.toJson());
       }
@@ -158,6 +215,27 @@ class LauncherHealth {
       // Reports are a help, never a reason not to start.
     }
     return found;
+  }
+
+  /// Whether [problem] still waits for what the system kept of the run.
+  static bool needsSystemReport(LauncherProblem problem) =>
+      problem.endedUnclosed &&
+      problem.pid != null &&
+      problem.started != null &&
+      !(problem.error ?? '').contains(SystemCrashReport.heading);
+
+  /// [problem] with what the system kept of how the run ended (Windows Error Reporting's report,
+  /// Linux's core dump), or a line saying it kept nothing, first in its error; read when the
+  /// report is sent, a while after the crash, so a report written late is there too.
+  Future<LauncherProblem> lookAgain(LauncherProblem problem) async {
+    if (!needsSystemReport(problem)) return problem;
+    final String report;
+    try {
+      report = await _systemReport(problem.started!, problem.pid!);
+    } on Object {
+      return problem;
+    }
+    return problem.copyWith(error: [report, ?problem.error].where((part) => part.isNotEmpty).join('\n\n'));
   }
 
   /// The launcher begins to close as it should. With the runner taking the marker away after a

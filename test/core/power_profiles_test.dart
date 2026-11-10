@@ -313,7 +313,7 @@ void main() {
       expect(reading.batteryPercent, 64);
       expect(reading.minutesToEmpty, 125);
       expect(reading.lowPowerMode, isTrue);
-      expect(reading.readsHeat, isFalse, reason: 'Windows gives no temperature without administrator rights');
+      expect(reading.readsHeat, isFalse, reason: 'the heat is WindowsHeat\'s, given apart (windows_heat_test.dart)');
     });
 
     test('a desktop has no battery; an unknown estimate is none', () {

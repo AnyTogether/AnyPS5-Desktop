@@ -10,25 +10,35 @@ import 'package:path/path.dart' as p;
 /// cancelled), `silent` (exits 0 but writes nothing). With [failOn] (a path relative to its
 /// working directory) it fails as the real one fails a conversion, exit 2 with `FAIL:` and
 /// `Input:` lines, while that file is in its input; every run's input files go to inputs.txt.
+/// With [traceImports] it knows --trace-imports and libc.prx exports what the option needs; with
+/// [refuseTrace] it stops as the real one does for a game without libc.prx when given the option.
 String makeFakeToolkit(
   String folder, {
   String mode = 'ok',
   String version = 'toolkit-1',
   bool windowsDlls = false,
   String? failOn,
+  bool traceImports = false,
+  bool refuseTrace = false,
 }) {
   Directory(p.join(folder, 'libs')).createSync(recursive: true);
   File(p.join(folder, 'libs', 'libkernel.prx')).writeAsStringSync('kernel library');
   File(p.join(folder, 'libs', 'libSceVideoOut.prx')).writeAsStringSync('video library');
   File(p.join(folder, 'libs', 'README.txt')).writeAsStringSync('not a library');
+  if (traceImports) File(p.join(folder, 'libs', 'libc.prx')).writeAsStringSync('exports TraceImport_nid_no_patch');
   if (windowsDlls) File(p.join(folder, 'libs', 'libwinpthread-1.dll')).writeAsStringSync('dll');
   File(p.join(folder, 'version.txt')).writeAsStringSync('$version\n');
   final argumentsFile = p.join(folder, 'arguments.txt');
   final inputsFile = p.join(folder, 'inputs.txt');
   if (File(inputsFile).existsSync()) File(inputsFile).deleteSync();
+  final runsFile = p.join(folder, 'runs.txt');
+  if (File(runsFile).existsSync()) File(runsFile).deleteSync();
   final script =
       '''
 #!/bin/sh
+${traceImports ? '# knows --trace-imports' : '# plain'}
+printf '%s\\n' "\$*" >> "$runsFile"
+${refuseTrace ? 'case "\$*" in *--trace-imports*) echo "FAIL: --trace-imports requires libc.prx among the libraries" >&2; echo "Input: \$PWD/eboot.bin" >&2; exit 2;; esac' : ''}
 printf '%s\\n' "\$PWD" > "$argumentsFile"
 for argument in "\$@"; do printf '%s\\n' "\$argument" >> "$argumentsFile"; done
 for last; do :; done
@@ -79,6 +89,12 @@ List<List<String>> fakeRelinkerInputs(String toolkit) {
     }
   }
   return runs;
+}
+
+/// The relinker's arguments of each run, joined by spaces.
+List<String> fakeRelinkerRuns(String toolkit) {
+  final file = File(p.join(toolkit, 'runs.txt'));
+  return file.existsSync() ? file.readAsLinesSync() : const [];
 }
 
 /// The relinker's working directory and arguments from its last run.

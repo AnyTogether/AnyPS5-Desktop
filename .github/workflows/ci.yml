@@ -41,7 +41,8 @@ env:
   # with it; the bundle then needs libpulse0, which PulseAudio and PipeWire systems have.
   LINUX_PACKAGES: clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libsdl2-2.0-0 libpulse-dev libegl-dev libepoxy-dev file
   # libmpv-dev: the in-app clip player (media_kit_video links libmpv); patchelf: the bundle carries
-  # that libmpv and what it needs in lib/ (packaging/linux/bundle-libmpv.sh).
+  # that libmpv and what it needs in lib/ (packaging/linux/bundle-libmpv.sh), and the packaging
+  # takes the build folders out of the plugin libraries' RUNPATHs (packaging/linux/runpaths.sh).
   CLIP_PLAYER_PACKAGES: libmpv-dev patchelf
 
 jobs:
@@ -221,6 +222,11 @@ jobs:
           du -sh build/linux/x64/release/bundle build/linux/x64/release/bundle/lib
           ls build/linux/x64/release/bundle/lib | grep -c . | xargs echo "files in lib/:"
           ls build/linux/x64/release/bundle/lib/libmpv.so.*
+          ls build/linux/x64/release/bundle/lib/licenses/ | grep -c . | xargs echo "licence files in lib/licenses/:"
+          ls build/linux/x64/release/bundle/lib/licenses/libmpv*.txt
+          ls build/linux/x64/release/bundle/lib/licenses/common-licenses/ | grep -c . | xargs echo "long licences in lib/licenses/common-licenses/:"
+          test -f build/linux/x64/release/bundle/lib/licenses/common-licenses/LGPL-2.1
+          test -f build/linux/x64/release/bundle/lib/licenses/common-licenses/GPL-3
       # Ubuntu 24.04 has libmpv.so.2, not the 22.04 build machine's libmpv.so.1: the clip player's
       # plugin and the libmpv it carries have to find everything they link in lib/ or in what a
       # GTK desktop has.
@@ -238,12 +244,54 @@ jobs:
             ldd /bundle/lib/libmpv.so.* | grep -c "/bundle/lib/" | xargs echo "  from the bundle:"
             ldd /bundle/lib/libmpv.so.* | grep -vc "/bundle/lib/" | xargs echo "  from the system:"
           '
-      - name: Package the AppImage, the .deb and the .tar.gz
+      # On pull requests too: a few seconds, and the check after it installs it.
+      - name: Package the .deb
+        run: SKIP_BUILD=1 bash packaging/linux/build-deb.sh
+      # Every ELF file the bundle and the .deb carry looks for libraries only in $ORIGIN-relative
+      # folders inside them, never in the build machine's /home/runner/... (namcap's insecure
+      # RUNPATH). Then the check itself: a library given a build folder, a folder above the
+      # bundle or a relative one has to fail it, and fix has to put it right.
+      - name: Check no RUNPATH in the bundle or the .deb leads out of it
+        run: |
+          rm -rf build/deb-contents && mkdir -p build/deb-contents
+          dpkg-deb -x build/packages/anyps5-desktop_*_amd64.deb build/deb-contents
+          bash packaging/linux/runpaths.sh check build/linux/x64/release/bundle build/deb-contents/opt/anyps5-desktop
+          probe="$(mktemp -d)"
+          mkdir "$probe/lib"
+          for bad in '/home/runner/work/build:$ORIGIN' '$ORIGIN/../..' '../lib'; do
+            cp build/linux/x64/release/bundle/lib/libmedia_kit_video_plugin.so "$probe/lib/"
+            patchelf --set-rpath "$bad" "$probe/lib/libmedia_kit_video_plugin.so"
+            if bash packaging/linux/runpaths.sh check "$probe" >/dev/null 2>&1; then
+              echo "::error::runpaths.sh check let the RUNPATH '$bad' through"
+              exit 1
+            fi
+            bash packaging/linux/runpaths.sh fix "$probe"
+            bash packaging/linux/runpaths.sh check "$probe" >/dev/null
+          done
+          rm -rf "$probe"
+      # The .deb on clean Ubuntu 22.04 and 24.04 with its Depends only: the launcher and every
+      # library it carries have to find all they link (packaging/linux/check-deb.sh).
+      - name: Check the .deb installs and every library resolves on Ubuntu 22.04 and 24.04
+        run: |
+          for image in ubuntu:22.04 ubuntu:24.04; do
+            echo "::group::$image"
+            docker run --rm -v "$PWD/build/packages:/packages:ro" -v "$PWD/packaging/linux:/scripts:ro" \
+              "$image" bash /scripts/check-deb.sh /packages
+            echo "::endgroup::"
+          done
+      - name: Package the AppImage and the .tar.gz
         if: github.event_name != 'pull_request'
         run: |
           SKIP_BUILD=1 bash packaging/linux/build-appimage.sh
-          SKIP_BUILD=1 bash packaging/linux/build-deb.sh
           tar -C build/linux/x64/release -czf build/packages/AnyPS5-Desktop-linux-x64.tar.gz --transform 's#^bundle#AnyPS5-Desktop#' bundle
+      - name: Check no RUNPATH in the AppImage or the .tar.gz leads out of it
+        if: github.event_name != 'pull_request'
+        run: |
+          rm -rf build/package-contents && mkdir -p build/package-contents
+          tar -C build/package-contents -xzf build/packages/AnyPS5-Desktop-linux-x64.tar.gz
+          appimage="$(ls "$PWD"/build/packages/AnyPS5-Desktop-*-x86_64.AppImage)"
+          (cd build/package-contents && "$appimage" --appimage-extract >/dev/null)
+          bash packaging/linux/runpaths.sh check build/package-contents/AnyPS5-Desktop build/package-contents/squashfs-root
       - uses: actions/upload-artifact@v7
         if: github.event_name != 'pull_request'
         with:
@@ -323,6 +371,9 @@ jobs:
           foreach ($dll in "SDL2.dll", "libmpv-2.dll", "libEGL.dll", "libGLESv2.dll", "media_kit_video_plugin.dll") {
             if (-not (Test-Path (Join-Path $release $dll))) { Write-Error "no $dll in $release"; exit 1 }
           }
+          foreach ($licence in "libmpv-LICENSE.txt", "ANGLE-LICENSE.txt") {
+            if (-not (Test-Path (Join-Path $release $licence))) { Write-Error "no $licence in $release"; exit 1 }
+          }
           Get-ChildItem $release -Filter *.dll | Sort-Object Length -Descending | Select-Object -First 8 Name, @{n = "MiB"; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize
       - name: Package the installer (Inno Setup 6)
         if: github.event_name != 'pull_request'
@@ -333,6 +384,20 @@ jobs:
           powershell -ExecutionPolicy Bypass -File packaging\windows\build-installer.ps1 -SkipBuild
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\installer\AnyPS5-Desktop-windows-x64.zip
+      # The installer's contents can only be seen by installing it (7-Zip and innoextract do not read
+      # this Inno Setup): silently, into a temporary folder on the runner.
+      - name: Install the package into a folder and check what it put there
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          $setup = Get-Item build\installer\AnyPS5-Desktop-Setup-*.exe
+          $target = Join-Path $env:RUNNER_TEMP "anyps5-install"
+          $run = Start-Process -FilePath $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$target" -Wait -PassThru
+          if ($run.ExitCode) { Write-Error "the installer ended with $($run.ExitCode)"; exit 1 }
+          foreach ($file in "anyps5_desktop.exe", "SDL2.dll", "SDL2-LICENSE.txt", "libmpv-2.dll", "libmpv-LICENSE.txt", "ANGLE-LICENSE.txt") {
+            if (-not (Test-Path (Join-Path $target $file))) { Write-Error "no $file installed"; exit 1 }
+          }
+          Get-ChildItem $target -Filter *LICENSE* | Select-Object Name, Length | Format-Table -AutoSize
       - uses: actions/upload-artifact@v7
         if: github.event_name != 'pull_request'
         with:

@@ -17,6 +17,7 @@ import 'package:anyps5_desktop/core/font_download.dart';
 import 'package:anyps5_desktop/core/game_library.dart';
 import 'package:anyps5_desktop/core/gamepad/pad_navigation.dart';
 import 'package:anyps5_desktop/core/host.dart';
+import 'package:anyps5_desktop/core/package_install.dart';
 import 'package:anyps5_desktop/core/power.dart';
 import 'package:anyps5_desktop/core/release_signing.dart';
 import 'package:anyps5_desktop/core/capture/wayland_capture.dart';
@@ -172,6 +173,7 @@ Fixture makeFixture({
   Future<String?> Function(String label, List<String> extensions)? pickFile,
   HostSystem system = HostSystem.linux,
   GitHubReleases? launcherReleases,
+  PackageManager? packageManager,
   Future<void> Function(String executable, List<String> arguments)? startDetached,
   void Function(int code)? quit,
   Map<String, String> environment = const {},
@@ -273,6 +275,8 @@ Fixture makeFixture({
       saveFileAs: saveFileAs,
       pickFile: pickFile,
       launcherReleases: launcherReleases,
+      // Not the test machine's own install: a package manager only when a test says so.
+      packageManager: () => packageManager,
       startDetached: startDetached,
       quit: quit,
       window: window,

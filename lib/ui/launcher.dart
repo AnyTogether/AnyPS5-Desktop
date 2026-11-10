@@ -93,7 +93,7 @@ class _LauncherShellState extends State<LauncherShell> {
     return 'look ${model.look.name}${model.solidGlass ? ' solid' : ''}'
         '${model.glassWindow.seeThrough ? ' see-through' : ''} layer ${model.overlay?.name ?? 'home'}'
         '${model.running != null ? ' game running' : ''} ${model.active ? 'in front' : 'behind'}'
-        '${model.windowFullscreen ? ' full screen' : ''}';
+        '${model.windowFullscreen ? ' full screen' : ''} ${ProcessInfo.currentRss >> 20} MB';
   }
 
   void _timings(List<FrameTiming> timings) {

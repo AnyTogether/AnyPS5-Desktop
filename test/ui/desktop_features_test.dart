@@ -28,6 +28,9 @@ class FakeDesktop implements DesktopWindows {
   final List<(String, String?)> noticeCards = [];
   bool canShow = true;
 
+  /// Each desktop notice's title and text.
+  final List<(String, String)> notified = [];
+
   @override
   bool get canShowCard => canShow;
 
@@ -36,6 +39,12 @@ class FakeDesktop implements DesktopWindows {
     calls.add(badge == null ? 'badge-off' : 'badge');
     return true;
   }
+
+  /// How the badge stays out of the picture here: none, unless a test says.
+  BadgeReach reach = BadgeReach.none;
+
+  @override
+  BadgeReach get badgeReach => reach;
 
   @override
   Future<bool> raiseLauncher() async {
@@ -87,6 +96,7 @@ class FakeDesktop implements DesktopWindows {
   @override
   Future<bool> notify(String title, String body, {String? icon}) async {
     calls.add('notify $body');
+    notified.add((title, body));
     return true;
   }
 
