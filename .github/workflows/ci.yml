@@ -41,7 +41,8 @@ env:
   # with it; the bundle then needs libpulse0, which PulseAudio and PipeWire systems have.
   LINUX_PACKAGES: clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libsdl2-2.0-0 libpulse-dev file
   # libmpv-dev: the in-app clip player (media_kit_video links libmpv); patchelf: the bundle carries
-  # that libmpv and what it needs in lib/ (packaging/linux/bundle-libmpv.sh).
+  # that libmpv and what it needs in lib/ (packaging/linux/bundle-libmpv.sh), and the packaging
+  # takes the build folders out of the plugin libraries' RUNPATHs (packaging/linux/runpaths.sh).
   CLIP_PLAYER_PACKAGES: libmpv-dev patchelf
 
 jobs:
@@ -246,6 +247,28 @@ jobs:
       # On pull requests too: a few seconds, and the check after it installs it.
       - name: Package the .deb
         run: SKIP_BUILD=1 bash packaging/linux/build-deb.sh
+      # Every ELF file the bundle and the .deb carry looks for libraries only in $ORIGIN-relative
+      # folders inside them, never in the build machine's /home/runner/... (namcap's insecure
+      # RUNPATH). Then the check itself: a library given a build folder, a folder above the
+      # bundle or a relative one has to fail it, and fix has to put it right.
+      - name: Check no RUNPATH in the bundle or the .deb leads out of it
+        run: |
+          rm -rf build/deb-contents && mkdir -p build/deb-contents
+          dpkg-deb -x build/packages/anyps5-desktop_*_amd64.deb build/deb-contents
+          bash packaging/linux/runpaths.sh check build/linux/x64/release/bundle build/deb-contents/opt/anyps5-desktop
+          probe="$(mktemp -d)"
+          mkdir "$probe/lib"
+          for bad in '/home/runner/work/build:$ORIGIN' '$ORIGIN/../..' '../lib'; do
+            cp build/linux/x64/release/bundle/lib/libmedia_kit_video_plugin.so "$probe/lib/"
+            patchelf --set-rpath "$bad" "$probe/lib/libmedia_kit_video_plugin.so"
+            if bash packaging/linux/runpaths.sh check "$probe" >/dev/null 2>&1; then
+              echo "::error::runpaths.sh check let the RUNPATH '$bad' through"
+              exit 1
+            fi
+            bash packaging/linux/runpaths.sh fix "$probe"
+            bash packaging/linux/runpaths.sh check "$probe" >/dev/null
+          done
+          rm -rf "$probe"
       # The .deb on clean Ubuntu 22.04 and 24.04 with its Depends only: the launcher and every
       # library it carries have to find all they link (packaging/linux/check-deb.sh).
       - name: Check the .deb installs and every library resolves on Ubuntu 22.04 and 24.04
@@ -261,6 +284,14 @@ jobs:
         run: |
           SKIP_BUILD=1 bash packaging/linux/build-appimage.sh
           tar -C build/linux/x64/release -czf build/packages/AnyPS5-Desktop-linux-x64.tar.gz --transform 's#^bundle#AnyPS5-Desktop#' bundle
+      - name: Check no RUNPATH in the AppImage or the .tar.gz leads out of it
+        if: github.event_name != 'pull_request'
+        run: |
+          rm -rf build/package-contents && mkdir -p build/package-contents
+          tar -C build/package-contents -xzf build/packages/AnyPS5-Desktop-linux-x64.tar.gz
+          appimage="$(ls "$PWD"/build/packages/AnyPS5-Desktop-*-x86_64.AppImage)"
+          (cd build/package-contents && "$appimage" --appimage-extract >/dev/null)
+          bash packaging/linux/runpaths.sh check build/package-contents/AnyPS5-Desktop build/package-contents/squashfs-root
       - uses: actions/upload-artifact@v7
         if: github.event_name != 'pull_request'
         with:
