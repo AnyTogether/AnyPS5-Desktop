@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:anyps5_desktop/core/app_update.dart';
 import 'package:anyps5_desktop/core/host.dart';
+import 'package:anyps5_desktop/core/package_install.dart';
+import 'package:anyps5_desktop/core/together/account.dart';
 import 'package:anyps5_desktop/core/update_notice.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
@@ -47,10 +49,15 @@ void main() {
     await github.close();
   });
 
-  AppModel launcher({HostSystem system = HostSystem.windows, Map<String, String> environment = const {}}) {
+  AppModel launcher({
+    HostSystem system = HostSystem.windows,
+    Map<String, String> environment = const {},
+    PackageManager? packageManager,
+  }) {
     fixture = makeFixture(
       system: system,
       environment: environment,
+      packageManager: packageManager,
       launcherReleases: LauncherUpdates.source(api: github.api, keys: [key.key]),
       startDetached: (executable, arguments) async => started.add((executable, arguments)),
       quit: quits.add,
@@ -144,6 +151,79 @@ void main() {
       await model.updates.restartNow();
       expect(started, isEmpty);
       expect(quits, isEmpty);
+    });
+
+    test('a Scoop copy is told the command, never sent the installer (a second copy)', () async {
+      final model = launcher(packageManager: PackageManager.scoop);
+      await model.updates.startupCheck();
+      expect(model.updates.state, const UpdateAvailable(newer), reason: 'still checked');
+      expect(model.updates.asset, isNull);
+      expect(github.downloads, isEmpty, reason: 'nothing downloaded');
+      expect(model.toast, 'AnyPS5 Desktop $newer is out. Update it with scoop update anyps5-desktop');
+      expect(model.updates.showsNotice, isFalse);
+      await model.updates.download();
+      await model.updates.restartNow();
+      model.updates.later();
+      expect(started, isEmpty);
+      expect(quits, isEmpty);
+      expect(github.downloads, isEmpty);
+
+      final row = model.updates.aboutRows().first;
+      expect(row.title, 'AnyPS5 Desktop $newer is out');
+      expect(
+        row.detail,
+        'Installed with Scoop: run scoop update anyps5-desktop to update. Select to copy the command.',
+      );
+      (row.kind as ActionRow).run();
+      expect(fixture!.copied.last, 'scoop update anyps5-desktop');
+      expect(model.toast, 'Command copied: paste it into a terminal');
+
+      await model.updates.check();
+      expect(model.toast, 'AnyPS5 Desktop $newer is out. Update it with scoop update anyps5-desktop');
+    });
+
+    test('a Scoop copy never runs an installer left for the next launch', () async {
+      final model = launcher(packageManager: PackageManager.scoop);
+      final installer = p.join(model.updates.folder, 'AnyPS5-Desktop-Setup-$newer-x64.exe');
+      File(installer)
+        ..parent.createSync(recursive: true)
+        ..writeAsBytesSync([0x4D, 0x5A]);
+      LauncherUpdates.writePending(model.updates.folder, newer, installer);
+      expect(await model.updates.applyPendingAtLaunch(), isFalse);
+      expect(started, isEmpty);
+    });
+
+    test('an Arch package is told to update with the package manager', () async {
+      final model = launcher(system: HostSystem.linux, packageManager: PackageManager.pacman);
+      await model.updates.startupCheck();
+      expect(model.updates.state, const UpdateAvailable(newer));
+      expect(github.downloads, isEmpty, reason: 'not the archive either');
+      expect(model.toast, 'AnyPS5 Desktop $newer is out. Update it with your package manager.');
+      final row = model.updates.aboutRows().first;
+      expect(row.title, 'AnyPS5 Desktop $newer is out');
+      expect(row.detail, 'Installed by your package manager, which keeps it up to date.');
+      expect(row.kind, isA<InfoRow>());
+    });
+
+    test('a package manager\'s copy follows Stable, with no Update Channel row', () async {
+      final model = launcher(packageManager: PackageManager.scoop);
+      model.preferences.updateChannel = 'nightly';
+      github.releases.add(
+        signed(FakeRelease('v9.0.1-nightly.20261109.1', release('9.0.1-nightly.20261109.1').files, prerelease: true), [
+          key,
+        ]),
+      );
+      await model.updates.check(quiet: true);
+      expect(model.updates.latest!.version, newer, reason: 'the release Scoop gets');
+      expect(model.updates.channelRow(), isNull);
+    });
+
+    test('Update Required on a Scoop copy shows the command instead of a download', () async {
+      final model = launcher(packageManager: PackageManager.scoop);
+      await model.updates.check(quiet: true);
+      final rows = model.updates.requiredRows(const ClientTooOld(minimum: '9.0.0', current: '0.1.0'));
+      expect(rows.map((row) => row.id), ['required-why', 'required-update', 'required-later']);
+      expect(rows[1].detail, contains('scoop update anyps5-desktop'));
     });
 
     test('back in front after half an hour it asks again; sooner it does not', () async {

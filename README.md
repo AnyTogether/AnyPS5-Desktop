@@ -45,9 +45,11 @@ scoop bucket add anytogether https://github.com/AnyTogether/scoop-bucket
 scoop install anytogether/anyps5-desktop
 ```
 
-Update it with `scoop update anyps5-desktop`. The launcher's own update offer runs the installer,
-which puts a second copy in `%LOCALAPPDATA%\Programs\AnyPS5 Desktop`, so with Scoop turn off
-**Settings → Behaviour → Check for updates**.
+Update it with `scoop update anyps5-desktop`. The launcher sees that Scoop installed it: it still
+says when a new version is out, with that command (Settings › About copies it), and never downloads
+or runs the installer itself. Version 0.1.20 and earlier do not: on those, turn off **Settings →
+Behaviour → Check for updates**, since their update puts a second copy in
+`%LOCALAPPDATA%\Programs\AnyPS5 Desktop`.
 
 **Windows with winget** (the installer; pending review in
 [microsoft/winget-pkgs#476211](https://github.com/microsoft/winget-pkgs/pull/476211), so it works
@@ -61,7 +63,8 @@ The launcher's own updates run the same installer, so winget and the launcher ke
 
 **Arch Linux:** the `anyps5-desktop-bin` package (the release's `.deb`, repacked) is in
 [AnyTogether/linux-packages](https://github.com/AnyTogether/linux-packages). It is not on the AUR
-yet. Build it from there with `makepkg -si` in `aur/anyps5-desktop-bin`.
+yet. Build it from there with `makepkg -si` in `aur/anyps5-desktop-bin`. The launcher sees that
+pacman owns it: it says when a new version is out and leaves the update to the package manager.
 
 The Scoop manifest and the Arch package follow the latest stable release by themselves: a
 scheduled workflow in each repository moves them within six hours of a release.
@@ -103,6 +106,8 @@ scheduled workflow in each repository moves them within six hours of a release.
     `desktop/file_types.dart` `.anyps5theme` registered for the zip, the AppImage and the archive
   - `update_channel.dart` Settings › About › Update Channel (Stable or Nightly) and the macOS
     launcher's order of versions, a nightly before the release it leads to
+  - `package_install.dart` whether Scoop or pacman installed this copy (a Scoop app folder, or a
+    file pacman's database lists): the launcher's own update then only says a new version is out
   - `audio/` the interface sounds (the macOS launcher's tones, synthesized sample for sample),
     a game's theme song (`snd0.at9` decoded with LibAtrac9 through FFI) and the music's fades
   - `capture/` the game's picture and sound sent somewhere: Remote Play to the phone (the

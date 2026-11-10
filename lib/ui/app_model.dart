@@ -49,6 +49,7 @@ import '../core/gyro_aiming.dart';
 import '../core/host.dart';
 import '../core/installer.dart';
 import '../core/library_watch.dart';
+import '../core/package_install.dart';
 import '../core/power.dart';
 import '../core/prepare_queue.dart';
 import '../core/relinker_flags.dart';
@@ -1072,6 +1073,7 @@ class LauncherServices {
     this.talkKeys,
     this.engineReleases,
     this.launcherReleases,
+    this.packageManager,
     this.hostGlibc,
     this.audio,
     this.decodeSong,
@@ -1229,6 +1231,10 @@ class LauncherServices {
   /// Where AnyPS5 Desktop's own releases are read from (GitHub, signed); none in tests without a
   /// fake.
   final GitHubReleases? launcherReleases;
+
+  /// The package manager that installed this copy (Scoop, pacman) or null; looked for on the
+  /// computer by default (PackageInstall.detect).
+  final PackageManager? Function()? packageManager;
 
   /// Party voice's microphone and connections; flutter_webrtc by default.
   final VoiceEngine Function()? voiceEngine;
@@ -5873,7 +5879,7 @@ class AppModel extends ChangeNotifier {
             kind: InfoRow(kit == null ? '—' : EngineModel.label(kit)),
           ),
           ...updates.aboutRows(),
-          updates.channelRow(),
+          ?updates.channelRow(),
           PanelRow(id: 'author', title: T.text('madeBy'), kind: const InfoRow('Utku Halis')),
           PanelRow(
             id: 'github',
