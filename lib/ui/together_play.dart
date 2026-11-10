@@ -381,7 +381,7 @@ extension TogetherPlay on TogetherModel {
     final offer = PlayTogetherOffer.fromSession(session);
     togetherOffers = [...togetherOffers.where((known) => known.sessionId != offer.sessionId), offer];
     disturbingSound();
-    app.vibrate(HapticCue.ring);
+    inviteRing();
     final text = T.format('togetherOffer', [offer.hostName, gameName(offer.titleId)]);
     app.show(text);
     // A game in front hears of it over the game, unless the user asked not to be disturbed.

@@ -108,7 +108,7 @@ class TogetherModel {
     );
     hub.games.onInvite = (invite) {
       disturbingSound();
-      app.vibrate(HapticCue.ring);
+      inviteRing();
       final text = T.format('gameInvitedYou', [invite.from?.displayName ?? '', gameName(invite.titleId)]);
       app.show(text);
       if (!doNotDisturb) {
@@ -772,6 +772,14 @@ class TogetherModel {
     if (!doNotDisturb) _noticeSound();
   }
 
+  /// A game invite, a party invite or a Play Together offer: the ring on the controller, none on
+  /// Do Not Disturb, as on the Mac. Asked whether or not the launcher is in front: the pulse
+  /// itself stays still behind a game or another window, and with Controller Vibration off
+  /// (the haptics' own gate), as every pulse does. A call rings on its own, as before.
+  void inviteRing() {
+    if (!doNotDisturb) app.vibrate(HapticCue.ring);
+  }
+
   void _welcome(TogetherUser user) {
     code = '';
     app.sounds.play(Cue.select);
@@ -1429,7 +1437,7 @@ class TogetherModel {
       case 'party.invite':
         final from = data['from'];
         disturbingSound();
-        app.vibrate(HapticCue.ring);
+        inviteRing();
         final text = T.format('partyInvitedYou', [
           from is Map<String, dynamic> ? (from['displayName'] as String?) ?? '' : '',
         ]);
