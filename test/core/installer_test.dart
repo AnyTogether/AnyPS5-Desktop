@@ -278,7 +278,7 @@ void main() {
       expect(Directory(p.join(root, GameLibrary.storeName, 'Work')).existsSync(), isFalse);
       expect(Directory('$installed-other.partial').existsSync(), isFalse);
       expect(Directory(installed).existsSync(), isTrue);
-      Installer.uninstall(game, root);
+      await Installer.uninstall(game, root);
       expect(Directory(installed).existsSync(), isFalse);
       expect(
         File(p.join(game.folder, 'data', 'level1.bin')).readAsStringSync(),
@@ -559,6 +559,38 @@ void main() {
       expect(Directory(partial).existsSync(), isFalse);
     });
 
+    // Issue 55: Uninstall deleted the whole game in one piece, and Windows called the launcher
+    // not responding while it went.
+    test('uninstalling a big game lets the screen go on', () async {
+      final game = makeGame();
+      final installed = await Installer(game: game, toolkit: Toolkit(toolkitFolder), root: root).run();
+      for (var index = 0; index < 1500; index++) {
+        File(p.join(installed, '_data', 'data${index % 30}', 'file$index.bin'))
+          ..createSync(recursive: true)
+          ..writeAsStringSync('written by the game');
+      }
+      final games = Directory(p.dirname(installed));
+      final ticks = await ticksDuring(() {
+        final gone = Installer.uninstall(game, root);
+        expect(Directory(installed).existsSync(), isFalse, reason: 'not installed from the moment it is asked');
+        return gone;
+      });
+      expect(ticks, greaterThan(0));
+      expect(
+        games.listSync().where((entry) => entry.path.startsWith(installed)),
+        isEmpty,
+        reason: 'what was set aside is gone too',
+      );
+      final kept = Installer.keptRelink(game, root);
+      final relinked = Directory(p.dirname(kept));
+      if (relinked.existsSync()) expect(relinked.listSync().where((entry) => entry.path.startsWith(kept)), isEmpty);
+      expect(
+        File(p.join(game.folder, 'data', 'level1.bin')).readAsStringSync(),
+        'level data',
+        reason: 'the dump stays',
+      );
+    });
+
     test('measuring a dump to copy lets the screen go on', () async {
       final source = Directory(p.join(temp.path, 'dump'))..createSync();
       for (var index = 0; index < 1500; index++) {
@@ -647,7 +679,7 @@ void main() {
       expect(File(p.join(game.folder, 'data', 'level1.bin')).readAsStringSync(), 'level data');
       await Installer(game: game, toolkit: Toolkit(toolkitFolder), root: root).run();
       expect(FileSystemEntity.typeSync(level, followLinks: false), FileSystemEntityType.link);
-      Installer.uninstall(game, root);
+      await Installer.uninstall(game, root);
       expect(Directory(installed).existsSync(), isFalse);
       expect(File(p.join(game.folder, 'data', 'level1.bin')).readAsStringSync(), 'level data');
       expect(File(p.join(game.folder, 'eboot.bin')).readAsBytesSync(), typicalSelf());

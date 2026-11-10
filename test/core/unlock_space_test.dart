@@ -223,7 +223,7 @@ void main() {
       await Installer(game: game, toolkit: Toolkit(toolkitFolder), root: root).run();
       expect(relinkerRan(), isTrue);
 
-      Installer.uninstall(game, root);
+      await Installer.uninstall(game, root);
       expect(Directory(kept).existsSync(), isFalse, reason: 'uninstall removes the kept output');
     });
 
