@@ -177,6 +177,7 @@ class Preferences {
     ..powerProfiles = json['powerProfiles'] is Map<String, dynamic>
         ? json['powerProfiles'] as Map<String, dynamic>
         : null
+    ..heatReader = json['heatReader'] == true
     ..screenshotsFolder = json['screenshotsFolder'] as String?
     ..showHiddenTrophies = json['showHiddenTrophies'] as bool? ?? false
     ..controllerVibration = json['controllerVibration'] as bool? ?? true
@@ -334,6 +335,10 @@ class Preferences {
   /// "powerProfiles"); null for the defaults.
   Map<String, dynamic>? powerProfiles;
 
+  /// Settings › Battery & Heat › Read the processor's temperature (Windows): the reader with
+  /// administrator rights starts with the launcher. Off again when Windows' prompt is turned down.
+  bool heatReader = false;
+
   /// Settings › Captures › Screenshots Folder: where F12 screenshots, trophy pictures and clips
   /// go; null for Pictures/AnyPS5 (AppPaths.pictures).
   String? screenshotsFolder;
@@ -454,6 +459,7 @@ class Preferences {
     'syncFolder': syncFolder,
     'syncThrough': syncThrough,
     'powerProfiles': powerProfiles,
+    if (heatReader) 'heatReader': true,
     'screenshotsFolder': screenshotsFolder,
     'showHiddenTrophies': showHiddenTrophies,
     'controllerVibration': controllerVibration,
