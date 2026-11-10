@@ -443,7 +443,11 @@ use those once changed in the game.
   `anyps5-desktop_<version>_amd64.deb` (`/opt/anyps5-desktop`, `/usr/bin/anyps5-desktop`).
   Build them on Ubuntu 22.04 so they run on glibc 2.34 and newer; GTK 3 comes from the system.
   Both bring the `application/x-anyps5theme` MIME type (`anyps5-desktop-mime.xml`), which the
-  desktop entry opens.
+  desktop entry opens. The .deb's Depends are the packages of every library the bundle links
+  (SDL2's X11, Wayland and ALSA ones too), by their 22.04 names with 24.04's t64 names as
+  alternatives. A library the build machine has no package for stops the build. CI installs it
+  on clean Ubuntu 22.04 and 24.04 with nothing else and checks every library resolves
+  (`packaging/linux/check-deb.sh`).
 - The clip player (media_kit, libmpv): on Windows `libmpv-2.dll` and ANGLE come from
   media_kit_libs_windows_video and sit beside the launcher. On Linux the build needs
   `libmpv-dev` and `patchelf`; `packaging/linux/bundle-libmpv.sh` (run by the install step)
