@@ -39,11 +39,11 @@ body:
     id: error
     attributes:
       label: Uncaught error
-      description: The first error the launcher's code did not catch in that run, with where it happened.
+      description: What Windows Error Reporting or Linux's core dump kept of how that run ended (or that it kept nothing), then the first error the launcher's code did not catch in that run, with where it happened.
       render: text
   - type: textarea
     id: log
     attributes:
       label: Last seconds
-      description: A line a second before it happened - frames drawn, how long they took (build and raster, average/90th percentile/worst in ms) and what was on screen. When the link had no room for every line, the launcher put the whole report on the clipboard - paste it in a comment.
+      description: A line a second before it happened - frames drawn, how long they took (build and raster, average/90th percentile/worst in ms) what was on screen and the launcher's memory. When the link had no room for every line, the launcher put the whole report on the clipboard - paste it in a comment.
       render: text

@@ -2042,6 +2042,10 @@ class AppModel extends ChangeNotifier {
   /// Called once that report was sent or put aside (problem.json goes).
   void Function()? onLauncherProblemDone;
 
+  /// The problem with what Windows or Linux kept of how that run ended (LauncherHealth.lookAgain),
+  /// read when the report is sent.
+  Future<LauncherProblem> Function(LauncherProblem problem)? lookAgainLauncherProblem;
+
   /// The first error this run's code did not catch, with its stack, for a report.
   String? firstError;
 
@@ -2066,9 +2070,10 @@ class AppModel extends ChangeNotifier {
 
   /// Opens the pre-filled GitHub issue; nothing is sent until the user submits it there.
   Future<void> sendLauncherReport() async {
-    final problem = launcherProblem;
-    if (problem == null) return;
+    final unread = launcherProblem;
+    if (unread == null) return;
     _launcherProblemDone();
+    final problem = await lookAgainLauncherProblem?.call(unread) ?? unread;
     final system = await crash.systemInfo();
     final privacy = crash.privacy();
     final draft = IssueDraft.launcherProblem(problem, system: system, privacy: privacy);

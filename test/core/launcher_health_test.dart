@@ -46,6 +46,71 @@ void main() {
     expect(run(500).start(), isNull);
   });
 
+  group('what the system kept of how the run ended', () {
+    test(
+      'a crash keeps its process and start; sending looks for the system\'s report once, first in the error',
+      () async {
+        final first = run(100)..start(now: DateTime.utc(2026, 11, 9, 4));
+        expect(first.pid, 100);
+        final problem = run(200).start()!;
+        expect(problem.pid, 100);
+        expect(problem.started, DateTime.utc(2026, 11, 9, 4));
+        expect(LauncherProblem.fromJson(problem.toJson()).pid, 100, reason: 'kept in problem.json');
+        expect(LauncherHealth.needsSystemReport(problem), isTrue);
+        final asked = <String>[];
+        final health = LauncherHealth(
+          folder,
+          version: '0.1.12',
+          platform: 'Windows',
+          pid: 300,
+          alive: (_) => false,
+          systemReport: (started, pid) async {
+            asked.add('$pid ${started.toIso8601String()}');
+            return 'System crash report (Windows Error Reporting):\n  Exception Code: c0000005';
+          },
+        );
+        final told = await health.lookAgain(problem.copyWith(error: 'Bad state: No element'));
+        expect(asked, ['100 2026-11-09T04:00:00.000Z']);
+        expect(
+          told.error,
+          'System crash report (Windows Error Reporting):\n  Exception Code: c0000005\n\nBad state: No element',
+        );
+        expect(await health.lookAgain(told), same(told), reason: 'looked for once');
+        expect(asked, hasLength(1));
+        final recovered = LauncherProblem(
+          kind: LauncherProblemKind.hang,
+          at: DateTime.utc(2026, 11, 9, 4),
+          version: '0.1.12',
+          platform: 'Windows',
+          stalledFor: const Duration(seconds: 6),
+          recovered: true,
+          pid: 100,
+          started: DateTime.utc(2026, 11, 9, 4),
+        );
+        expect(await health.lookAgain(recovered), same(recovered), reason: 'a stall it came out of ended no run');
+      },
+    );
+
+    test('a stall the run never came out of keeps its process too', () {
+      run(100).start(now: DateTime.utc(2026, 11, 9, 4));
+      File(p.join(folder, 'problem.json')).writeAsStringSync(
+        jsonEncode(
+          LauncherProblem(
+            kind: LauncherProblemKind.hang,
+            at: DateTime.utc(2026, 11, 9, 4, 10),
+            version: '0.1.12',
+            platform: 'Windows',
+            stalledFor: const Duration(seconds: 8),
+          ).toJson(),
+        ),
+      );
+      final problem = run(200).start()!;
+      expect(problem.kind, LauncherProblemKind.hang);
+      expect(problem.pid, 100);
+      expect(LauncherHealth.needsSystemReport(problem), isTrue);
+    });
+  });
+
   group('closing', () {
     test('with the runner taking the marker away after a clean close: the marker says closing until then', () {
       final first = run(100)..start(now: DateTime.utc(2026, 10, 30, 1));
