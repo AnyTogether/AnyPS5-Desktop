@@ -3622,7 +3622,7 @@ class AppModel extends ChangeNotifier {
     try {
       await gone;
     } finally {
-      _removals.remove(game.id);
+      _removals.removeWhere((id, _) => id == game.id);
     }
   }
 
