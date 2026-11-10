@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:path/path.dart' as p;
 
 import '../core/power_profiles.dart';
+import '../core/windows_heat.dart';
 import 'app_model.dart';
 import 'engine_model.dart';
 import 'strings.dart';
@@ -12,7 +14,10 @@ import 'theme.dart';
 /// Settings › Battery & Heat at work: the power read every few seconds, the policy
 /// (core/power_profiles.dart) fed with it, and what it decides handed on: the running game hears
 /// of it through EngineControl's file, the launcher dims its effects, and a note shows over the
-/// game when it runs hot. The macOS launcher's PowerWatch.
+/// game when it runs hot. The macOS launcher's PowerWatch. On Windows the heat also needs the
+/// reader with administrator rights where nothing else gives the processor's (windows_heat.dart):
+/// started when the user turns it on (or turns on the heat profile without it), and with each
+/// launch after that until it is turned off or Windows' prompt is turned down.
 class PowerModel {
   PowerModel(this.app);
 
@@ -23,7 +28,10 @@ class PowerModel {
 
   // What tests replace.
 
-  late PowerReading Function() read = PowerReader.current;
+  late PowerReading Function() read = () => PowerReader.current(gaming: app.running != null);
+
+  /// The heat on Windows beyond the reading: null elsewhere.
+  late WindowsHeatSource? windowsHeat = Platform.isWindows ? WindowsHeat.instance : null;
 
   /// The fastest display's refresh rate in hertz, null when the system does not say.
   late int? Function() displayHertz = _displayHertz;
@@ -49,6 +57,9 @@ class PowerModel {
   /// The file the running game reads its frame cap and frame generation pause from.
   String get controlFile => p.join(p.dirname(app.paths.toolkits), 'Power', 'control.txt');
 
+  /// The file that tells the reader with administrator rights to end.
+  String get readerStopFile => p.join(p.dirname(controlFile), 'heat-reader.stop');
+
   PowerProfiles get profiles => PowerProfiles.fromJson(app.preferences.powerProfiles);
 
   PowerAdjustment get adjustment => policy.adjustment;
@@ -67,6 +78,8 @@ class PowerModel {
     policy.profiles = profiles;
     take();
     _timer = Timer.periodic(interval, (_) => take());
+    // Turned on before: Windows asks again, once, as the launcher starts.
+    if (app.preferences.heatReader && readerOffered) unawaited(_startReader());
   }
 
   void stop() {
@@ -99,11 +112,50 @@ class PowerModel {
   }
 
   void setProfiles(PowerProfiles next) {
+    // On Windows, turning the heat profile on asks for the processor's temperature too.
+    final askReader = !profiles.hot.on && next.hot.on && !app.preferences.heatReader && readerOffered;
     app.preferences.powerProfiles = next.isDefault ? null : next.toJson();
     app.savePreferences();
     final before = policy.adjustment;
     policy.profiles = next;
     _report(before, becameHot: false);
+    app.refresh();
+    if (askReader) unawaited(setReader(true));
+  }
+
+  /// Whether Settings offers the reader with administrator rights: on Windows, where no thermal
+  /// zone is read without them (or the reader is already on).
+  bool get readerOffered {
+    final heat = windowsHeat;
+    if (heat == null) return false;
+    return !heat.zonesWithoutAdmin || heat.readerState != HeatReaderState.off;
+  }
+
+  HeatReaderState get readerState => windowsHeat?.readerState ?? HeatReaderState.off;
+
+  /// The reader turned on (Windows asks for administrator rights) or off.
+  Future<void> setReader(bool on) async {
+    app.preferences.heatReader = on;
+    app.savePreferences();
+    if (on) {
+      await _startReader();
+    } else {
+      windowsHeat?.stopReader(stopFile: readerStopFile);
+      take();
+    }
+  }
+
+  Future<void> _startReader() async {
+    final heat = windowsHeat;
+    if (heat == null) return;
+    final started = heat.startReader(stopFile: readerStopFile);
+    app.refresh();
+    if (!await started && heat.readerState == HeatReaderState.declined) {
+      // Turned down: not asked again until the user turns it on again.
+      app.preferences.heatReader = false;
+      app.savePreferences();
+    }
+    take();
     app.refresh();
   }
 
@@ -123,6 +175,8 @@ class PowerModel {
       minutesLeft,
       reading.thermal,
       reading.lowPowerMode,
+      readerState,
+      windowsHeat?.graphicsFound,
       policy.mode,
       policy.canUndo,
       now,
@@ -176,7 +230,12 @@ class PowerModel {
     ]);
   }
 
+  /// Whether the heat profile can hold here: the heat is read, or on a Windows laptop the
+  /// graphics card's is, while a game runs.
+  bool get heatKnown => reading.readsHeat || (windowsHeat?.graphicsFound ?? false);
+
   String get thermalLine => switch (reading.thermal) {
+    null when heatKnown => T.text('powerThermalInGames'),
     null => T.text('powerNoHeat'),
     ThermalLevel.nominal => T.text('powerThermalNominal'),
     ThermalLevel.fair => T.text('powerThermalFair'),
@@ -246,11 +305,11 @@ class PowerModel {
       ),
       PanelRow(id: 'hotSection', title: T.text('powerSectionHot'), kind: const InfoRow('')),
       // Where the heat cannot be read, the heat profile would never hold: said instead.
-      if (!reading.readsHeat)
+      if (!heatKnown)
         PanelRow(
           id: 'hotUnavailable',
           title: T.text('powerHeatUnavailable'),
-          detail: T.text('powerHeatUnavailableDetail'),
+          detail: T.text(windowsHeat == null ? 'powerHeatUnavailableDetail' : 'powerHeatUnavailableWindowsDetail'),
           kind: const InfoRow(''),
         )
       else
@@ -258,11 +317,31 @@ class PowerModel {
           'hot',
           current.hot,
           title: 'powerHotProfile',
-          detail: 'powerHotProfileDetail',
+          detail: windowsHeat == null ? 'powerHotProfileDetail' : 'powerHotProfileWindowsDetail',
           set: (profile) => setProfiles(current.copyWith(hot: profile)),
+        ),
+      if (readerOffered)
+        PanelRow(
+          id: 'hotReader',
+          title: T.text('powerHeatReader'),
+          detail: [T.text('powerHeatReaderDetail'), if (readerLine case final String line) line].join('\n'),
+          kind: ToggleRow(
+            app.preferences.heatReader || readerState == HeatReaderState.asking,
+            (value) => unawaited(setReader(value)),
+          ),
         ),
     ];
   }
+
+  /// Where the reader is, null while it is off.
+  String? get readerLine => switch (readerState) {
+    HeatReaderState.off => null,
+    HeatReaderState.asking => T.text('powerHeatReaderAsking'),
+    HeatReaderState.running => T.text('powerHeatReaderRunning'),
+    HeatReaderState.empty => T.text('powerHeatReaderEmpty'),
+    HeatReaderState.declined => T.text('powerHeatReaderDeclined'),
+    HeatReaderState.stopped => T.text('powerHeatReaderStopped'),
+  };
 
   List<PanelRow> _profileRows(
     String id,

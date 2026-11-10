@@ -32,6 +32,40 @@ Japanese, Hindi, Bengali, Bhojpuri, Arabic and Urdu, one JSON file each in `asse
 and Urdu read right to left, but the screens are not mirrored yet. A new language is one more
 file there, no code: see [TRANSLATING.md](TRANSLATING.md).
 
+## Install
+
+Every [release](https://github.com/AnyTogether/AnyPS5-Desktop/releases/latest) has the Windows
+installer (`AnyPS5-Desktop-Setup-<version>-x64.exe`, per user, no administrator rights), a
+portable Windows zip, an AppImage, a `.deb` and a `.tar.gz`, with `SHA256SUMS` and its signature.
+
+**Windows with [Scoop](https://scoop.sh)** (the portable zip, with a Start menu shortcut):
+
+```powershell
+scoop bucket add anytogether https://github.com/AnyTogether/scoop-bucket
+scoop install anytogether/anyps5-desktop
+```
+
+Update it with `scoop update anyps5-desktop`. The launcher's own update offer runs the installer,
+which puts a second copy in `%LOCALAPPDATA%\Programs\AnyPS5 Desktop`, so with Scoop turn off
+**Settings → Behaviour → Check for updates**.
+
+**Windows with winget** (the installer; pending review in
+[microsoft/winget-pkgs#476211](https://github.com/microsoft/winget-pkgs/pull/476211), so it works
+once that is merged):
+
+```powershell
+winget install AnyTogether.AnyPS5Desktop
+```
+
+The launcher's own updates run the same installer, so winget and the launcher keep one copy.
+
+**Arch Linux:** the `anyps5-desktop-bin` package (the release's `.deb`, repacked) is in
+[AnyTogether/linux-packages](https://github.com/AnyTogether/linux-packages). It is not on the AUR
+yet. Build it from there with `makepkg -si` in `aur/anyps5-desktop-bin`.
+
+The Scoop manifest and the Arch package follow the latest stable release by themselves: a
+scheduled workflow in each repository moves them within six hours of a release.
+
 ## Layout
 
 - `lib/core/` platform-independent logic in pure Dart (no Flutter), unit tested:
