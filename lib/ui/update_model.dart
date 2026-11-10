@@ -7,6 +7,7 @@ import '../core/app_update.dart';
 import '../core/audio/tones.dart';
 import '../core/gamepad/feel.dart' show HapticCue;
 import '../core/host.dart';
+import '../core/package_install.dart';
 import '../core/toolkit_download.dart';
 import '../core/update_channel.dart';
 import '../core/update_notice.dart';
@@ -21,7 +22,8 @@ import 'together_model.dart' show launcherVersion;
 /// Behaviour › Check for updates is on); a newer one is
 /// downloaded quietly and checked against the release's signature, then a quiet notice on the
 /// home screen offers Restart Now and Later (the next launch). Settings › About shows where it
-/// stands.
+/// stands. A copy a package manager installed (Scoop, pacman) is that package manager's to
+/// update: a newer release is said, with how to get it, and nothing is downloaded.
 class LauncherUpdateModel {
   LauncherUpdateModel(this.app);
 
@@ -70,8 +72,37 @@ class LauncherUpdateModel {
 
   bool get _appImage => _appImagePath != null;
 
-  /// The newest release's file for this system.
-  ReleaseAsset? get asset => latest == null ? null : LauncherUpdates.assetFor(latest!, app.system, appImage: _appImage);
+  /// The package manager that installed this copy, looked for once.
+  late final PackageManager? managedBy =
+      (app.services.packageManager ??
+      () => PackageInstall.detect(app.system, environment: app.services.environment ?? Platform.environment))();
+
+  /// The newest release's file for this system; none for a package manager's copy.
+  ReleaseAsset? get asset =>
+      latest == null || managedBy != null ? null : LauncherUpdates.assetFor(latest!, app.system, appImage: _appImage);
+
+  /// What the toast says of [version] for a package manager's copy: the command, or the package
+  /// manager.
+  String _managedNews(String version) => switch (managedBy?.command) {
+    final command? => T.format('desktopUpdateWithCommand', [version, command]),
+    null => T.format('desktopUpdateWithPackageManager', [version]),
+  };
+
+  /// About's row for a package manager's copy: how it updates, and the command copied on select.
+  PanelRow _managedRow(String id, String version) {
+    final command = managedBy?.command;
+    return PanelRow(
+      id: id,
+      title: T.format('desktopUpdateOut', [version]),
+      detail: command == null ? T.text('desktopUpdatePackageDetail') : T.format('desktopUpdateScoopDetail', [command]),
+      kind: command == null
+          ? const InfoRow('')
+          : ActionRow(() {
+              app.services.copyText?.call(command);
+              app.show(T.text('padCopied'));
+            }),
+    );
+  }
 
   /// Where downloads are kept.
   String get folder => p.join(app.paths.cache, 'Updates');
@@ -106,12 +137,14 @@ class LauncherUpdateModel {
     try {
       // Stable: the release GitHub calls latest. Nightly: the newest signed one for this system
       // of the recent ones, pre-releases too, in the order releases come out.
-      latest = app.updateChannel == UpdateChannel.nightly
+      // A package manager's copy follows Stable, the releases the package manager gets.
+      latest = app.updateChannel == UpdateChannel.nightly && managedBy == null
           ? LauncherUpdates.newestNightly(await source.all(), app.system, appImage: _appImage)
           : await source.latest();
       lastCheck = DateTime.now();
       if (!quiet) {
         app.show(switch (available) {
+          true when managedBy != null => _managedNews(latest!.version),
           true => T.format('desktopUpdateAvailable', [latest!.version]),
           false when ChannelReleases.stays(app.updateChannel, current) => T.format('updateChannelStays', [current]),
           false => T.format('desktopUpToDate', [current]),
@@ -142,7 +175,8 @@ class LauncherUpdateModel {
   }
 
   /// A quiet look; a newer release with a file for this system is downloaded at once (its
-  /// notice comes once it is ready), one without is said once.
+  /// notice comes once it is ready), one without (or any, for a package manager's copy) is said
+  /// once.
   Future<void> periodicCheck({bool first = false}) async {
     // Settings › Behaviour › Check for updates off: only Check for Updates Now asks.
     if (!app.preferences.checkUpdates) return;
@@ -150,7 +184,11 @@ class LauncherUpdateModel {
     await check(quiet: true);
     if (!available) return;
     if (asset == null) {
-      if (first || before != latest!.version) app.show(T.format('desktopUpdateAvailable', [latest!.version]));
+      if (first || before != latest!.version) {
+        app.show(
+          managedBy != null ? _managedNews(latest!.version) : T.format('desktopUpdateAvailable', [latest!.version]),
+        );
+      }
       return;
     }
     if (_ready == null && received == null) await download(quiet: true);
@@ -281,9 +319,10 @@ class LauncherUpdateModel {
   }
 
   /// At launch, before the window: an installer left by Later runs now (silently, opening the
-  /// launcher again after it) and this launcher quits. True when it did.
+  /// launcher again after it) and this launcher quits. True when it did. Never for a package
+  /// manager's copy, which would get a second copy beside it.
   Future<bool> applyPendingAtLaunch() async {
-    if (app.system != HostSystem.windows) return false;
+    if (app.system != HostSystem.windows || managedBy != null) return false;
     final installer = LauncherUpdates.takePending(folder, current);
     if (installer == null) return false;
     try {
@@ -336,6 +375,7 @@ class LauncherUpdateModel {
           detail: T.text('desktopUpdateLaterDetail'),
           kind: ActionRow(() => unawaited(restartNow())),
         ),
+        UpdateAvailable(:final version) when managedBy != null => _managedRow('desktopUpdate', version),
         UpdateAvailable(:final version) when file != null => PanelRow(
           id: 'desktopUpdate',
           title: T.format('desktopUpdateTo', [version]),
@@ -373,19 +413,22 @@ class LauncherUpdateModel {
     ].nonNulls.toList();
   }
 
-  /// Settings › About › Update Channel: Stable or Nightly, as on the Mac.
-  PanelRow channelRow() => PanelRow(
-    id: 'updateChannel',
-    title: T.text('updateChannel'),
-    detail: T.text(
-      app.updateChannel == UpdateChannel.nightly ? 'updateChannelNightlyDetail' : 'updateChannelStableDetail',
-    ),
-    kind: ChoiceRow(
-      [T.text('channelStable'), T.text('channelNightly')],
-      app.updateChannel.index,
-      (index) => app.setUpdateChannel(UpdateChannel.values[index]),
-    ),
-  );
+  /// Settings › About › Update Channel: Stable or Nightly, as on the Mac. None for a package
+  /// manager's copy, which gets the stable releases.
+  PanelRow? channelRow() => managedBy != null
+      ? null
+      : PanelRow(
+          id: 'updateChannel',
+          title: T.text('updateChannel'),
+          detail: T.text(
+            app.updateChannel == UpdateChannel.nightly ? 'updateChannelNightlyDetail' : 'updateChannelStableDetail',
+          ),
+          kind: ChoiceRow(
+            [T.text('channelStable'), T.text('channelNightly')],
+            app.updateChannel.index,
+            (index) => app.setUpdateChannel(UpdateChannel.values[index]),
+          ),
+        );
 
   /// Update Required (AnyTogether's client_too_old): why, the update where it stands (the same
   /// download and restart as About) or the downloads page, and Later.
@@ -404,6 +447,7 @@ class LauncherUpdateModel {
         detail: T.text('desktopUpdateLaterDetail'),
         kind: ActionRow(() => unawaited(restartNow())),
       ),
+      UpdateAvailable(:final version) when managedBy != null => _managedRow('required-update', version),
       UpdateAvailable(:final version) when file != null => PanelRow(
         id: 'required-update',
         title: T.format('desktopUpdateTo', [version]),
