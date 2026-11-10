@@ -2,15 +2,47 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:math' show max;
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
 import 'desktop.dart';
+import 'layer_overlay.dart';
 import 'window_backdrop.dart';
 
 /// Which kind of Linux desktop session this is.
 enum LinuxSession { x11, wayland, none }
+
+/// How a card goes over the game on a Linux desktop.
+enum LinuxCardWay {
+  /// X11: an override-redirect window of the launcher's own.
+  x11Window,
+
+  /// Wayland with wlr-layer-shell (KDE Plasma, Sway, Hyprland): a surface on the overlay layer.
+  layerShell,
+
+  /// Wayland without it (GNOME), or no display: the system notification.
+  notification,
+}
+
+/// X11 draws its own windows (once Xlib loads); Wayland needs the compositor's layer shell and
+/// gtk-layer-shell, which the runner looked for ([layerShellScale]).
+LinuxCardWay linuxCardWay({required LinuxSession session, required bool xlib, required bool layerShell}) =>
+    switch (session) {
+      LinuxSession.x11 when xlib => LinuxCardWay.x11Window,
+      LinuxSession.wayland when layerShell => LinuxCardWay.layerShell,
+      _ => LinuxCardWay.notification,
+    };
+
+/// How the LIVE badge stays out of the picture each way: on X11 out of a recording of the
+/// game's window by itself; under Wayland out of everything, since the portal shares the game's
+/// window alone and the badge is a surface of the launcher's own over it.
+BadgeReach linuxBadgeReach(LinuxCardWay way) => switch (way) {
+  LinuxCardWay.x11Window => BadgeReach.windowRecordingOnly,
+  LinuxCardWay.layerShell => BadgeReach.excluded,
+  LinuxCardWay.notification => BadgeReach.none,
+};
 
 LinuxSession linuxSession(Map<String, String> environment) {
   final type = (environment['XDG_SESSION_TYPE'] ?? '').toLowerCase();
@@ -265,11 +297,29 @@ final class _Xlib {
 /// manager's hands, its input shape empty so clicks go through), the LIVE badge as another one
 /// while a compositing manager runs. Windows are brought in front
 /// with xdotool or wmctrl when one is installed. On Wayland, where no program may place a window
-/// over another's or read it, the card is a desktop notification and no picture is taken.
+/// over another's or read it, the card and the badge are layer-shell surfaces of the runner's
+/// ([overlay]) where the compositor has the protocol, the card a desktop notification elsewhere
+/// (GNOME); no picture is taken.
 class LinuxDesktop implements DesktopWindows, GameAreas {
-  LinuxDesktop({Map<String, String>? environment}) : session = linuxSession(environment ?? Platform.environment);
+  LinuxDesktop({Map<String, String>? environment, this.overlay, this.cardStay = const Duration(milliseconds: 4600)})
+    : _environment = environment ?? Platform.environment,
+      session = linuxSession(environment ?? Platform.environment);
 
+  final Map<String, String> _environment;
   final LinuxSession session;
+
+  /// The runner's layer-shell surfaces, used under Wayland when the runner found layer shell.
+  final LayerOverlay? overlay;
+
+  /// How long a card stays on screen.
+  final Duration cardStay;
+
+  /// How cards go over the game here.
+  LinuxCardWay get cardWay => linuxCardWay(
+    session: session,
+    xlib: session == LinuxSession.x11 && _x != null,
+    layerShell: overlay != null && layerShellScale(_environment) != null,
+  );
 
   _Xlib? _xlibCache;
   bool _xlibTried = false;
@@ -557,10 +607,14 @@ class LinuxDesktop implements DesktopWindows, GameAreas {
     });
   });
 
+  /// GDK_SCALE where it is set; under Wayland the monitor's scale the runner found otherwise, so
+  /// a card is drawn sharp on a HiDPI screen.
   @override
   double cardScale(int? pid) {
-    final scale = double.tryParse(Platform.environment['GDK_SCALE'] ?? '');
-    return scale != null && scale > 0 ? scale : 1;
+    final scale = double.tryParse(_environment['GDK_SCALE'] ?? '');
+    if (scale != null && scale > 0) return scale;
+    if (session == LinuxSession.wayland) return (layerShellScale(_environment) ?? 1).toDouble();
+    return 1;
   }
 
   bool _showing = false;
@@ -587,7 +641,7 @@ class LinuxDesktop implements DesktopWindows, GameAreas {
   /// x11grab's window_id) while a compositing manager keeps each window's picture apart; a
   /// recording of the screen would take it.
   @override
-  BadgeReach get badgeReach => _x != null ? BadgeReach.windowRecordingOnly : BadgeReach.none;
+  BadgeReach get badgeReach => linuxBadgeReach(cardWay);
 
   /// On X11 an override-redirect 32-bit window at the top left of the game's window, its input
   /// shape empty, drawn again at each change. Shown only while a compositing manager runs, and
@@ -595,6 +649,7 @@ class LinuxDesktop implements DesktopWindows, GameAreas {
   /// window gives what is on the screen there, this badge too.
   @override
   Future<bool> showBadge(RgbaImage? badge, {int? pid}) async {
+    if (cardWay == LinuxCardWay.layerShell) return _layerBadge(badge, pid);
     final x = _x;
     if (x == null) return false;
     if (badge == null) {
@@ -724,12 +779,50 @@ class LinuxDesktop implements DesktopWindows, GameAreas {
     x.closeDisplay(display);
   }
 
+  /// Under Wayland, the badge as the runner's surface at the top left of the screen.
+  Future<bool> _layerBadge(RgbaImage? badge, int? pid) async {
+    final layers = overlay!;
+    if (badge == null) return layers.hide('badge');
+    return layers.show('badge', badge, anchor: LayerAnchor.topLeft, left: 18, top: 14, scale: cardScale(pid));
+  }
+
   @override
-  bool get canShowCard => _x != null;
+  bool get canShowCard => cardWay != LinuxCardWay.notification;
+
+  /// Under Wayland, the card as the runner's surface at the top of the screen, coming in and
+  /// going as on X11; positions are in the desktop's own units.
+  Future<bool> _layerCard(RgbaImage card, int? pid) async {
+    final layers = overlay!;
+    _showing = true;
+    try {
+      int top(double t) => max(
+        0,
+        cardPosition(screenLeft: 0, screenTop: 0, screenWidth: 0, cardWidth: 0, margin: 18, slide: 22, t: t).y,
+      );
+      final scale = cardScale(pid);
+      if (!await layers.show('card', card, anchor: LayerAnchor.top, top: top(0), scale: scale, opacity: 0)) {
+        return false;
+      }
+      final started = DateTime.now();
+      while (true) {
+        final phase = cardPhase(DateTime.now().difference(started), stay: cardStay);
+        if (phase.done) break;
+        await layers.update('card', opacity: phase.opacity, top: top(phase.t));
+        await Future<void>.delayed(const Duration(milliseconds: 33));
+      }
+      return true;
+    } on Object {
+      return false;
+    } finally {
+      await layers.hide('card');
+      _showing = false;
+    }
+  }
 
   @override
   Future<bool> showCard(RgbaImage card, {int? pid}) async {
     if (_showing) return false;
+    if (cardWay == LinuxCardWay.layerShell) return _layerCard(card, pid);
     final x = _x;
     if (x == null) return false;
     final display = x.openDisplay(nullptr);
@@ -791,7 +884,7 @@ class LinuxDesktop implements DesktopWindows, GameAreas {
         final started = DateTime.now();
         var lastOpacity = -1.0;
         while (true) {
-          final phase = cardPhase(DateTime.now().difference(started));
+          final phase = cardPhase(DateTime.now().difference(started), stay: cardStay);
           if (phase.done) break;
           final place = cardPosition(
             screenLeft: 0,

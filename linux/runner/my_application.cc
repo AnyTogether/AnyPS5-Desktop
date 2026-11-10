@@ -8,6 +8,7 @@
 #endif
 
 #include "flutter/generated_plugin_registrant.h"
+#include "layer_overlay.h"
 
 struct _MyApplication {
   GtkApplication parent_instance;
@@ -174,6 +175,10 @@ static void my_application_activate(GApplication* application) {
     rgba = TRUE;
   }
 
+  // Under Wayland, whether cards can go over the game (layer shell): said in the environment
+  // before Flutter starts, as ANYPS5_RGBA_VISUAL is.
+  layer_overlay_probe();
+
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(
       project, self->dart_entrypoint_arguments);
@@ -207,6 +212,7 @@ static void my_application_activate(GApplication* application) {
                                             window_method_cb, self, nullptr);
   g_signal_connect(window, "window-state-event", G_CALLBACK(window_state_cb),
                    self);
+  layer_overlay_register(fl_plugin_registrar_get_messenger(window_registrar));
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

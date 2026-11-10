@@ -79,7 +79,8 @@ abstract class DesktopWindows {
   double cardScale(int? pid);
 
   /// Whether a card can be drawn over the game here (Wayland gives a client no way to place a
-  /// window above another program's: [notify] is the way there).
+  /// window above another program's but the compositor's layer shell, which GNOME does not have:
+  /// [notify] is the way there).
   bool get canShowCard;
 
   /// Shows [card] at the top of the game's screen for a few seconds, above the game, never taking
@@ -95,7 +96,8 @@ abstract class DesktopWindows {
   /// How the badge stays out of what is recorded here.
   BadgeReach get badgeReach;
 
-  /// A system notification, where a card cannot be shown (Wayland); [icon] is a PNG file.
+  /// A system notification, where a card cannot be shown (GNOME under Wayland); [icon] is a PNG
+  /// file.
   Future<bool> notify(String title, String body, {String? icon});
 
   void dispose();
@@ -107,7 +109,8 @@ enum BadgeReach {
   none,
 
   /// Out of every picture recorded: Windows leaves it out of every capture
-  /// (WDA_EXCLUDEFROMCAPTURE), as the Mac's does.
+  /// (WDA_EXCLUDEFROMCAPTURE), as the Mac's does, and under Wayland the portal shares the game's
+  /// window alone, the badge a layer-shell surface over it.
   excluded,
 
   /// X11: out of a recording of the game's window by itself (x11grab's window_id under a
