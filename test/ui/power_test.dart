@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -6,6 +7,7 @@ import 'package:anyps5_desktop/core/game_process.dart';
 import 'package:anyps5_desktop/core/host.dart';
 import 'package:anyps5_desktop/core/installer.dart';
 import 'package:anyps5_desktop/core/power_profiles.dart';
+import 'package:anyps5_desktop/core/windows_heat.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:anyps5_desktop/ui/theme.dart';
@@ -214,6 +216,97 @@ value = 1080
     expect(hasRow('batteryOn'), isTrue);
   });
 
+  group('on Windows', () {
+    late FakeWindowsHeat heat;
+    const noHeat = PowerReading(hasBattery: true, onBattery: false, batteryPercent: 80);
+    setUp(() {
+      model.powerWatch.windowsHeat = heat = FakeWindowsHeat();
+      // What the model reads again by itself, not this computer's own.
+      model.powerWatch.read = () => noHeat;
+    });
+    Future<void> settle() => Future<void>.delayed(Duration.zero);
+    ToggleRow reader() => row('hotReader').kind as ToggleRow;
+
+    test('without a zone or a card: the reader offered, with why it needs administrator rights', () {
+      model.powerWatch.take(noHeat);
+      expect(row('hotUnavailable').detail, T.text('powerHeatUnavailableWindowsDetail'));
+      expect(row('hotReader').title, T.text('powerHeatReader'));
+      expect(row('hotReader').detail, T.text('powerHeatReaderDetail'));
+      expect(reader().value, isFalse);
+      expect(heat.asked, 0, reason: 'nothing is asked before the user turns it on');
+      expect(hasRow('batteryOn'), isTrue);
+    });
+
+    test('turned down at Windows\' prompt: said, not asked again, the battery profile still works', () async {
+      model.powerWatch.take(noHeat);
+      reader().set(true);
+      expect(heat.asked, 1);
+      expect(model.preferences.heatReader, isTrue);
+      expect(reader().value, isTrue);
+      expect(row('hotReader').detail, endsWith(T.text('powerHeatReaderAsking')));
+      heat.answer(false);
+      await settle();
+      expect(model.preferences.heatReader, isFalse);
+      expect(model.preferences.toJson().containsKey('heatReader'), isFalse);
+      expect(reader().value, isFalse);
+      expect(row('hotReader').detail, endsWith(T.text('powerHeatReaderDeclined')));
+      expect(hasRow('hotUnavailable'), isTrue);
+      expect((row('batteryOn').kind as ToggleRow).value, isTrue);
+      // The next launch asks nothing.
+      model.powerWatch.start();
+      expect(heat.asked, 1);
+    });
+
+    test('allowed: the reader runs, the heat profile holds on its zones, and it starts with the launcher', () async {
+      model.powerWatch.take(noHeat);
+      reader().set(true);
+      heat.answer(true);
+      await settle();
+      expect(row('hotReader').detail, endsWith(T.text('powerHeatReaderRunning')));
+      expect(Preferences.fromJson(model.preferences.toJson()).heatReader, isTrue);
+      model.powerWatch.take(const PowerReading(hasBattery: true, onBattery: false, thermal: ThermalLevel.nominal));
+      expect(hasRow('hotOn'), isTrue);
+      expect(row('hotOn').detail, T.text('powerHotProfileWindowsDetail'));
+      heat.readerState = HeatReaderState.empty;
+      expect(row('hotReader').detail, endsWith(T.text('powerHeatReaderEmpty')));
+      // Off: the reader is told to end.
+      reader().set(false);
+      await settle();
+      expect(heat.stoppedWith, model.powerWatch.readerStopFile);
+      expect(model.preferences.heatReader, isFalse);
+      // Turned on before: asked again as the launcher starts.
+      model.preferences.heatReader = true;
+      model.powerWatch.start();
+      expect(heat.asked, 2);
+    });
+
+    test('a card read while a game runs: the heat profile offered; turning it on asks for the processor\'s too', () {
+      heat.graphicsFound = true;
+      model.powerWatch.take(noHeat);
+      expect(row('powerStatus').detail, contains(T.text('powerThermalInGames')));
+      expect(hasRow('hotUnavailable'), isFalse);
+      (row('hotOn').kind as ToggleRow).set(false);
+      expect(heat.asked, 0);
+      (row('hotOn').kind as ToggleRow).set(true);
+      expect(heat.asked, 1);
+      expect(model.preferences.heatReader, isTrue);
+    });
+
+    test('zones read without administrator rights: no reader to offer', () {
+      heat.zonesWithoutAdmin = true;
+      model.powerWatch.take(const PowerReading(hasBattery: true, onBattery: false, thermal: ThermalLevel.fair));
+      expect(hasRow('hotReader'), isFalse);
+      expect(row('powerStatus').detail, contains(T.text('powerThermalFair')));
+    });
+
+    test('the reader stopping on its own is said', () {
+      heat.readerState = HeatReaderState.stopped;
+      model.preferences.heatReader = true;
+      model.powerWatch.take(noHeat);
+      expect(row('hotReader').detail, endsWith(T.text('powerHeatReaderStopped')));
+    });
+  });
+
   test('a desktop without a battery says so; battery saver holds the battery profile', () {
     model.powerWatch.take(PowerReading.pluggedIn);
     expect(row('powerStatus').title, T.text('powerNoBattery'));
@@ -293,6 +386,41 @@ value = 1080
     expect(row('powerStatus').title, 'Pilde, %64, yaklaşık 2 sa 5 dk kaldı');
     expect(model.panelCategories()[model.panelCategory].title, 'Pil ve ısı');
   });
+}
+
+/// Windows' heat as a test sets it: the prompt answered by [answer].
+class FakeWindowsHeat implements WindowsHeatSource {
+  @override
+  bool graphicsFound = false;
+
+  @override
+  bool zonesWithoutAdmin = false;
+
+  @override
+  HeatReaderState readerState = HeatReaderState.off;
+
+  int asked = 0;
+  String? stoppedWith;
+  Completer<bool>? _prompt;
+
+  void answer(bool yes) => _prompt?.complete(yes);
+
+  @override
+  Future<bool> startReader({required String stopFile}) {
+    asked++;
+    readerState = HeatReaderState.asking;
+    final prompt = _prompt = Completer<bool>();
+    return prompt.future.then((yes) {
+      readerState = yes ? HeatReaderState.running : HeatReaderState.declined;
+      return yes;
+    });
+  }
+
+  @override
+  void stopReader({required String stopFile}) {
+    stoppedWith = stopFile;
+    readerState = HeatReaderState.off;
+  }
 }
 
 /// The environment the last fake start was given.
