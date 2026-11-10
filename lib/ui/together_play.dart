@@ -380,7 +380,7 @@ extension TogetherPlay on TogetherModel {
   void togetherStarted(GameSession session) {
     final offer = PlayTogetherOffer.fromSession(session);
     togetherOffers = [...togetherOffers.where((known) => known.sessionId != offer.sessionId), offer];
-    _noticeSound();
+    disturbingSound();
     app.vibrate(HapticCue.ring);
     final text = T.format('togetherOffer', [offer.hostName, gameName(offer.titleId)]);
     app.show(text);
