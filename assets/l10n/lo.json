@@ -1732,7 +1732,6 @@
   "broadcastNoMicrophone": "ໃຊ້ໄມໂຄຣໂຟນບໍ່ໄດ້. ການອອກອາກາດດຳເນີນຕໍ່ໂດຍບໍ່ມີມັນ.",
   "broadcastBadge": "ປ້າຍສົດ",
   "broadcastBadgeDetail": "ປ້າຍນ້ອຍເທິງເກມໃນຂະນະທີ່ເຈົ້າກຳລັງຖ່າຍທອດສົດ. ຜູ້ຊົມບໍ່ເຫັນມັນ.",
-  "broadcastBadgeLinux": "ບໍ່ມີໃນ Linux: ທຸກຢ່າງທີ່ແຕ້ມທັບເກມຈະຢູ່ໃນການອອກອາກາດນຳ.",
   "broadcastLiveBadge": "ສົດ",
   "broadcastViewerLink": "ລິ້ງສຳລັບຜູ້ເບິ່ງ",
   "broadcastViewerLinkDetail": "ບ່ອນທີ່ຄົນເບິ່ງ ເຊັ່ນ twitch.tv/yourname. ມັນສະແດງໃນຂະນະທີ່ທ່ານອອກອາກາດ, ແລະ ທ່ານຄັດລອກໄດ້.",

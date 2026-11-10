@@ -285,6 +285,105 @@ void main() {
       expect(processes.single.ended, isTrue);
     });
 
+    Broadcaster onX11({required bool windowGrab, List<List<String>>? probes, List<String>? log}) => Broadcaster(
+      ffmpeg: 'ffmpeg',
+      system: HostSystem.linux,
+      environment: const {'DISPLAY': ':0'},
+      encoders: EncoderChoice(
+        ffmpeg: 'ffmpeg',
+        system: HostSystem.linux,
+        run: (executable, arguments) async => ProcessResult(1, arguments.contains('h264_vaapi') ? 0 : 1, '', ''),
+      ),
+      areaOf: (_) => const ScreenArea(1920, 0, 2560, 1440, window: 77594631),
+      soundOf: (_) => SilentGameSound(),
+      changed: () {},
+      retryDelays: const [Duration(milliseconds: 10)],
+      run: (executable, arguments) async {
+        probes?.add(arguments);
+        return ProcessResult(
+          1,
+          0,
+          windowGrab ? 'x11grab indev AVOptions:\n  -window_id         <int>  .D......... Window to capture.\n' : '',
+          '',
+        );
+      },
+      start: (executable, arguments) async {
+        started.add(arguments);
+        final process = StreamingProcess();
+        processes.add(process);
+        return process;
+      },
+      log: log?.add,
+    );
+
+    test('on X11 the game\'s window is recorded by itself, where ffmpeg can', () async {
+      final probes = <List<String>>[];
+      final caster = onX11(windowGrab: true, probes: probes);
+      await caster.start(pid: 9, endpoint: endpoint, quality: BroadcastQuality.hd1080p60);
+      await pumpEventQueue();
+      expect(probes, [
+        ['-hide_banner', '-h', 'demuxer=x11grab'],
+      ]);
+      final arguments = started.single.join(' ');
+      expect(
+        arguments,
+        contains(
+          '-thread_queue_size 64 -f x11grab -framerate 60 -draw_mouse 0 -window_id 77594631 -video_size 2560x1440 -i :0 ',
+        ),
+      );
+      expect(arguments, isNot(contains(':0+1920,0')), reason: 'the window, not where it is on the screen');
+      expect(caster.recordsWindowOnly, isTrue);
+      caster.stop();
+      expect(caster.recordsWindowOnly, isFalse);
+    });
+
+    test('an ffmpeg without window_id records the screen as before', () async {
+      final caster = onX11(windowGrab: false);
+      await caster.start(pid: 9, endpoint: endpoint, quality: BroadcastQuality.hd720p60);
+      await pumpEventQueue();
+      expect(
+        started.single.join(' '),
+        contains('-f x11grab -framerate 60 -draw_mouse 0 -video_size 2560x1440 -i :0+1920,0'),
+      );
+      expect(caster.recordsWindowOnly, isFalse);
+      caster.stop();
+    });
+
+    test('x11grab refusing the window before anything went out records the screen instead', () async {
+      final log = <String>[];
+      final caster = onX11(windowGrab: true, log: log);
+      await caster.start(pid: 9, endpoint: endpoint, quality: BroadcastQuality.hd720p60);
+      await pumpEventQueue();
+      expect(started.single, contains('-window_id'));
+      processes.single.writeError("[x11grab @ 0x5581] Can't find window '0x4a00007', aborting.\n");
+      await pumpEventQueue();
+      processes.single.end(1);
+      await pumpEventQueue();
+      expect(started, hasLength(2));
+      expect(started.last, isNot(contains('-window_id')));
+      expect(started.last.join(' '), contains('-i :0+1920,0'));
+      expect(caster.phase, isA<BroadcastStarting>(), reason: 'not a dropped connection');
+      expect(caster.recordsWindowOnly, isFalse);
+      expect(log, contains("broadcast: recording the screen instead of the game's window"));
+      // Live on the screen's picture: a server dropping it later does not go back to the window.
+      processes.last.write(utf8.encode('frame=30\nprogress=continue\n'));
+      await pumpEventQueue();
+      expect(caster.phase, isA<BroadcastLive>());
+      caster.stop();
+    });
+
+    test('a server refusing a window recording still fails at once', () async {
+      final caster = onX11(windowGrab: true);
+      await caster.start(pid: 9, endpoint: endpoint, quality: BroadcastQuality.hd720p60);
+      await pumpEventQueue();
+      processes.single.writeError('rtmps://a.rtmps.youtube.com/live2/key-1: Input/output error\n');
+      await pumpEventQueue();
+      processes.single.end(1);
+      await pumpEventQueue();
+      expect(started, hasLength(1));
+      expect(caster.phase, isA<BroadcastFailed>());
+    });
+
     test('a server that refuses at the start fails at once, saying why without the key', () async {
       final caster = broadcaster();
       final starting = caster.start(pid: 9, endpoint: endpoint, quality: BroadcastQuality.hd720p60);

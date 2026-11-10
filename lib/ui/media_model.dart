@@ -40,7 +40,8 @@ class MediaModel {
   ProcessStarter? startOverride;
   ProcessRunner? runOverride;
 
-  /// Tests: whether the LIVE badge shows, whatever the system.
+  /// Tests: whether the LIVE badge shows, whatever the desktop: true as where it is left out of
+  /// every picture (Windows), false as where there is none.
   bool? badgeOverride;
 
   /// Under Wayland, what records through the desktop's portal; null elsewhere.
@@ -135,6 +136,8 @@ class MediaModel {
     // The phone's long side across: the size it asked for, no more than 1280 x 720.
     final height = min(720, wishes.map((wish) => min(wish.$2, wish.$3)).reduce(max));
     final width = min(1280, wishes.map((wish) => max(wish.$2, wish.$3)).reduce(max));
+    // On X11 Remote Play records the screen: the LIVE badge goes first.
+    await _updateBadge();
     final stream = _remotePlay ??= RemotePlayStream(
       ffmpeg: tool,
       system: app.system,
@@ -299,33 +302,55 @@ class MediaModel {
     app.refresh();
   }
 
-  // The LIVE badge over the game, on Windows only: on Linux, anything drawn over the game would
-  // be in the broadcast too, since it is recorded from the screen.
+  // The LIVE badge over the game, kept out of what viewers see: Windows leaves its window out of
+  // every capture, as the Mac does. On X11 the broadcast records the game's window by itself, which
+  // leaves it out under a compositing manager (LinuxDesktop shows it only then); a recording of the
+  // screen would take it, so it stays hidden while the replay buffer or Remote Play records.
+
+  BadgeReach get _badgeReach => switch (badgeOverride) {
+    null => app.desktop.badgeReach,
+    true => BadgeReach.excluded,
+    false => BadgeReach.none,
+  };
+
+  /// Whether the LIVE badge can be over the game now without being in anything recorded.
+  static bool badgeKeptOut(BadgeReach reach, {required bool windowOnly, required bool screenRecorded}) =>
+      switch (reach) {
+        BadgeReach.none => false,
+        BadgeReach.excluded => true,
+        BadgeReach.windowRecordingOnly => windowOnly && !screenRecorded,
+      };
+
+  /// Whether something records the whole screen, or is about to: the replay buffer, Remote Play.
+  bool get _screenRecorded =>
+      app.replayStarted || remotePlaying || ((app.remote?.streamWishes.isNotEmpty ?? false) && app.running != null);
 
   bool get _badgeShown =>
-      (badgeOverride ?? app.system == HostSystem.windows) &&
       settings.liveBadge &&
-      (phase is BroadcastLive || phase is BroadcastReconnecting);
+      (phase is BroadcastLive || phase is BroadcastReconnecting) &&
+      badgeKeptOut(_badgeReach, windowOnly: _broadcaster?.recordsWindowOnly ?? false, screenRecorded: _screenRecorded);
+
+  /// The badge as things are now, before something starts recording the screen.
+  Future<void> badgeCheck() => _updateBadge();
 
   String? _badgeState;
-  bool _badgeBusy = false;
+  Future<void>? _badgeRun;
   bool _badgeAgain = false;
 
-  /// Keeps the badge's window as the broadcast now is, one drawing at a time.
-  Future<void> _updateBadge() async {
-    if (_badgeBusy) {
-      _badgeAgain = true;
-      return;
-    }
-    _badgeBusy = true;
-    try {
-      do {
-        _badgeAgain = false;
-        await _drawBadge();
-      } while (_badgeAgain);
-    } finally {
-      _badgeBusy = false;
-    }
+  /// Keeps the badge's window as the broadcast now is, one drawing at a time; completes once it
+  /// is.
+  Future<void> _updateBadge() {
+    _badgeAgain = true;
+    return _badgeRun ??= () async {
+      try {
+        while (_badgeAgain) {
+          _badgeAgain = false;
+          await _drawBadge();
+        }
+      } finally {
+        _badgeRun = null;
+      }
+    }();
   }
 
   Future<void> _drawBadge() async {
@@ -619,11 +644,13 @@ class MediaModel {
           ),
         ),
       if (settings.microphone && (micDevicesOverride != null || app.system == HostSystem.windows)) ?_micDeviceRow(),
-      if (badgeOverride ?? app.system == HostSystem.windows)
+      if (_badgeReach != BadgeReach.none)
         PanelRow(
           id: 'broadcast-badge',
           title: T.text('broadcastBadge'),
-          detail: T.text('broadcastBadgeDetail'),
+          detail: T.text(
+            _badgeReach == BadgeReach.windowRecordingOnly ? 'broadcastBadgeDetailX11' : 'broadcastBadgeDetail',
+          ),
           kind: ToggleRow(settings.liveBadge, (on) {
             settings.liveBadge = on;
             _saveSettings();
@@ -632,7 +659,11 @@ class MediaModel {
           }),
         )
       else
-        PanelRow(id: 'broadcast-badge', title: T.text('broadcastBadge'), kind: InfoRow(T.text('broadcastBadgeLinux'))),
+        PanelRow(
+          id: 'broadcast-badge',
+          title: T.text('broadcastBadge'),
+          kind: InfoRow(T.text('broadcastBadgeNoOverlay')),
+        ),
       PanelRow(
         id: 'broadcast-link',
         title: T.text('broadcastViewerLink'),

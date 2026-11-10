@@ -40,6 +40,12 @@ class FakeDesktop implements DesktopWindows {
     return true;
   }
 
+  /// How the badge stays out of the picture here: none, unless a test says.
+  BadgeReach reach = BadgeReach.none;
+
+  @override
+  BadgeReach get badgeReach => reach;
+
   @override
   Future<bool> raiseLauncher() async {
     calls.add('raise');

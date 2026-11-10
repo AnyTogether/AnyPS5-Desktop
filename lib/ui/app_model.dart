@@ -4767,6 +4767,9 @@ class AppModel extends ChangeNotifier {
   /// Whether the replay buffer is recording now.
   bool get replayRecording => _replay?.running ?? false;
 
+  /// Whether the replay buffer is recording or starting to.
+  bool get replayStarted => _replay != null;
+
   ReplayBuffer? _defaultReplay(int seconds, {VideoEncoder? encoder, GameSound? sound}) {
     final environment = services.environment ?? Platform.environment;
     final ffmpeg = replayFfmpeg;
@@ -4868,6 +4871,9 @@ class AppModel extends ChangeNotifier {
     }
     if (buffer == null) return;
     _replay = buffer;
+    // On X11 it records the screen: the LIVE badge goes first.
+    await media.badgeCheck();
+    if (_replay != buffer) return;
     if (!await buffer.start()) {
       // Stopped meanwhile (the game ended during the desktop's dialog): nothing to say.
       if (_replay != buffer) return;

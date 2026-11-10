@@ -1732,7 +1732,6 @@
   "broadcastNoMicrophone": "माइक्रोफोन काम में ना आ सकल। प्रसारण एकरा बिना चलत बा।",
   "broadcastBadge": "लाइव बैज",
   "broadcastBadgeDetail": "लाइव रहला पर खेल के ऊपर एगो छोट बैज। देखे वाला लोग के ई ना लउके।",
-  "broadcastBadgeLinux": "Linux पर ना: खेल के ऊपर बनल हर चीज प्रसारण में भी आ जाई।",
   "broadcastLiveBadge": "लाइव",
   "broadcastViewerLink": "देखे के लिंक",
   "broadcastViewerLinkDetail": "जहाँ लोग देखेला, जइसे twitch.tv/yourname। लाइव रहे पर देखाला, आ रउआ कॉपी कर सकीले।",

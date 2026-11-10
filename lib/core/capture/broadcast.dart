@@ -500,7 +500,25 @@ class Broadcaster {
     process.kill();
   }
 
-  /// ffmpeg's arguments to publish the game in [area] to [endpoint].
+  /// Whether this run records the game's window by itself (X11's window_id), not the screen:
+  /// what keeps the LIVE badge out of it there.
+  bool recordsWindowOnly = false;
+
+  /// Whether this ffmpeg's x11grab takes window_id, asked once.
+  Future<bool>? _windowGrab;
+
+  /// x11grab would not record the game's window by itself this broadcast: the screen instead.
+  bool _windowGrabFailed = false;
+
+  /// On X11, the game's window by itself when this ffmpeg can and it has not failed this
+  /// broadcast; the screen otherwise.
+  Future<bool> _recordWindow(ScreenArea? area) async {
+    if (system != HostSystem.linux || wayland != null || area?.window == null || _windowGrabFailed) return false;
+    return _windowGrab ??= ScreenGrab.windowGrab(ffmpeg, _runTool);
+  }
+
+  /// ffmpeg's arguments to publish the game in [area] to [endpoint]; with [windowOnly], its
+  /// window by itself (X11).
   List<String> arguments(
     VideoEncoder encoder,
     ScreenArea? area,
@@ -508,6 +526,7 @@ class Broadcaster {
     BroadcastQuality quality, {
     ({List<String> input, int level})? microphone,
     WaylandFeed? feed,
+    bool windowOnly = false,
   }) {
     final width = quality.width;
     final height = quality.height;
@@ -523,6 +542,7 @@ class Broadcaster {
         framesPerSecond: quality.frameRate,
         area: area,
         wayland: feed,
+        windowOnly: windowOnly,
       ),
       '-thread_queue_size',
       '1024',
@@ -569,6 +589,7 @@ class Broadcaster {
     _attempt = 0;
     _microphone = null;
     _microphoneFailed = false;
+    _windowGrabFailed = false;
     _set(const BroadcastStarting());
     final encoder = await encoders.encoder;
     if (!phase.active) return;
@@ -606,10 +627,20 @@ class Broadcaster {
     }
     final area = areaOf(pid);
     _area = area;
+    final windowOnly = await _recordWindow(area);
+    if (!phase.active) {
+      await feed?.close();
+      return;
+    }
+    log?.call('broadcast: recording ${windowOnly ? 'the game\'s window by itself' : 'the screen'}');
+    recordsWindowOnly = windowOnly;
     final microphone = _liveMicrophone;
     final Process process;
     try {
-      process = await _start(ffmpeg, arguments(encoder, area, endpoint, _quality, microphone: microphone, feed: feed));
+      process = await _start(
+        ffmpeg,
+        arguments(encoder, area, endpoint, _quality, microphone: microphone, feed: feed, windowOnly: windowOnly),
+      );
     } on Object catch (error) {
       await feed?.close();
       return _fail('$error');
@@ -658,6 +689,7 @@ class Broadcaster {
     _process = null;
     _tick?.cancel();
     _steady = null;
+    recordsWindowOnly = false;
     if (!phase.active) return;
     // Started again on purpose: the microphone was switched or moved.
     if (_restarting) {
@@ -666,6 +698,12 @@ class Broadcaster {
     }
     final reason = _reason(errors.toString(), code);
     log?.call('broadcast: ffmpeg ended ($code): ${_scrub(errors.toString().trim())}');
+    // x11grab would not record the game's window by itself: the screen, as before window_id.
+    if (windowOnly && !_wentLive && errors.toString().contains('x11grab')) {
+      log?.call('broadcast: recording the screen instead of the game\'s window');
+      _windowGrabFailed = true;
+      return _run();
+    }
     // ffmpeg could not open the microphone: the broadcast goes on without it.
     if (microphone != null && !_wentLive) {
       log?.call('broadcast: going on without the microphone');
@@ -741,6 +779,7 @@ class Broadcaster {
     unawaited(sound?.stop());
     _live.stop();
     _wentLive = false;
+    recordsWindowOnly = false;
     pid = null;
   }
 

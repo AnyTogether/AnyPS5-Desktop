@@ -88,8 +88,12 @@ abstract class DesktopWindows {
   Future<bool> showCard(RgbaImage card, {int? pid});
 
   /// The small badge over the game (the top left of its screen, clicks passing through), drawn
-  /// over and over as it changes; null takes it away. False where there is no such window.
+  /// over and over as it changes; null takes it away. False where there is no such window, or
+  /// where it would be in the picture now (X11 without a compositing manager).
   Future<bool> showBadge(RgbaImage? badge, {int? pid});
+
+  /// How the badge stays out of what is recorded here.
+  BadgeReach get badgeReach;
 
   /// A system notification, where a card cannot be shown (Wayland); [icon] is a PNG file.
   Future<bool> notify(String title, String body, {String? icon});
@@ -97,21 +101,43 @@ abstract class DesktopWindows {
   void dispose();
 }
 
+/// How the LIVE badge over the game stays out of the picture viewers see.
+enum BadgeReach {
+  /// No badge here: nothing can be drawn over the game (GNOME under Wayland, no display, tests).
+  none,
+
+  /// Out of every picture recorded: Windows leaves it out of every capture
+  /// (WDA_EXCLUDEFROMCAPTURE), as the Mac's does.
+  excluded,
+
+  /// X11: out of a recording of the game's window by itself (x11grab's window_id under a
+  /// compositing manager, which keeps each window's picture apart), in one of the screen.
+  windowRecordingOnly,
+}
+
 /// Where a window's picture is on the screen, in pixels: what Remote Play and broadcasting
 /// record.
 class ScreenArea {
-  const ScreenArea(this.x, this.y, this.width, this.height);
+  const ScreenArea(this.x, this.y, this.width, this.height, {this.window});
   final int x;
   final int y;
   final int width;
   final int height;
 
-  @override
-  bool operator ==(Object other) =>
-      other is ScreenArea && other.x == x && other.y == y && other.width == width && other.height == height;
+  /// The X11 window this is the picture of, for recording it by itself; null elsewhere.
+  final int? window;
 
   @override
-  int get hashCode => Object.hash(x, y, width, height);
+  bool operator ==(Object other) =>
+      other is ScreenArea &&
+      other.x == x &&
+      other.y == y &&
+      other.width == width &&
+      other.height == height &&
+      other.window == window;
+
+  @override
+  int get hashCode => Object.hash(x, y, width, height, window);
 
   @override
   String toString() => '${width}x$height at $x,$y';
@@ -151,6 +177,8 @@ class NoDesktop implements DesktopWindows {
   Future<bool> showCard(RgbaImage card, {int? pid}) async => false;
   @override
   Future<bool> showBadge(RgbaImage? badge, {int? pid}) async => false;
+  @override
+  BadgeReach get badgeReach => BadgeReach.none;
   @override
   Future<bool> notify(String title, String body, {String? icon}) async => false;
   @override
