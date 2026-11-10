@@ -9,6 +9,7 @@ project(runner LANGUAGES CXX)
 add_executable(${BINARY_NAME}
   "main.cc"
   "my_application.cc"
+  "layer_overlay.cc"
   "retro_core_host_linux.cc"
   "retro_linux_audio.cc"
   "retro_linux_video.cc"
@@ -28,5 +29,7 @@ pkg_check_modules(RETRO_RENDER REQUIRED IMPORTED_TARGET egl epoxy)
 pkg_check_modules(RETRO_AUDIO REQUIRED IMPORTED_TARGET libpulse)
 add_subdirectory("${CMAKE_SOURCE_DIR}/../native/retro" "${CMAKE_CURRENT_BINARY_DIR}/retro")
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GTK PkgConfig::RETRO_RENDER PkgConfig::RETRO_AUDIO anyps5_retro)
+# dlopen for gtk-layer-shell (layer_overlay.cc), which is loaded at run time, never linked.
+target_link_libraries(${BINARY_NAME} PRIVATE ${CMAKE_DL_LIBS})
 
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")

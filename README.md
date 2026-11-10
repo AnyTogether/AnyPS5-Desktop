@@ -100,8 +100,9 @@ embedded PS1 and PS2 games.
     on Linux (`linux_pads.dart`), through FFI
   - `desktop/` the game's window and the trophy card over it: Win32 through FFI on Windows
     (foreground, F11 and window size for upstream's engine, the window's picture, a layered
-    click-through topmost card), Xlib on Linux X11 (override-redirect card, XGetImage), a
-    desktop notification on Wayland
+    click-through topmost card), Xlib on Linux X11 (override-redirect card, XGetImage), and
+    on Wayland the runner's layer-shell surfaces (`linux/runner/layer_overlay.cc`, gtk-layer-shell
+    loaded at run time where the compositor has wlr-layer-shell) or a desktop notification (GNOME)
   - `themes/` the Theme Studio's themes (`theme_design.dart`, `theme_library.dart`): one folder
     each under the config folder's `Themes`, shared as one `.anyps5theme` zip, the same file as
     the macOS launcher's; `looping_video.dart` a background video looped through ffmpeg;

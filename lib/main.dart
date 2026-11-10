@@ -32,6 +32,7 @@ import 'ui/clip_player.dart';
 import 'ui/crash_model.dart';
 import 'ui/launcher.dart';
 import 'ui/launcher_window_channel.dart';
+import 'ui/layer_overlay_channel.dart';
 import 'ui/profile_picture.dart';
 import 'ui/sealed_photo.dart';
 import 'ui/voice_note_player.dart';
@@ -79,7 +80,7 @@ Future<void> main(List<String> arguments) async {
                   }
                 },
         )
-      : LinuxDesktop();
+      : LinuxDesktop(overlay: const ChannelLayerOverlay());
   final WindowBackdrop backdrop = switch (desktop) {
     final LinuxDesktop linux => LinuxBackdrop(linux),
     _ => Platform.isWindows ? WindowsBackdrop() : const NoBackdrop(),
