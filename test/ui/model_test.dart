@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:anyps5_desktop/core/file_links.dart';
@@ -337,11 +338,51 @@ void main() {
     expect(File(model.paths.logFile(orbit.titleId)).existsSync(), isFalse, reason: 'nothing started');
   });
 
-  test('uninstalling removes the installed game and keeps the dump', () {
+  test('uninstalling removes the installed game and keeps the dump', () async {
     final orbit = model.games[indexOf('PPSA01001')];
-    model.uninstall(orbit);
+    await model.uninstall(orbit);
     expect(model.stateOf(orbit), isA<Locked>());
     expect(Directory(Installer.installedFolder(orbit, model.root!)).existsSync(), isFalse);
     expect(File(p.join(orbit.folder, 'eboot.bin')).existsSync(), isTrue);
+  });
+
+  // Issue 55: pressed again and again while a big game went, the launcher stopped answering.
+  test('Uninstall is done at once while the files go after; a second one or an unlock waits for them', () async {
+    final orbit = model.games[indexOf('PPSA01001')];
+    File(p.join(orbit.folder, 'eboot.bin')).writeAsBytesSync(typicalSelf());
+    final installed = Installer.installedFolder(orbit, model.root!);
+    final removeAside = Installer.removeAside;
+    addTearDown(() => Installer.removeAside = removeAside);
+    final removing = <String>[];
+    final slow = Completer<void>();
+    Installer.removeAside = (path) async {
+      removing.add(path);
+      await slow.future;
+      await removeAside(path);
+    };
+    final first = model.uninstall(orbit);
+    expect(model.stateOf(orbit), isA<Locked>());
+    expect(model.toast, T.text('uninstallDone'));
+    expect(Directory(installed).existsSync(), isFalse);
+    expect(removing, isNotEmpty);
+    for (final path in removing) {
+      expect(Directory(path).existsSync(), isTrue, reason: 'set aside, not deleted on the screen\'s thread');
+    }
+    final asked = List.of(removing);
+    await model.uninstall(orbit);
+    expect(removing, asked, reason: 'a second Uninstall starts nothing');
+    model.rescan();
+    expect(model.stateOf(orbit), isA<Locked>());
+    model.unlock(orbit);
+    expect(model.stateOf(orbit), isA<Installing>());
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    expect(model.stateOf(orbit), isA<Installing>(), reason: 'the unlock waits for the old files');
+    expect(Directory(installed).existsSync(), isFalse);
+    slow.complete();
+    await first;
+    for (final path in removing) {
+      expect(Directory(path).existsSync(), isFalse);
+    }
+    await until(() => model.stateOf(orbit) is Installed);
   });
 }

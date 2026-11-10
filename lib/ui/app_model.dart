@@ -2839,7 +2839,8 @@ class AppModel extends ChangeNotifier {
     trophies.clear();
     for (final game in games) {
       final installed = Installer.installedFolder(game, rootOf(game)!);
-      final record = Installer.record(installed, system: system);
+      // Being uninstalled: not installed, whatever is left of it on the disk.
+      final record = _removals.containsKey(game.id) ? null : Installer.record(installed, system: system);
       if (record != null) records[game.id] = record;
       _loadTrophies(game);
     }
@@ -3336,6 +3337,9 @@ class AppModel extends ChangeNotifier {
     unawaited(() async {
       Object? failure;
       try {
+        // Uninstalled a moment ago: its old files go first (one that could not be renamed aside
+        // is still being removed where the new one goes).
+        await _removals[id];
         final installed = await installer.run();
         GameLog.writeUnlockLog(unlockLog, unlockLines);
         final record = Installer.record(installed, system: system);
@@ -3601,13 +3605,25 @@ class AppModel extends ChangeNotifier {
     return one ? T.format('newGame', [names.first]) : T.format('newGames', [names.length]);
   }
 
-  void uninstall(Game game) {
+  /// The games whose files are being removed (Uninstall), by id, until they are gone.
+  final Map<String, Future<void>> _removals = {};
+
+  /// Uninstalls [game] at once: its folders are renamed aside and go after, off the screen's
+  /// thread, so the launcher keeps answering while a big game goes. A second Uninstall meanwhile
+  /// does nothing, and an unlock of the game waits until its old files are gone. Completes then.
+  Future<void> uninstall(Game game) async {
     final folder = rootOf(game);
-    if (folder == null) return;
-    Installer.uninstall(game, folder);
+    if (folder == null || _removals.containsKey(game.id)) return;
+    final gone = Installer.uninstall(game, folder);
+    _removals[game.id] = gone;
     records.remove(game.id);
     show(T.text('uninstallDone'));
     _changed();
+    try {
+      await gone;
+    } finally {
+      _removals.removeWhere((id, _) => id == game.id);
+    }
   }
 
   void clearShaderCache(Game game) {
@@ -5180,7 +5196,7 @@ class AppModel extends ChangeNotifier {
                 title: T.text('uninstall'),
                 detail: T.text('uninstallConfirm'),
                 kind: ActionRow(() {
-                  uninstall(game);
+                  unawaited(uninstall(game));
                   closeOverlay();
                 }, destructive: true),
               ),
