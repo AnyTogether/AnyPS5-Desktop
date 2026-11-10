@@ -510,12 +510,10 @@ class Broadcaster {
   /// x11grab would not record the game's window by itself this broadcast: the screen instead.
   bool _windowGrabFailed = false;
 
-  /// On X11, the game's window by itself when this ffmpeg can and it has not failed this
-  /// broadcast; the screen otherwise.
-  Future<bool> _recordWindow(ScreenArea? area) async {
-    if (system != HostSystem.linux || wayland != null || area?.window == null || _windowGrabFailed) return false;
-    return _windowGrab ??= ScreenGrab.windowGrab(ffmpeg, _runTool);
-  }
+  /// On X11, whether the game's window could be recorded by itself: it has one, and that has not
+  /// failed this broadcast. Then this ffmpeg is asked whether it can.
+  bool _mayRecordWindow(ScreenArea? area) =>
+      system == HostSystem.linux && wayland == null && area?.window != null && !_windowGrabFailed;
 
   /// ffmpeg's arguments to publish the game in [area] to [endpoint]; with [windowOnly], its
   /// window by itself (X11).
@@ -627,10 +625,13 @@ class Broadcaster {
     }
     final area = areaOf(pid);
     _area = area;
-    final windowOnly = await _recordWindow(area);
-    if (!phase.active) {
-      await feed?.close();
-      return;
+    var windowOnly = false;
+    if (_mayRecordWindow(area)) {
+      windowOnly = await (_windowGrab ??= ScreenGrab.windowGrab(ffmpeg, _runTool));
+      if (!phase.active) {
+        await feed?.close();
+        return;
+      }
     }
     log?.call('broadcast: recording ${windowOnly ? 'the game\'s window by itself' : 'the screen'}');
     recordsWindowOnly = windowOnly;
