@@ -266,13 +266,34 @@ abstract final class ScreenGrab {
     return (environment['DISPLAY'] ?? '').isNotEmpty;
   }
 
+  /// What asks ffmpeg for x11grab's options.
+  static const windowGrabProbe = ['-hide_banner', '-h', 'demuxer=x11grab'];
+
+  /// Whether [ffmpeg]'s x11grab can record one window by itself: its window_id option, in
+  /// FFmpeg 4.4 and later (the launcher's download is 8.1), not in an older one on the PATH or
+  /// a build without x11grab.
+  static Future<bool> windowGrab(String ffmpeg, ProcessRunner run) async {
+    try {
+      final result = await run(ffmpeg, windowGrabProbe).timeout(const Duration(seconds: 10));
+      // ffmpeg's help goes to its standard output; either is read, in case a build differs.
+      return result.exitCode == 0 && '${result.stdout}${result.stderr}'.contains('-window_id');
+    } on Object {
+      return false;
+    }
+  }
+
   /// The input arguments for [area] (the whole screen when null) at [framesPerSecond].
+  ///
+  /// With [windowOnly] on X11, the window [area] is the picture of by itself (x11grab's
+  /// window_id): under a compositing manager the window's own picture, without the windows over
+  /// it (the LIVE badge, the launcher's cards).
   static List<String> input({
     required HostSystem system,
     required Map<String, String> environment,
     required int framesPerSecond,
     ScreenArea? area,
     WaylandFeed? wayland,
+    bool windowOnly = false,
   }) {
     if (wayland != null) return wayland.input;
     // Even sizes: the encoders take nothing else, and the filter keeps them so after scaling.
@@ -294,6 +315,25 @@ abstract final class ScreenGrab {
       ];
     }
     final display = environment['DISPLAY'] ?? ':0';
+    final window = area?.window;
+    if (windowOnly && window != null) {
+      return [
+        '-thread_queue_size',
+        '64',
+        '-f',
+        'x11grab',
+        '-framerate',
+        '$framesPerSecond',
+        '-draw_mouse',
+        '0',
+        '-window_id',
+        '$window',
+        '-video_size',
+        '${width}x$height',
+        '-i',
+        display,
+      ];
+    }
     return [
       '-thread_queue_size',
       '64',

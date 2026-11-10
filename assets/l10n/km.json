@@ -1742,7 +1742,6 @@
   "broadcastNoMicrophone": "មិនអាចប្រើមីក្រូហ្វូនបានទេ។ ការផ្សាយបន្តដោយគ្មានវា។",
   "broadcastBadge": "ផ្លាកសញ្ញាផ្ទាល់",
   "broadcastBadgeDetail": "ផ្លាកសញ្ញាតូចនៅលើហ្គេមពេលអ្នកកំពុងផ្សាយផ្ទាល់។ អ្នកទស្សនាមើលមិនឃើញវាទេ។",
-  "broadcastBadgeLinux": "មិនមាននៅលើ Linux ទេ៖ អ្វីៗដែលគូរពីលើហ្គេមក៏នឹងចូលក្នុងការផ្សាយដែរ។",
   "broadcastLiveBadge": "ផ្ទាល់",
   "broadcastViewerLink": "តំណសម្រាប់អ្នកទស្សនា",
   "broadcastViewerLinkDetail": "កន្លែងដែលមនុស្សមើល ដូចជា twitch.tv/yourname។ វាបង្ហាញពេលអ្នកកំពុងផ្សាយផ្ទាល់ ហើយអ្នកអាចចម្លងវាបាន។",

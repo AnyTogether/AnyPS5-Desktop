@@ -1742,7 +1742,6 @@
   "broadcastNoMicrophone": "ማይክሮፎኑን መጠቀም አልተቻለም። ስርጭቱ ያለ እሱ ይቀጥላል።",
   "broadcastBadge": "የቀጥታ ምልክት",
   "broadcastBadgeDetail": "በቀጥታ ሲያሰራጩ ከጨዋታው በላይ የሚታይ ትንሽ ምልክት። ተመልካቾች አያዩትም።",
-  "broadcastBadgeLinux": "በLinux ላይ አይገኝም: በጨዋታው ላይ የሚሳል ማንኛውም ነገር በስርጭቱም ውስጥ ይታያል።",
   "broadcastLiveBadge": "ቀጥታ",
   "broadcastViewerLink": "የተመልካች አገናኝ",
   "broadcastViewerLinkDetail": "ሰዎች የሚመለከቱበት ቦታ፣ ለምሳሌ twitch.tv/yourname። በቀጥታ ስርጭት ጊዜ ይታያል፣ ሊቀዱትም ይችላሉ።",
