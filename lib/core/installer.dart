@@ -348,26 +348,38 @@ class Installer {
   }
 
   /// Removes an installed game and everything it wrote; links to the dump go, never what they
-  /// point to. The relinker's kept output goes too. Both are renamed aside at once, so the game
-  /// is no longer installed when this returns, and removed after by [removeAside]: a game of tens
-  /// of thousands of files deleted on the screen's thread kept the launcher from answering until
-  /// it was gone. A folder that cannot be renamed is removed where it is. The future completes
-  /// when everything is gone.
+  /// point to. The relinker's kept output goes too. Both are moved into the store's Removing
+  /// folder at once, so the game is no longer installed when this returns, and removed from there
+  /// by [removeAside]: a game of tens of thousands of files deleted on the screen's thread kept the
+  /// launcher from answering until it was gone. What an uninstall left there (the launcher closed
+  /// before it was done) goes too. A folder that cannot be moved is removed where it is. The
+  /// future completes when everything is gone.
   static Future<void> uninstall(Game game, String root) {
-    final going = [_setAside(installedFolder(game, root), 'game'), _setAside(keptRelink(game, root), 'relinked')];
+    final removing = Directory(removingFolder(root));
+    final left = <String>{
+      if (removing.existsSync())
+        for (final entry in removing.listSync(followLinks: false)) entry.path,
+    };
+    final going = [
+      _setAside(installedFolder(game, root), root, 'game'),
+      _setAside(keptRelink(game, root), root, 'relinked'),
+    ];
     return Future.wait([
-      for (final path in going)
-        if (path != null) removeAside(path),
+      for (final path in {...going.nonNulls, ...left}) removeAside(path),
     ]);
   }
 
-  /// How [uninstall] removes what it renamed aside: on the system's file threads, off the
-  /// screen's thread. Replaceable in tests (a removal that takes its time).
+  /// Where [uninstall] puts what it removes until it is gone, in the store of the games folder
+  /// [root].
+  static String removingFolder(String root) => p.join(root, GameLibrary.storeName, 'Removing');
+
+  /// How [uninstall] removes what it set aside: on the system's file threads, off the screen's
+  /// thread. Replaceable in tests (a removal that takes its time).
   static Future<void> Function(String path) removeAside = _deleteAway;
 
-  /// [path] under a leftover name beside it (a ".partial", as a half-made game), null when there
-  /// is nothing there; [path] itself when it cannot be renamed (a file held open).
-  static String? _setAside(String path, String label) {
+  /// [path] moved into the Removing folder, null when there is nothing there; [path] itself when
+  /// it cannot be moved (a file in it held open).
+  static String? _setAside(String path, String root, String label) {
     switch (FileSystemEntity.typeSync(path, followLinks: false)) {
       case FileSystemEntityType.notFound:
         return null;
@@ -376,8 +388,9 @@ class Installer {
       default:
         return path;
     }
-    final aside = '$path.$label-removed-${DateTime.now().microsecondsSinceEpoch}.partial';
+    final aside = p.join(removingFolder(root), '${p.basename(path)}-$label-${DateTime.now().microsecondsSinceEpoch}');
     try {
+      Directory(p.dirname(aside)).createSync(recursive: true);
       Directory(path).renameSync(aside);
       return aside;
     } on FileSystemException {

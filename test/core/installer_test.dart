@@ -569,21 +569,19 @@ void main() {
           ..createSync(recursive: true)
           ..writeAsStringSync('written by the game');
       }
-      final games = Directory(p.dirname(installed));
+      // What an uninstall left when the launcher closed before it was done.
+      final removing = Installer.removingFolder(root);
+      File(p.join(removing, 'left-over', 'file.bin'))
+        ..createSync(recursive: true)
+        ..writeAsStringSync('old');
       final ticks = await ticksDuring(() {
         final gone = Installer.uninstall(game, root);
         expect(Directory(installed).existsSync(), isFalse, reason: 'not installed from the moment it is asked');
+        expect(Directory(Installer.keptRelink(game, root)).existsSync(), isFalse);
         return gone;
       });
       expect(ticks, greaterThan(0));
-      expect(
-        games.listSync().where((entry) => entry.path.startsWith(installed)),
-        isEmpty,
-        reason: 'what was set aside is gone too',
-      );
-      final kept = Installer.keptRelink(game, root);
-      final relinked = Directory(p.dirname(kept));
-      if (relinked.existsSync()) expect(relinked.listSync().where((entry) => entry.path.startsWith(kept)), isEmpty);
+      expect(Directory(removing).listSync(), isEmpty, reason: 'what was set aside is gone, and what was left');
       expect(
         File(p.join(game.folder, 'data', 'level1.bin')).readAsStringSync(),
         'level data',
