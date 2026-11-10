@@ -122,11 +122,13 @@ class TogetherModel {
     hub.games.onAnyEnded = togetherEnded;
     hub.games.onPlayersChanged = () => unawaited(hub.parties.refresh().catchError((Object _) {}));
     app.onUnlocked = togetherUnlockDone;
+    // Someone asks to join the party led here: the Mac's words, and over a game its card (Do
+    // Not Disturb or not, as on the Mac). The party's row says whether they asked with the code.
     hub.parties.onRequest = (person, via) {
       _noticeSound();
-      app.show(
-        via == 'code' ? T.format('partyAsksCode', [person.displayName]) : T.format('partyAsks', [person.displayName]),
-      );
+      final text = T.format('discoverAsksParty', [person.displayName]);
+      app.show(text);
+      unawaited(app.noticeOverGame(text, detail: T.text('partyTitle'), symbol: Icons.back_hand_rounded));
     };
     // Handed the lead, as the Mac says it.
     hub.parties.onBecameLeader = () => app.show(T.text('partyYouLead'));
@@ -145,9 +147,15 @@ class TogetherModel {
       ..onFamilyNotice = (_) => unawaited(family.refresh());
     // The friends-only names and pictures the friends list brought, for every card shown.
     identities = hub.friends.identities;
+    // A friend request: over a game the card with the handle, unless the user asked not to be
+    // disturbed, as on the Mac.
     hub.friends.onRequest = (person) {
       _noticeSound();
-      app.show(T.format('friendsAsked', [person.displayName]));
+      final text = T.format('friendsAsked', [person.displayName]);
+      app.show(text);
+      if (!doNotDisturb) {
+        unawaited(app.noticeOverGame(text, detail: '@${person.handle}', symbol: Icons.person_add_alt_1_rounded));
+      }
     };
     hub.friends.onAccepted = (person) => app.show(T.format('friendsNowFriends', [person.displayName]));
     // A friend went up a trophy level: only while the launcher is in front and no game runs, as
@@ -1416,9 +1424,14 @@ class TogetherModel {
         final from = data['from'];
         _noticeSound();
         app.vibrate(HapticCue.ring);
-        app.show(
-          T.format('partyInvitedYou', [from is Map<String, dynamic> ? (from['displayName'] as String?) ?? '' : '']),
-        );
+        final text = T.format('partyInvitedYou', [
+          from is Map<String, dynamic> ? (from['displayName'] as String?) ?? '' : '',
+        ]);
+        app.show(text);
+        // Over a game the card, unless the user asked not to be disturbed, as on the Mac.
+        if (!doNotDisturb) {
+          unawaited(app.noticeOverGame(text, detail: T.text('partyTitle'), symbol: Icons.groups_rounded));
+        }
       case 'party.member_joined' when data['partyId'] == hub.parties.party?.id:
         final member = data['member'];
         if (member is Map<String, dynamic> && member['userId'] != user?.id) {
