@@ -1134,9 +1134,13 @@ extension TogetherFind on TogetherModel {
     switch (event.type) {
       case 'lfg.changed' || 'discover.changed':
         reloadDiscoverSoon();
+      // Someone is in for a post, and the answer to one's own "I'm in": over a game the card,
+      // Do Not Disturb or not, as on the Mac.
       case 'lfg.request':
         _noticeSound();
-        app.show(T.format('discoverWantsIn', [name, gameName(data['titleId'] as String? ?? '')]));
+        final text = T.format('discoverWantsIn', [name, gameName(data['titleId'] as String? ?? '')]);
+        app.show(text);
+        unawaited(app.noticeOverGame(text, detail: T.text('discoverFindPlayers'), symbol: Icons.back_hand_rounded));
         unawaited(_refreshMine());
       case 'lfg.request_cancelled':
         unawaited(_refreshMine());
@@ -1144,7 +1148,11 @@ extension TogetherFind on TogetherModel {
         if (data['answer'] == 'accepted') {
           _noticeSound();
           final invite = LfgInvite.fromJson(data['invite']);
-          app.show(T.text(invite?.isSharePlay == true ? 'discoverYoureInShare' : 'discoverYoureInParty'));
+          final text = T.text(invite?.isSharePlay == true ? 'discoverYoureInShare' : 'discoverYoureInParty');
+          app.show(text);
+          unawaited(
+            app.noticeOverGame(text, detail: T.text('discoverFindPlayers'), symbol: Icons.check_circle_rounded),
+          );
           unawaited(hub.parties.refresh().catchError((Object _) {}));
         } else {
           app.show(T.text('discoverNotThisTime'));

@@ -28,6 +28,9 @@ class FakeDesktop implements DesktopWindows {
   final List<(String, String?)> noticeCards = [];
   bool canShow = true;
 
+  /// Each desktop notice's title and text.
+  final List<(String, String)> notified = [];
+
   @override
   bool get canShowCard => canShow;
 
@@ -87,6 +90,7 @@ class FakeDesktop implements DesktopWindows {
   @override
   Future<bool> notify(String title, String body, {String? icon}) async {
     calls.add('notify $body');
+    notified.add((title, body));
     return true;
   }
 

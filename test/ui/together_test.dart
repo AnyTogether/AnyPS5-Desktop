@@ -761,14 +761,14 @@ void main() {
 
       server.push('party.request', {'partyId': id, 'from': FakeTogether.card('u-cem', 'cem', 'Cem'), 'via': 'code'});
       await until(() => together.hub.parties.party!.requests.length == 1);
-      expect(model.toast, 'Cem asks to join with your code');
+      expect(model.toast, 'Cem asks to join your party', reason: "the Mac's words, the row says it was the code");
       server.push('party.request', {
         'partyId': id,
         'from': FakeTogether.card('u-deniz', 'deniz', 'Deniz'),
         'via': 'list',
       });
       await until(() => together.hub.parties.party!.requests.length == 2);
-      expect(model.toast, 'Deniz asks to join the party');
+      expect(model.toast, 'Deniz asks to join your party');
       expect(together.partyBadge, 2);
       expect(rowIds().take(4), [
         'party-request-u-cem',

@@ -840,6 +840,9 @@ extension TogetherMessages on TogetherModel {
       T.format('messagesFrom', [name, text.length > 80 ? '${text.substring(0, 80)}…' : text]),
       onTap: conversation == null ? null : () => unawaited(openConversation(conversation)),
     );
+    // Over a game the card: who wrote it, and what, unless the user asked not to be disturbed,
+    // as on the Mac.
+    if (!doNotDisturb) unawaited(app.noticeOverGame(name, detail: text, symbol: Icons.chat_bubble_rounded));
   }
 
   // End-to-end encryption.
