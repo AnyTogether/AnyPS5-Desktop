@@ -82,6 +82,8 @@ extension GameSharing on AppModel {
     if (imported.engine case final String key when !engine.downloaded.any((kit) => p.basename(kit.root) == key)) {
       imported = imported.copyWith(engine: null);
     }
+    // Options typed and not saved give way to the file's.
+    dropOptionDrafts(game);
     saveSettings(game, imported);
     show(
       shared.titleId == game.titleId ? T.text('settingsImported') : T.format('settingsImportedOther', [shared.game]),

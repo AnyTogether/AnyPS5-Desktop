@@ -55,17 +55,26 @@ class FakeGameStarts {
   final started = <String>[];
   final processes = <FakeGameProcess>[];
 
+  /// What each start was given: its environment, its arguments and its log notes.
+  final environments = <Map<String, String>>[];
+  final arguments = <List<String>>[];
+  final notes = <List<String>>[];
+
   FakeGameProcess get last => processes.last;
 
   Future<RunningGame> call({
     required String installed,
     required Map<String, String> environment,
+    List<String> arguments = const [],
     required String logFile,
     HostSystem? system,
     bool traced = false,
     List<String> notes = const [],
   }) async {
     started.add(installed);
+    environments.add(environment);
+    this.arguments.add(arguments);
+    this.notes.add(notes);
     final process = make();
     processes.add(process);
     return RunningGame(process, process.exitCode, DateTime(2026, 10, 30, 20));

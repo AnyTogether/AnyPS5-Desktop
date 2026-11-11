@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:anyps5_desktop/core/cli.dart';
 import 'package:anyps5_desktop/core/game_library.dart';
+import 'package:anyps5_desktop/core/game_settings.dart';
 import 'package:anyps5_desktop/core/host.dart';
 import 'package:anyps5_desktop/core/installer.dart';
 import 'package:path/path.dart' as p;
@@ -110,6 +111,47 @@ void main() {
     final last = log3.substring(log3.lastIndexOf('relinked game'));
     expect(last, contains('ANYPS5_FULLSCREEN=1'));
   });
+
+  test(
+    "install passes the game's custom relinker options; play its launch options, the launcher's values winning",
+    () async {
+      final toolkit = makeFakeToolkit(p.join(temp.path, 'toolkit'));
+      final root = p.join(temp.path, 'Games');
+      final game = makeDump(root, 'G', titleId: 'PPSA07007', eboot: const [0]);
+      File(p.join(game, 'eboot.bin')).writeAsBytesSync(typicalSelf());
+      final environment = {'HOME': p.join(temp.path, 'home'), 'ANYPS5_TOOLKIT': toolkit};
+      final paths = AppPaths.forSystem(HostSystem.linux, environment: environment);
+      GameSettingsStore(paths.gameSettingsFolder).save(
+        GameLibrary.inspect(game)!.slug,
+        const GameSettings(
+          customRelinkerOptions: '--exclude-sce-module "lib a.sprx"',
+          launchOptions: 'ANYPS5_MINE="a b" ANYPS5_FULLSCREEN=1 --aps5-report=off "two words"',
+        ),
+      );
+      final installed = await run(['install', game, root], environment: environment);
+      expect(installed.$1, 0, reason: installed.$3);
+      final arguments = fakeRelinkerArguments(toolkit);
+      expect(arguments.sublist(arguments.length - 4, arguments.length - 2), ['--exclude-sce-module', 'lib a.sprx']);
+      final record = Installer.record(
+        Installer.installedFolder(GameLibrary.inspect(game)!, root),
+        system: HostSystem.linux,
+      );
+      expect(record!.customRelinkerOptions, ['--exclude-sce-module', 'lib a.sprx']);
+      final played = await run(['play', game, root], environment: environment);
+      expect(played.$1, 0, reason: played.$3);
+      final log = File(paths.logFile('PPSA07007')).readAsStringSync();
+      expect(log, contains('relinked game --aps5-report=off two words'));
+      expect(log, contains('ANYPS5_MINE=a b'));
+      expect(log, contains('ANYPS5_FULLSCREEN=0'), reason: "the launcher's own value");
+      expect(
+        log,
+        contains(
+          '[anyps5-launcher] launch options: ANYPS5_MINE="a b" ANYPS5_FULLSCREEN=1 --aps5-report=off "two words"',
+        ),
+      );
+      expect(log, contains("[anyps5-launcher] launch options: the launcher's own value is used for ANYPS5_FULLSCREEN"));
+    },
+  );
 
   test('remote: a phone is let in with --allow-all and sees the games', () async {
     final root = p.join(temp.path, 'Games');
