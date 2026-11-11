@@ -58,7 +58,10 @@ Future<void> loadFonts() async {
   _fontsLoaded = true;
   final figtree = FontLoader('Figtree')..addFont(rootBundle.load('assets/fonts/Figtree.ttf'));
   final icons = FontLoader('MaterialIcons')..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
-  await Future.wait([figtree.load(), icons.load()]);
+  final mono = FontLoader('NotoSansMono')
+    ..addFont(rootBundle.load('assets/system-fonts/NotoSansMono-Regular.ttf'))
+    ..addFont(rootBundle.load('assets/system-fonts/NotoSansMono-Bold.ttf'));
+  await Future.wait([figtree.load(), icons.load(), mono.load()]);
 }
 
 /// A PNG written in Dart: [color] gives each pixel's RGBA.

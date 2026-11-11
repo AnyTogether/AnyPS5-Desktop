@@ -495,7 +495,13 @@ class _CommandLineState extends State<_CommandLine> {
   @override
   Widget build(BuildContext context) {
     final scale = LayoutScale.of(context);
-    final mono = TextStyle(fontFamily: 'monospace', fontSize: 15 * scale, height: 1.3, color: Colors.white);
+    final mono = TextStyle(
+      fontFamily: 'NotoSansMono',
+      fontFamilyFallback: const ['monospace'],
+      fontSize: 15 * scale,
+      height: 1.3,
+      color: Colors.white,
+    );
     return Container(
       padding: EdgeInsets.fromLTRB(16 * scale, 6 * scale, 6 * scale, 6 * scale),
       decoration: BoxDecoration(

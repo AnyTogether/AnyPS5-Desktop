@@ -56,6 +56,13 @@ flutter:
     - family: Figtree
       fonts:
         - asset: assets/fonts/Figtree.ttf
+    # Commands to copy, as a terminal prints them (the libmpv notice over a clip on Linux): the
+    # Noto Sans Mono the engine's typewriter font set already carries, so nothing more is shipped.
+    - family: NotoSansMono
+      fonts:
+        - asset: assets/system-fonts/NotoSansMono-Regular.ttf
+        - asset: assets/system-fonts/NotoSansMono-Bold.ttf
+          weight: 700
 
 hooks:
   user_defines:
