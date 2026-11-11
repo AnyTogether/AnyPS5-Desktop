@@ -21,8 +21,9 @@ MISSING_LINE='libmpv is not installed'
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq --no-install-recommends "$FOLDER"/anyps5-desktop_*_amd64.deb >/dev/null
-# To start it: an X server and Mesa's software OpenGL.
-apt-get install -y -qq --no-install-recommends xvfb xauth libgl1-mesa-dri >/dev/null
+# To start it: an X server and Mesa's software OpenGL and GLES, which Flutter's engine opens
+# (libGLESv2.so.2) and every desktop has.
+apt-get install -y -qq --no-install-recommends xvfb xauth libgl1-mesa-dri libgles2 libegl1 libegl-mesa0 >/dev/null
 sed -n 's/^VERSION=//p' /etc/os-release
 
 libmpv=$(dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'libmpv*' 2>/dev/null | awk '$1 == "ii" && $2 ~ /^libmpv[0-9]+$/ {print $2}')
