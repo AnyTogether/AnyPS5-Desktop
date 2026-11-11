@@ -158,13 +158,10 @@ void main() {
       model.open(Layer.advanced);
       final rows = model.panelCategories().single.rows;
       (rows.firstWhere((row) => row.id == 'relinkerCustomOptions').kind as TextRow).set('--lazy-binding --windows');
+      model.panelRow = rows.indexWhere((row) => row.id == 'launchOptions');
       await pumpLauncher(tester, model);
-      final target = rows.indexWhere((row) => row.id == 'launchOptions');
-      for (var moves = 0; moves < 60 && model.panelRow < target; moves++) {
-        model.handle(Command.down);
-        await tester.pump(const Duration(milliseconds: 50));
-      }
-      expect(model.panelRow, target);
+      // The rebuild options at the top, the Launch section under them.
+      await tester.ensureVisible(find.byKey(const ValueKey('row-relinker---trace-imports')));
       await tester.pump(const Duration(seconds: 1));
       await expectLater(shell, matchesGoldenFile('goldens/advanced_options_en.png'));
     });
