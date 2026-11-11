@@ -31,17 +31,14 @@ void main() {
   }
 
   void makeAddon(String relative, {String? name, String? contentId}) {
-    write(
-      '$relative/sce_sys/param.json',
-      jsonEncode({
-        'contentId': ?contentId,
-        if (name != null)
-          'localizedParameters': {
-            'defaultLanguage': 'en-US',
-            'en-US': {'titleName': name},
-          },
-      }),
-    );
+    write('$relative/sce_sys/param.json', jsonEncode({
+      'contentId': ?contentId,
+      if (name != null)
+        'localizedParameters': {
+          'defaultLanguage': 'en-US',
+          'en-US': {'titleName': name},
+        },
+    }));
     write('$relative/data.pak', 'data');
   }
 
@@ -115,19 +112,12 @@ void main() {
       final game = GameLibrary.inspect(folder)!;
       expect(game.addonEnvironment['ANYPS5_UPDATE_DIR'], p.join(root, 'PPSA01234-UPDATE'));
       final dlc = p.join(root, 'PPSA01234-DLC');
-      expect(
-        GameAddons.environment(update: game.update, addons: game.addons, windows: false)['ANYPS5_ADDCONT_DIRS'],
-        '${p.join(dlc, 'COSTUMEPACK00002')}:${p.join(dlc, 'EXPANSION0000001')}',
-      );
-      expect(
-        GameAddons.environment(addons: game.addons, windows: true)['ANYPS5_ADDCONT_DIRS'],
-        '${p.join(dlc, 'COSTUMEPACK00002')};${p.join(dlc, 'EXPANSION0000001')}',
-      );
-      expect(
-        GameLibrary.inspect(makeDump(root, 'Plain', titleId: 'PPSA00002'))!.addonEnvironment,
-        isEmpty,
-        reason: 'a game without them starts as before',
-      );
+      expect(GameAddons.environment(update: game.update, addons: game.addons, windows: false)['ANYPS5_ADDCONT_DIRS'],
+          '${p.join(dlc, 'COSTUMEPACK00002')}:${p.join(dlc, 'EXPANSION0000001')}');
+      expect(GameAddons.environment(addons: game.addons, windows: true)['ANYPS5_ADDCONT_DIRS'],
+          '${p.join(dlc, 'COSTUMEPACK00002')};${p.join(dlc, 'EXPANSION0000001')}');
+      expect(GameLibrary.inspect(makeDump(root, 'Plain', titleId: 'PPSA00002'))!.addonEnvironment, isEmpty,
+          reason: 'a game without them starts as before');
     });
 
     test("the update's executable and modules are the ones relinked", () async {
@@ -139,16 +129,9 @@ void main() {
       write('PPSA01234-UPDATE/sce_module/libshared.prx', 'updated shared');
       write('PPSA01234-UPDATE/sce_module/libnew.prx', 'update only');
       final game = GameLibrary.inspect(folder)!;
-      expect(Installer.modulesOf(game, HostSystem.linux), [
-        'sce_module/libbase.prx',
-        'sce_module/libnew.prx',
-        'sce_module/libshared.prx',
-      ]);
+      expect(Installer.modulesOf(game, HostSystem.linux), ['sce_module/libbase.prx', 'sce_module/libnew.prx', 'sce_module/libshared.prx']);
       expect(Installer.source(game, 'eboot.bin'), p.join(root, 'PPSA01234-UPDATE', 'eboot.bin'));
-      expect(
-        Installer.source(game, 'sce_module/libshared.prx'),
-        p.join(root, 'PPSA01234-UPDATE', 'sce_module', 'libshared.prx'),
-      );
+      expect(Installer.source(game, 'sce_module/libshared.prx'), p.join(root, 'PPSA01234-UPDATE', 'sce_module', 'libshared.prx'));
       expect(Installer.source(game, 'sce_module/libbase.prx'), p.join(folder, 'sce_module', 'libbase.prx'));
 
       // Unlocked, the update's ELF is relinked, not the game's SELF, and the record says which update.
