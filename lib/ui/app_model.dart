@@ -6299,7 +6299,7 @@ class AppModel extends ChangeNotifier {
         id: 'launchOptions',
         detail: 'launchOptionsDetail',
         saved: settings.launchOptions,
-        check: (text) => LaunchOptions.parse(text).$2,
+        check: (text) => GameLaunchOptions.parse(text).$2,
         apply: (settings, text) => settings.copyWith(launchOptions: text),
       ),
       section('shareSection', 'sectionShare'),

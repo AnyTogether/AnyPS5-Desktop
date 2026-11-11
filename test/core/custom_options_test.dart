@@ -149,8 +149,8 @@ void main() {
   });
 
   group('launch options', () {
-    LaunchOptions parse(String text) {
-      final (options, problem) = LaunchOptions.parse(text);
+    GameLaunchOptions parse(String text) {
+      final (options, problem) = GameLaunchOptions.parse(text);
       expect(problem, isNull);
       return options!;
     }
@@ -172,7 +172,7 @@ void main() {
     });
 
     test('only a quote left open stops them', () {
-      expect(LaunchOptions.parse('A=1 "b').$2, const OptionProblem(OptionProblemKind.openQuote));
+      expect(GameLaunchOptions.parse('A=1 "b').$2, const OptionProblem(OptionProblemKind.openQuote));
       expect(parse('--windows eboot.bin').arguments, ['--windows', 'eboot.bin']);
     });
 

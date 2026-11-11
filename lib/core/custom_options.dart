@@ -220,8 +220,8 @@ OptionWords checkRelinkerOptions(String text) {
 
 /// A game's Launch options: variables first (NAME=value), then the arguments for the game. Where
 /// the launcher sets a variable for the start too, the launcher's value is used.
-class LaunchOptions {
-  const LaunchOptions({required this.text, this.environment = const {}, this.arguments = const []});
+class GameLaunchOptions {
+  const GameLaunchOptions({required this.text, this.environment = const {}, this.arguments = const []});
 
   /// The text as saved.
   final String text;
@@ -235,7 +235,7 @@ class LaunchOptions {
   static final _variable = RegExp(r'^[A-Za-z_][A-Za-z0-9_]*=');
 
   /// The options in [text], or the problem (only a quote left open) that stops them.
-  static (LaunchOptions?, OptionProblem?) parse(String text) {
+  static (GameLaunchOptions?, OptionProblem?) parse(String text) {
     final split = splitOptionWords(text);
     if (!split.ok) return (null, split.problem);
     final environment = <String, String>{};
@@ -246,7 +246,7 @@ class LaunchOptions {
       final equals = word.indexOf('=');
       environment[word.substring(0, equals)] = word.substring(equals + 1);
     }
-    return (LaunchOptions(text: text, environment: environment, arguments: split.words.sublist(index)), null);
+    return (GameLaunchOptions(text: text, environment: environment, arguments: split.words.sublist(index)), null);
   }
 
   /// The environment a start gets: these variables with [launcher]'s over them, and the names

@@ -173,7 +173,7 @@ class GameSettings {
           ? (json['relinkerFlags'] as List<dynamic>).whereType<String>().toList()
           : null,
       customRelinkerOptions: optionsText(json['customRelinkerOptions'], (text) => checkRelinkerOptions(text).ok),
-      launchOptions: optionsText(json['launchOptions'], (text) => LaunchOptions.parse(text).$2 == null),
+      launchOptions: optionsText(json['launchOptions'], (text) => GameLaunchOptions.parse(text).$2 == null),
     );
   }
 
@@ -295,9 +295,9 @@ class GameSettings {
 
   /// The variables and arguments [launchOptions] gives the game's start; null when it is not set
   /// or has a quote left open.
-  LaunchOptions? get launch {
+  GameLaunchOptions? get launch {
     final text = launchOptions;
-    return text == null || text.trim().isEmpty ? null : LaunchOptions.parse(text).$1;
+    return text == null || text.trim().isEmpty ? null : GameLaunchOptions.parse(text).$1;
   }
 
   Map<String, Object?> toJson() => {
