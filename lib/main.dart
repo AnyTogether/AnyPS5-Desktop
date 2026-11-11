@@ -31,6 +31,7 @@ import 'core/steam/steam_launch.dart';
 import 'core/toolkit_download.dart';
 import 'ui/app_model.dart';
 import 'ui/clip_player.dart';
+import 'ui/countries.dart';
 import 'ui/crash_model.dart';
 import 'ui/launcher.dart';
 import 'ui/launcher_window_channel.dart';
@@ -66,6 +67,7 @@ Future<void> main(List<String> arguments) async {
   }
   // The built-in languages, and any file a translator put in the Languages folder to try it.
   await T.load(tryOut: Directory(p.join(paths.config, 'Languages')));
+  await Countries.load();
   final options = LaunchOptions.parse(arguments);
   // An anyps5:// link with a launcher already open: that one takes it, and this one quits before
   // it shows a window.

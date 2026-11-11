@@ -57,6 +57,7 @@ import '../core/game_settings.dart';
 import 'app_model.dart';
 import 'clip_player.dart' show ViewedMedia, mediaAspect;
 import 'compare_view.dart';
+import 'countries.dart';
 import 'family_gate.dart';
 import 'livekit_room.dart';
 import 'now_playing_model.dart';
@@ -507,6 +508,7 @@ class TogetherModel {
         Layer.profile,
         Layer.showcaseEdit,
         Layer.profileTheme,
+        Layer.countryPicker,
         Layer.compare,
         Layer.feed,
         Layer.captures,
@@ -1420,11 +1422,20 @@ class TogetherModel {
         'handle_reserved' => T.text('togetherHandleReserved'),
         'handle_cooldown' => switch (DateTime.tryParse(error.extra['handleChangeAt'] as String? ?? '')) {
           final DateTime at => T.format('togetherHandleAgain', [CompareView.day(at)]),
-          null => error.title,
+          null => T.format('togetherErrorOther', [error.code]),
         },
         'links_not_allowed' => T.text('togetherNoLinks'),
         'media_server_off' => T.format('togetherMediaServerOff', [(error.extra['max'] as num?)?.toInt() ?? 4]),
-        _ => error.title.isEmpty ? T.text('togetherUnreachable') : error.title,
+        // The server's own words are English: every code gets the launcher's.
+        'bad_request' => T.text('togetherErrorBadRequest'),
+        'unauthorized' || 'session_revoked' || 'refresh_reused' => T.text('togetherErrorSignedOut'),
+        'forbidden' => T.text('togetherErrorForbidden'),
+        'not_found' => T.text('togetherErrorNotFound'),
+        'conflict' => T.text('togetherErrorConflict'),
+        'full' => T.text('togetherErrorFull'),
+        'payload_too_large' => T.text('togetherErrorTooLarge'),
+        'internal' => T.text('togetherErrorInternal'),
+        final code => code.isEmpty ? T.text('togetherUnreachable') : T.format('togetherErrorOther', [code]),
       };
     }
     return T.text('togetherUnreachable');
@@ -1518,12 +1529,9 @@ class TogetherModel {
       PanelRow(
         id: 'together-country',
         title: T.text('togetherCountry'),
-        detail: T.text('togetherCountryDetail'),
-        kind: TextRow(
-          countryDraft ?? self.country ?? '',
-          (text) => countryDraft = text,
-          submit: () => unawaited(saveProfile()),
-        ),
+        // The country by its name, chosen from the list: never a code to know and type.
+        detail: Countries.name(countryDraft ?? self.country) ?? T.text('togetherCountryChoose'),
+        kind: ActionRow(openCountryPicker),
       ),
       PanelRow(
         id: 'together-save',
@@ -1543,6 +1551,81 @@ class TogetherModel {
         title: T.text('togetherChangeHandle'),
         kind: ActionRow(() => unawaited(changeHandle())),
       ),
+    ];
+  }
+
+  // The country: a list to search, by name in the launcher's language (Layer.countryPicker).
+
+  /// The search field's row, and the rows of no country and of each one.
+  static const countrySearchRow = 'country-search';
+  static const countryNoneRow = 'country-none';
+  static String countryRowId(String code) => 'country-$code';
+
+  /// What is typed in the picker's search, and where Back from the picker goes.
+  String countryQuery = '';
+  PanelSpot? countryReturn;
+
+  /// The country the profile would get on Save: the one picked, else the profile's own.
+  String get countryChosen => (countryDraft ?? hub.self.country ?? '').trim().toUpperCase();
+
+  /// Opens the list over Settings, on the row of the country chosen now.
+  void openCountryPicker() {
+    countryReturn = app.spot;
+    countryQuery = '';
+    app.open(Layer.countryPicker);
+    final chosen = countryChosen;
+    final row = countryRows().indexWhere((row) => row.id == (chosen.isEmpty ? countryNoneRow : countryRowId(chosen)));
+    if (row > 0) app.panelRow = row;
+    app.refresh();
+  }
+
+  /// Back to the row the picker was opened from, nothing chosen.
+  void backFromCountry() {
+    app.stopEditing();
+    app.returnTo(countryReturn);
+    countryReturn = null;
+  }
+
+  /// [code] is the profile's country once Save is chosen (null: none), and the list closes.
+  void chooseCountry(String? code) {
+    countryDraft = code ?? '';
+    backFromCountry();
+  }
+
+  /// The search field, None (while nothing is searched for) and the countries the search finds.
+  List<PanelRow> countryRows() {
+    final found = Countries.search(countryQuery);
+    final searching = countryQuery.trim().isNotEmpty;
+    return [
+      PanelRow(
+        id: countrySearchRow,
+        title: T.text('togetherCountrySearch'),
+        kind: TextRow(
+          countryQuery,
+          (text) {
+            countryQuery = text;
+            // The rows under the field change: the focus stays on the field.
+            app.panelRow = 0;
+            app.refresh();
+          },
+          // Enter: on to the first country found.
+          submit: () {
+            if (Countries.search(countryQuery).isEmpty) return;
+            app.panelRow = 1;
+            app.refresh();
+          },
+        ),
+      ),
+      if (!searching)
+        PanelRow(id: countryNoneRow, title: T.text('togetherCountryNone'), kind: ActionRow(() => chooseCountry(null))),
+      for (final (code, name) in found)
+        PanelRow(id: countryRowId(code), title: name, kind: ActionRow(() => chooseCountry(code))),
+      if (found.isEmpty)
+        PanelRow(
+          id: 'country-no-match',
+          title: T.format('togetherCountryNoMatch', [countryQuery.trim()]),
+          kind: const InfoRow(''),
+        ),
     ];
   }
 

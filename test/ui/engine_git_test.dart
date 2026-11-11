@@ -168,7 +168,12 @@ void main() {
     commands.results['git --version'] = const FakeResult(missing: true);
     choose('engineGitUpdate');
     await until(() => !model.engine.git.running);
-    expect(model.toast, T.format('engineGitFailed', [T.text('engineGitNoGit')]));
+    expect(
+      model.toast,
+      T.format('engineGitFailed', [
+        T.format('engineGitMissing', ['Git']),
+      ]),
+    );
     expect(row('engineGitGuide')?.title, T.text('engineGitGuideUpstream'));
     choose('engineGitGuide');
     expect(fixture.opened.single, EngineCheckout.upstreamLinuxGuide);
@@ -203,7 +208,12 @@ void main() {
     commands.results['g++ --version'] = const FakeResult(missing: true);
     choose('engineGitUpdate');
     await until(() => !model.engine.git.running);
-    expect(model.toast, T.format('engineGitFailed', [T.text('engineGitNoCompiler')]));
+    expect(
+      model.toast,
+      T.format('engineGitFailed', [
+        T.format('engineGitMissing', [T.text('engineToolCompiler')]),
+      ]),
+    );
     expect(commands.lines.where((line) => line.startsWith('git pull')), isEmpty);
     expect(row('engineGitGuide')?.title, T.text('engineGitGuideArm'));
     choose('engineGitGuide');

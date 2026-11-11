@@ -65,6 +65,23 @@ class EngineGitModel {
 
   bool get running => step != null;
 
+  /// What installs the tools the last update found missing, each to copy and, where it installs
+  /// for the user only, to run here.
+  List<InstallCommand> fixes = const [];
+
+  /// The install command running now, null when none is.
+  InstallCommand? installing;
+
+  /// Looking for the tools again (Check again, or after an install).
+  bool rechecking = false;
+
+  /// Tests: what /etc/os-release says, in place of the computer's own (which package manager a
+  /// Linux system installs with).
+  static String? Function()? osReleaseOverride;
+
+  EngineGit _gitFor(EngineCheckout checkout) =>
+      EngineGit(checkout, runner: _runner, environment: app.services.environment, osRelease: osReleaseOverride);
+
   /// The game whose Play asked for the check and the build (Update from Git Before Playing).
   String? forGame;
 
@@ -79,16 +96,17 @@ class EngineGitModel {
   /// (before a game starts, the caller does).
   Future<bool> update({bool quiet = false}) async {
     final checkout = this.checkout;
-    if (checkout == null || running) return false;
+    if (checkout == null || running || installing != null || rechecking) return false;
     // A game being unlocked uses the relinker and the libraries the build would rewrite.
     if (app.unlocking) {
       if (!quiet) app.show(T.text('engineGitWaitUnlock'));
       return false;
     }
-    final git = EngineGit(checkout, runner: _runner, environment: app.services.environment);
+    final git = _gitFor(checkout);
     final cancel = CommandCancel();
     _cancel = cancel;
     failure = null;
+    fixes = const [];
     updated = false;
     lines.clear();
     step = GitStep.checking;
@@ -132,6 +150,14 @@ class EngineGitModel {
     } on GitUpdateFailure catch (stopped) {
       _output = List.of(git.output);
       failure = stopped.kind == GitFailureKind.cancelled ? null : stopped;
+      // Tools to install: the commands that do it on this system, beside what is missing.
+      if (stopped.missing.isNotEmpty) {
+        try {
+          fixes = await git.fixes(stopped.missing);
+        } on Object {
+          fixes = const [];
+        }
+      }
       // A build stopped half way may have changed some libraries.
       if (!stopped.untouched || stopped.kind == GitFailureKind.cancelled) app.reloadDiskFacts();
       if (!quiet) {
@@ -139,7 +165,7 @@ class EngineGitModel {
           app.show(T.text('engineGitStopped'));
         } else {
           app.sounds.play(Cue.back);
-          app.show(T.format('engineGitFailed', [reason(stopped.kind)]));
+          app.show(T.format('engineGitFailed', [reasonOf(stopped)]));
         }
       }
       return false;
@@ -163,6 +189,8 @@ class EngineGitModel {
     GitFailureKind.noCmake => 'engineGitNoCmake',
     GitFailureKind.noNinja => 'engineGitNoNinja',
     GitFailureKind.noCompiler => 'engineGitNoCompiler',
+    // Said with what is missing ([reasonOf]); alone, as a tool not found.
+    GitFailureKind.prerequisites => 'engineGitNoBuildReason',
     GitFailureKind.configure => 'engineGitConfigureFailed',
     GitFailureKind.notGit => 'engineGitNotGit',
     GitFailureKind.dirty => 'engineGitDirty',
@@ -172,6 +200,115 @@ class EngineGitModel {
     GitFailureKind.build => 'engineGitBuildFailed',
     GitFailureKind.cancelled => 'engineGitStopped',
   });
+
+  /// Why [stopped] stopped: for tools not installed, every one of them by name.
+  static String reasonOf(GitUpdateFailure stopped) => stopped.missing.isEmpty
+      ? reason(stopped.kind)
+      : T.format('engineGitMissing', [stopped.missing.map(needName).join(', ')]);
+
+  /// A missing tool as the failure names it.
+  static String needName(MissingNeed missing) => switch (missing.need) {
+    BuildNeed.git => 'Git',
+    BuildNeed.cmake => 'CMake',
+    BuildNeed.ninja => 'Ninja',
+    BuildNeed.compiler => T.text('engineToolCompiler'),
+    BuildNeed.newerCompiler => T.format('engineToolCompilerOld', [missing.found ?? '']),
+    BuildNeed.x11 => T.text('engineToolX11'),
+  };
+
+  /// What a command installs, in a few words: "Git", "GCC, CMake, Ninja".
+  static String fixNames(InstallCommand command) => [
+    for (final need in command.needs)
+      switch (need) {
+        BuildNeed.git => 'Git',
+        BuildNeed.cmake => 'CMake',
+        BuildNeed.ninja => 'Ninja',
+        BuildNeed.compiler || BuildNeed.newerCompiler => 'GCC',
+        BuildNeed.x11 => T.text('engineToolX11'),
+      },
+  ].toSet().join(', ');
+
+  void copyFix(InstallCommand command) {
+    app.services.copyText?.call(command.line);
+    app.show(T.text('engineGitFixCopied'));
+  }
+
+  /// Looks for the tools again, PATH read anew (no restart after an install): the failure goes
+  /// when all are there, or lists what is still missing. [quiet] says nothing when all are there.
+  Future<bool> recheck({bool quiet = false}) async {
+    final checkout = this.checkout;
+    if (checkout == null || running || installing != null || rechecking) return false;
+    final git = _gitFor(checkout);
+    rechecking = true;
+    app.refresh();
+    try {
+      final missing = await git.missingNeeds();
+      if (missing.isEmpty) {
+        failure = null;
+        fixes = const [];
+        if (!quiet) app.show(T.text('engineGitToolsReady'));
+        return true;
+      }
+      failure = GitUpdateFailure(GitFailureKind.prerequisites, const [], missing);
+      try {
+        fixes = await git.fixes(missing);
+      } on Object {
+        fixes = const [];
+      }
+      app.show(T.format('engineGitStillMissing', [missing.map(needName).join(', ')]));
+      return false;
+    } on GitUpdateFailure {
+      return false;
+    } finally {
+      rechecking = false;
+      app.refresh();
+    }
+  }
+
+  /// Runs [command] here, its lines shown as the update's are; then looks for the tools again.
+  /// Only a command that installs for the user: one that needs administrator rights is copied.
+  Future<void> installFix(InstallCommand command) async {
+    final checkout = this.checkout;
+    if (checkout == null || running || installing != null || rechecking) return;
+    if (!command.runnable || command.admin) return copyFix(command);
+    final git = _gitFor(checkout);
+    final cancel = CommandCancel();
+    _cancel = cancel;
+    installing = command;
+    lines.clear();
+    app.refresh();
+    var installed = false;
+    try {
+      installed = await git.install(
+        command,
+        cancel: cancel,
+        onLine: (line) {
+          if (line.trim().isEmpty) return;
+          lines.add(line);
+          if (lines.length > 3) lines.removeAt(0);
+          _refresh ??= Timer(const Duration(milliseconds: 250), () {
+            _refresh = null;
+            app.refresh();
+          });
+        },
+      );
+      _output = List.of(git.output);
+    } finally {
+      _refresh?.cancel();
+      _refresh = null;
+      installing = null;
+      _cancel = null;
+      lines.clear();
+      app.refresh();
+    }
+    if (cancel.cancelled) return;
+    if (!installed) {
+      app.sounds.play(Cue.back);
+      app.show(T.format('engineGitFixFailed', [fixNames(command)]));
+      return;
+    }
+    await recheck();
+  }
 
   static String stepName(GitStep step) => T.text(switch (step) {
     GitStep.checking => 'engineGitStepChecking',
@@ -186,7 +323,7 @@ class EngineGitModel {
     final stopped = failure;
     if (stopped == null) return '';
     return [
-      T.format('engineGitFailed', [reason(stopped.kind)]),
+      T.format('engineGitFailed', [reasonOf(stopped)]),
       ..._output,
       ...stopped.tail.where((line) => !_output.contains(line)),
     ].join('\n');
@@ -233,11 +370,7 @@ class EngineGitModel {
     app.refresh();
     bool? needed;
     try {
-      needed = await EngineGit(
-        checkout,
-        runner: _runner,
-        environment: app.services.environment,
-      ).needsUpdate(built: app.preferences.engineGitBuilt[checkout.root]);
+      needed = await _gitFor(checkout).needsUpdate(built: app.preferences.engineGitBuilt[checkout.root]);
     } finally {
       checking = false;
       // Nothing to build (or the remote did not answer): the game no longer waits on the engine.
@@ -263,11 +396,11 @@ class EngineGitModel {
       if (stopped == null) return app.show(T.text('engineGitStopped'));
       // Nothing changed (a tree with changes, offline, no CMake): the current build plays.
       if (stopped.untouched) {
-        app.show(T.format('engineGitPlayAnyway', [reason(stopped.kind)]));
+        app.show(T.format('engineGitPlayAnyway', [reasonOf(stopped)]));
         return play();
       }
       app.sounds.play(Cue.back);
-      return app.show(T.format('engineGitFailed', [reason(stopped.kind)]));
+      return app.show(T.format('engineGitFailed', [reasonOf(stopped)]));
     }
     if (app.stateOf(game) case Installed(outdated: true)) return app.updateAndPlay(game);
     play();
@@ -313,7 +446,7 @@ class EngineGitModel {
       if (now == null && stopped != null)
         PanelRow(
           id: 'engineGitFailed',
-          title: T.format('engineGitFailed', [reason(stopped.kind)]),
+          title: T.format('engineGitFailed', [reasonOf(stopped)]),
           detail: [
             ...(stopped.tail.isEmpty ? _output : stopped.tail).reversed
                 .take(2)
@@ -323,6 +456,39 @@ class EngineGitModel {
             T.text('engineGitCopy'),
           ].join(' · '),
           kind: ActionRow(copyFailure),
+        ),
+      // Tools to install: each command to copy, the ones that install for the user also to run
+      // here, and Check again once they are in (PATH is read anew, no restart).
+      if (now == null && installing == null && stopped != null && stopped.missing.isNotEmpty) ...[
+        for (final (index, fix) in fixes.indexed) ...[
+          PanelRow(
+            id: 'engineGitFixCopy$index',
+            title: T.format(fix.admin ? 'engineGitFixCopyAdmin' : 'engineGitFixCopy', [fixNames(fix)]),
+            detail: fix.line,
+            wraps: true,
+            kind: ActionRow(() => copyFix(fix)),
+          ),
+          if (fix.runnable)
+            PanelRow(
+              id: 'engineGitFixRun$index',
+              title: T.format('engineGitFixRun', [fixNames(fix)]),
+              detail: T.text('engineGitFixRunDetail'),
+              kind: ActionRow(() => unawaited(installFix(fix))),
+            ),
+        ],
+        PanelRow(
+          id: 'engineGitRecheck',
+          title: T.text('engineGitRecheck'),
+          detail: T.text('engineGitRecheckDetail'),
+          kind: ActionRow(() => unawaited(recheck())),
+        ),
+      ],
+      if (installing case final InstallCommand fix)
+        PanelRow(
+          id: 'engineGitFixRunning',
+          title: T.format('engineGitFixRunning', [fixNames(fix)]),
+          detail: [...lines.map((line) => line.trim()), T.text('engineStop')].join(' · '),
+          kind: ActionRow(cancel),
         ),
       // A tool to install, or CMake's setup: the guide of this tree says how.
       if (now == null && stopped != null && stopped.guideHelps)

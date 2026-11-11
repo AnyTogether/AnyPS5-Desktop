@@ -643,7 +643,6 @@ extension TogetherProfiles on TogetherModel {
       }
       app.show(switch (problem.code) {
         'full' => T.text('gameSessionFull'),
-        'version_mismatch' => problem.title,
         _ => message(problem),
       });
     } on Object catch (error) {

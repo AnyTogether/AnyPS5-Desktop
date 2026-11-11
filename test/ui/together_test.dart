@@ -1485,18 +1485,25 @@ void main() {
       expect(row('together-edit').title, 'Your profile');
       expect((row('together-name').kind as TextRow).value, 'Utku');
       expect((row('together-bio').kind as TextRow).value, 'Night owl');
-      expect((row('together-country').kind as TextRow).value, 'TR');
-      expect(row('together-country').detail, 'Two letters: TR, DE, US…');
+      // The country by its name, on a row that opens the list: no code to type.
+      expect(row('together-country').kind, isA<ActionRow>());
+      expect(row('together-country').detail, 'Türkiye');
       expect(row('together-handle').detail, 'Can change once every 30 days.');
 
       // Only what changed goes; the country in capitals.
       (row('together-name').kind as TextRow).set('Utku Halis');
-      (row('together-country').kind as TextRow).set('de');
+      (row('together-country').kind as ActionRow).run();
+      expect(model.overlay, Layer.countryPicker);
+      (row(TogetherModel.countrySearchRow).kind as TextRow).set('germ');
+      expect(rowIds(), [TogetherModel.countrySearchRow, 'country-DE']);
+      (row('country-DE').kind as ActionRow).run();
+      expect(model.overlay, Layer.settings, reason: 'chosen: back where the list was opened from');
+      expect(row('together-country').detail, 'Germany');
       (row('together-save').kind as ActionRow).run();
       await until(() => model.toast == 'Profile saved');
       expect(server.callsTo('me/profile').single.body, {'displayName': 'Utku Halis', 'country': 'DE'});
       expect(together.user!.displayName, 'Utku Halis');
-      expect((row('together-country').kind as TextRow).value, 'DE');
+      expect(row('together-country').detail, 'Germany');
       // A blank bio clears it.
       (row('together-bio').kind as TextRow).set('  ');
       await together.saveProfile();
