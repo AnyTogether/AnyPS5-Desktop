@@ -499,8 +499,11 @@ class _LauncherShellState extends State<LauncherShell> {
                                                   onBack: () => model.handle(Command.back),
                                                   child: LeaderboardView(model: model),
                                                 ),
-                                                // A plain yes or no: Quit AnyPS5?, Close the game?
-                                                Layer.confirmQuit || Layer.closeGame => ConfirmCard(model: model),
+                                                // A plain yes or no: Quit AnyPS5?, Close the game?,
+                                                // Delete the game?
+                                                Layer.confirmQuit ||
+                                                Layer.closeGame ||
+                                                Layer.confirmDeleteGame => ConfirmCard(model: model),
                                                 Layer.challenge => WithBackPill(
                                                   onBack: () => model.handle(Command.back),
                                                   child: ChallengeDetailView(model: model),
