@@ -18,6 +18,9 @@ enum ProfileOrigin {
 /// Where the profile screens are: the picker's focus, adding a profile (offline or signing in),
 /// and the sign-in a profile going online waits on.
 class ProfileFlow {
+  /// Add Profile's name field, as the row being typed in (AppModel.editingRow).
+  static const nameRow = 'profile-add-name';
+
   /// The picker's focused tile (the last one is Add Profile).
   int pickerIndex = 0;
 
@@ -421,6 +424,12 @@ extension LauncherProfiles on AppModel {
   /// The two cards (Add Profile and the first start's last step): left and right pick one.
   void modeChoiceCommand(Command command) {
     switch (command) {
+      // Add Profile: the name is over the cards. Up puts the cursor in it (Enter and Esc give
+      // the keys back to the cards).
+      case Command.up when overlay == Layer.addProfile:
+        sounds.play(Cue.move);
+        startEditing(ProfileFlow.nameRow);
+        return;
       case Command.left || Command.right:
         final next = command == Command.left ? 0 : 1;
         if (next == profileFlow.modeChoice) return;
