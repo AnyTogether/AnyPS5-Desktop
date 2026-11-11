@@ -11,6 +11,94 @@ section is copied into the release.
 
 Nothing yet.
 
+## 0.1.22
+
+- **Delete game.** Game Settings has a new action under Remove installation that takes the game
+  itself off the disk: its own folder, the update and add-ons dumped beside it, and the zip or
+  .ffpfsc it was unpacked from go to the Recycle Bin (the trash on Linux), and the installation
+  AnyPS5 made from them is removed. The card names the folder and its size and starts on Cancel.
+  Your saves and trophies are kept and come back when you add the game to the same folder again.
+  Backups, cloud saves, captures and your AnyTogether profile are not touched. Where the files
+  cannot go to the Recycle Bin (a drive without one, a folder too big for it), AnyPS5 asks again
+  before deleting them for good. It never deletes a games folder itself, a game reached through a
+  link that leads out of your games folders, or a game that is playing or being unlocked.
+- **A module the dump holds twice no longer spoils the unlock.** Some dumps carry the same module in
+  two folders: a `decrypted/sce_module` folder beside `sce_module` (Lost in Play), or `.prx` files
+  next to `eboot.bin` that `sce_module` holds too (Minecraft). The relinker refuses two modules with
+  one name. On older engines the unlock stopped with "Conflicting guest output filename". On newer
+  ones it went on with the wrong copy, and Lost in Play stopped as it started. AnyPS5 now takes one
+  copy of each such module, the one in `sce_module` first, and the unlock log names the copy it set
+  aside. Every other module is converted where the dump has it, as before. For a game that failed
+  this way, choose ⋯ → Unlock Again. Thanks to Slick Daddy for the report and its log, and to
+  Lenny4250gh for tracking down the Minecraft case and proposing a fix.
+- **Add Profile's name can be typed without the mouse**. Up from the two cards puts the cursor in
+  the name, and Enter or Esc gives the keys back to the cards. While the name is typed, space,
+  Backspace and letters such as O, Q and E are the name's (before, they chose a card, went back or
+  ran a shortcut, and the cursor could jump out of the field).
+- **A game made with another engine is rebuilt before it starts**. After an engine update (or
+  another engine chosen), a game unlocked with the old one was offered "Update and play or Play
+  now", and Play Together and a friend's game started it as it was, so two up-to-date launchers
+  could end up with different builds that cannot connect. Play, Play Together and Join now rebuild
+  the copy first with the usual progress, then go on. A newer engine to download is still offered,
+  and after a rebuild that fails the old copy can still be played as it is.
+- **A join that cannot go on says why in full**. A different game version or engine build opens a
+  panel that names which of the two differs and shows the host's and yours whole, each on its own
+  line (before: a one-line notice with the builds cut to six characters, such as "arm-ni" and
+  "arm-f7"). It offers what fits: Rebuild and join when only your copy is stale, Check for updates
+  when your release is the older one, Try anyway for a game version, and it no longer says "update"
+  to the side that is already newer.
+- **Play on a game a friend already hosts asks first**. When a party member or friend hosts a game
+  of the same title that still has room, Play asks "Ana is playing this. Join their game, or start
+  your own?" with Join first, instead of quietly opening a second session. Start my own game says
+  that a separate session was made.
+- **The party shows who is in whose game**. Each member's row in the party, and the quick menu over
+  a game, says "In your game", "In another game of Orbit Runner", "Playing Orbit Runner" or "Not in
+  a game", with Join right there for a game that takes players. Play Together explains in one line
+  that a party is voice and chat and that the game session is what connects the games.
+- **Now playing in the quick menu** (asked for by Slick Daddy), as on the Mac. While a music or
+  video player plays or is paused, the menu over a game shows its title, artist, player and cover,
+  with previous, play or pause and next: left, right and ✕ on the controller, the arrow keys and
+  Enter, or the mouse. It reads Windows' media session and MPRIS on Linux, so it works with any
+  player that tells the system what it plays and needs no account. Settings › Behaviour has its
+  switch, and a second one, off until you turn it on, that shows your AnyTogether friends what you
+  are listening to. The player is read only while the menu is open or while friends are shown it.
+- **Remove installation keeps your saves.** A game's saves and trophies live inside the installation
+  AnyPS5 builds, and Remove installation used to delete them with it without saying so. It now keeps
+  them, together with the game's download data, in the games folder under `.AnyPS5/Saves`, and they
+  come back when you unlock the game again, the same way as after Delete game. The card says they
+  are kept. When they cannot be moved aside the installation stays as it is and AnyPS5 says why.
+  Saves are also safe when an unlock is interrupted or fails just as the new installation takes the
+  old one's place: they go back into the game or wait for the next unlock.
+- **Update from Git says everything it needs at once, and how to install it.** When build tools were
+  missing, Update from Git named one, and after you installed it, the next. Now it looks for all of
+  them before it pulls anything (Git, CMake and, for a checkout without a build folder, Ninja and
+  the C and C++ compilers, plus the X11 development files on Linux) and lists every missing one
+  together. Under the failure there is the command that installs them, ready to copy: winget on
+  Windows (WinLibs GCC 15.2, which brings gcc, g++, CMake and Ninja), Scoop where only Scoop is
+  installed, and apt, dnf or pacman on Linux. On Windows, WinLibs and Ninja install for your user
+  only, so the launcher can also run that command itself and show what it prints. Commands that need
+  administrator rights (Git's installer, sudo on Linux) are only ever shown to copy. Check again
+  looks for the tools again without restarting AnyPS5: on Windows it reads PATH anew, so what you
+  just installed is found. On an Ubuntu whose own GCC is older than 12, gcc-12 and g++-12 are used
+  when they are installed, as the build guide does. Reported by Slick Daddy.
+- **Switch profile from the picture on Home.** Point at your profile picture at the top right (or
+  click it, or move to it with the keys or the controller, one step past the last button) and a list
+  drops down under it: the other profiles with their picture and name, AnyTogether's mark on the
+  ones linked to an account, and Add profile at the end. Choosing one plays as that profile at once,
+  with the same rules as the "Who's playing?" screen (not while a game runs or saves sync). Escape,
+  Back, moving the pointer away or a click elsewhere closes it. Suggested by Slick Daddy.
+- **Pick your country by name.** Settings › AnyTogether › Country was a text field that wanted a
+  two-letter code and took more than two letters. It is now a list of countries by name in the
+  launcher's language, with a search that ignores capitals and accents and also finds a country by
+  its English name or its code, and None at the top to clear it. Messages AnyTogether sends back
+  when it refuses something are now said in the launcher's language too, where the server's English
+  sentence was shown before. Reported by Slick Daddy.
+- **Paired phones show what they are.** In Settings › Phones each paired device has a sign before
+  its name: Android, an iPhone or iPad, a browser, or a plain phone when the name does not say. A
+  browser used as a controller is listed as "Android browser" or "iPhone browser" in your language
+  in place of "Android · Web", and a device connected now says so under its name. Suggested by Slick
+  Daddy.
+
 ## 0.1.21
 
 - **A game in one .ffpfsc file installs like a zip**, as on the Mac: drop it in a games folder or
