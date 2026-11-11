@@ -3126,13 +3126,18 @@ class AppModel extends ChangeNotifier {
 
   /// What [game] takes on the disk: its folder, or its own files when it shares the folder
   /// ([Game.files]). Static, so the closure sent to the other isolate holds only the paths.
-  static Future<int> _measure(Game game, Future<int> Function(String path)? measure) async {
+  static Future<int> _measure(Game game, Future<int> Function(String path)? measure) {
     final files = game.files;
     if (files == null) {
       final folder = game.folder;
       return measure != null ? measure(folder) : Isolate.run(() => GameLibrary.size(folder));
     }
     if (measure == null) return Isolate.run(() => GameLibrary.filesSize(files));
+    return _measureEach(files, measure);
+  }
+
+  /// [files] measured one after the other with [measure].
+  static Future<int> _measureEach(List<String> files, Future<int> Function(String path) measure) async {
     var total = 0;
     for (final file in files) {
       total += await measure(file);
