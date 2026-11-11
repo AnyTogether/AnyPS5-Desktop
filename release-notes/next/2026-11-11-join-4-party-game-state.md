@@ -1,0 +1,1 @@
+- **The party shows who is in whose game**. Each member's row in the party, and the quick menu over a game, says "In your game", "In another game of Orbit Runner", "Playing Orbit Runner" or "Not in a game", with Join right there for a game that takes players. Play Together explains in one line that a party is voice and chat and that the game session is what connects the games.

@@ -107,8 +107,10 @@ void main() {
     expect(model.preferences.engineGitBuilt[checkout], 'bbbbbbbb22');
     model.select(model.games.indexOf(orbit()));
     model.primaryAction(orbit());
-    expect(model.overlay, Layer.updateChoice, reason: 'Play offers Update and play');
-    model.closeOverlay();
+    expect(model.overlay, isNull);
+    expect(model.afterRebuild?.$1, orbit().id, reason: 'Play rebuilds the copy first');
+    model.cancelUnlock(orbit());
+    await until(() => orbitState() is Installed);
     expect(row('engineGitRelinkAll')?.detail, T.format('engineGitRelinkAllDetail', [1]));
     choose('engineGitRelinkAll');
     expect(model.queue.contains(orbit().id) || model.progress.containsKey(orbit().id), isTrue);

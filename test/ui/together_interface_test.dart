@@ -1,4 +1,5 @@
 import 'package:anyps5_desktop/core/together/account.dart';
+import 'package:anyps5_desktop/core/together/join_advice.dart';
 import 'package:anyps5_desktop/core/together/messages.dart';
 import 'package:anyps5_desktop/core/together/parties.dart';
 import 'package:anyps5_desktop/core/together/people.dart';
@@ -422,6 +423,65 @@ void main() {
       model.refresh();
       await tester.pumpAndSettle();
       await expectLater(find.byType(LauncherShell), matchesGoldenFile('goldens/together_party_code_tr.png'));
+    });
+
+    testWidgets('golden: a join held back by another engine build, both builds whole and what to do', (tester) async {
+      fixture = makeFixture();
+      model = fixture.model;
+      signedInPreview(model);
+      model.together.tell(
+        const JoinBlock.engine(
+          advice: EngineAdvice.updateHost,
+          hostName: 'Ana',
+          gameName: 'Greenhollow',
+          host: '0.2.36-arm-nightly.20261110.1-a6fff1ba742d',
+          yours: '0.2.36-arm-f75c475400e3',
+        ),
+      );
+      await pumpLauncher(tester, model);
+      expect(find.text('Different engine build'), findsOneWidget);
+      expect(find.text('0.2.36-arm-nightly.20261110.1-a6fff1ba742d'), findsOneWidget, reason: 'whole');
+      expect(find.text('0.2.36-arm-f75c475400e3'), findsOneWidget);
+      expect(find.text('Check for updates'), findsNothing, reason: 'this launcher is the newer one');
+      await expectLater(find.byType(LauncherShell), matchesGoldenFile('goldens/together_join_blocked_en.png'));
+    });
+
+    testWidgets('golden: a stale copy offers Rebuild and join, in Turkish', (tester) async {
+      fixture = makeFixture(language: Language.byCode('tr'));
+      model = fixture.model;
+      signedInPreview(model);
+      model.together.tell(
+        JoinBlock.engine(
+          advice: EngineAdvice.rebuild,
+          hostName: 'Ana',
+          gameName: 'Greenhollow',
+          host: '0.2.36-arm-f75c475400e3',
+          yours: '0.2.36-arm-nightly.20261110.1-a6fff1ba742d',
+          rebuild: () {},
+        ),
+      );
+      await pumpLauncher(tester, model);
+      expect(find.text('Yeniden hazırla ve katıl'), findsOneWidget);
+      await expectLater(find.byType(LauncherShell), matchesGoldenFile('goldens/together_join_blocked_rebuild_tr.png'));
+    });
+
+    testWidgets('golden: Play on a game a friend hosts asks to join theirs or start your own, in Turkish', (
+      tester,
+    ) async {
+      fixture = makeFixture(language: Language.byCode('tr'));
+      model = fixture.model;
+      signedInPreview(model);
+      final orbit = model.games.firstWhere((game) => game.titleId == 'PPSA01001');
+      model.together.joinChoice = JoinChoice(
+        game: orbit,
+        other: const JoinableGame(sessionId: 's1', titleId: 'PPSA01001', personId: 'u-ana', together: false),
+        name: 'Ana',
+      );
+      model.open(Layer.joinOrHost);
+      await pumpLauncher(tester, model);
+      expect(find.text('Kendi oyunumu başlat'), findsOneWidget);
+      expect(model.panelRow, 1, reason: 'Join is the default');
+      await expectLater(find.byType(LauncherShell), matchesGoldenFile('goldens/together_join_or_host_tr.png'));
     });
 
     /// A party of Utku (leading, in voice), Ana (talking) and Cem, with its chat.
