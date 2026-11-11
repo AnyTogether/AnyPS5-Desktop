@@ -1,1 +1,0 @@
-- **A Windows build can no longer leave out SDL2**: a failed `SDL2.dll` download now stops the build (three tries first), and packaging stops if the DLL is missing from the build output, so no package goes out with SDL2 controller support missing.
