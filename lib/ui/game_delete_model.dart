@@ -98,22 +98,26 @@ class GameDeleteModel {
 
   void _ask(DeleteAsk next) {
     ask = next;
-    final items = next.plan.items;
-    final measure = app.services.folderSize;
-    final Future<int> size = measure == null
-        ? _measure(items)
-        : Future.wait([
-            for (final item in items)
-              FileSystemEntity.isDirectorySync(item) ? measure(item) : Future.value(GameDeletion.size([item])),
-          ]).then((sizes) => sizes.fold<int>(0, (sum, bytes) => sum + bytes));
     unawaited(
-      size.then((bytes) {
+      _size(next.plan.items).then((bytes) {
         next.size = bytes;
         if (ask == next) app.refresh();
       }, onError: (Object _) {}),
     );
     // Cancel is where the focus starts.
     app.open(Layer.confirmDeleteGame);
+  }
+
+  /// What [items] take on the disk, measured away from the interface: a dump holds tens of
+  /// thousands of files. One after the other, as the launcher measures a game's folder.
+  Future<int> _size(List<String> items) async {
+    final measure = app.services.folderSize;
+    if (measure == null) return _measure(items);
+    var total = 0;
+    for (final item in items) {
+      total += FileSystemEntity.isDirectorySync(item) ? await measure(item) : GameDeletion.size([item]);
+    }
+    return total;
   }
 
   /// Static, so the closure sent to the other isolate holds only the paths and not the model.
