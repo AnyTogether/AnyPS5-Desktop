@@ -1483,6 +1483,8 @@
   "uninstall": "Eliminare instalare",
   "uninstallConfirm": "Elimini instalarea? Fișierele jocului rămân pe loc; jocul va apărea din nou ca fiind blocat.",
   "uninstallDone": "Instalare eliminată",
+  "uninstallKeeps": "Salvările și trofeele tale se păstrează și revin când deblochezi din nou jocul.",
+  "uninstallFailed": "Instalarea nu a putut fi eliminată: %@",
   "deleteGame": "Șterge jocul",
   "deleteGameDetail": "Scoate de pe disc fișierele proprii ale jocului.",
   "deleteGameTitle": "Ștergi %@?",

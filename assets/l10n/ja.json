@@ -1483,6 +1483,8 @@
   "uninstall": "インストールを削除してください",
   "uninstallConfirm": "インストールを削除しますか?ゲームファイルはそのまま残ります。ゲームは再びロックされていると表示されます。",
   "uninstallDone": "インストールが削除されました",
+  "uninstallKeeps": "セーブデータとトロフィーは残り、ゲームのロックをもう一度解除すると戻ります。",
+  "uninstallFailed": "インストールを削除できませんでした: %@",
   "deleteGame": "ゲームを削除",
   "deleteGameDetail": "ゲーム本体のファイルをディスクから取り除きます。",
   "deleteGameTitle": "%@ を削除しますか？",

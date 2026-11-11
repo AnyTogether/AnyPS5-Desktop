@@ -1483,6 +1483,8 @@
   "uninstall": "Fjern installasjon",
   "uninstallConfirm": "Vil ​​du fjerne installasjonen? Spillfilene dine blir værende; spillet vises som låst igjen.",
   "uninstallDone": "Installasjon fjernet",
+  "uninstallKeeps": "Lagringene og trofeene dine beholdes og kommer tilbake når du låser opp spillet på nytt.",
+  "uninstallFailed": "Installasjonen kunne ikke fjernes: %@",
   "deleteGame": "Slett spill",
   "deleteGameDetail": "Fjerner spillets egne filer fra disken.",
   "deleteGameTitle": "Slette %@?",

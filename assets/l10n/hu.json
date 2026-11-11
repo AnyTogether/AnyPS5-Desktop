@@ -1483,6 +1483,8 @@
   "uninstall": "Telepítés eltávolítása",
   "uninstallConfirm": "Eltávolítod a telepítést? A játékfájlok megmaradnak, de a játék újra zárolt állapotba kerül.",
   "uninstallDone": "Telepítés eltávolítva",
+  "uninstallKeeps": "A mentéseid és trófeáid megmaradnak, és visszatérnek, ha újra feloldod a játékot.",
+  "uninstallFailed": "Nem sikerült eltávolítani a telepítést: %@",
   "deleteGame": "Játék törlése",
   "deleteGameDetail": "Eltávolítja a lemezről a játék saját fájljait.",
   "deleteGameTitle": "Törlöd ezt: %@?",

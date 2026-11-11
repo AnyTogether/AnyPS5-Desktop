@@ -1483,6 +1483,8 @@
   "uninstall": "Buang Pemasangan",
   "uninstallConfirm": "Buang pemasangan? Fail permainan anda akan kekal; Permainan dipaparkan sebagai terkunci semula.",
   "uninstallDone": "Pemasangan telah dibuang",
+  "uninstallKeeps": "Simpanan dan trofi anda kekal dan kembali apabila anda membuka kunci permainan semula.",
+  "uninstallFailed": "Pemasangan tidak dapat dibuang: %@",
   "deleteGame": "Padam permainan",
   "deleteGameDetail": "Membuang fail milik permainan itu sendiri daripada cakera.",
   "deleteGameTitle": "Padam %@?",
