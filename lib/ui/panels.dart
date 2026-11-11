@@ -222,6 +222,7 @@ class PanelView extends StatelessWidget {
       // The user's own profile: the count pinned, and the Hub the themes come from, beside it.
       Layer.showcaseEdit => T.text('showcaseEdit'),
       Layer.profileTheme => T.text('profileTheme'),
+      Layer.countryPicker => T.text('togetherCountry'),
       _ => category.title,
     };
     return _Scrim(
@@ -870,6 +871,11 @@ class _RowView extends StatelessWidget {
                     switch (row.icon!) {
                       PanelIcon.flag => Icons.flag_rounded,
                       PanelIcon.trophy => Icons.emoji_events_rounded,
+                      // Material Icons, which Flutter ships (Apache 2.0): no logo files of ours.
+                      PanelIcon.android => Icons.android_rounded,
+                      PanelIcon.iphone => Icons.phone_iphone_rounded,
+                      PanelIcon.browser => Icons.language_rounded,
+                      PanelIcon.phone => Icons.smartphone_rounded,
                     },
                     size: 22 * scale,
                     color: focused ? model.accentChoice.color : Colors.white,
@@ -883,9 +889,13 @@ class _RowView extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          row.title,
-                          style: AppText.display(17 * scale, weight: FontWeight.w500, color: titleColor),
+                        // A title longer than the row (every missing tool by name) goes on to a
+                        // second line; one that fits is drawn as before.
+                        Flexible(
+                          child: Text(
+                            row.title,
+                            style: AppText.display(17 * scale, weight: FontWeight.w500, color: titleColor),
+                          ),
                         ),
                         if (row.glyph != null) ...[
                           SizedBox(width: 8 * scale),
@@ -1684,7 +1694,7 @@ class PairingCard extends StatelessWidget {
                 SizedBox(height: 16 * scale),
                 Text(T.text('phonePairingTitle'), style: AppText.display(28 * scale, weight: FontWeight.w300)),
                 SizedBox(height: 10 * scale),
-                Text(request.deviceName, style: AppText.display(18 * scale, weight: FontWeight.w600)),
+                Text(PhoneLabel.title(request.deviceName), style: AppText.display(18 * scale, weight: FontWeight.w600)),
                 SizedBox(height: 6 * scale),
                 Text(
                   T.text('phonePairingText'),

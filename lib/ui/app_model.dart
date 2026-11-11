@@ -728,6 +728,10 @@ class HomeFocus {
   const HomeFocus.actions(int index) : this._('actions', index);
   const HomeFocus.notice(int index) : this._('notice', index);
 
+  /// The profile picture at the end of the top bar (0) and, under it, the list's entries from 1:
+  /// the other profiles, then Add profile.
+  const HomeFocus.switcher(int index) : this._('switcher', index);
+
   final String area;
   final int index;
 
@@ -735,6 +739,7 @@ class HomeFocus {
   bool get isTop => area == 'top';
   bool get isActions => area == 'actions';
   bool get isNotice => area == 'notice';
+  bool get isSwitcher => area == 'switcher';
 
   @override
   bool operator ==(Object other) => other is HomeFocus && other.area == area && other.index == index;
@@ -886,11 +891,42 @@ enum Layer {
   /// theme (a Theme Hub theme to wear), as panels over it (together_profile.dart).
   showcaseEdit,
   profileTheme,
+
+  /// Settings › AnyTogether › Country: the countries by name, with a search (countries.dart).
+  countryPicker,
 }
 
 /// A settings row the panels draw and the keyboard moves through.
 /// The signs a row can carry before its title.
-enum PanelIcon { flag, trophy }
+enum PanelIcon { flag, trophy, android, iphone, browser, phone }
+
+/// How a paired phone or browser pad shows: the sign for its kind, and its name for people.
+/// A browser pad's stored name is "Android · Web" (BrowserPadAccess.deviceName, the same on the
+/// Mac); it is shown as "Android browser", in the launcher's language.
+class PhoneLabel {
+  static const _web = ' · Web';
+
+  static bool isBrowser(String name) => name.endsWith(_web);
+
+  /// The device behind [name]: "Android" of "Android · Web", the name itself otherwise.
+  static String device(String name) => isBrowser(name) ? name.substring(0, name.length - _web.length) : name;
+
+  /// The sign for the device's kind: Android, an iPhone or iPad, a browser on a system it did not
+  /// name, or a phone the name says nothing about.
+  static PanelIcon icon(String name) {
+    final device = PhoneLabel.device(name);
+    if (RegExp('iPhone|iPad|iPod', caseSensitive: false).hasMatch(device)) return PanelIcon.iphone;
+    if (device.toLowerCase().contains('android')) return PanelIcon.android;
+    return isBrowser(name) ? PanelIcon.browser : PanelIcon.phone;
+  }
+
+  /// The name as people read it: a phone app's own name as it is, a browser pad's by its system.
+  static String title(String name) {
+    if (!isBrowser(name)) return name;
+    final device = PhoneLabel.device(name);
+    return device.isEmpty || device == 'Phone' ? T.text('phoneBrowserGeneric') : T.format('phoneBrowserName', [device]);
+  }
+}
 
 class PanelRow {
   const PanelRow({
@@ -4732,6 +4768,9 @@ class AppModel extends ChangeNotifier {
       case Layer.showcaseEdit || Layer.profileTheme when command == Command.back || command == Command.options:
         together.backToProfile();
         return;
+      case Layer.countryPicker when command == Command.back || command == Command.options:
+        together.backFromCountry();
+        return;
       case Layer.friendOptions when command == Command.back || command == Command.options:
         // A question asked in place (together_ask.dart) is answered Cancel first.
         if (!together.cancelAsk()) open(Layer.friends, cue: Cue.back);
@@ -4763,6 +4802,7 @@ class AppModel extends ChangeNotifier {
           Layer.themeStudio ||
           Layer.showcaseEdit ||
           Layer.profileTheme ||
+          Layer.countryPicker ||
           Layer.notifications ||
           Layer.compat ||
           Layer.findPlayers ||
@@ -4784,7 +4824,24 @@ class AppModel extends ChangeNotifier {
     // The notice went (Later, or the update went in): its focus goes to the top bar.
     if (focus.isNotice && !updates.showsNotice) focus = const HomeFocus.top(0);
     if (focus == const HomeFocus.notice(1) && updates.restartAfterGame) focus = const HomeFocus.notice(0);
+    // The profile list the pointer opened: Back closes it, whatever has the focus.
+    if (profileFlow.listShown && command == Command.back) return closeProfileList();
     switch ((focus.area, command)) {
+      // The profile picture, past the last button: its list opens under it.
+      case ('top', Command.right) when focus.index >= topButtons - 1:
+        _moveFocus(const HomeFocus.switcher(0));
+      case ('switcher', Command.left) when focus.index == 0:
+        _moveFocus(HomeFocus.top(topButtons - 1));
+      case ('switcher', Command.down) || ('switcher', Command.select) when focus.index == 0:
+        _moveFocus(const HomeFocus.switcher(1));
+      case ('switcher', Command.down):
+        focus.index < switcherCount ? _moveFocus(HomeFocus.switcher(focus.index + 1)) : sounds.play(Cue.bump);
+      case ('switcher', Command.up):
+        if (focus.index > 0) _moveFocus(HomeFocus.switcher(focus.index - 1));
+      case ('switcher', Command.select):
+        chooseFromProfileList(focus.index - 1);
+      case ('switcher', Command.back):
+        closeProfileList();
       case ('tiles', Command.left):
         moveSelection(-1);
       case ('tiles', Command.right):
@@ -4945,6 +5002,8 @@ class AppModel extends ChangeNotifier {
     if (!preferences.onboarded || overlay != null || pairing != null || starting != null || !focus.isTiles) {
       return false;
     }
+    // The profile list opened with the pointer: Escape closes it first.
+    if (profileFlow.listShown) return false;
     open(Layer.confirmQuit);
     return true;
   }
@@ -5477,6 +5536,8 @@ class AppModel extends ChangeNotifier {
             rows: together.showcaseRows(),
           ),
         ];
+      case Layer.countryPicker:
+        return [PanelCategory(id: 'country', title: T.text('togetherCountryChoose'), rows: together.countryRows())];
       case Layer.profileTheme:
         // Under the heading Profile theme: where the themes come from.
         return [PanelCategory(id: 'profileTheme', title: T.text('themesHub'), rows: together.profileThemeRows())];
@@ -5960,10 +6021,11 @@ class AppModel extends ChangeNotifier {
           for (final device in remote?.devices.all ?? const <PairedDevice>[])
             PanelRow(
               id: 'device-${device.id}',
-              title: remote?.connectedDeviceIds.contains(device.id) ?? false
-                  ? '${device.name} · ${T.text('phoneOnline')}'
-                  : device.name,
-              detail: T.text('phoneRemove'),
+              title: PhoneLabel.title(device.name),
+              detail: T.text(
+                remote?.connectedDeviceIds.contains(device.id) ?? false ? 'phoneRemoveOnline' : 'phoneRemove',
+              ),
+              icon: PhoneLabel.icon(device.name),
               kind: ActionRow(() {
                 remote?.devices.remove(device.id);
                 _changed();
@@ -7625,7 +7687,7 @@ class AppModel extends ChangeNotifier {
           unawaited(
             noticeOverGame(
               T.text('phonePairingTitle'),
-              detail: T.format('phoneOpenLauncher', [request.deviceName]),
+              detail: T.format('phoneOpenLauncher', [PhoneLabel.title(request.deviceName)]),
               symbol: Icons.smartphone_rounded,
             ),
           );
@@ -7938,6 +8000,7 @@ class AppModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    profileFlow.listLeave?.cancel();
     saveSync.dispose();
     powerWatch.stop();
     for (final watcher in _libraries.values) {

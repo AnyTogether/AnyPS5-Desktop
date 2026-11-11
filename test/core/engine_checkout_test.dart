@@ -168,13 +168,22 @@ void main() {
 
     test('git or CMake not installed: said, nothing run', () async {
       commands.results['git --version'] = const FakeResult(missing: true);
-      expect((await failure()).kind, GitFailureKind.noGit);
+      final noGit = await failure();
+      expect(noGit.kind, GitFailureKind.prerequisites);
+      expect(noGit.missing, const [MissingNeed(BuildNeed.git)]);
       commands
         ..results.clear()
         ..calls.clear()
         ..results['cmake --version'] = const FakeResult(missing: true);
-      expect((await failure()).kind, GitFailureKind.noCmake);
+      final noCmake = await failure();
+      expect(noCmake.kind, GitFailureKind.prerequisites);
+      expect(noCmake.missing, const [MissingNeed(BuildNeed.cmake)]);
       expect(commands.lines, ['git --version', 'cmake --version']);
+      // Both gone: one answer names both.
+      commands
+        ..calls.clear()
+        ..results['git --version'] = const FakeResult(missing: true);
+      expect((await failure()).missing, const [MissingNeed(BuildNeed.git), MissingNeed(BuildNeed.cmake)]);
     });
 
     test('no build folder: set up with CMake as the build guides do, then pulled and built', () async {
@@ -195,6 +204,8 @@ void main() {
         'cmake --version',
         'ninja --version',
         'g++ --version',
+        'gcc --version',
+        'pkg-config --exists x11 xext xrandr',
         'git status --porcelain --untracked-files=no',
         'git rev-parse HEAD',
         'git pull --ff-only',
@@ -213,14 +224,22 @@ void main() {
       git = EngineGit(EngineCheckout.at(bare)!, runner: commands);
       commands.results['ninja --version'] = const FakeResult(missing: true);
       final noNinja = await failure();
-      expect(noNinja.kind, GitFailureKind.noNinja);
+      expect(noNinja.kind, GitFailureKind.prerequisites);
+      expect(noNinja.missing, const [MissingNeed(BuildNeed.ninja)]);
       expect((noNinja.untouched, noNinja.guideHelps), (true, true));
+      // Ninja and the compiler both missing: named together, not one after the other.
       commands
-        ..results.clear()
         ..calls.clear()
         ..results['g++ --version'] = const FakeResult(missing: true);
-      expect((await failure()).kind, GitFailureKind.noCompiler);
-      expect(commands.lines, ['git --version', 'cmake --version', 'ninja --version', 'g++ --version']);
+      expect((await failure()).missing, const [MissingNeed(BuildNeed.ninja), MissingNeed(BuildNeed.compiler)]);
+      expect(commands.lines, [
+        'git --version',
+        'cmake --version',
+        'ninja --version',
+        'g++ --version',
+        'gcc --version',
+        'pkg-config --exists x11 xext xrandr',
+      ]);
     });
 
     test('a setup CMake cannot finish leaves no build folder to be taken for one', () async {

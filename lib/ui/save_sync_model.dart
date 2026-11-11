@@ -205,7 +205,8 @@ class SaveSyncModel {
           info = StorageInfo.disabled;
           return T.text('cloudOff');
       }
-      return error.title.isEmpty ? error.code : error.title;
+      // Any other code: the launcher's words for it, never the server's English.
+      return app.together.message(error);
     }
     if (error is IOException) return T.text('togetherUnreachable');
     return '$error';

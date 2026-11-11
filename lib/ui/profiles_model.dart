@@ -32,6 +32,12 @@ class ProfileFlow {
   String name = '';
   ProfileOrigin origin = ProfileOrigin.adding;
 
+  /// Home's profile list is open because the pointer is on the picture or on the list (the
+  /// keys open it through the focus, HomeFocus.switcher); [listLeave] closes it a moment after
+  /// the pointer left both, so it can cross the gap between them.
+  bool listShown = false;
+  Timer? listLeave;
+
   /// A new online profile's ID while it signs in, and the profile to go back to on Cancel.
   String? pendingId;
   String? returnTo;
@@ -446,6 +452,73 @@ extension LauncherProfiles on AppModel {
         }
       default:
         break;
+    }
+    _changed();
+  }
+
+  // Home's profile list: under the picture at the top right, the other profiles and Add profile.
+
+  /// The profiles the list offers: every one but the one playing, as they were made.
+  List<LauncherProfile> get switcherProfiles {
+    final current = currentProfile;
+    return [
+      for (final profile in profiles.book.profiles)
+        if (profile.id != current?.id) profile,
+    ];
+  }
+
+  /// The list's entries: the other profiles, then Add profile.
+  int get switcherCount => switcherProfiles.length + 1;
+
+  /// The list shows: the keys are on the picture or in the list, or the pointer is.
+  bool get profileListOpen => preferences.onboarded && overlay == null && (focus.isSwitcher || profileFlow.listShown);
+
+  /// The pointer came onto the picture or the list (or clicked the picture).
+  void showProfileList() {
+    profileFlow.listLeave?.cancel();
+    profileFlow.listLeave = null;
+    if (profileFlow.listShown) return;
+    profileFlow.listShown = true;
+    sounds.play(Cue.hover);
+    _changed();
+  }
+
+  /// The pointer left the picture or the list: closed a moment later, unless it came back.
+  void leaveProfileList() {
+    if (!profileFlow.listShown) return;
+    profileFlow.listLeave?.cancel();
+    profileFlow.listLeave = Timer(const Duration(milliseconds: 220), () {
+      profileFlow.listLeave = null;
+      if (_disposed || !profileFlow.listShown) return;
+      profileFlow.listShown = false;
+      _changed();
+    });
+  }
+
+  /// Escape, Back or a click elsewhere: the list closes and the keys are back on the games.
+  void closeProfileList() {
+    profileFlow.listLeave?.cancel();
+    profileFlow.listLeave = null;
+    if (!profileFlow.listShown && !focus.isSwitcher) return;
+    profileFlow.listShown = false;
+    if (focus.isSwitcher) focus = HomeFocus.tiles;
+    sounds.play(Cue.back);
+    _changed();
+  }
+
+  /// The list's entry [entry] chosen, from 0: that profile plays from now on, as from the
+  /// picker (not while a game runs or saves sync: said as there), or Add profile for the last.
+  void chooseFromProfileList(int entry) {
+    final others = switcherProfiles;
+    if (entry < 0 || entry > others.length) return;
+    profileFlow.listLeave?.cancel();
+    profileFlow.listLeave = null;
+    profileFlow.listShown = false;
+    if (focus.isSwitcher) focus = HomeFocus.tiles;
+    if (entry < others.length) {
+      unawaited(switchProfile(others[entry].id));
+    } else {
+      openAddProfile();
     }
     _changed();
   }
