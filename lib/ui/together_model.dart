@@ -27,6 +27,7 @@ import '../core/together/e2ee_client.dart';
 import '../core/together/family.dart';
 import '../core/together/friends.dart';
 import '../core/together/hub.dart';
+import '../core/together/join_advice.dart';
 import '../core/together/levels.dart';
 import '../core/together/people.dart';
 import '../core/together/self.dart';
@@ -69,6 +70,7 @@ part 'together_messages.dart';
 part 'together_ask.dart';
 part 'together_party.dart';
 part 'together_party_chat.dart';
+part 'together_join.dart';
 part 'together_play.dart';
 part 'together_profile.dart';
 part 'together_find.dart';
@@ -377,6 +379,11 @@ class TogetherModel {
   /// anyway), and games the server refused for the version though the check here let them by.
   Set<String> togetherTryAnyway = {};
   Set<String> togetherVersionRefused = {};
+
+  /// What holds a join back, for the panel that says it whole, and the game being started while
+  /// someone the user knows plays it (together_join.dart).
+  JoinBlock? joinBlock;
+  JoinChoice? joinChoice;
 
   /// The row whose social step is asking first (together_ask.dart): it shows the question instead.
   String? askingRow;

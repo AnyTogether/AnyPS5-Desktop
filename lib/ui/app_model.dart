@@ -75,6 +75,7 @@ import '../core/profiles/profile_saves.dart';
 import '../core/profiles/profiles.dart';
 import '../core/together/account.dart' show ClientTooOld, TogetherAccount, TogetherProblem;
 import '../core/together/e2ee_keys.dart';
+import '../core/together/join_advice.dart' show StaleCopy;
 import '../core/together/levels.dart';
 import '../core/together/media.dart' show SfuRoom;
 import '../core/together/talk_key.dart';
@@ -759,6 +760,14 @@ enum Layer {
 
   /// AnyTogether no longer answers this launcher's version (client_too_old): update.
   updateRequired,
+
+  /// A join held back by a different game version or engine build (together.joinBlock): what
+  /// differs, both builds whole, and what gets past it.
+  joinBlocked,
+
+  /// Play on a game someone the user knows already plays (together.joinChoice): join theirs, or
+  /// start one's own.
+  joinOrHost,
   log,
   trophies,
 
@@ -890,11 +899,16 @@ class PanelRow {
     this.icon,
     this.picture,
     this.meter,
+    this.wraps = false,
   });
 
   final String id;
   final String title;
   final String? detail;
+
+  /// The words under the title are to be read whole (two engine builds, what to do about them):
+  /// no line limit.
+  final bool wraps;
 
   /// A thin bar under the words: how much of something the row's two parts take up.
   final PanelMeter? meter;
@@ -2504,6 +2518,10 @@ class AppModel extends ChangeNotifier {
   Installer? _installer;
   String? _playAfterInstall;
 
+  /// What goes on once a copy made by another engine is rebuilt ([rebuildFirst]): the game's
+  /// start, hosting Play Together, a friend's game joined.
+  (String, void Function())? afterRebuild;
+
   Game? starting;
   (Game, RunningGame)? running;
 
@@ -3077,6 +3095,44 @@ class AppModel extends ChangeNotifier {
     return engine.downloaded.where((kit) => p.basename(kit.root) == pin).firstOrNull;
   }
 
+  /// The version of the engine [game] is unlocked with now: its own when it has one, else the
+  /// default's.
+  String? engineVersionFor(Game game) =>
+      currentSettings(game).engine != null ? toolkitFor(game)?.version : toolkitVersion;
+
+  /// Whether [game]'s copy was made by another engine than the one it is unlocked with now (the
+  /// engine was updated or changed since). A newer engine to download is not this: that one is
+  /// offered ([Layer.updateChoice]).
+  bool needsRebuild(Game game) =>
+      stateOf(game) is Installed &&
+      StaleCopy.needsRebuild(built: records[game.id]?.toolkit, current: engineVersionFor(game));
+
+  /// A copy made by another engine than the one it starts with now is rebuilt first, with the
+  /// unlock's usual progress, and [then] runs once it is ready; a copy that is current goes on at
+  /// once. Nothing goes on after a rebuild that failed or was cancelled.
+  void rebuildFirst(Game game, void Function() then) {
+    if (!needsRebuild(game)) return then();
+    afterRebuild = (game.id, then);
+    show(T.format('gameRebuildingFirst', [game.name]));
+    unlock(game);
+    // The unlock did not begin (no engine at hand): nothing waits on it. A question about
+    // copying the game's files asked first keeps it.
+    if (afterRebuild?.$1 == game.id &&
+        !queue.contains(game.id) &&
+        !progress.containsKey(game.id) &&
+        copyWarning?.game.id != game.id) {
+      afterRebuild = null;
+    }
+  }
+
+  /// An unlock ended: what waited on the copy's rebuild goes on, or is dropped when it failed.
+  void _rebuildDone(String id, bool succeeded) {
+    final waiting = afterRebuild;
+    if (waiting == null || waiting.$1 != id) return;
+    afterRebuild = null;
+    if (succeeded) waiting.$2();
+  }
+
   /// The engine [game] is pinned to when that one is not on this computer, null otherwise.
   String? missingEngine(Game game) {
     final pin = currentSettings(game).engine;
@@ -3190,12 +3246,18 @@ class AppModel extends ChangeNotifier {
   void primaryAction(Game game) {
     switch (stateOf(game)) {
       case Installed(:final outdated):
-        void go() => outdated ? open(Layer.updateChoice) : unawaited(play(game));
+        // A copy made by another engine than the one at hand is rebuilt on the way (play); a
+        // newer engine to download is offered; a game someone the user knows already plays asks
+        // first whether to join theirs.
+        void go() => outdated && !needsRebuild(game) ? open(Layer.updateChoice) : together.playOrJoin(game);
         // Settings › AnyPS5 Engine › Update from Git Before Playing: the checkout's remote first.
         engine.git.updatesBeforePlay ? unawaited(engine.git.beforePlay(game, go)) : go();
       case WaitingForEngine(:final forThisGame):
         // The engine is being built in place: its relinker and libraries are not whole yet.
         show(forThisGame ? T.format('gameStartsAfterEngine', [game.name]) : T.text('gameWaitsForEngine'));
+      // The rebuild of a copy that is still there failed: try again, or play it as it is.
+      case Failed() when records[game.id] != null:
+        open(Layer.updateChoice);
       case Locked() || Failed():
         unlock(game);
       case Installing(preparing: true):
@@ -3268,6 +3330,7 @@ class AppModel extends ChangeNotifier {
       final shortage = plan?.space?.shortage(free: free, folder: folder);
       if (plan != null && (shortage != null || (!copy && plan.copies && plan.bytes >= copyWarningFrom))) {
         if (shortage != null && _playAfterInstall == game.id) _playAfterInstall = null;
+        if (shortage != null && afterRebuild?.$1 == game.id) afterRebuild = null;
         copyWarning = (game: game, bytes: plan.bytes, shortage: shortage, needed: plan.space?.needed, free: free);
         open(Layer.copyWarning, cue: shortage == null ? Cue.select : Cue.back);
         return;
@@ -3306,6 +3369,7 @@ class AppModel extends ChangeNotifier {
 
   void cancelUnlock(Game game) {
     if (_playAfterInstall == game.id) _playAfterInstall = null;
+    if (afterRebuild?.$1 == game.id) afterRebuild = null;
     if (prepare.contains(game.id)) {
       if (prepare.cancel(game.id)) _preparer?.cancel();
       sounds.play(Cue.back);
@@ -3333,6 +3397,7 @@ class AppModel extends ChangeNotifier {
     // Its engine was deleted while it waited: said, and the next game goes on.
     if (kit == null) {
       if (_playAfterInstall == id) _playAfterInstall = null;
+      if (afterRebuild?.$1 == id) afterRebuild = null;
       _tellEngineMissing(game, missingEngine(game)!);
       return _startNext();
     }
@@ -3353,13 +3418,16 @@ class AppModel extends ChangeNotifier {
               unawaited(play(game));
             }
             onUnlocked?.call(id, true);
+            _rebuildDone(id, true);
           case InstallCancelled():
             onUnlocked?.call(id, false);
+            _rebuildDone(id, false);
           case final SpaceShortage shortage:
             _tellShortage(game, shortage);
           default:
             failures[id] = error.toString();
             onUnlocked?.call(id, false);
+            _rebuildDone(id, false);
             show('${T.text('unlockFailed')}: ${game.name}');
         }
       },
@@ -3450,6 +3518,7 @@ class AppModel extends ChangeNotifier {
   /// and free, and what to do.
   void _tellShortage(Game game, SpaceShortage shortage) {
     if (_playAfterInstall == game.id) _playAfterInstall = null;
+    if (afterRebuild?.$1 == game.id) afterRebuild = null;
     copyWarning = (game: game, bytes: 0, shortage: shortage, needed: shortage.needed, free: shortage.free);
     open(Layer.copyWarning, cue: Cue.back);
   }
@@ -3781,9 +3850,16 @@ class AppModel extends ChangeNotifier {
 
   /// Plays [game]; [trace] turns detailed logging on for this start only, and [once] adds to the
   /// engine's environment for this start only (the crash report's PlayGo answer).
-  Future<void> play(Game game, {bool trace = false, Map<String, String> once = const {}}) async {
+  ///
+  /// A copy made by another engine than the one it starts with now is rebuilt first, so two
+  /// launchers on the same release always play the same build; [asItIs] starts the copy as it is
+  /// (it was just rebuilt, it joins a host on that very engine, or the user chose to).
+  Future<void> play(Game game, {bool trace = false, Map<String, String> once = const {}, bool asItIs = false}) async {
     final folder = rootOf(game);
     if (folder == null || starting != null || running != null || saveSync.syncing != null) return;
+    if (!asItIs && needsRebuild(game)) {
+      return rebuildFirst(game, () => unawaited(play(game, trace: trace, once: once, asItIs: true)));
+    }
     // The profile's own saves and trophies in the game's folder before anything reads them.
     activateProfileSaves(game);
     final allowed = together.family.beforePlay(game);
@@ -4616,6 +4692,8 @@ class AppModel extends ChangeNotifier {
           Layer.gameFiles ||
           Layer.updateChoice ||
           Layer.updateRequired ||
+          Layer.joinBlocked ||
+          Layer.joinOrHost ||
           Layer.phoneEngine ||
           Layer.friends ||
           Layer.friendOptions ||
@@ -5370,6 +5448,8 @@ class AppModel extends ChangeNotifier {
               ),
               ...media.gameRows(),
               ...sharePlay.rows(),
+              // The party next to the game playing: who is in it, who plays another one (Join).
+              ...together.partyGameRows(),
               ...nowPlaying.quickRows(),
               PanelRow(
                 id: 'closeGame',
@@ -5505,12 +5585,29 @@ class AppModel extends ChangeNotifier {
                 detail: T.text('playNowDetail'),
                 kind: ActionRow(() {
                   closeOverlay();
-                  unawaited(play(game));
+                  // The copy as it is, whatever engine made it (also after a rebuild that failed
+                  // and left the copy in place).
+                  failures.remove(game.id);
+                  unawaited(play(game, asItIs: true));
                 }),
               ),
             ],
           ),
         ];
+      case Layer.joinBlocked:
+        final block = together.joinBlock;
+        if (block == null) return const [];
+        return [
+          PanelCategory(
+            id: 'joinBlocked',
+            title: T.text('togetherBlockedTitle'),
+            rows: together.joinBlockedRows(block),
+          ),
+        ];
+      case Layer.joinOrHost:
+        final choice = together.joinChoice;
+        if (choice == null) return const [];
+        return [PanelCategory(id: 'joinOrHost', title: choice.game.name, rows: together.joinOrHostRows(choice))];
       default:
         return const [];
     }
@@ -5605,6 +5702,7 @@ class AppModel extends ChangeNotifier {
         kind: ActionRow(() {
           dismiss();
           if (_playAfterInstall == warning.game.id) _playAfterInstall = null;
+          if (afterRebuild?.$1 == warning.game.id) afterRebuild = null;
         }),
       ),
     ];

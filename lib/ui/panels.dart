@@ -176,6 +176,8 @@ class PanelView extends StatelessWidget {
       Layer.confirmUninstall,
       Layer.updateChoice,
       Layer.updateRequired,
+      Layer.joinBlocked,
+      Layer.joinOrHost,
       Layer.phoneEngine,
       Layer.friendOptions,
       Layer.copyWarning,
@@ -199,7 +201,8 @@ class PanelView extends StatelessWidget {
     // ConfirmCard, with the icon too).
     final gameIcon = model.overlay == Layer.quickMenu ? model.running?.$1.icon : null;
     // The copy warning explains itself before its four choices.
-    final tall = model.overlay == Layer.copyWarning;
+    // A join held back says both builds whole and what to do.
+    final tall = model.overlay == Layer.copyWarning || model.overlay == Layer.joinBlocked;
     // The party with its chat beside the rows: wider.
     final partyChat = model.overlay == Layer.party && model.together.partyChatShown;
     final heading = switch (model.overlay) {
@@ -898,8 +901,8 @@ class _RowView extends StatelessWidget {
                       SizedBox(height: 4 * scale),
                       Text(
                         info ?? row.detail!,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
+                        maxLines: row.wraps ? null : 3,
+                        overflow: row.wraps ? TextOverflow.clip : TextOverflow.ellipsis,
                         style: AppText.display(13 * scale, color: detailColor),
                       ),
                     ],
