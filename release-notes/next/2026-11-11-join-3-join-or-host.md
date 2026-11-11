@@ -1,0 +1,1 @@
+- **Play on a game a friend already hosts asks first**. When a party member or friend hosts a game of the same title that still has room, Play asks "Ana is playing this. Join their game, or start your own?" with Join first, instead of quietly opening a second session. Start my own game says that a separate session was made.

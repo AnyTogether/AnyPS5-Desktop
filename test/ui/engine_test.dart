@@ -354,7 +354,7 @@ void main() {
       model.rescan();
     }
 
-    test('a folder of the user\'s own built again in place: its games offer Update and play', () {
+    test('a folder of the user\'s own built again in place: its games are rebuilt before they start', () {
       final own = makeFakeToolkit(p.join(fixture.temp.path, 'own'));
       File(p.join(own, 'version.txt')).deleteSync();
       model.preferences.toolkitFolder = own;
@@ -366,9 +366,13 @@ void main() {
       model.setActive(false);
       model.setActive(true);
       expect(outdated(), isTrue, reason: 'the games were made with the libraries before the build');
+      expect(model.needsRebuild(orbit()), isTrue);
       model.select(model.games.indexOf(orbit()));
       model.primaryAction(orbit());
-      expect(model.overlay, Layer.updateChoice);
+      expect(model.overlay, isNull, reason: 'no question: the copy is rebuilt with the engine at hand');
+      expect(model.afterRebuild?.$1, orbit().id);
+      expect(model.starting, isNull);
+      model.cancelUnlock(orbit());
     });
 
     test('choosing another engine says the installed games will offer Update and play', () async {

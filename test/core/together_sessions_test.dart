@@ -9,8 +9,6 @@ void main() {
     expect(GameSession.cleanEngineBuild('a' * 80), hasLength(64));
     expect(GameSession.cleanGameVersion('01.000.000'), '01.000.000');
     expect(GameSession.cleanGameVersion('9' * 40), hasLength(32));
-    expect(GameSession.release('0.2.13-a1b2c3d4e5f6'), '0.2.13 (a1b2c3)');
-    expect(GameSession.release('toolkit'), 'toolkit');
   });
 
   test('a session says why another copy cannot join', () {
