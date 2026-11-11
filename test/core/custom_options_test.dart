@@ -297,7 +297,7 @@ void main() {
     test('are part of the key: a change relinks, the same words reuse the kept output', () async {
       final game = makeGame();
       final kit = Toolkit(toolkitFolder);
-      final found = Installer.modulesOf(game);
+      final found = Installer.modulesOf(game, kit.system);
       final none = Installer.relinkKey(game, kit, found, null);
       expect(
         Installer.relinkKey(game, kit, found, null, custom: const []),
