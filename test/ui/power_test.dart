@@ -185,6 +185,7 @@ value = 1080
         ({
           required String installed,
           required Map<String, String> environment,
+          List<String> arguments = const [],
           required String logFile,
           HostSystem? system,
           bool traced = false,
@@ -329,6 +330,7 @@ value = 1080
         ({
           required String installed,
           required Map<String, String> environment,
+          List<String> arguments = const [],
           required String logFile,
           HostSystem? system,
           bool traced = false,

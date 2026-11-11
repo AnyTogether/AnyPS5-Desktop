@@ -114,6 +114,7 @@ Future<int> runCli(
         root: arguments[2],
         resolution: settings.resolution,
         relinkerFlags: settings.chosenRelinkerFlags,
+        customRelinkerOptions: settings.customRelinkerWords,
         onProgress: (step, fraction) {
           final percent = (fraction * 100).round();
           if (lastShown[step] == percent) return;
@@ -146,22 +147,28 @@ Future<int> runCli(
           .withDefaults(DisplayDefaults.load(paths.preferencesFile));
       final inputFile = p.join(paths.inputFilesFolder, '${game.slug}.ini');
       settings.writeInputFile(inputFile);
+      final launcherEnvironment = {
+        ...settings.environment(
+          launcherLanguage: 1,
+          inputFile: inputFile,
+          screenshots: paths.pictures,
+          shaderCacheFolder: paths.shaderCache(game.slug),
+          trace: trace,
+        ),
+        ...game.addonEnvironment,
+        ...GamePresetsStore(_gamePresetsFile(paths)).load().environment,
+      };
+      // The game's Launch options, as the launcher starts it: the launcher's own values win.
+      final launch = settings.launch;
+      final (environment, overridden) = launch?.over(launcherEnvironment) ?? (launcherEnvironment, const <String>[]);
       final running = await GameProcess.start(
         installed: installed,
         system: host,
-        environment: {
-          ...settings.environment(
-            launcherLanguage: 1,
-            inputFile: inputFile,
-            screenshots: paths.pictures,
-            shaderCacheFolder: paths.shaderCache(game.slug),
-            trace: trace,
-          ),
-          ...game.addonEnvironment,
-          ...GamePresetsStore(_gamePresetsFile(paths)).load().environment,
-        },
+        environment: environment,
+        arguments: launch?.arguments ?? const [],
         logFile: paths.logFile(game.titleId),
         traced: trace || settings.trace == true,
+        notes: launch?.notes(overridden) ?? const [],
       );
       output.writeln(
         'started ${game.titleId} (pid ${running.pid})${trace || settings.trace == true ? ' with detailed logging' : ''}, '

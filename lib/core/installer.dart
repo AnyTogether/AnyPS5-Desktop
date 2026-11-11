@@ -31,6 +31,7 @@ class InstallRecord {
     this.resolution,
     this.update,
     this.relinkerFlags = const [],
+    this.customRelinkerOptions = const [],
   });
 
   factory InstallRecord.fromJson(Map<String, dynamic> json) => InstallRecord(
@@ -43,6 +44,9 @@ class InstallRecord {
     update: json['update'] as String?,
     relinkerFlags: json['relinkerFlags'] is List<dynamic>
         ? (json['relinkerFlags'] as List<dynamic>).whereType<String>().toList()
+        : const [],
+    customRelinkerOptions: json['customRelinkerOptions'] is List<dynamic>
+        ? (json['customRelinkerOptions'] as List<dynamic>).whereType<String>().toList()
         : const [],
   );
 
@@ -61,10 +65,14 @@ class InstallRecord {
   /// The relinker options the game was unlocked with ([RelinkerFlag]).
   final List<String> relinkerFlags;
 
+  /// The Custom relinker options the game was unlocked with, word by word.
+  final List<String> customRelinkerOptions;
+
   Map<String, Object> toJson() => {
     'resolution': ?resolution,
     'update': ?update,
     if (relinkerFlags.isNotEmpty) 'relinkerFlags': relinkerFlags,
+    if (customRelinkerOptions.isNotEmpty) 'customRelinkerOptions': customRelinkerOptions,
     'date': date.toUtc().toIso8601String(),
     'source': source,
     'system': system,
@@ -234,6 +242,7 @@ class Installer {
     this.linkMode,
     this.resolution,
     this.relinkerFlags = const [],
+    this.customRelinkerOptions = const [],
     DateTime Function()? clock,
     int? Function(String folder)? freeSpace,
   }) : _clock = clock ?? DateTime.now,
@@ -256,6 +265,11 @@ class Installer {
   /// The relinker options asked for this game: the ones this toolkit lacks or its relinker
   /// refuses are left out, and the record says which were used.
   final List<RelinkerFlag> relinkerFlags;
+
+  /// The game's Custom relinker options, checked (GameSettings.customRelinkerWords): passed after
+  /// the launcher's own options, before the executable's paths. A relinker that stops with them
+  /// runs again without them, and the record says which were used.
+  final List<String> customRelinkerOptions;
   final DateTime Function() _clock;
 
   /// The free bytes where the games folder is (FreeSpace.of); replaceable in tests.
@@ -408,6 +422,7 @@ class Installer {
     Toolkit? toolkit,
     String? resolution,
     List<RelinkerFlag> relinkerFlags = const [],
+    List<String> customRelinkerOptions = const [],
   }) {
     final games = p.join(root, GameLibrary.storeName, 'Games');
     final mode = FileLinks.probe(p.join(game.folder, 'eboot.bin'), games);
@@ -416,7 +431,15 @@ class Installer {
     return InstallPlan(
       mode,
       bytes,
-      space: space(game, root, toolkit, copied: bytes, resolution: resolution, relinkerFlags: relinkerFlags),
+      space: space(
+        game,
+        root,
+        toolkit,
+        copied: bytes,
+        resolution: resolution,
+        relinkerFlags: relinkerFlags,
+        customRelinkerOptions: customRelinkerOptions,
+      ),
     );
   }
 
@@ -429,6 +452,7 @@ class Installer {
     int copied = 0,
     String? resolution,
     List<RelinkerFlag> relinkerFlags = const [],
+    List<String> customRelinkerOptions = const [],
   }) {
     int size(String path) {
       try {
@@ -455,6 +479,7 @@ class Installer {
         found,
         _patchText(toolkit, game, resolution).$1,
         flags: relinkerFlags.where(toolkit.supports).toList(),
+        custom: customRelinkerOptions,
       );
       final reusable = reusableRelink(game, root, key);
       if (reusable != null) kept = GameLibrary.size(reusable);
@@ -490,14 +515,16 @@ class Installer {
   }
 
   /// What the relinker's output depends on: the toolkit, the system, the patches (with the
-  /// resolution in them), the module folders, and the dump's executable and modules (path, size
-  /// and modification time of each). Unlocking again with the same key reuses the kept output.
+  /// resolution in them), the module folders, the Custom relinker options ([custom]), and the
+  /// dump's executable and modules (path, size and modification time of each). Unlocking again
+  /// with the same key reuses the kept output.
   static String relinkKey(
     Game game,
     Toolkit toolkit,
     List<String> found,
     String? patches, {
     List<RelinkerFlag> flags = const [],
+    List<String> custom = const [],
   }) {
     final lines = <String>[
       'toolkit ${toolkit.version}',
@@ -505,6 +532,8 @@ class Installer {
       'system ${toolkit.system.name} ${[...toolkit.system.relinkerOptions, ...flags.map((flag) => flag.option)].join(' ')}',
       'modules ${moduleDirectories(found).join(' ')}',
       'patches ${patches == null ? '-' : sha256.convert(utf8.encode(patches))}',
+      // Word by word, so a word with a space in it is not two.
+      if (custom.isNotEmpty) 'custom ${jsonEncode(custom)}',
     ];
     for (final relative in ['eboot.bin', ...found]) {
       final path = source(game, relative);
@@ -658,7 +687,15 @@ class Installer {
     await _gate();
     final mode = linkMode ?? FileLinks.probe(p.join(game.folder, 'eboot.bin'), p.join(store, 'Games'));
     final copied = mode == LinkMode.copy ? await measurePayload(game.folder) : 0;
-    final needs = space(game, root, toolkit, copied: copied, resolution: resolution, relinkerFlags: relinkerFlags);
+    final needs = space(
+      game,
+      root,
+      toolkit,
+      copied: copied,
+      resolution: resolution,
+      relinkerFlags: relinkerFlags,
+      customRelinkerOptions: customRelinkerOptions,
+    );
     final shortage = needs.shortage(free: freeSpace(root), folder: root);
     if (shortage != null) throw shortage;
     try {
@@ -671,7 +708,8 @@ class Installer {
           _log('${game.titleId}: this engine does not support ${flag.option}, the game is rebuilt without it');
         }
       }
-      var key = relinkKey(game, toolkit, found, patchText, flags: flags);
+      var custom = customRelinkerOptions;
+      var key = relinkKey(game, toolkit, found, patchText, flags: flags, custom: custom);
       final keeps = needs.linksOutput;
       String relinked;
       final reusable = keeps ? reusableRelink(game, root, key) : null;
@@ -727,6 +765,7 @@ class Installer {
                 for (final flag in flags) flag.option,
                 ...patchOptions,
                 for (final directory in moduleDirectories(found)) ...['--module-dir', directory],
+                ...custom,
                 'eboot.bin',
                 executable,
               ],
@@ -751,14 +790,15 @@ class Installer {
               );
               continue;
             }
-            if (flags.isEmpty) rethrow;
+            if (flags.isEmpty && custom.isEmpty) rethrow;
             // A saved option never costs the game its unlock: it runs again without them, and
             // the kept output is filed under what it was really made with.
             _log(
-              '${game.titleId}: the relinker stopped with ${flags.map((flag) => flag.option).join(' ')} '
+              '${game.titleId}: the relinker stopped with ${[...flags.map((flag) => flag.option), ...custom].join(' ')} '
               '(${failure.reason}); the game is rebuilt without it',
             );
             flags = [];
+            custom = const [];
             key = relinkKey(game, toolkit, found, patchText);
             _delete(output);
             Directory(output).createSync(recursive: true);
@@ -817,6 +857,7 @@ class Installer {
         resolution: appliedResolution,
         update: game.update?.version,
         relinkerFlags: [for (final flag in flags) flag.option],
+        customRelinkerOptions: custom,
       );
       File(p.join(partial, recordName)).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(record.toJson()));
       _progress(InstallStep.layout, 1);

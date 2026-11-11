@@ -480,6 +480,8 @@ extension ReportSettings on GameSettings {
       if (tuning != null) 'Stick and mouse tuning changed',
       'Detailed logging ${trace == true ? 'on' : 'off'}',
       if (chosenRelinkerFlags.isNotEmpty) 'Relinker flags ${chosenRelinkerFlags.map((flag) => flag.option).join(' ')}',
+      if (customRelinkerOptions case final String text) 'Custom relinker options $text',
+      if (launchOptions case final String text) 'Launch options $text',
     ].join(' · ');
   }
 }
@@ -501,6 +503,7 @@ class SessionReport {
     this.unlockedWith,
     this.engineNow,
     this.relinkerFlags = const [],
+    this.customRelinkerOptions = const [],
     this.exitCode,
     this.stoppedByUser = false,
     this.traced = false,
@@ -533,6 +536,9 @@ class SessionReport {
 
   /// The relinker options the game was unlocked with ([RelinkerFlag]).
   final List<String> relinkerFlags;
+
+  /// The Custom relinker options the game was unlocked with, word by word.
+  final List<String> customRelinkerOptions;
 
   /// The game's exit code; null when the launcher no longer knows it.
   final int? exitCode;
@@ -657,6 +663,8 @@ class SessionReport {
       'Engine the game was unlocked with: ${unlockedWith ?? 'unknown'}',
       'Engine chosen for it now: ${engineNow ?? 'unknown'}',
       if (relinkerFlags.isNotEmpty) 'Relinker flags the game was unlocked with: ${relinkerFlags.join(' ')}',
+      if (customRelinkerOptions.isNotEmpty)
+        'Custom relinker options the game was unlocked with: ${customRelinkerOptions.join(' ')}',
       '',
       'Settings: ${settings.reportSummary}',
       if (traced) 'Detailed logging: ${TraceMode.environment.entries.map((e) => '${e.key}=${e.value}').join(' ')}',

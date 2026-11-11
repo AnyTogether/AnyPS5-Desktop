@@ -23,6 +23,7 @@ import '../core/audio/tones.dart';
 import '../core/controllers/pad_info.dart';
 import '../core/controllers/troubleshooter.dart';
 import '../core/controls.dart';
+import '../core/custom_options.dart';
 import '../core/crash_report.dart' show Diagnosis, IssueDraft, SystemInfo;
 import '../core/launcher_health.dart';
 import '../core/desktop_notice.dart';
@@ -3213,6 +3214,7 @@ class AppModel extends ChangeNotifier {
           toolkit: kit,
           resolution: _unlockResolution(game, kit),
           relinkerFlags: currentSettings(game).chosenRelinkerFlags,
+          customRelinkerOptions: currentSettings(game).customRelinkerWords,
         );
       } on FileSystemException {
         plan = null; // The install says what is wrong.
@@ -3340,6 +3342,7 @@ class AppModel extends ChangeNotifier {
       root: folder,
       resolution: _unlockResolution(game, kit),
       relinkerFlags: currentSettings(game).chosenRelinkerFlags,
+      customRelinkerOptions: currentSettings(game).customRelinkerWords,
       freeSpace: freeSpace,
       onProgress: (step, fraction) {
         progress[id] = (step, fraction);
@@ -3474,6 +3477,7 @@ class AppModel extends ChangeNotifier {
               toolkit: toolkitFor(game) ?? kit,
               resolution: _unlockResolution(game, toolkitFor(game) ?? kit),
               relinkerFlags: currentSettings(game).chosenRelinkerFlags,
+              customRelinkerOptions: currentSettings(game).customRelinkerWords,
             );
             return plan.space?.shortage(free: freeSpace(folder), folder: folder);
           } on FileSystemException {
@@ -3793,7 +3797,7 @@ class AppModel extends ChangeNotifier {
         if (starting == null) unawaited(together.onlineGameEnded());
         return;
       }
-      final environment = {
+      final launcherEnvironment = {
         ...settings.environment(
           launcherLanguage: T.language.consoleLanguage,
           inputFile: written ? inputFile : null,
@@ -3814,11 +3818,16 @@ class AppModel extends ChangeNotifier {
         ...online,
         ...once,
       };
+      // Advanced › Launch › Launch options: the player's variables under the launcher's (its own
+      // value wins), and the arguments for the game.
+      final launch = settings.launch;
+      final (environment, overridden) = launch?.over(launcherEnvironment) ?? (launcherEnvironment, const <String>[]);
       fonts.watch(game, logFile);
       final resolutionNote = await _setLaunchResolution(game, folder);
       final run = await startGame(
         installed: Installer.installedFolder(game, folder),
         environment: environment,
+        arguments: launch?.arguments ?? const [],
         logFile: logFile,
         system: system,
         traced: traced,
@@ -3828,6 +3837,7 @@ class AppModel extends ChangeNotifier {
           if (phonesConnected) '[anyps5-launcher] phones: ${_phoneReachNote(game)}',
           ?resolutionNote,
           for (final MapEntry(:key, :value) in once.entries) '[anyps5-launcher] this start only: $key=$value',
+          ...?launch?.notes(overridden),
         ],
       );
       // Closed while it was starting: the process goes again.
@@ -4092,6 +4102,7 @@ class AppModel extends ChangeNotifier {
   Future<RunningGame> Function({
     required String installed,
     required Map<String, String> environment,
+    List<String> arguments,
     required String logFile,
     HostSystem? system,
     bool traced,
@@ -6274,6 +6285,23 @@ class AppModel extends ChangeNotifier {
       ),
       section('relinkerSection', 'sectionRelinker'),
       ..._relinkerRows(game, settings, change),
+      _optionsRow(
+        game,
+        id: 'relinkerCustomOptions',
+        detail: 'relinkerCustomOptionsDetail',
+        saved: settings.customRelinkerOptions,
+        check: (text) => checkRelinkerOptions(text).problem,
+        apply: (settings, text) => settings.copyWith(customRelinkerOptions: text),
+      ),
+      section('launchSection', 'sectionLaunch'),
+      _optionsRow(
+        game,
+        id: 'launchOptions',
+        detail: 'launchOptionsDetail',
+        saved: settings.launchOptions,
+        check: (text) => GameLaunchOptions.parse(text).$2,
+        apply: (settings, text) => settings.copyWith(launchOptions: text),
+      ),
       section('shareSection', 'sectionShare'),
       PanelRow(
         id: 'export',
@@ -6290,10 +6318,71 @@ class AppModel extends ChangeNotifier {
       PanelRow(
         id: 'resetAdvanced',
         title: T.text('resetAdvanced'),
-        kind: ActionRow(() => change(settings.copyWith(tuning: null, shaderCache: null, relinkerFlags: null))),
+        kind: ActionRow(() {
+          dropOptionDrafts(game);
+          change(
+            settings.copyWith(
+              tuning: null,
+              shaderCache: null,
+              relinkerFlags: null,
+              customRelinkerOptions: null,
+              launchOptions: null,
+            ),
+          );
+        }),
       ),
     ];
   }
+
+  /// What was typed in a game's options row ([_optionsRow]) and failed its check, by game and
+  /// row: kept as typed for the field, never saved.
+  final Map<String, String> _optionDrafts = {};
+
+  /// Forgets what was typed in [game]'s options rows and not saved (Reset, Import).
+  void dropOptionDrafts(Game game) => _optionDrafts.removeWhere((key, _) => key.startsWith('${game.id}\n'));
+
+  /// A field for options typed as text (Custom relinker options, Launch options): each keystroke
+  /// is checked; a valid text (or none) is saved at once, one that fails is kept here unsaved and
+  /// the row says why.
+  PanelRow _optionsRow(
+    Game game, {
+    required String id,
+    required String detail,
+    required String? saved,
+    required OptionProblem? Function(String text) check,
+    required GameSettings Function(GameSettings settings, String? text) apply,
+  }) {
+    final key = '${game.id}\n$id';
+    final draft = _optionDrafts[key];
+    final problem = draft == null ? null : check(draft);
+    return PanelRow(
+      id: id,
+      title: T.text(id),
+      detail: problem == null
+          ? '${T.text(detail)}\n${T.text('customOptionsWarning')}'
+          : T.format('optionsNotSaved', [optionProblemText(problem)]),
+      kind: TextRow(draft ?? saved ?? '', (text) {
+        if (check(text) == null) {
+          _optionDrafts.remove(key);
+          saveSettings(game, apply(currentSettings(game), text.trim().isEmpty ? null : text));
+        } else {
+          _optionDrafts[key] = text;
+          _changed();
+        }
+      }),
+    );
+  }
+
+  /// What an options row says about [problem].
+  static String optionProblemText(OptionProblem problem) => switch (problem.kind) {
+    OptionProblemKind.openQuote => T.text('optionsQuoteOpen'),
+    OptionProblemKind.launcherOption => T.format('relinkerOptionLauncher', [problem.shown]),
+    OptionProblemKind.breaksGame => T.format('relinkerOptionBreaks', [problem.shown]),
+    OptionProblemKind.hasSwitch => T.format('relinkerOptionSwitch', [problem.shown]),
+    OptionProblemKind.unknown => T.format('relinkerOptionUnknown', [problem.shown]),
+    OptionProblemKind.needsValue => T.format('relinkerOptionValue', [problem.shown]),
+    OptionProblemKind.positional => T.format('relinkerOptionPositional', [problem.shown]),
+  };
 
   /// The relinker options a player can choose for this game, used by its next rebuild. An engine
   /// that lacks one shows why instead of the switch; the rebuild leaves it out either way

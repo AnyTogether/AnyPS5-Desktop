@@ -142,6 +142,7 @@ void main() {
       Future<RunningGame> held({
         required String installed,
         required Map<String, String> environment,
+        List<String> arguments = const [],
         required String logFile,
         HostSystem? system,
         bool traced = false,
