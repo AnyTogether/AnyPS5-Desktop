@@ -593,51 +593,107 @@ class Installer {
     return p.join(game.folder, p.joinAll(relative.split('/')));
   }
 
+  /// Module folder names the relinker scans by itself (AnyPS5 USAGE.md / AnyPS5-GUI MODULE_DIRS).
+  static const moduleDirNames = ['sce_module', 'sce_modules', 'prx'];
+
   /// The game's modules and its update's, each once and sorted: the relinker converts the
   /// update's copy of one both have ([source]), and the engine loads the relinked ones from app0.
   ///
-  /// When the same basename appears in more than one place (root, `sce_module/`, an extra
-  /// folder such as Media/Modules, …), only one copy is kept so the relinker never sees two
-  /// guests that would write the same `*.guest.prx` ("Conflicting guest output filename").
-  /// Preference matches AnyPS5-GUI: standard module folders win, then other directories, then root.
+  /// Staging rules match AnyPS5-GUI (`move_root_prx` + `effective_module_dirs`):
+  /// - a root `.prx` whose name already exists under a module folder is left out;
+  /// - a root `.prx` that does not (except `libc.prx`) is staged *as if* moved into the module
+  ///   folder ([stageRelative]);
+  /// - `libc.prx` next to eboot.bin is left out of the relinker input (GUI never moves it; the
+  ///   engine ships its own);
+  /// - an extra folder (Media/Modules, …) that shares any basename with a module folder already
+  ///   taken is skipped entirely, so the relinker never sees two guests with the same output name.
   static List<String> modulesOf(Game game) {
     final update = game.update;
     final all = update == null
         ? modules(game.folder)
         : {...modules(game.folder), ...modules(update.folder)}.toList()
       ..sort();
-    return dedupeModulesByBasename(all);
+    return guiStagedModules(all);
   }
 
-  /// Priority for [dedupeModulesByBasename]: lower is preferred.
-  /// Standard module folders (sce_module / sce_modules / prx) beat extra dirs beat root.
-  static int _modulePriority(String module) {
-    final slash = module.indexOf('/');
-    if (slash < 0) return 2;
-    final first = module.substring(0, slash).toLowerCase();
-    if (const {'sce_module', 'sce_modules', 'prx'}.contains(first)) return 0;
-    return 1;
+  /// Module-folder name to receive root `.prx` files (first that already exists, else sce_module).
+  static String _rootPrxDestination(List<String> modules) {
+    for (final name in moduleDirNames) {
+      final prefix = '$name/';
+      if (modules.any((m) => m.length > prefix.length && m.toLowerCase().startsWith(prefix))) {
+        return name;
+      }
+    }
+    return 'sce_module';
   }
 
-  /// One path per basename (case-insensitive). The dump is unchanged; only the staged
-  /// input list for the relinker is filtered. Same goal as AnyPS5-GUI's
-  /// `effective_module_dirs` / `move_root_prx` (name already present elsewhere wins).
-  static List<String> dedupeModulesByBasename(List<String> modules) {
-    final best = <String, String>{}; // lowercase basename -> chosen relative path
+  /// Same selection AnyPS5-GUI uses before calling the relinker: dump-relative paths only.
+  static List<String> guiStagedModules(List<String> modules) {
+    final standard = {for (final n in moduleDirNames) n};
+    // Basename -> folder that already owns it (module folders first, then accepted extra dirs).
+    final taken = <String, String>{};
     for (final module in modules) {
-      final key = p.basename(module).toLowerCase();
-      final previous = best[key];
-      if (previous == null) {
-        best[key] = module;
+      final slash = module.indexOf('/');
+      if (slash < 0) continue;
+      final first = module.substring(0, slash).toLowerCase();
+      if (!standard.contains(first)) continue;
+      taken.putIfAbsent(p.basename(module).toLowerCase(), () => first);
+    }
+
+    final extraByDir = <String, List<String>>{};
+    for (final module in modules) {
+      final slash = module.indexOf('/');
+      if (slash < 0) continue;
+      final first = module.substring(0, slash).toLowerCase();
+      if (standard.contains(first) || first == 'fakelib') continue;
+      final dir = module.substring(0, module.lastIndexOf('/'));
+      (extraByDir[dir] ??= []).add(module);
+    }
+
+    final skippedExtra = <String>{};
+    final extraOrder = extraByDir.keys.toList()..sort();
+    for (final dir in extraOrder) {
+      final group = extraByDir[dir]!;
+      final clash = group.where((m) => taken.containsKey(p.basename(m).toLowerCase())).toList();
+      if (clash.isNotEmpty) {
+        skippedExtra.add(dir);
         continue;
       }
-      final preferNew =
-          _modulePriority(module) < _modulePriority(previous) ||
-          (_modulePriority(module) == _modulePriority(previous) && module.compareTo(previous) < 0);
-      if (preferNew) best[key] = module;
+      for (final module in group) {
+        taken.putIfAbsent(p.basename(module).toLowerCase(), () => dir);
+      }
     }
-    if (best.length == modules.length) return modules;
-    return [for (final module in modules) if (best[p.basename(module).toLowerCase()] == module) module];
+
+    final dest = _rootPrxDestination(modules);
+    final out = <String>[];
+    for (final module in modules) {
+      final slash = module.indexOf('/');
+      if (slash < 0) {
+        // move_root_prx: never libc; skip if the module folder already has the name.
+        final base = p.basename(module).toLowerCase();
+        if (base == 'libc.prx') continue;
+        if (taken.containsKey(base)) continue;
+        taken[base] = dest;
+        out.add(module);
+        continue;
+      }
+      final first = module.substring(0, slash).toLowerCase();
+      if (first == 'fakelib') continue;
+      final dir = module.substring(0, module.lastIndexOf('/'));
+      if (skippedExtra.contains(dir)) continue;
+      out.add(module);
+    }
+    return out;
+  }
+
+  /// Where a dump-relative module is written under the work `source/` folder.
+  /// Root modules that GUI would move into the module folder are staged there so the relinker
+  /// sees them without `--module-dir .` (dump file is unchanged; [source] still reads the root).
+  static String stageRelative(String dumpRelative, List<String> allModules) {
+    if (dumpRelative.contains('/')) return dumpRelative;
+    final base = p.basename(dumpRelative).toLowerCase();
+    if (base == 'libc.prx') return dumpRelative;
+    return '${_rootPrxDestination(allModules)}/${p.basename(dumpRelative)}';
   }
 
   /// The kept relinker output of [game] when its key is [key], null when there is none or it was
@@ -791,19 +847,25 @@ class Installer {
         _progress(InstallStep.unwrap, 1);
         _progress(InstallStep.relink, 1);
       } else {
-        // 1. The executable and every guest module as plain ELF files, in the dump's layout.
+        // 1. The executable and every guest module as plain ELF files. Root .prx are staged
+        // into the module folder like AnyPS5-GUI move_root_prx (dump paths unchanged).
         _progress(InstallStep.unwrap, 0);
         final source = p.join(work, 'source');
         Directory(source).createSync(recursive: true);
-        // Only what the dump holds goes in: a fresh folder each time, the output beside it.
         final inputs = ['eboot.bin', ...found];
         final placed = <String>[];
         for (var index = 0; index < inputs.length; index++) {
           await _gate();
           final relative = inputs[index];
-          final target = p.join(source, p.joinAll(relative.split('/')));
+          final staged = relative == 'eboot.bin' ? relative : stageRelative(relative, found);
+          final target = p.join(source, p.joinAll(staged.split('/')));
           Directory(p.dirname(target)).createSync(recursive: true);
-          if (await _unwrap(relative, Installer.source(game, relative), target) && index > 0) placed.add(relative);
+          if (await _unwrap(relative, Installer.source(game, relative), target) && index > 0) {
+            placed.add(relative);
+            if (staged != relative) {
+              _log('${p.basename(relative)} → $staged (root module, as AnyPS5-GUI move_root_prx)');
+            }
+          }
           _progress(InstallStep.unwrap, (index + 1) / inputs.length);
           await _yield();
         }
@@ -1027,23 +1089,21 @@ class Installer {
     return found;
   }
 
-  /// The folders besides sce_module whose modules the relinker converts too (Unity's
-  /// Media/Modules and Media/Plugins, root .prx next to eboot.bin). fakelib holds a dump
-  /// tool's stand-ins for system libraries, which AnyPS5 implements itself.
-  ///
-  /// `.` is included only when a root-level module remains after [dedupeModulesByBasename]
-  /// (same idea as AnyPS5-GUI, which moves root .prx into the module folder instead of
-  /// always passing `--module-dir .`).
+  /// Extra folders passed as `--module-dir` (Unity Media/Modules, Media/Plugins, …).
+  /// Matches AnyPS5-GUI `effective_module_dirs`: never `.` (root `.prx` are staged into the
+  /// module folder instead), never the standard module folders the relinker already scans,
+  /// never fakelib.
   static List<String> moduleDirectories(List<String> modules) {
-    final directories = <String>[
-      if (modules.any((module) => !module.contains('/'))) '.',
-    ];
+    final directories = <String>[];
     for (final module in modules) {
-      if (!module.toLowerCase().endsWith('.prx')) continue;
+      if (!module.toLowerCase().endsWith('.prx') && !module.toLowerCase().endsWith('.sprx')) {
+        continue;
+      }
       final slash = module.lastIndexOf('/');
-      final directory = slash < 0 ? '.' : module.substring(0, slash);
-      final first = directory.split('/').first;
-      if (const ['sce_module', 'sce_modules', 'prx', 'fakelib'].contains(first.toLowerCase())) continue;
+      if (slash < 0) continue; // root: staged into sce_module via [stageRelative]
+      final directory = module.substring(0, slash);
+      final first = directory.split('/').first.toLowerCase();
+      if (moduleDirNames.contains(first) || first == 'fakelib') continue;
       if (directories.contains(directory)) continue;
       directories.add(directory);
     }
