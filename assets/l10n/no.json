@@ -2289,5 +2289,11 @@
   "publicProfileOffNote": "Så lenge profilen din ikke er offentlig, fungerer Alle som Venner.",
   "publicProfileFamily": "Familieinnstillingene dine begrenser profilen din til venner.",
   "broadcastMicrophoneDevice": "Mikrofonenhet",
-  "broadcastMicrophoneAuto": "Automatisk"
+  "broadcastMicrophoneAuto": "Automatisk",
+  "libmpvMissingTitle": "Klipp trenger libmpv",
+  "libmpvMissingText": "Oppstarteren spiller av klipp og talemeldinger med systemets libmpv, og den er ikke installert. Installer den, og åpne oppstarteren igjen.",
+  "libmpvOpenElsewhere": "Åpne i en annen spiller",
+  "libmpvCopy": "Kopier",
+  "libmpvMissingVoice": "Installer libmpv for å spille av talemeldinger i oppstarteren: %@",
+  "libmpvMissingVoicePlain": "Installer libmpv for å spille av talemeldinger i oppstarteren."
 }

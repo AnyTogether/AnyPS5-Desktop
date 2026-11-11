@@ -2287,5 +2287,11 @@
   "publicProfileOffNote": "ໃນຂະນະທີ່ໂປຣໄຟລ໌ຂອງເຈົ້າບໍ່ເປັນສາທາລະນະ, ທຸກຄົນ ເຮັດວຽກຄືກັບ ໝູ່ເພື່ອນ.",
   "publicProfileFamily": "ການຕັ້ງຄ່າຄອບຄົວຂອງເຈົ້າຈຳກັດໂປຣໄຟລ໌ຂອງເຈົ້າໄວ້ສຳລັບໝູ່.",
   "broadcastMicrophoneDevice": "ອຸປະກອນໄມໂຄຣໂຟນ",
-  "broadcastMicrophoneAuto": "ອັດຕະໂນມັດ"
+  "broadcastMicrophoneAuto": "ອັດຕະໂນມັດ",
+  "libmpvMissingTitle": "ການຫຼິ້ນຄລິບຕ້ອງໃຊ້ libmpv",
+  "libmpvMissingText": "ໂປຣແກຣມເປີດເກມຫຼິ້ນຄລິບ ແລະ ຂໍ້ຄວາມສຽງດ້ວຍ libmpv ຂອງລະບົບ, ແຕ່ຍັງບໍ່ໄດ້ຕິດຕັ້ງ libmpv. ກະລຸນາຕິດຕັ້ງ, ແລ້ວເປີດໂປຣແກຣມເປີດເກມຄືນໃໝ່.",
+  "libmpvOpenElsewhere": "ເປີດໃນໂປຣແກຣມຫຼິ້ນອື່ນ",
+  "libmpvCopy": "ສຳເນົາ",
+  "libmpvMissingVoice": "ຕິດຕັ້ງ libmpv ເພື່ອຫຼິ້ນຂໍ້ຄວາມສຽງໃນໂປຣແກຣມເປີດເກມ: %@",
+  "libmpvMissingVoicePlain": "ຕິດຕັ້ງ libmpv ເພື່ອຫຼິ້ນຂໍ້ຄວາມສຽງໃນໂປຣແກຣມເປີດເກມ."
 }

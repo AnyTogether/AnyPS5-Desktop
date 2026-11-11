@@ -2287,5 +2287,11 @@
   "publicProfileOffNote": "መገለጫዎ ይፋዊ ባልሆነበት ጊዜ ሁሉም እንደ ጓደኞች ይሰራል።",
   "publicProfileFamily": "የቤተሰብ ቅንብሮችዎ መገለጫዎን ለጓደኞች ብቻ ያደርጉታል።",
   "broadcastMicrophoneDevice": "የማይክሮፎን መሣሪያ",
-  "broadcastMicrophoneAuto": "ራስ-ሰር"
+  "broadcastMicrophoneAuto": "ራስ-ሰር",
+  "libmpvMissingTitle": "ክሊፖች libmpv ያስፈልጋቸዋል",
+  "libmpvMissingText": "ማስጀመሪያው ክሊፖችን እና የድምፅ መልእክቶችን በሲስተሙ libmpv ያጫውታል፣ ግን libmpv አልተጫነም። ይጫኑት፣ ከዚያ ማስጀመሪያውን እንደገና ይክፈቱ።",
+  "libmpvOpenElsewhere": "በሌላ ማጫወቻ ክፈት",
+  "libmpvCopy": "ቅዳ",
+  "libmpvMissingVoice": "የድምፅ መልእክቶችን በማስጀመሪያው ለማጫወት libmpv ይጫኑ፦ %@",
+  "libmpvMissingVoicePlain": "የድምፅ መልእክቶችን በማስጀመሪያው ለማጫወት libmpv ይጫኑ።"
 }

@@ -2289,5 +2289,11 @@
   "publicProfileOffNote": "Selama profil Anda tidak publik, Semua orang berfungsi seperti Teman.",
   "publicProfileFamily": "Pengaturan keluarga Anda membatasi profil Anda hanya untuk teman.",
   "broadcastMicrophoneDevice": "Perangkat mikrofon",
-  "broadcastMicrophoneAuto": "Otomatis"
+  "broadcastMicrophoneAuto": "Otomatis",
+  "libmpvMissingTitle": "Klip memerlukan libmpv",
+  "libmpvMissingText": "Peluncur memutar klip dan pesan suara dengan libmpv milik sistem, dan libmpv belum terpasang. Pasang libmpv, lalu buka peluncur lagi.",
+  "libmpvOpenElsewhere": "Buka di pemutar lain",
+  "libmpvCopy": "Salin",
+  "libmpvMissingVoice": "Pasang libmpv untuk memutar pesan suara di peluncur: %@",
+  "libmpvMissingVoicePlain": "Pasang libmpv untuk memutar pesan suara di peluncur."
 }

@@ -2289,5 +2289,11 @@
   "publicProfileOffNote": "Solange dein Profil nicht öffentlich ist, funktioniert Alle wie Freunde.",
   "publicProfileFamily": "Deine Familieneinstellungen beschränken dein Profil auf Freunde.",
   "broadcastMicrophoneDevice": "Mikrofongerät",
-  "broadcastMicrophoneAuto": "Automatisch"
+  "broadcastMicrophoneAuto": "Automatisch",
+  "libmpvMissingTitle": "Clips brauchen libmpv",
+  "libmpvMissingText": "Der Launcher spielt Clips und Sprachnachrichten mit der libmpv des Systems ab, und sie ist nicht installiert. Installiere sie und öffne den Launcher dann erneut.",
+  "libmpvOpenElsewhere": "In einem anderen Player öffnen",
+  "libmpvCopy": "Kopieren",
+  "libmpvMissingVoice": "Installiere libmpv, um Sprachnachrichten im Launcher abzuspielen: %@",
+  "libmpvMissingVoicePlain": "Installiere libmpv, um Sprachnachrichten im Launcher abzuspielen."
 }

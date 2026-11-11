@@ -2289,5 +2289,11 @@
   "publicProfileOffNote": "আপনার প্রোফাইল পাবলিক না থাকলে সবাই বন্ধুরা-র মতো কাজ করে।",
   "publicProfileFamily": "আপনার পরিবারের সেটিংস আপনার প্রোফাইল বন্ধুদের মধ্যে সীমিত রাখে।",
   "broadcastMicrophoneDevice": "মাইক্রোফোন ডিভাইস",
-  "broadcastMicrophoneAuto": "স্বয়ংক্রিয়"
+  "broadcastMicrophoneAuto": "স্বয়ংক্রিয়",
+  "libmpvMissingTitle": "ক্লিপের জন্য libmpv দরকার",
+  "libmpvMissingText": "লঞ্চার সিস্টেমের libmpv দিয়ে ক্লিপ ও ভয়েস নোট চালায়, কিন্তু সেটি ইনস্টল করা নেই। এটি ইনস্টল করুন, তারপর লঞ্চারটি আবার খুলুন।",
+  "libmpvOpenElsewhere": "অন্য প্লেয়ারে খুলুন",
+  "libmpvCopy": "কপি করুন",
+  "libmpvMissingVoice": "লঞ্চারে ভয়েস নোট শুনতে libmpv ইনস্টল করুন: %@",
+  "libmpvMissingVoicePlain": "লঞ্চারে ভয়েস নোট শুনতে libmpv ইনস্টল করুন।"
 }

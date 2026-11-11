@@ -2289,5 +2289,11 @@
   "publicProfileOffNote": "Tant que votre profil n'est pas public, Tout le monde fonctionne comme Amis.",
   "publicProfileFamily": "Vos paramètres familiaux limitent votre profil à vos amis.",
   "broadcastMicrophoneDevice": "Périphérique du microphone",
-  "broadcastMicrophoneAuto": "Automatique"
+  "broadcastMicrophoneAuto": "Automatique",
+  "libmpvMissingTitle": "Les clips ont besoin de libmpv",
+  "libmpvMissingText": "Le lanceur lit les clips et les messages vocaux avec la libmpv du système, et elle n’est pas installée. Installez-la, puis rouvrez le lanceur.",
+  "libmpvOpenElsewhere": "Ouvrir dans un autre lecteur",
+  "libmpvCopy": "Copier",
+  "libmpvMissingVoice": "Installez libmpv pour écouter les messages vocaux dans le lanceur : %@",
+  "libmpvMissingVoicePlain": "Installez libmpv pour écouter les messages vocaux dans le lanceur."
 }

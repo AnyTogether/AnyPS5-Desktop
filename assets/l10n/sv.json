@@ -2289,5 +2289,11 @@
   "publicProfileOffNote": "Så länge din profil inte är offentlig fungerar Alla som Vänner.",
   "publicProfileFamily": "Dina familjeinställningar begränsar din profil till vänner.",
   "broadcastMicrophoneDevice": "Mikrofonenhet",
-  "broadcastMicrophoneAuto": "Automatiskt"
+  "broadcastMicrophoneAuto": "Automatiskt",
+  "libmpvMissingTitle": "Klipp kräver libmpv",
+  "libmpvMissingText": "Startprogrammet spelar upp klipp och röstmeddelanden med systemets libmpv, och den är inte installerad. Installera den och öppna sedan startprogrammet igen.",
+  "libmpvOpenElsewhere": "Öppna i en annan spelare",
+  "libmpvCopy": "Kopiera",
+  "libmpvMissingVoice": "Installera libmpv för att spela upp röstmeddelanden i startprogrammet: %@",
+  "libmpvMissingVoicePlain": "Installera libmpv för att spela upp röstmeddelanden i startprogrammet."
 }

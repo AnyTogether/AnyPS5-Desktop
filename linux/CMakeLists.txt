@@ -78,6 +78,36 @@ set(MIMALLOC_USE_STATIC_LIBS OFF)
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# The clip player uses the system's libmpv, never one carried in the bundle (the launcher is
+# GPL-2.0-only; the distributions' libmpv builds are not). media_kit_video's plugin links
+# libanyps5_mpv.so (mpv_shim/anyps5_mpv.cc) in place of libmpv: it has the seven libmpv functions
+# the plugin calls and opens the system's libmpv (libmpv.so.2 or libmpv.so.1) when a clip plays,
+# so the launcher starts without one. The build still needs libmpv-dev for the headers.
+add_library(anyps5_mpv SHARED "mpv_shim/anyps5_mpv.cc")
+apply_standard_settings(anyps5_mpv)
+set_target_properties(anyps5_mpv PROPERTIES CXX_VISIBILITY_PRESET hidden)
+pkg_check_modules(ANYPS5_MPV_HEADERS REQUIRED mpv)
+if(ANYPS5_MPV_HEADERS_INCLUDE_DIRS)
+  target_include_directories(anyps5_mpv PRIVATE ${ANYPS5_MPV_HEADERS_INCLUDE_DIRS})
+endif()
+target_link_libraries(anyps5_mpv PRIVATE ${CMAKE_DL_LIBS})
+if(TARGET media_kit_video_plugin)
+  get_target_property(MEDIA_KIT_VIDEO_LINKS media_kit_video_plugin LINK_LIBRARIES)
+  list(FIND MEDIA_KIT_VIDEO_LINKS "PkgConfig::mpv" MEDIA_KIT_VIDEO_MPV)
+  if(MEDIA_KIT_VIDEO_MPV EQUAL -1)
+    message(FATAL_ERROR "media_kit_video_plugin no longer links PkgConfig::mpv (${MEDIA_KIT_VIDEO_LINKS}): "
+      "see how it links libmpv now, and link it to anyps5_mpv instead")
+  endif()
+  list(REMOVE_ITEM MEDIA_KIT_VIDEO_LINKS "PkgConfig::mpv")
+  list(APPEND MEDIA_KIT_VIDEO_LINKS anyps5_mpv)
+  set_property(TARGET media_kit_video_plugin PROPERTY LINK_LIBRARIES "${MEDIA_KIT_VIDEO_LINKS}")
+  # libmpv's headers (in /usr/include/mpv on Debian and Ubuntu), without libmpv itself.
+  if(ANYPS5_MPV_HEADERS_INCLUDE_DIRS)
+    target_include_directories(media_kit_video_plugin PRIVATE ${ANYPS5_MPV_HEADERS_INCLUDE_DIRS})
+  endif()
+  list(APPEND PLUGIN_BUNDLED_LIBRARIES $<TARGET_FILE:anyps5_mpv>)
+endif()
+
 
 # === Installation ===
 # By default, "installing" just makes a relocatable bundle in the build
@@ -141,15 +171,3 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
   install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     COMPONENT Runtime)
 endif()
-
-# The clip player's libmpv and the libraries it needs that the launcher does not, into lib/
-# (packaging/linux/bundle-libmpv.sh): the bundle then starts where the system has another libmpv,
-# or none. Last, once the plugins are in lib/.
-install(CODE "
-  execute_process(
-    COMMAND bash \"${CMAKE_CURRENT_SOURCE_DIR}/../packaging/linux/bundle-libmpv.sh\" \"${CMAKE_INSTALL_PREFIX}\"
-    RESULT_VARIABLE BUNDLE_LIBMPV_RESULT)
-  if(NOT BUNDLE_LIBMPV_RESULT EQUAL 0)
-    message(FATAL_ERROR \"bundle-libmpv.sh failed (\${BUNDLE_LIBMPV_RESULT})\")
-  endif()
-  " COMPONENT Runtime)

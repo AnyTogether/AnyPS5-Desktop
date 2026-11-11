@@ -2289,5 +2289,11 @@
   "publicProfileOffNote": "Profilin herkese açık değilken Herkes, Arkadaşlar gibi çalışır.",
   "publicProfileFamily": "Aile ayarların profilini arkadaşlarınla sınırlıyor.",
   "broadcastMicrophoneDevice": "Mikrofon aygıtı",
-  "broadcastMicrophoneAuto": "Otomatik"
+  "broadcastMicrophoneAuto": "Otomatik",
+  "libmpvMissingTitle": "Klipler için libmpv gerekli",
+  "libmpvMissingText": "Başlatıcı klipleri ve sesli mesajları sistemdeki libmpv ile oynatır, ama libmpv kurulu değil. Kurun, sonra başlatıcıyı yeniden açın.",
+  "libmpvOpenElsewhere": "Başka bir oynatıcıda aç",
+  "libmpvCopy": "Kopyala",
+  "libmpvMissingVoice": "Sesli mesajları başlatıcıda dinlemek için libmpv'yi kurun: %@",
+  "libmpvMissingVoicePlain": "Sesli mesajları başlatıcıda dinlemek için libmpv'yi kurun."
 }

@@ -2289,5 +2289,11 @@
   "publicProfileOffNote": "Selagi profil anda bukan awam, Semua orang berfungsi seperti Rakan.",
   "publicProfileFamily": "Tetapan keluarga anda mengehadkan profil anda kepada rakan sahaja.",
   "broadcastMicrophoneDevice": "Peranti mikrofon",
-  "broadcastMicrophoneAuto": "Automatik"
+  "broadcastMicrophoneAuto": "Automatik",
+  "libmpvMissingTitle": "Klip memerlukan libmpv",
+  "libmpvMissingText": "Pelancar memainkan klip dan nota suara dengan libmpv sistem, dan ia belum dipasang. Pasangkannya, kemudian buka pelancar semula.",
+  "libmpvOpenElsewhere": "Buka dalam pemain lain",
+  "libmpvCopy": "Salin",
+  "libmpvMissingVoice": "Pasang libmpv untuk memainkan nota suara dalam pelancar: %@",
+  "libmpvMissingVoicePlain": "Pasang libmpv untuk memainkan nota suara dalam pelancar."
 }

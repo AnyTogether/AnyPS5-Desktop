@@ -2289,5 +2289,11 @@
   "publicProfileOffNote": "Mientras tu perfil no sea público, Todos funciona como Amigos.",
   "publicProfileFamily": "Tus ajustes familiares limitan tu perfil a tus amigos.",
   "broadcastMicrophoneDevice": "Dispositivo de micrófono",
-  "broadcastMicrophoneAuto": "Automático"
+  "broadcastMicrophoneAuto": "Automático",
+  "libmpvMissingTitle": "Los clips necesitan libmpv",
+  "libmpvMissingText": "El lanzador reproduce los clips y las notas de voz con la libmpv del sistema, y no está instalada. Instálala y vuelve a abrir el lanzador.",
+  "libmpvOpenElsewhere": "Abrir en otro reproductor",
+  "libmpvCopy": "Copiar",
+  "libmpvMissingVoice": "Instala libmpv para escuchar las notas de voz en el lanzador: %@",
+  "libmpvMissingVoicePlain": "Instala libmpv para escuchar las notas de voz en el lanzador."
 }

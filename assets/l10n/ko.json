@@ -2289,5 +2289,11 @@
   "publicProfileOffNote": "프로필이 공개 상태가 아니면 '모두'는 '친구'와 동일하게 작동합니다.",
   "publicProfileFamily": "가족 설정에 따라 프로필이 친구에게만 공개됩니다.",
   "broadcastMicrophoneDevice": "마이크 장치",
-  "broadcastMicrophoneAuto": "자동"
+  "broadcastMicrophoneAuto": "자동",
+  "libmpvMissingTitle": "클립을 재생하려면 libmpv가 필요합니다",
+  "libmpvMissingText": "런처는 시스템의 libmpv로 클립과 음성 메시지를 재생하는데, libmpv가 설치되어 있지 않습니다. 설치한 다음 런처를 다시 여세요.",
+  "libmpvOpenElsewhere": "다른 플레이어에서 열기",
+  "libmpvCopy": "복사",
+  "libmpvMissingVoice": "런처에서 음성 메시지를 재생하려면 libmpv를 설치하세요: %@",
+  "libmpvMissingVoicePlain": "런처에서 음성 메시지를 재생하려면 libmpv를 설치하세요."
 }
