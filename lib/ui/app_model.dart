@@ -145,6 +145,7 @@ class Preferences {
     ..menuMusicFile = json['menuMusicFile'] as String?
     ..profileName = json['profileName'] as String? ?? ''
     ..gamesFolders = _folders(json['gamesFolders'], json['gamesFolder'])
+    ..retroLibrary = json['retroLibrary'] == true
     ..retroEmulators = {
       if (json['retroEmulators'] case final Map<dynamic, dynamic> entries)
         for (final platform in RetroPlatform.values)
@@ -261,7 +262,16 @@ class Preferences {
   /// The games folders in order (a library over several drives); the first holds the store, where
   /// games are unlocked. A folder whose drive is unplugged stays in the list.
   List<String> gamesFolders = [];
+
+  /// Settings › Game Library › Emulator games: the games folders' PS1, PS2 and PS3 discs are
+  /// listed too, for the emulators in Settings › Emulators. Off until turned on, so a PS5-only
+  /// library is scanned as before.
+  bool retroLibrary = false;
+
+  /// The emulator chosen for each console ([RetroPlatform.name]), by its executable's path.
   Map<String, String> retroEmulators = {};
+
+  /// Settings › Emulators › Show as folders: a console's games in one tile on the home screen.
   bool showRetroFolders = false;
   String? toolkitFolder;
   bool onboarded = false;
@@ -448,6 +458,7 @@ class Preferences {
     'menuMusicFile': menuMusicFile,
     'profileName': profileName,
     'gamesFolders': gamesFolders,
+    if (retroLibrary) 'retroLibrary': true,
     if (retroEmulators.isNotEmpty) 'retroEmulators': retroEmulators,
     if (showRetroFolders) 'showRetroFolders': true,
     // The first one under the old name too, for an older launcher started again.
@@ -2948,7 +2959,7 @@ class AppModel extends ChangeNotifier {
       _connected.clear();
       _scannedFolders = key;
     }
-    final survey = GameLibrary.surveyAll(folders, includeRetro: true);
+    final survey = GameLibrary.surveyAll(folders, includeRetro: preferences.retroLibrary);
     folderCounts = survey.folders;
     _gameRoots = survey.roots;
     _takeScan(survey.games, quiet: _newlyConnected());
@@ -2974,7 +2985,7 @@ class AppModel extends ChangeNotifier {
   List<String> _watchedScan(String folder) {
     final folders = preferences.gamesFolders;
     if (_disposed || !folders.contains(folder)) return const [];
-    final survey = GameLibrary.surveyAll(folders, includeRetro: true);
+    final survey = GameLibrary.surveyAll(folders, includeRetro: preferences.retroLibrary);
     final key = folders.join('\n');
     final counted = !mapEquals(folderCounts, survey.folders);
     folderCounts = survey.folders;
@@ -3007,6 +3018,7 @@ class AppModel extends ChangeNotifier {
     _forgetDiskFacts();
     // A game being deleted stays out of the library until its files are gone or came back.
     games = deletion.visible(found);
+    _adoptRetroIds();
     records.clear();
     trophies.clear();
     for (final game in games) {
@@ -3098,9 +3110,8 @@ class AppModel extends ChangeNotifier {
     final game = selectedGame;
     if (game == null || sizes.containsKey(game.id) || _measuring) return;
     _measuring = true;
-    final size = services.folderSize ?? (folder) => Isolate.run(() => GameLibrary.size(folder));
     unawaited(
-      size(game.folder)
+      _measure(game, services.folderSize)
           .then((bytes) => sizes[game.id] = bytes, onError: (Object _) => sizes[game.id] = 0)
           .whenComplete(() {
             _measuring = false;
@@ -3112,6 +3123,22 @@ class AppModel extends ChangeNotifier {
   }
 
   bool _measuring = false;
+
+  /// What [game] takes on the disk: its folder, or its own files when it shares the folder
+  /// ([Game.files]). Static, so the closure sent to the other isolate holds only the paths.
+  static Future<int> _measure(Game game, Future<int> Function(String path)? measure) async {
+    final files = game.files;
+    if (files == null) {
+      final folder = game.folder;
+      return measure != null ? measure(folder) : Isolate.run(() => GameLibrary.size(folder));
+    }
+    if (measure == null) return Isolate.run(() => GameLibrary.filesSize(files));
+    var total = 0;
+    for (final file in files) {
+      total += await measure(file);
+    }
+    return total;
+  }
 
   /// A game's own controls read on another isolate. Static, so the closure sent there holds
   /// only the folder and not the model.
@@ -4175,11 +4202,6 @@ class AppModel extends ChangeNotifier {
     if (starting == null) return;
     _startTurn++;
     sounds.play(Cue.back);
-    if (starting?.retro != null) {
-      // The retro start owns this slot until its process has drained.
-      if (running != null) stopGame();
-      return;
-    }
     starting = null;
     _changed();
   }
@@ -6016,6 +6038,7 @@ class AppModel extends ChangeNotifier {
               _stepPrepare();
             }),
           ),
+          _retroLibraryRow(),
         ],
       ),
       PanelCategory(id: 'engine', title: T.text('engine'), rows: engine.settingsRows()),
@@ -6219,7 +6242,7 @@ class AppModel extends ChangeNotifier {
       PanelCategory(id: 'shortcuts', title: T.text('shortcuts'), rows: _shortcutRows()),
       // Fonts are rarely changed: near the end, before About.
       PanelCategory(id: 'fonts', title: T.text('fonts'), rows: fonts.settingsRows()),
-      _standaloneEmulatorSettings(),
+      if (preferences.retroLibrary) _standaloneEmulatorSettings(),
       PanelCategory(
         id: 'about',
         title: T.text('about'),

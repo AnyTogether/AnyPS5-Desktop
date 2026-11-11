@@ -1,42 +1,96 @@
 # AnyPS5 Desktop standalone emulator library
 
 Install and configure DuckStation for PS1, PCSX2 for PS2 or RPCS3 for PS3
-on Windows or Linux. In AnyPS5, open **Settings → Emulators** and select
-the emulator executable for each console you want to use. Choose the
-application executable or AppImage directly. Make an AppImage executable
-before selecting it. Add your games through **Settings → Game Library**.
-The emulators handle BIOS, firmware, graphics, controller setup and saves.
+on Windows or Linux. In AnyPS5, turn on **Settings → Game Library →
+Emulator games**. The switch is off by default: until it is on, the games
+folders are scanned for PS5 dumps only, no disc file is opened, and
+Settings shows no Emulators section. Once it is on, open **Settings →
+Emulators** and select the emulator executable for each console you want
+to use. Choose the application executable or AppImage directly. Make an
+AppImage executable before selecting it. The emulators handle BIOS,
+firmware, graphics, controller setup and saves.
 
 **Show as folders** groups titles for configured emulators after the main
 game row. Select a folder to preview its titles below it. Press Down to
 enter the row and Up to return. Play starts the installed emulator in a
-separate window. Window focus depends on the desktop environment.
+separate window. Window focus depends on the desktop environment. A title
+whose emulator is not selected yet shows the **Emulator required** badge,
+and its action opens the file picker.
+
+## Discovery
 
 [Game discovery](../lib/core/game_library.dart) recognizes PS1 cue sheets
 with local tracks, PBP files and local M3U playlists, PS2 ISO images with
 a PS2 boot entry, and CHD images under a console-named PS1 or PS2 folder.
 [PS3 disc discovery](../lib/core/ps3_disc.dart) reads the title from
 `PS3_GAME/PARAM.SFO` in an extracted disc folder. The file
-`PS3_GAME/USRDIR/EBOOT.BIN` is the RPCS3 launch target. A PS1 or PS2 game folder
-can also contain a `retro.json` descriptor with `platform`, `name`,
+`PS3_GAME/USRDIR/EBOOT.BIN` is the RPCS3 launch target. A PS1 or PS2 game
+folder can also contain a `retro.json` descriptor with `platform`, `name`,
 `disc` and `titleId` fields. Optional `icon` and `background` fields point
-to artwork. Paths
-are relative to the descriptor. Discovery is opt-in for the launcher so
-the existing PS5 command-line tools keep their library scope.
+to artwork. Paths are relative to the descriptor. Discovery runs only when
+the launcher passes `includeRetro`, which follows the Emulator games
+switch, so the PS5 command-line tools and PS5-only libraries keep their
+scope.
+
+Scans run on the interface isolate, as the PS5 scan always has, so the
+disc parsing is cached instead of repeated. `RetroScanCache` keeps what was
+read from each disc file (a cue sheet's file names, a playlist's entries,
+whether an ISO boots a PS2, a PBP or CHD header, a PARAM.SFO) by path,
+size and modification time. A rescan or a folder-watch event reads again
+only the files that changed. A full library scan drops the entries for
+files it no longer sees. Whether a cue sheet's tracks exist is still
+checked on every scan, because the tracks can disappear without the sheet
+changing.
+
+## Identity and size
+
+A disc's `Game.libraryId` is `retro:<console>:<path inside the games
+folder>`, with `/` separators on every system. When a drive letter or
+mount point changes and the same games folder is added again, the
+identifier stays the same, so last played and the measured size follow
+the game. The title ID of a loose disc is derived from that identifier.
+Last-played entries saved under the earlier identifier (the disc's
+absolute path for loose files, or the folder for `retro.json` and PS3
+folders) are moved to the new one on the next scan.
+
+Disc images that share a folder each list their own `Game.files`: a cue
+sheet and its tracks, or a playlist with every listed sheet and its
+tracks. The home screen's Size card adds up only those files. A game with
+its own folder (`retro.json` or a PS3 disc) is still measured as a whole
+folder.
+
+## Launch
 
 [Executable selection and launch](../lib/ui/standalone_emulators.dart)
 store paths in launcher preferences and hand the selected file to the
 [existing process and log lifecycle](../lib/core/game_process.dart).
+Cancelling a start (Close on the phone) clears the Starting state at once,
+even if the emulator's process start never returns. If that process does
+start later, it is stopped, and any start begun in the meantime is left
+alone.
+
 The [launcher model](../lib/ui/app_model.dart) exposes the setup rows and
 keeps standalone discs out of PS5 unlocking and trophy discovery. The
 [file picker adapter](../lib/main.dart) leaves Linux executable names
 unfiltered. The [game action](../lib/ui/game_action.dart) opens the picker
-when a title needs an emulator. The [folder selection model](../lib/ui/retro_home_folders.dart) keeps
-the focused console separate from its game selection. The [folder tile](../lib/ui/retro_folder_tile.dart)
-shows the console abbreviation and indicates the lower row in
-[Home](../lib/ui/home.dart). The [English](../assets/l10n/en.json) and
-[Turkish](../assets/l10n/tr.json) dictionaries provide the launcher copy.
+when a title needs an emulator. The [folder selection model](../lib/ui/retro_home_folders.dart)
+keeps the focused console separate from its game selection. The
+[folder tile](../lib/ui/retro_folder_tile.dart) shows the console
+abbreviation and indicates the lower row in [Home](../lib/ui/home.dart).
+Every file in [the language folder](../assets/l10n/en.json) carries the
+launcher copy.
+
+## Tests
+
 [Discovery tests](../test/core/retro_library_test.dart) cover mixed
-libraries and cue-sheet grouping. [Standalone launcher tests](../test/ui/standalone_retro_test.dart)
-use synthetic files and fake processes to verify selection, navigation
-and the launch arguments for all three consoles.
+libraries, cue-sheet grouping, identifiers that survive a moved games
+folder, per-game file lists and the cache.
+[Standalone launcher tests](../test/ui/standalone_retro_test.dart) use
+synthetic files and fake processes to verify the off-by-default switch,
+selection, navigation, the launch arguments for all three consoles, a
+cancelled start whose process never answers, the size of a shared-folder
+disc and the last-played migration.
+[Golden tests](../test/ui/standalone_retro_golden_test.dart) draw the
+switch, Settings → Emulators, the Emulator required badge and the console
+folder. Their images are made on macOS by CI (`ci.yml` with
+`update_goldens`), like every other golden in the repository.

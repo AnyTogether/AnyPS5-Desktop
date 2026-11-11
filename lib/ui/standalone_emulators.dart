@@ -1,11 +1,15 @@
 part of 'app_model.dart';
 
+/// PS1, PS2 and PS3 discs in the games folders, played in an emulator installed on the computer
+/// (DuckStation, PCSX2, RPCS3): the library's switch, the emulators' settings and the start.
 extension StandaloneEmulators on AppModel {
+  /// The emulator chosen for [platform], while its executable is still there.
   String? standaloneEmulator(RetroPlatform platform) {
     final program = preferences.retroEmulators[platform.name];
     return program != null && p.isAbsolute(program) && File(program).existsSync() ? program : null;
   }
 
+  /// Asks for [platform]'s emulator executable and keeps it.
   Future<void> chooseStandaloneEmulator(RetroPlatform platform) async {
     final String? selected;
     try {
@@ -26,6 +30,25 @@ extension StandaloneEmulators on AppModel {
     savePreferences();
   }
 
+  /// Settings › Game Library › Emulator games: turns the discs' discovery on or off, and with it
+  /// Settings › Emulators. The scan that follows announces none of the discs as new games.
+  void setRetroLibrary(bool enabled) {
+    if (preferences.retroLibrary == enabled) return;
+    preferences.retroLibrary = enabled;
+    if (!enabled) _homeRetroFolder = null;
+    savePreferences();
+    _tracker.reset();
+    rescan();
+  }
+
+  PanelRow _retroLibraryRow() => PanelRow(
+    id: 'retroLibrary',
+    title: T.text('retroLibrary'),
+    detail: T.text('retroLibraryDetail'),
+    kind: ToggleRow(preferences.retroLibrary, setRetroLibrary),
+  );
+
+  /// Settings › Emulators, shown while Emulator games is on.
   PanelCategory _standaloneEmulatorSettings() => PanelCategory(
     id: 'emulators',
     title: T.text('retroEmulators'),
@@ -45,6 +68,25 @@ extension StandaloneEmulators on AppModel {
     ],
   );
 
+  /// Last played kept under a disc's identifier from before it was the disc's path inside its
+  /// games folder (its whole path, or its folder's) moves to the one it has now.
+  void _adoptRetroIds() {
+    final played = preferences.lastPlayed;
+    var moved = false;
+    for (final game in games) {
+      final disc = game.retro;
+      if (disc == null || played.containsKey(game.id)) continue;
+      final earlier = game.files == null ? game.folder : p.normalize(p.absolute(disc.path));
+      if (played.remove(earlier) case final last?) {
+        played[game.id] = last;
+        moved = true;
+      }
+    }
+    if (moved && persist) preferences.save(paths.preferencesFile);
+  }
+
+  /// Starts [game]'s disc in its emulator. Given up while the emulator starts ([cancelStart]),
+  /// the start lets the slot go at once, and an emulator that starts after all is stopped.
   Future<void> _playStandalone(Game game, RetroDisc disc) async {
     if (starting != null || running != null) return;
     final allowed = together.family.beforePlay(game);
@@ -78,12 +120,8 @@ extension StandaloneEmulators on AppModel {
         logFile: paths.logFile(game.titleId),
       );
     } on Object catch (error) {
-      if (_disposed) return;
+      if (_disposed || turn != _startTurn) return;
       starting = null;
-      if (turn != _startTurn) {
-        _changed();
-        return;
-      }
       _padLog?.call('Could not start ${disc.platform.emulator}: $error');
       show(T.format('retroEmulatorStartFailed', [disc.platform.emulator]));
       _changed();
@@ -93,10 +131,6 @@ extension StandaloneEmulators on AppModel {
     if (_disposed || turn != _startTurn) {
       if (!run.stop()) run.kill();
       await run.exitCode;
-      if (!_disposed) {
-        starting = null;
-        _changed();
-      }
       return;
     }
     starting = null;
