@@ -8,6 +8,13 @@
 # (lib/core/update_channel.dart), so this tag reaches no update check. CI has no signing key: the
 # launcher offers nothing from it until the release Mac has signed it
 # (tools/release/sign_nightly.sh -R AnyTogether/AnyPS5-Desktop <tag>, AnyPS5-ARM).
+#
+# GITHUB_TOKEN can make no tag at a commit whose .github/workflows/ has a file main lacks or has
+# otherwise (GitHub answers 403 Resource not accessible by integration; that needs the Workflows
+# permission, which GITHUB_TOKEN cannot be given). That is the run's commit when main got a
+# workflow change after the run began, or when the run is of a branch with workflows of its own.
+# The publish job then publishes nothing and starts this workflow again on main; it ends green
+# with a warning.
 name: Publish ffmpeg
 
 on:
@@ -54,6 +61,8 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
+      # To start the workflow again when the run's commit cannot be tagged (see the top).
+      actions: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -85,8 +94,20 @@ jobs:
 
           Unsigned until it is signed on the release Mac. The launcher does not offer it until then.
           EOF
+          # GITHUB_TOKEN cannot tag this commit once main has other workflows than it (see the top):
+          # publishing is then left to a new run of this workflow on main.
+          start_over() {
+            local changed
+            git fetch -q --depth=1 origin main
+            changed="$(git diff --name-only --no-renames --diff-filter=d FETCH_HEAD "$SHA" -- .github/workflows)"
+            [ -n "$changed" ] || return 1
+            echo "::warning::$FFMPEG_TAG is not published: main ($(git rev-parse --short=10 FETCH_HEAD)) has other workflows than ${SHA:0:10} (${changed//$'\n'/ }), and GITHUB_TOKEN cannot tag such a commit. Starting this workflow again on main."
+            gh workflow run ffmpeg-release.yml --repo "$REPO" --ref main
+          }
+          if start_over; then exit 0; fi
           gh release create "$FFMPEG_TAG" dist/* --repo "$REPO" --target "$SHA" --prerelease --latest=false \
-            --title "FFmpeg $FFMPEG_VERSION for AnyPS5 Desktop" --notes-file notes.md
+            --title "FFmpeg $FFMPEG_VERSION for AnyPS5 Desktop" --notes-file notes.md ||
+            { if start_over; then exit 0; fi; exit 1; }
           # Latest must never be this.
           [ "$(gh release view "$FFMPEG_TAG" --repo "$REPO" --json isPrerelease --jq .isPrerelease)" = true ] ||
             { echo "::error::$FFMPEG_TAG is not a pre-release"; exit 1; }
