@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import 'controls.dart';
+import 'custom_options.dart';
 import 'game_log.dart';
 import 'gyro_aiming.dart';
 import 'relinker_flags.dart';
@@ -110,6 +111,8 @@ class GameSettings {
     this.trace,
     this.gyro,
     this.relinkerFlags,
+    this.customRelinkerOptions,
+    this.launchOptions,
   }) : ownFullscreen = fullscreen,
        ownWindowSize = windowSize,
        ownVsync = vsync;
@@ -169,8 +172,16 @@ class GameSettings {
       relinkerFlags: json['relinkerFlags'] is List<dynamic>
           ? (json['relinkerFlags'] as List<dynamic>).whereType<String>().toList()
           : null,
+      customRelinkerOptions: optionsText(json['customRelinkerOptions'], (text) => checkRelinkerOptions(text).ok),
+      launchOptions: optionsText(json['launchOptions'], (text) => LaunchOptions.parse(text).$2 == null),
     );
   }
+
+  /// A typed options text as it is kept: null for anything but a text, one with only spaces, or
+  /// one that fails its [check], so a settings file (imported, written by hand) never brings an
+  /// invalid one.
+  static String? optionsText(Object? value, bool Function(String text) check) =>
+      value is String && value.trim().isNotEmpty && check(value) ? value : null;
 
   /// A WIDTHxHEIGHT the title's patch file can set (see [ResolutionPatch]), null for the title's
   /// own. Taking effect needs the game installed again, as the value is written at relink time.
@@ -268,6 +279,27 @@ class GameSettings {
     return copyWith(relinkerFlags: chosen.isEmpty ? null : chosen);
   }
 
+  /// Advanced › Rebuild options › Custom relinker options, as typed; null is none. Added after the
+  /// launcher's own options on the next rebuild, through [customRelinkerWords].
+  final String? customRelinkerOptions;
+
+  /// The words [customRelinkerOptions] gives the relinker: none when it is not set or fails its
+  /// check ([checkRelinkerOptions]).
+  List<String> get customRelinkerWords {
+    final text = customRelinkerOptions;
+    return text == null ? const [] : checkRelinkerOptions(text).words;
+  }
+
+  /// Advanced › Launch › Launch options, as typed; null is none. Read through [launch].
+  final String? launchOptions;
+
+  /// The variables and arguments [launchOptions] gives the game's start; null when it is not set
+  /// or has a quote left open.
+  LaunchOptions? get launch {
+    final text = launchOptions;
+    return text == null || text.trim().isEmpty ? null : LaunchOptions.parse(text).$1;
+  }
+
   Map<String, Object?> toJson() => {
     'settingsVersion': version,
     if (ownFullscreen != null) 'fullscreen': ownFullscreen,
@@ -288,6 +320,8 @@ class GameSettings {
     if (trace != null) 'trace': trace,
     if (gyro != null) 'gyro': gyro!.toJson(),
     if (relinkerFlags != null) 'relinkerFlags': relinkerFlags,
+    if (customRelinkerOptions != null) 'customRelinkerOptions': customRelinkerOptions,
+    if (launchOptions != null) 'launchOptions': launchOptions,
   };
 
   static const _keep = Object();
@@ -312,6 +346,8 @@ class GameSettings {
     Object? trace = _keep,
     Object? gyro = _keep,
     Object? relinkerFlags = _keep,
+    Object? customRelinkerOptions = _keep,
+    Object? launchOptions = _keep,
   }) => GameSettings(
     resolution: identical(resolution, _keep) ? this.resolution : resolution as String?,
     fullscreen: identical(fullscreen, _keep) ? ownFullscreen : fullscreen as bool?,
@@ -331,6 +367,10 @@ class GameSettings {
     trace: identical(trace, _keep) ? this.trace : trace as bool?,
     gyro: identical(gyro, _keep) ? this.gyro : gyro as GyroAiming?,
     relinkerFlags: identical(relinkerFlags, _keep) ? this.relinkerFlags : relinkerFlags as List<String>?,
+    customRelinkerOptions: identical(customRelinkerOptions, _keep)
+        ? this.customRelinkerOptions
+        : customRelinkerOptions as String?,
+    launchOptions: identical(launchOptions, _keep) ? this.launchOptions : launchOptions as String?,
   );
 
   /// The game reads the controllers (through SDL2) only while its window is in front: with the
