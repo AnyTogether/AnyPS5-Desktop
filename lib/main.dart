@@ -43,6 +43,7 @@ import 'ui/sharing_model.dart';
 import 'ui/strings.dart';
 import 'ui/together_model.dart' show launcherVersion;
 import 'ui/theme.dart';
+import 'ui/trash_channel.dart';
 
 /// Takes the window's close (and the other ways the launcher quits) to the launcher's health: a
 /// run that closed as it should is no crash next time.
@@ -112,6 +113,8 @@ Future<void> main(List<String> arguments) async {
   final model = AppModel(
     paths: paths,
     services: LauncherServices(
+      // Delete game: the Recycle Bin on Windows; Linux asks the desktop's own tool.
+      trash: Platform.isWindows ? const ChannelTrash() : null,
       pickFolder: (title) => getDirectoryPath(confirmButtonText: title),
       openFolder: (folder) => unawaited(Process.run(Platform.isWindows ? 'explorer' : 'xdg-open', [folder])),
       openUrl: (url) => unawaited(

@@ -40,10 +40,20 @@ target_compile_options(now_playing PRIVATE /W3 /EHsc)
 target_compile_definitions(now_playing PRIVATE "NOMINMAX" "UNICODE" "_UNICODE" "WIN32_LEAN_AND_MEAN")
 target_link_libraries(now_playing PRIVATE windowsapp)
 
+# Delete game: a game's files into the Recycle Bin (recycle.cpp, the shell's IFileOperation) on
+# a thread of its own. A library with a plain C header for the same reason: the thread it starts
+# needs exceptions.
+add_library(recycle STATIC "recycle.cpp")
+target_compile_features(recycle PRIVATE cxx_std_17)
+target_compile_options(recycle PRIVATE /W3 /EHsc)
+target_compile_definitions(recycle PRIVATE "NOMINMAX" "UNICODE" "_UNICODE")
+target_link_libraries(recycle PRIVATE shell32 ole32)
+
 # Add dependency libraries and include directories. Add any application-specific
 # dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE now_playing)
+target_link_libraries(${BINARY_NAME} PRIVATE recycle)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 

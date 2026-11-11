@@ -15,7 +15,9 @@ import 'game_library.dart';
 import 'game_settings.dart';
 import 'host.dart';
 import 'process_control.dart';
+import 'profiles/profile_saves.dart';
 import 'relinker_flags.dart';
+import 'save_backup.dart';
 import 'self_unwrap.dart';
 import 'toolkit.dart';
 import 'unlock_space.dart';
@@ -381,6 +383,35 @@ class Installer {
     return Future.wait([
       for (final path in {...going.nonNulls, ...left}) removeAside(path),
     ]);
+  }
+
+  /// What of an installed game is the player's own: the saves, the save memory and the trophies
+  /// in place, every other profile's parked ones and the mark that says whose are in place.
+  static const savedParts = [...SaveBackup.parts, ProfileSaves.parkName, ProfileSaves.markName];
+
+  /// Where a deleted game's saves and trophies wait, in the store of the games folder: the next
+  /// unlock of a game in the same folder takes them back ([placeInstalled]).
+  static String keptSaves(String installed) => p.join(p.dirname(p.dirname(installed)), 'Saves', p.basename(installed));
+
+  /// Before a game is deleted: its saves and trophies ([savedParts]) move out of the installed
+  /// folder into [keptSaves], so the uninstall that follows takes none of them. Renames on one
+  /// drive, quick however big they are. Something kept there already (the game deleted before and
+  /// never unlocked since) stays, the newer one beside it under its date. Throws
+  /// FileSystemException when one cannot be moved: the installed game is then left as it is.
+  static void keepSaves(Game game, String root) {
+    final installed = installedFolder(game, root);
+    final kept = keptSaves(installed);
+    for (final part in savedParts) {
+      final source = p.join(installed, part);
+      final type = FileSystemEntity.typeSync(source, followLinks: false);
+      if (type == FileSystemEntityType.notFound || type == FileSystemEntityType.link) continue;
+      Directory(kept).createSync(recursive: true);
+      var target = p.join(kept, part);
+      if (FileSystemEntity.typeSync(target, followLinks: false) != FileSystemEntityType.notFound) {
+        target = '$target.${DateTime.now().microsecondsSinceEpoch}';
+      }
+      type == FileSystemEntityType.directory ? Directory(source).renameSync(target) : File(source).renameSync(target);
+    }
   }
 
   /// Where [uninstall] puts what it removes until it is gone, in the store of the games folder
@@ -879,8 +910,19 @@ class Installer {
   /// renamed aside at once and removed after, on the system's file threads: a game of tens of
   /// thousands of files took the screen with it while it went.
   static Future<void> placeInstalled(String partial, String installed) async {
-    if (Directory(installed).existsSync()) {
-      carryOver(installed, partial);
+    final exists = Directory(installed).existsSync();
+    if (exists) carryOver(installed, partial);
+    // The saves a deleted game left ([keepSaves]) come back, unless the game has its own.
+    final kept = keptSaves(installed);
+    if (Directory(kept).existsSync()) {
+      carryOver(kept, partial);
+      try {
+        if (Directory(kept).listSync().isEmpty) Directory(kept).deleteSync();
+      } on FileSystemException {
+        // It stays for the next unlock.
+      }
+    }
+    if (exists) {
       final old = '$installed.old-${DateTime.now().microsecondsSinceEpoch}.partial';
       try {
         Directory(installed).renameSync(old);
