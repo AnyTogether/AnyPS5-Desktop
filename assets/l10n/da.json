@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "Åbn i en anden afspiller",
   "libmpvCopy": "Kopiér",
   "libmpvMissingVoice": "Installer libmpv for at afspille stemmebeskeder i launcheren: %@",
-  "libmpvMissingVoicePlain": "Installer libmpv for at afspille stemmebeskeder i launcheren."
+  "libmpvMissingVoicePlain": "Installer libmpv for at afspille stemmebeskeder i launcheren.",
+  "nowPlaying": "Afspiller nu",
+  "nowPlayingIn": "Afspiller nu i %@",
+  "nowPlayingPausedIn": "Sat på pause i %@",
+  "nowPlayingPrevious": "Forrige nummer",
+  "nowPlayingNext": "Næste nummer",
+  "nowPlayingPlayPause": "Afspil eller sæt på pause",
+  "nowPlayingCard": "Afspiller nu i hurtigmenuen",
+  "nowPlayingCardDetail": "Viser i menuen over et spil, hvad en musik- eller videoafspiller på denne computer afspiller, med forrige, afspil eller pause og næste. Virker med enhver afspiller, der fortæller systemet, hvad den afspiller.",
+  "nowPlayingShare": "Vis venner, hvad jeg lytter til",
+  "nowPlayingShareDetail": "Venner på AnyTogether ser titel og kunstner, mens det spiller. Der sendes intet, mens dette er slået fra.",
+  "friendsListening": "Lytter til %@",
+  "friendsListeningBy": "Lytter til %1$@, %2$@"
 }

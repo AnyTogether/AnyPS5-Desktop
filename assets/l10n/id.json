@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "Buka di pemutar lain",
   "libmpvCopy": "Salin",
   "libmpvMissingVoice": "Pasang libmpv untuk memutar pesan suara di peluncur: %@",
-  "libmpvMissingVoicePlain": "Pasang libmpv untuk memutar pesan suara di peluncur."
+  "libmpvMissingVoicePlain": "Pasang libmpv untuk memutar pesan suara di peluncur.",
+  "nowPlaying": "Sedang diputar",
+  "nowPlayingIn": "Sedang diputar di %@",
+  "nowPlayingPausedIn": "Dijeda di %@",
+  "nowPlayingPrevious": "Lagu sebelumnya",
+  "nowPlayingNext": "Lagu berikutnya",
+  "nowPlayingPlayPause": "Putar atau jeda",
+  "nowPlayingCard": "Sedang diputar di menu cepat",
+  "nowPlayingCardDetail": "Menampilkan apa yang diputar pemutar musik atau video di komputer ini pada menu di atas game, dengan sebelumnya, putar atau jeda, dan berikutnya. Berfungsi dengan pemutar apa pun yang memberi tahu sistem apa yang diputarnya.",
+  "nowPlayingShare": "Tampilkan kepada teman apa yang saya dengarkan",
+  "nowPlayingShareDetail": "Teman di AnyTogether melihat judul dan artis selama diputar. Tidak ada yang dikirim selama ini nonaktif.",
+  "friendsListening": "Mendengarkan %@",
+  "friendsListeningBy": "Mendengarkan %1$@, %2$@"
 }

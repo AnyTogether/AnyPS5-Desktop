@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "Åpne i en annen spiller",
   "libmpvCopy": "Kopier",
   "libmpvMissingVoice": "Installer libmpv for å spille av talemeldinger i oppstarteren: %@",
-  "libmpvMissingVoicePlain": "Installer libmpv for å spille av talemeldinger i oppstarteren."
+  "libmpvMissingVoicePlain": "Installer libmpv for å spille av talemeldinger i oppstarteren.",
+  "nowPlaying": "Spilles nå",
+  "nowPlayingIn": "Spilles nå i %@",
+  "nowPlayingPausedIn": "Satt på pause i %@",
+  "nowPlayingPrevious": "Forrige spor",
+  "nowPlayingNext": "Neste spor",
+  "nowPlayingPlayPause": "Spill av eller sett på pause",
+  "nowPlayingCard": "Spilles nå i hurtigmenyen",
+  "nowPlayingCardDetail": "Viser i menyen over et spill hva en musikk- eller videospiller på denne datamaskinen spiller av, med forrige, spill av eller pause og neste. Fungerer med alle spillere som forteller systemet hva de spiller av.",
+  "nowPlayingShare": "Vis venner hva jeg hører på",
+  "nowPlayingShareDetail": "Venner på AnyTogether ser tittel og artist mens det spilles. Ingenting sendes mens dette er slått av.",
+  "friendsListening": "Hører på %@",
+  "friendsListeningBy": "Hører på %1$@, %2$@"
 }

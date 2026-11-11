@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 
+#include "now_playing.h"
 #include "win32_window.h"
 
 // A window that does nothing but host a Flutter view.
@@ -49,6 +50,18 @@ class FlutterWindow : public Win32Window {
 
   // The title bar's Maximize turned into the launcher's full screen.
   void MaximizeToFullscreen();
+
+  // "anyps5/now_playing": what a media player on this computer plays, for the quick menu's
+  // card (now_playing.h). The launcher turns the watching on and off, asks for the track and
+  // sends previous, play or pause and next; it hears "changed" with the track each time
+  // Windows says it changed.
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
+      now_playing_channel_;
+  NowPlaying* now_playing_ = nullptr;
+
+  // The track as the channel carries it: null with no session, else a map of title, artist,
+  // player, playing and (when the player gave a cover) artwork.
+  flutter::EncodableValue NowPlayingValue();
 
   std::wstring run_marker_;
 

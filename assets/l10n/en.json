@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "Open in another player",
   "libmpvCopy": "Copy",
   "libmpvMissingVoice": "Install libmpv to play voice notes in the launcher: %@",
-  "libmpvMissingVoicePlain": "Install libmpv to play voice notes in the launcher."
+  "libmpvMissingVoicePlain": "Install libmpv to play voice notes in the launcher.",
+  "nowPlaying": "Now playing",
+  "nowPlayingIn": "Now playing in %@",
+  "nowPlayingPausedIn": "Paused in %@",
+  "nowPlayingPrevious": "Previous track",
+  "nowPlayingNext": "Next track",
+  "nowPlayingPlayPause": "Play or pause",
+  "nowPlayingCard": "Now playing in the quick menu",
+  "nowPlayingCardDetail": "Shows what a music or video player on this computer is playing in the menu over a game, with previous, play or pause and next. Works with any player that tells the system what it plays.",
+  "nowPlayingShare": "Show friends what I'm listening to",
+  "nowPlayingShareDetail": "Friends on AnyTogether see the title and artist while it plays. Nothing is sent while this is off.",
+  "friendsListening": "Listening to %@",
+  "friendsListeningBy": "Listening to %1$@, %2$@"
 }

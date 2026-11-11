@@ -14,6 +14,7 @@ import 'core/desktop/desktop.dart';
 import 'core/desktop/file_types.dart';
 import 'core/desktop/url_scheme.dart';
 import 'core/link_relay.dart';
+import 'core/now_playing_mpris.dart';
 import 'core/desktop/linux_desktop.dart';
 import 'core/desktop/window_backdrop.dart';
 import 'core/desktop/windows_desktop.dart';
@@ -34,6 +35,7 @@ import 'ui/crash_model.dart';
 import 'ui/launcher.dart';
 import 'ui/launcher_window_channel.dart';
 import 'ui/layer_overlay_channel.dart';
+import 'ui/now_playing_channel.dart';
 import 'ui/profile_picture.dart';
 import 'ui/sealed_photo.dart';
 import 'ui/voice_note_player.dart';
@@ -163,6 +165,8 @@ Future<void> main(List<String> arguments) async {
       desktop: desktop,
       backdrop: backdrop,
       window: window,
+      // Now playing: Windows' media session through the runner, MPRIS on the session bus on Linux.
+      nowPlaying: () => Platform.isWindows ? ChannelNowPlaying() : MprisNowPlaying(),
       quit: (code) => unawaited(shutdown.quit(code)),
     ),
   );

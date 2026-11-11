@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "Ouvrir dans un autre lecteur",
   "libmpvCopy": "Copier",
   "libmpvMissingVoice": "Installez libmpv pour écouter les messages vocaux dans le lanceur : %@",
-  "libmpvMissingVoicePlain": "Installez libmpv pour écouter les messages vocaux dans le lanceur."
+  "libmpvMissingVoicePlain": "Installez libmpv pour écouter les messages vocaux dans le lanceur.",
+  "nowPlaying": "Lecture en cours",
+  "nowPlayingIn": "Lecture en cours dans %@",
+  "nowPlayingPausedIn": "En pause dans %@",
+  "nowPlayingPrevious": "Piste précédente",
+  "nowPlayingNext": "Piste suivante",
+  "nowPlayingPlayPause": "Lire ou mettre en pause",
+  "nowPlayingCard": "Lecture en cours dans le menu rapide",
+  "nowPlayingCardDetail": "Affiche dans le menu au-dessus du jeu ce que lit un lecteur de musique ou de vidéo de cet ordinateur, avec précédent, lecture ou pause et suivant. Fonctionne avec tout lecteur qui indique au système ce qu'il lit.",
+  "nowPlayingShare": "Montrer à mes amis ce que j'écoute",
+  "nowPlayingShareDetail": "Vos amis sur AnyTogether voient le titre et l'artiste pendant la lecture. Rien n'est envoyé tant que cette option est désactivée.",
+  "friendsListening": "Écoute %@",
+  "friendsListeningBy": "Écoute %1$@, %2$@"
 }

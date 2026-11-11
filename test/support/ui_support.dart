@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:anyps5_desktop/core/discord_presence.dart';
+import 'package:anyps5_desktop/core/now_playing.dart';
 import 'package:anyps5_desktop/core/ffmpeg_download.dart';
 import 'package:anyps5_desktop/core/engine_checkout.dart';
 import 'package:anyps5_desktop/core/audio/atrac9.dart';
@@ -192,6 +193,7 @@ Fixture makeFixture({
   Future<List<String>?> Function()? pickPictures,
   CommandRunner? commands,
   DiscordPresence Function()? discord,
+  NowPlayingSource Function()? nowPlaying,
   ClipPlayback Function()? clipPlayback,
   VoicePlayback Function()? voicePlayback,
 }) {
@@ -291,6 +293,7 @@ Fixture makeFixture({
       gameControls: gameControls ?? (folder) => SynchronousFuture(UnrealControls.read(folder)),
       commands: commands,
       discord: discord,
+      nowPlaying: nowPlaying,
       discordGames: (_) async => null,
       systemInfo: () async =>
           const SystemInfo(os: 'Ubuntu 24.04.1 LTS, kernel 6.8.0-45-generic', cpu: 'AMD Ryzen 7 5800X', memoryGB: 32),
