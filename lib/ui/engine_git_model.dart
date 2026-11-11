@@ -217,7 +217,7 @@ class EngineGitModel {
   };
 
   /// What a command installs, in a few words: "Git", "GCC, CMake, Ninja".
-  static String fixNames(InstallCommand command) => [
+  static String fixNames(InstallCommand command) => <String>{
     for (final need in command.needs)
       switch (need) {
         BuildNeed.git => 'Git',
@@ -226,7 +226,7 @@ class EngineGitModel {
         BuildNeed.compiler || BuildNeed.newerCompiler => 'GCC',
         BuildNeed.x11 => T.text('engineToolX11'),
       },
-  ].toSet().join(', ');
+  }.join(', ');
 
   void copyFix(InstallCommand command) {
     app.services.copyText?.call(command.line);

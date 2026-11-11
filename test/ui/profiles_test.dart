@@ -496,7 +496,8 @@ void main() {
       // Refused: said so.
       server.answers['PUT me/avatar'] = FakeTogether.problem(413, 'payload_too_large', 'The file is too big');
       await model.uploadProfilePicture();
-      expect(model.toast, 'The picture could not be uploaded: The file is too big');
+      // The launcher's words for the code, not the server's English.
+      expect(model.toast, 'The picture could not be uploaded: That\'s too large.');
       // A picture that does not come: said so.
       model.together.account.updateUser(
         TogetherUser(id: 'u-me', handle: 'utku', displayName: 'Utku', avatar: '${server.base}/avatars/gone.png'),

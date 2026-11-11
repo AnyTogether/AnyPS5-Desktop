@@ -161,7 +161,7 @@ void main() {
       final user = Directory(p.join(temp.path, 'user'))..createSync();
       File(p.join(tools.path, 'git.exe')).writeAsStringSync('');
       File(p.join(user.path, 'ninja.exe')).writeAsStringSync('');
-      commands.results['reg query HKLM'] = FakeResult(
+      commands.results['reg query HKLM'] = const FakeResult(
         lines: [
           '',
           r'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment',

@@ -889,9 +889,13 @@ class _RowView extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          row.title,
-                          style: AppText.display(17 * scale, weight: FontWeight.w500, color: titleColor),
+                        // A title longer than the row (every missing tool by name) goes on to a
+                        // second line; one that fits is drawn as before.
+                        Flexible(
+                          child: Text(
+                            row.title,
+                            style: AppText.display(17 * scale, weight: FontWeight.w500, color: titleColor),
+                          ),
                         ),
                         if (row.glyph != null) ...[
                           SizedBox(width: 8 * scale),

@@ -1574,7 +1574,7 @@ void main() {
       server.answers['PATCH me/privacy'] = FakeTogether.problem(403, 'forbidden', 'Not allowed');
       await together.setPrivacy(PrivacySection.presence, ProfileVisibility.everyone);
       expect((row('privacy-presence').kind as ChoiceRow).selected, 1, reason: 'put back');
-      expect(model.toast, 'Not allowed');
+      expect(model.toast, 'You\'re not allowed to do that.', reason: 'the launcher\'s words, not the server\'s');
     });
   });
 
