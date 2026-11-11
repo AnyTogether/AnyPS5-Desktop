@@ -595,10 +595,38 @@ class Installer {
 
   /// The game's modules and its update's, each once and sorted: the relinker converts the
   /// update's copy of one both have ([source]), and the engine loads the relinked ones from app0.
+  ///
+  /// A root-level module whose basename is already present under a standard module folder
+  /// (`sce_module/`, `sce_modules/`, `prx/`) is left out: the module-folder copy wins, so the
+  /// relinker never sees two guests that would write the same `*.guest.prx` (the
+  /// "Conflicting guest output filename" failure). Matches AnyPS5-GUI staging.
   static List<String> modulesOf(Game game) {
     final update = game.update;
-    if (update == null) return modules(game.folder);
-    return {...modules(game.folder), ...modules(update.folder)}.toList()..sort();
+    final all = update == null
+        ? modules(game.folder)
+        : {...modules(game.folder), ...modules(update.folder)}.toList()
+      ..sort();
+    return preferModuleFolderOverRoot(all);
+  }
+
+  /// Drops a root-level `.prx`/`.sprx` when the same filename already exists under
+  /// `sce_module/`, `sce_modules/` or `prx/`. The dump is unchanged; only the staged
+  /// input list for the relinker is filtered.
+  static List<String> preferModuleFolderOverRoot(List<String> modules) {
+    const standard = {'sce_module', 'sce_modules', 'prx'};
+    final claimed = <String>{};
+    for (final module in modules) {
+      final slash = module.indexOf('/');
+      if (slash < 0) continue;
+      final first = module.substring(0, slash).toLowerCase();
+      if (!standard.contains(first)) continue;
+      claimed.add(p.basename(module).toLowerCase());
+    }
+    if (claimed.isEmpty) return modules;
+    return [
+      for (final module in modules)
+        if (module.contains('/') || !claimed.contains(p.basename(module).toLowerCase())) module,
+    ];
   }
 
   /// The kept relinker output of [game] when its key is [key], null when there is none or it was
