@@ -596,37 +596,48 @@ class Installer {
   /// The game's modules and its update's, each once and sorted: the relinker converts the
   /// update's copy of one both have ([source]), and the engine loads the relinked ones from app0.
   ///
-  /// A root-level module whose basename is already present under a standard module folder
-  /// (`sce_module/`, `sce_modules/`, `prx/`) is left out: the module-folder copy wins, so the
-  /// relinker never sees two guests that would write the same `*.guest.prx` (the
-  /// "Conflicting guest output filename" failure). Matches AnyPS5-GUI staging.
+  /// When the same basename appears in more than one place (root, `sce_module/`, an extra
+  /// folder such as Media/Modules, …), only one copy is kept so the relinker never sees two
+  /// guests that would write the same `*.guest.prx` ("Conflicting guest output filename").
+  /// Preference matches AnyPS5-GUI: standard module folders win, then other directories, then root.
   static List<String> modulesOf(Game game) {
     final update = game.update;
     final all = update == null
         ? modules(game.folder)
         : {...modules(game.folder), ...modules(update.folder)}.toList()
       ..sort();
-    return preferModuleFolderOverRoot(all);
+    return dedupeModulesByBasename(all);
   }
 
-  /// Drops a root-level `.prx`/`.sprx` when the same filename already exists under
-  /// `sce_module/`, `sce_modules/` or `prx/`. The dump is unchanged; only the staged
-  /// input list for the relinker is filtered.
-  static List<String> preferModuleFolderOverRoot(List<String> modules) {
-    const standard = {'sce_module', 'sce_modules', 'prx'};
-    final claimed = <String>{};
+  /// Priority for [dedupeModulesByBasename]: lower is preferred.
+  /// Standard module folders (sce_module / sce_modules / prx) beat extra dirs beat root.
+  static int _modulePriority(String module) {
+    final slash = module.indexOf('/');
+    if (slash < 0) return 2;
+    final first = module.substring(0, slash).toLowerCase();
+    if (const {'sce_module', 'sce_modules', 'prx'}.contains(first)) return 0;
+    return 1;
+  }
+
+  /// One path per basename (case-insensitive). The dump is unchanged; only the staged
+  /// input list for the relinker is filtered. Same goal as AnyPS5-GUI's
+  /// `effective_module_dirs` / `move_root_prx` (name already present elsewhere wins).
+  static List<String> dedupeModulesByBasename(List<String> modules) {
+    final best = <String, String>{}; // lowercase basename -> chosen relative path
     for (final module in modules) {
-      final slash = module.indexOf('/');
-      if (slash < 0) continue;
-      final first = module.substring(0, slash).toLowerCase();
-      if (!standard.contains(first)) continue;
-      claimed.add(p.basename(module).toLowerCase());
+      final key = p.basename(module).toLowerCase();
+      final previous = best[key];
+      if (previous == null) {
+        best[key] = module;
+        continue;
+      }
+      final preferNew =
+          _modulePriority(module) < _modulePriority(previous) ||
+          (_modulePriority(module) == _modulePriority(previous) && module.compareTo(previous) < 0);
+      if (preferNew) best[key] = module;
     }
-    if (claimed.isEmpty) return modules;
-    return [
-      for (final module in modules)
-        if (module.contains('/') || !claimed.contains(p.basename(module).toLowerCase())) module,
-    ];
+    if (best.length == modules.length) return modules;
+    return [for (final module in modules) if (best[p.basename(module).toLowerCase()] == module) module];
   }
 
   /// The kept relinker output of [game] when its key is [key], null when there is none or it was
@@ -1017,10 +1028,16 @@ class Installer {
   }
 
   /// The folders besides sce_module whose modules the relinker converts too (Unity's
-  /// Media/Modules and Media/Plugins, prx next to eboot.bin). fakelib holds a dump tool's
-  /// stand-ins for system libraries, which AnyPS5 implements itself.
+  /// Media/Modules and Media/Plugins, root .prx next to eboot.bin). fakelib holds a dump
+  /// tool's stand-ins for system libraries, which AnyPS5 implements itself.
+  ///
+  /// `.` is included only when a root-level module remains after [dedupeModulesByBasename]
+  /// (same idea as AnyPS5-GUI, which moves root .prx into the module folder instead of
+  /// always passing `--module-dir .`).
   static List<String> moduleDirectories(List<String> modules) {
-    final directories = ['.'];
+    final directories = <String>[
+      if (modules.any((module) => !module.contains('/'))) '.',
+    ];
     for (final module in modules) {
       if (!module.toLowerCase().endsWith('.prx')) continue;
       final slash = module.lastIndexOf('/');
