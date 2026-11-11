@@ -1468,7 +1468,7 @@
   "uninstallConfirm": "Installation entfernen? Die Spieldateien bleiben erhalten; das Spiel wird wieder als gesperrt angezeigt.",
   "uninstallDone": "Installation entfernt",
   "deleteGame": "Spiel löschen",
-  "deleteGameDetail": "Entfernt die eigenen Dateien des Spiels vom Datenträger",
+  "deleteGameDetail": "Entfernt die eigenen Dateien des Spiels vom Datenträger.",
   "deleteGameTitle": "%@ löschen?",
   "deleteGameGoes": "Die Dateien des Spiels werden hierhin verschoben: %@. Die Installation, die AnyPS5 daraus erstellt hat, wird entfernt.",
   "deleteGameGoesForever": "Die Dateien des Spiels werden endgültig gelöscht und können nicht wiederhergestellt werden. Die Installation, die AnyPS5 daraus erstellt hat, wird entfernt.",

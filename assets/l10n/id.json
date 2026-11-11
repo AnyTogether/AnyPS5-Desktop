@@ -1468,7 +1468,7 @@
   "uninstallConfirm": "Hapus instalasi? File game Anda tetap ada; permainan ditampilkan terkunci lagi.",
   "uninstallDone": "Instalasi dihapus",
   "deleteGame": "Hapus game",
-  "deleteGameDetail": "Menghapus file milik game itu sendiri dari disk",
+  "deleteGameDetail": "Menghapus file milik game itu sendiri dari disk.",
   "deleteGameTitle": "Hapus %@?",
   "deleteGameGoes": "File game dipindahkan ke sini: %@. Instalasi yang dibuat AnyPS5 dari file itu dihapus.",
   "deleteGameGoesForever": "File game dihapus permanen dan tidak bisa dikembalikan. Instalasi yang dibuat AnyPS5 dari file itu dihapus.",

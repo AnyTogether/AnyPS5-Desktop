@@ -1468,7 +1468,7 @@
   "uninstallConfirm": "Kurulum kaldırılsın mı? Oyun dosyaların silinmez, oyun tekrar kilitli görünür.",
   "uninstallDone": "Kurulum kaldırıldı",
   "deleteGame": "Oyunu sil",
-  "deleteGameDetail": "Oyunun kendi dosyalarını diskten kaldırır",
+  "deleteGameDetail": "Oyunun kendi dosyalarını diskten kaldırır.",
   "deleteGameTitle": "%@ silinsin mi?",
   "deleteGameGoes": "Oyunun dosyaları şuraya taşınır: %@. AnyPS5'in bu dosyalardan yaptığı kurulum kaldırılır.",
   "deleteGameGoesForever": "Oyunun dosyaları kalıcı olarak silinir ve geri getirilemez. AnyPS5'in bu dosyalardan yaptığı kurulum kaldırılır.",

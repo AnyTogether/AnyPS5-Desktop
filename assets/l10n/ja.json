@@ -1468,7 +1468,7 @@
   "uninstallConfirm": "インストールを削除しますか?ゲームファイルはそのまま残ります。ゲームは再びロックされていると表示されます。",
   "uninstallDone": "インストールが削除されました",
   "deleteGame": "ゲームを削除",
-  "deleteGameDetail": "ゲーム本体のファイルをディスクから取り除きます",
+  "deleteGameDetail": "ゲーム本体のファイルをディスクから取り除きます。",
   "deleteGameTitle": "%@ を削除しますか？",
   "deleteGameGoes": "ゲームのファイルは次の場所に移動します: %@。AnyPS5 がそこから作ったインストールは削除されます。",
   "deleteGameGoesForever": "ゲームのファイルは完全に削除され、元に戻せません。AnyPS5 がそこから作ったインストールは削除されます。",

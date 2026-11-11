@@ -1468,7 +1468,7 @@
   "uninstallConfirm": "Supprimer l’installation ? Les fichiers du jeu sont conservés ; le jeu apparaîtra à nouveau comme verrouillé.",
   "uninstallDone": "Installation supprimée",
   "deleteGame": "Supprimer le jeu",
-  "deleteGameDetail": "Retire du disque les fichiers du jeu lui-même",
+  "deleteGameDetail": "Retire du disque les fichiers du jeu lui-même.",
   "deleteGameTitle": "Supprimer %@ ?",
   "deleteGameGoes": "Les fichiers du jeu sont déplacés ici : %@. L’installation qu’AnyPS5 en a faite est retirée.",
   "deleteGameGoesForever": "Les fichiers du jeu sont supprimés définitivement et ne peuvent pas être récupérés. L’installation qu’AnyPS5 en a faite est retirée.",

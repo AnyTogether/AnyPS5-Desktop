@@ -1468,7 +1468,7 @@
   "uninstallConfirm": "Alisin ang pag-install? Nanatili ang iyong mga file ng laro; Ang laro ay lumalabas na naka-lock muli.",
   "uninstallDone": "Tinanggal ang instalasyon",
   "deleteGame": "Burahin ang laro",
-  "deleteGameDetail": "Inaalis sa disk ang sariling mga file ng laro",
+  "deleteGameDetail": "Inaalis sa disk ang sariling mga file ng laro.",
   "deleteGameTitle": "Burahin ang %@?",
   "deleteGameGoes": "Ililipat ang mga file ng laro dito: %@. Aalisin ang installation na ginawa ng AnyPS5 mula sa mga ito.",
   "deleteGameGoesForever": "Buburahin nang tuluyan ang mga file ng laro at hindi na maibabalik. Aalisin ang installation na ginawa ng AnyPS5 mula sa mga ito.",

@@ -1468,7 +1468,7 @@
   "uninstallConfirm": "Elimini instalarea? Fișierele jocului rămân pe loc; jocul va apărea din nou ca fiind blocat.",
   "uninstallDone": "Instalare eliminată",
   "deleteGame": "Șterge jocul",
-  "deleteGameDetail": "Scoate de pe disc fișierele proprii ale jocului",
+  "deleteGameDetail": "Scoate de pe disc fișierele proprii ale jocului.",
   "deleteGameTitle": "Ștergi %@?",
   "deleteGameGoes": "Fișierele jocului se mută aici: %@. Instalarea făcută de AnyPS5 din ele este eliminată.",
   "deleteGameGoesForever": "Fișierele jocului sunt șterse definitiv și nu mai pot fi recuperate. Instalarea făcută de AnyPS5 din ele este eliminată.",

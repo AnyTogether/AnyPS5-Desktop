@@ -1468,7 +1468,7 @@
   "uninstallConfirm": "Vil ​​du fjerne installasjonen? Spillfilene dine blir værende; spillet vises som låst igjen.",
   "uninstallDone": "Installasjon fjernet",
   "deleteGame": "Slett spill",
-  "deleteGameDetail": "Fjerner spillets egne filer fra disken",
+  "deleteGameDetail": "Fjerner spillets egne filer fra disken.",
   "deleteGameTitle": "Slette %@?",
   "deleteGameGoes": "Spillets filer flyttes hit: %@. Installasjonen AnyPS5 laget av dem, fjernes.",
   "deleteGameGoesForever": "Spillets filer slettes for godt og kan ikke hentes tilbake. Installasjonen AnyPS5 laget av dem, fjernes.",

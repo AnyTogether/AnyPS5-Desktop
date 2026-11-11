@@ -1468,7 +1468,7 @@
   "uninstallConfirm": "Odstranit instalaci? Soubory hry zůstanou zachovány, ale hra bude opět označena jako uzamčená.",
   "uninstallDone": "Instalace odstraněna",
   "deleteGame": "Smazat hru",
-  "deleteGameDetail": "Odstraní z disku vlastní soubory hry",
+  "deleteGameDetail": "Odstraní z disku vlastní soubory hry.",
   "deleteGameTitle": "Smazat %@?",
   "deleteGameGoes": "Soubory hry se přesunou sem: %@. Instalace, kterou z nich AnyPS5 vytvořil, se odstraní.",
   "deleteGameGoesForever": "Soubory hry se smažou natrvalo a nelze je obnovit. Instalace, kterou z nich AnyPS5 vytvořil, se odstraní.",

@@ -1468,7 +1468,7 @@
   "uninstallConfirm": "要移除此安裝嗎？遊戲檔案會保留；此遊戲會再次顯示為已鎖定。",
   "uninstallDone": "已移除安裝",
   "deleteGame": "刪除遊戲",
-  "deleteGameDetail": "從磁碟上移除遊戲本身的檔案",
+  "deleteGameDetail": "從磁碟上移除遊戲本身的檔案。",
   "deleteGameTitle": "刪除 %@？",
   "deleteGameGoes": "遊戲的檔案會移到這裡:%@。AnyPS5 用它們製作的安裝會被移除。",
   "deleteGameGoesForever": "遊戲的檔案會被永久刪除，無法復原。AnyPS5 用它們製作的安裝會被移除。",

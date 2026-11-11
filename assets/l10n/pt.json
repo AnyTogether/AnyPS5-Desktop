@@ -1468,7 +1468,7 @@
   "uninstallConfirm": "Remover a instalação? Os arquivos do jogo serão mantidos; ele voltará a aparecer como bloqueado.",
   "uninstallDone": "Instalação removida",
   "deleteGame": "Apagar jogo",
-  "deleteGameDetail": "Tira do disco os ficheiros do próprio jogo",
+  "deleteGameDetail": "Tira do disco os ficheiros do próprio jogo.",
   "deleteGameTitle": "Apagar %@?",
   "deleteGameGoes": "Os ficheiros do jogo são movidos para aqui: %@. A instalação que o AnyPS5 fez a partir deles é removida.",
   "deleteGameGoesForever": "Os ficheiros do jogo são apagados de vez e não podem ser recuperados. A instalação que o AnyPS5 fez a partir deles é removida.",

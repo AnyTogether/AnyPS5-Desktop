@@ -1468,7 +1468,7 @@
   "uninstallConfirm": "Remove the installation? Your game files stay; the game shows as locked again.",
   "uninstallDone": "Installation removed",
   "deleteGame": "Delete game",
-  "deleteGameDetail": "Takes the game's own files off the disk",
+  "deleteGameDetail": "Takes the game's own files off the disk.",
   "deleteGameTitle": "Delete %@?",
   "deleteGameGoes": "The game's files move to the %@. The installation AnyPS5 made from them is removed.",
   "deleteGameGoesForever": "The game's files are deleted for good and cannot be brought back. The installation AnyPS5 made from them is removed.",

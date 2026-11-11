@@ -1468,7 +1468,7 @@
   "uninstallConfirm": "Ta bort installationen? Dina spelfiler finns kvar, men spelet visas som låst igen.",
   "uninstallDone": "Installation borttagen",
   "deleteGame": "Radera spel",
-  "deleteGameDetail": "Tar bort spelets egna filer från disken",
+  "deleteGameDetail": "Tar bort spelets egna filer från disken.",
   "deleteGameTitle": "Radera %@?",
   "deleteGameGoes": "Spelets filer flyttas hit: %@. Installationen som AnyPS5 gjorde av dem tas bort.",
   "deleteGameGoesForever": "Spelets filer raderas för gott och kan inte återställas. Installationen som AnyPS5 gjorde av dem tas bort.",

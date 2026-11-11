@@ -1468,7 +1468,7 @@
   "uninstallConfirm": "Eltávolítod a telepítést? A játékfájlok megmaradnak, de a játék újra zárolt állapotba kerül.",
   "uninstallDone": "Telepítés eltávolítva",
   "deleteGame": "Játék törlése",
-  "deleteGameDetail": "Eltávolítja a lemezről a játék saját fájljait",
+  "deleteGameDetail": "Eltávolítja a lemezről a játék saját fájljait.",
   "deleteGameTitle": "Törlöd ezt: %@?",
   "deleteGameGoes": "A játék fájljai ide kerülnek: %@. Az AnyPS5 által belőlük készített telepítés eltávolításra kerül.",
   "deleteGameGoesForever": "A játék fájljai véglegesen törlődnek, és nem hozhatók vissza. Az AnyPS5 által belőlük készített telepítés eltávolításra kerül.",
