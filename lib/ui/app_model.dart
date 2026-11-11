@@ -3784,12 +3784,21 @@ class AppModel extends ChangeNotifier {
   /// Uninstalls [game] at once: its folders are renamed aside and go after, off the screen's
   /// thread, so the launcher keeps answering while a big game goes. A second Uninstall meanwhile
   /// does nothing, and an unlock of the game waits until its old files are gone. Completes then.
-  /// Delete game uninstalls too, from the games folder it knew ([root]) and without the notice
-  /// ([quiet]): it has its own.
+  /// The saves and trophies in it are kept in the store first and come back with the next unlock
+  /// (Installer.keepSaves); when they cannot be moved the installation stays as it is and the
+  /// notice says so. Delete game uninstalls too, from the games folder it knew ([root]) and
+  /// without the notices ([quiet]): it has its own.
   Future<void> uninstall(Game game, {String? root, bool quiet = false}) async {
     final folder = root ?? rootOf(game);
     if (folder == null || _removals.containsKey(game.id)) return;
-    final gone = Installer.uninstall(game, folder);
+    final Future<void> gone;
+    try {
+      gone = Installer.uninstall(game, folder);
+    } on FileSystemException catch (error) {
+      // Nothing of the player's is lost: the installation stays where it is.
+      if (!quiet) show(T.format('uninstallFailed', [error.osError?.message ?? error.message]));
+      return;
+    }
     _removals[game.id] = gone;
     records.remove(game.id);
     if (!quiet) show(T.text('uninstallDone'));
@@ -5394,7 +5403,9 @@ class AppModel extends ChangeNotifier {
               PanelRow(
                 id: 'confirm',
                 title: T.text('uninstall'),
-                detail: T.text('uninstallConfirm'),
+                // What goes, then what stays: the saves and trophies are kept.
+                detail: '${T.text('uninstallConfirm')} ${T.text('uninstallKeeps')}',
+                wraps: true,
                 kind: ActionRow(() {
                   unawaited(uninstall(game));
                   closeOverlay();

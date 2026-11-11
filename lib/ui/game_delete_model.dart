@@ -8,7 +8,6 @@ import '../core/engine_checkout.dart' show SystemCommands;
 import '../core/game_deletion.dart';
 import '../core/game_library.dart';
 import '../core/host.dart';
-import '../core/installer.dart';
 import 'app_model.dart';
 import 'strings.dart';
 
@@ -169,14 +168,9 @@ class GameDeleteModel {
     if (app.disposed) return;
     switch (outcome) {
       case Deleted(:final left):
-        // The saves and trophies stay in the store; the rest of the installation goes as
-        // Uninstall takes it. Saves that cannot be moved keep the whole installation in place.
-        try {
-          Installer.keepSaves(game, plan.root);
-          unawaited(app.uninstall(game, root: plan.root, quiet: true));
-        } on FileSystemException {
-          // Nothing of the player's is lost: the installation stays where it is.
-        }
+        // The installation goes as Uninstall takes it: the saves and trophies stay in the store,
+        // and saves that cannot be moved keep the whole installation in place.
+        unawaited(app.uninstall(game, root: plan.root, quiet: true));
         app.forgetGame(game);
         hidden.remove(game.id);
         app.rescan();

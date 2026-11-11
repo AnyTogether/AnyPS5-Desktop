@@ -352,25 +352,39 @@ class Installer {
     }
   }
 
-  /// The work folders and half-made games an interrupted install left in the store.
+  /// The work folders and half-made games an interrupted install left in the store. A half-made
+  /// game may hold the player's saves (the launcher closed while the new one took the old one's
+  /// place): they go back into the game when it is still there, else wait in [keptSaves].
   static void removeLeftovers(String root) {
     final store = p.join(root, GameLibrary.storeName);
     _delete(p.join(store, 'Work'));
     final games = Directory(p.join(store, 'Games'));
     if (!games.existsSync()) return;
     for (final entry in games.listSync(followLinks: false)) {
-      if (entry.path.endsWith('.partial')) _delete(entry.path);
+      if (!entry.path.endsWith('.partial')) continue;
+      // "<game>.partial", or the old one set aside as "<game>.old-<date>.partial".
+      final installed = p.join(games.path, p.basename(entry.path).split('.').first);
+      try {
+        _rescueSaves(entry.path, installed);
+      } on FileSystemException {
+        // They cannot be moved out: the folder stays until they can.
+        continue;
+      }
+      _delete(entry.path);
     }
   }
 
-  /// Removes an installed game and everything it wrote; links to the dump go, never what they
-  /// point to. The relinker's kept output goes too. Both are moved into the store's Removing
-  /// folder at once, so the game is no longer installed when this returns, and removed from there
-  /// by [removeAside]: a game of tens of thousands of files deleted on the screen's thread kept the
-  /// launcher from answering until it was gone. What an uninstall left there (the launcher closed
-  /// before it was done) goes too. A folder that cannot be moved is removed where it is. The
-  /// future completes when everything is gone.
+  /// Removes an installed game and what the launcher made for it; links to the dump go, never
+  /// what they point to. The player's own ([savedParts]: saves, trophies, download data) is kept
+  /// first ([keepSaves]) and comes back with the next unlock; when it cannot be kept this throws
+  /// FileSystemException and the game stays installed. The relinker's kept output goes too. Both
+  /// are moved into the store's Removing folder at once, so the game is no longer installed when
+  /// this returns, and removed from there by [removeAside]: a game of tens of thousands of files
+  /// deleted on the screen's thread kept the launcher from answering until it was gone. What an
+  /// uninstall left there (the launcher closed before it was done) goes too. A folder that cannot
+  /// be moved is removed where it is. The future completes when everything is gone.
   static Future<void> uninstall(Game game, String root) {
+    keepSaves(game, root);
     final removing = Directory(removingFolder(root));
     final left = <String>{
       if (removing.existsSync())
@@ -385,32 +399,65 @@ class Installer {
     ]);
   }
 
-  /// What of an installed game is the player's own: the saves, the save memory and the trophies
-  /// in place, every other profile's parked ones and the mark that says whose are in place.
-  static const savedParts = [...SaveBackup.parts, ProfileSaves.parkName, ProfileSaves.markName];
+  /// The game's download data, /download0 to /download2 as the game sees them: what it fetched
+  /// or made for the player and keeps between its runs.
+  static const downloadData = ['download0', 'download1', 'download2'];
 
-  /// Where a deleted game's saves and trophies wait, in the store of the games folder: the next
-  /// unlock of a game in the same folder takes them back ([placeInstalled]).
+  /// What of an installed game is the player's own: the saves, the save memory and the trophies
+  /// in place, every other profile's parked ones, the mark that says whose are in place, and the
+  /// game's download data.
+  static const savedParts = [...SaveBackup.parts, ProfileSaves.parkName, ProfileSaves.markName, ...downloadData];
+
+  /// Where the saves and trophies of a game that is no longer installed wait (Remove
+  /// installation, Delete game), in the store of the games folder: the next unlock of a game in
+  /// the same folder takes them back ([placeInstalled]).
   static String keptSaves(String installed) => p.join(p.dirname(p.dirname(installed)), 'Saves', p.basename(installed));
 
-  /// Before a game is deleted: its saves and trophies ([savedParts]) move out of the installed
-  /// folder into [keptSaves], so the uninstall that follows takes none of them. Renames on one
-  /// drive, quick however big they are. Something kept there already (the game deleted before and
-  /// never unlocked since) stays, the newer one beside it under its date. Throws
-  /// FileSystemException when one cannot be moved: the installed game is then left as it is.
+  /// The saves a half-made game holds go back into the installed one, or wait in [keptSaves]
+  /// when there is none: the half-made one is removed after.
+  static void _rescueSaves(String partial, String installed) =>
+      moveSaves(partial, Directory(installed).existsSync() ? installed : keptSaves(installed));
+
+  /// Before an installed game goes: its saves and trophies ([savedParts]) move out of the
+  /// installed folder into [keptSaves], so the uninstall takes none of them ([moveSaves]).
   static void keepSaves(Game game, String root) {
     final installed = installedFolder(game, root);
-    final kept = keptSaves(installed);
-    for (final part in savedParts) {
-      final source = p.join(installed, part);
-      final type = FileSystemEntity.typeSync(source, followLinks: false);
-      if (type == FileSystemEntityType.notFound || type == FileSystemEntityType.link) continue;
-      Directory(kept).createSync(recursive: true);
-      var target = p.join(kept, part);
-      if (FileSystemEntity.typeSync(target, followLinks: false) != FileSystemEntityType.notFound) {
-        target = '$target.${DateTime.now().microsecondsSinceEpoch}';
+    moveSaves(installed, keptSaves(installed));
+  }
+
+  /// The player's own ([savedParts]) moves out of [from] into [to]. Renames on one drive, quick
+  /// however big they are. A link and an empty folder hold nothing of the player's and stay.
+  /// Something there already under the same name stays, the newer one beside it under its date.
+  /// Throws FileSystemException when one cannot be moved: the ones moved before it go back, so
+  /// [from] is left as it was.
+  static void moveSaves(String from, String to) {
+    final moved = <(String, String)>[];
+    void rename(String source, String target) => FileSystemEntity.isDirectorySync(source)
+        ? Directory(source).renameSync(target)
+        : File(source).renameSync(target);
+    try {
+      for (final part in savedParts) {
+        final source = p.join(from, part);
+        final type = FileSystemEntity.typeSync(source, followLinks: false);
+        if (type == FileSystemEntityType.notFound || type == FileSystemEntityType.link) continue;
+        if (type == FileSystemEntityType.directory && Directory(source).listSync().isEmpty) continue;
+        Directory(to).createSync(recursive: true);
+        var target = p.join(to, part);
+        if (FileSystemEntity.typeSync(target, followLinks: false) != FileSystemEntityType.notFound) {
+          target = '$target.${DateTime.now().microsecondsSinceEpoch}';
+        }
+        rename(source, target);
+        moved.add((source, target));
       }
-      type == FileSystemEntityType.directory ? Directory(source).renameSync(target) : File(source).renameSync(target);
+    } on FileSystemException {
+      for (final (source, target) in moved.reversed) {
+        try {
+          rename(target, source);
+        } on FileSystemException {
+          // It waits where it got to.
+        }
+      }
+      rethrow;
     }
   }
 
@@ -714,6 +761,9 @@ class Installer {
     final store = p.join(root, GameLibrary.storeName);
     final work = p.join(store, 'Work', '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}');
     final partial = '$installed.partial';
+    // A half-made one the launcher was closed over may hold the saves: they come out before it
+    // is made again.
+    _rescueSaves(partial, installed);
     // 0. The room it takes, before anything is written.
     await _gate();
     final mode = linkMode ?? FileLinks.probe(p.join(game.folder, 'eboot.bin'), p.join(store, 'Games'));
@@ -910,32 +960,44 @@ class Installer {
   /// renamed aside at once and removed after, on the system's file threads: a game of tens of
   /// thousands of files took the screen with it while it went.
   static Future<void> placeInstalled(String partial, String installed) async {
-    final exists = Directory(installed).existsSync();
-    if (exists) carryOver(installed, partial);
-    // The saves a deleted game left ([keepSaves]) come back, unless the game has its own.
-    final kept = keptSaves(installed);
-    if (Directory(kept).existsSync()) {
-      carryOver(kept, partial);
-      try {
-        if (Directory(kept).listSync().isEmpty) Directory(kept).deleteSync();
-      } on FileSystemException {
-        // It stays for the next unlock.
+    try {
+      final exists = Directory(installed).existsSync();
+      if (exists) carryOver(installed, partial);
+      // The saves an uninstalled or deleted game left ([keepSaves]) come back, unless the game
+      // has its own.
+      final kept = keptSaves(installed);
+      if (Directory(kept).existsSync()) {
+        carryOver(kept, partial);
+        try {
+          if (Directory(kept).listSync().isEmpty) Directory(kept).deleteSync();
+        } on FileSystemException {
+          // It stays for the next unlock.
+        }
       }
-    }
-    if (exists) {
-      final old = '$installed.old-${DateTime.now().microsecondsSinceEpoch}.partial';
-      try {
-        Directory(installed).renameSync(old);
-      } on FileSystemException {
-        await _deleteAway(installed);
+      if (exists) {
+        final old = '$installed.old-${DateTime.now().microsecondsSinceEpoch}.partial';
+        try {
+          Directory(installed).renameSync(old);
+        } on FileSystemException {
+          await _deleteAway(installed);
+        }
+        Directory(p.dirname(installed)).createSync(recursive: true);
+        Directory(partial).renameSync(installed);
+        await _deleteAway(old);
+        return;
       }
       Directory(p.dirname(installed)).createSync(recursive: true);
       Directory(partial).renameSync(installed);
-      await _deleteAway(old);
-      return;
+    } on FileSystemException {
+      // The new one did not take its place and is removed by the unlock that made it: the saves
+      // that moved into it wait in the store for the next unlock.
+      try {
+        if (Directory(partial).existsSync()) moveSaves(partial, keptSaves(installed));
+      } on FileSystemException {
+        // Where they are.
+      }
+      rethrow;
     }
-    Directory(p.dirname(installed)).createSync(recursive: true);
-    Directory(partial).renameSync(installed);
   }
 
   /// The items of [source] the new game does not have move into [target]; links stay behind.

@@ -1483,6 +1483,8 @@
   "uninstall": "ጫናውን ያስወግዱ",
   "uninstallConfirm": "ጫነው ሶፍትዌር ይወገድ? የጨዋታ ፋይሎችዎ ይቀራሉ፤ ጨዋታውም እንደገና እንደተቆለፈ ይታያል።",
   "uninstallDone": "መጫኑ ተወግዷል",
+  "uninstallKeeps": "የተቀመጡ ጨዋታዎችዎ እና ዋንጫዎችዎ ይቆያሉ፣ ጨዋታውን እንደገና ሲከፍቱ ይመለሳሉ።",
+  "uninstallFailed": "መጫኑ ሊወገድ አልቻለም፦ %@",
   "deleteGame": "ጨዋታውን ሰርዝ",
   "deleteGameDetail": "የጨዋታውን የራሱ ፋይሎች ከዲስኩ ያስወግዳል።",
   "deleteGameTitle": "%@ ይሰረዝ?",
