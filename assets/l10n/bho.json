@@ -2301,5 +2301,11 @@
   "publicProfileOffNote": "जब रउआ प्रोफाइल सार्वजनिक ना होखे, सभे, दोस्त जइसन काम करेला।",
   "publicProfileFamily": "रउआ परिवार सेटिंग्स रउआ प्रोफाइल के दोस्तन तक सीमित रखेला।",
   "broadcastMicrophoneDevice": "माइक्रोफोन डिवाइस",
-  "broadcastMicrophoneAuto": "अपने आप"
+  "broadcastMicrophoneAuto": "अपने आप",
+  "libmpvMissingTitle": "क्लिप खातिर libmpv चाहीं",
+  "libmpvMissingText": "लॉन्चर क्लिप आ वॉइस नोट सिस्टम के libmpv से चलावेला, आ ऊ इंस्टॉल नइखे। ओकरा के इंस्टॉल करीं, फेर लॉन्चर दोबारा खोलीं।",
+  "libmpvOpenElsewhere": "दोसर प्लेयर में खोलीं",
+  "libmpvCopy": "कॉपी करीं",
+  "libmpvMissingVoice": "लॉन्चर में वॉइस नोट सुने खातिर libmpv इंस्टॉल करीं: %@",
+  "libmpvMissingVoicePlain": "लॉन्चर में वॉइस नोट सुने खातिर libmpv इंस्टॉल करीं।"
 }

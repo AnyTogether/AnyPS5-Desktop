@@ -2303,5 +2303,11 @@
   "publicProfileOffNote": "Пока ваш профиль не публичный, вариант «Все» работает как «Друзья».",
   "publicProfileFamily": "Семейные настройки ограничивают ваш профиль кругом друзей.",
   "broadcastMicrophoneDevice": "Устройство микрофона",
-  "broadcastMicrophoneAuto": "Автоматически"
+  "broadcastMicrophoneAuto": "Автоматически",
+  "libmpvMissingTitle": "Для клипов нужна libmpv",
+  "libmpvMissingText": "Программа запуска воспроизводит клипы и голосовые сообщения через системную libmpv, а она не установлена. Установите её и снова откройте программу запуска.",
+  "libmpvOpenElsewhere": "Открыть в другом проигрывателе",
+  "libmpvCopy": "Копировать",
+  "libmpvMissingVoice": "Установите libmpv, чтобы слушать голосовые сообщения в программе запуска: %@",
+  "libmpvMissingVoicePlain": "Установите libmpv, чтобы слушать голосовые сообщения в программе запуска."
 }

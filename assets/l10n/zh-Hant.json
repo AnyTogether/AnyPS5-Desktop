@@ -2303,5 +2303,11 @@
   "publicProfileOffNote": "個人檔案未公開時，「所有人」的效果與「好友」相同。",
   "publicProfileFamily": "你的家庭設定將你的個人檔案限制為僅好友可見。",
   "broadcastMicrophoneDevice": "麥克風裝置",
-  "broadcastMicrophoneAuto": "自動"
+  "broadcastMicrophoneAuto": "自動",
+  "libmpvMissingTitle": "播放片段需要 libmpv",
+  "libmpvMissingText": "啟動器使用系統的 libmpv 播放片段和語音訊息，但系統中沒有安裝 libmpv。請安裝後重新開啟啟動器。",
+  "libmpvOpenElsewhere": "在其他播放器中開啟",
+  "libmpvCopy": "複製",
+  "libmpvMissingVoice": "安裝 libmpv 即可在啟動器中播放語音訊息：%@",
+  "libmpvMissingVoicePlain": "安裝 libmpv 即可在啟動器中播放語音訊息。"
 }

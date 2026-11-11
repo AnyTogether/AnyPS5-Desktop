@@ -2303,5 +2303,11 @@
   "publicProfileOffNote": "Cât timp profilul tău nu este public, Toată lumea funcționează ca Prieteni.",
   "publicProfileFamily": "Setările tale de familie îți limitează profilul la prieteni.",
   "broadcastMicrophoneDevice": "Dispozitiv microfon",
-  "broadcastMicrophoneAuto": "Automat"
+  "broadcastMicrophoneAuto": "Automat",
+  "libmpvMissingTitle": "Clipurile au nevoie de libmpv",
+  "libmpvMissingText": "Lansatorul redă clipurile și mesajele vocale cu libmpv din sistem, iar aceasta nu este instalată. Instalați-o, apoi deschideți din nou lansatorul.",
+  "libmpvOpenElsewhere": "Deschide în alt player",
+  "libmpvCopy": "Copiază",
+  "libmpvMissingVoice": "Instalați libmpv pentru a reda mesajele vocale în lansator: %@",
+  "libmpvMissingVoicePlain": "Instalați libmpv pentru a reda mesajele vocale în lansator."
 }

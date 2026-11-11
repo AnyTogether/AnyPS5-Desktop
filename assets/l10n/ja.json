@@ -2303,5 +2303,11 @@
   "publicProfileOffNote": "プロフィールが公開されていない間、「全員」は「友達」と同じように機能します。",
   "publicProfileFamily": "家族設定により、プロフィールは友達にのみ公開されます。",
   "broadcastMicrophoneDevice": "マイクデバイス",
-  "broadcastMicrophoneAuto": "自動"
+  "broadcastMicrophoneAuto": "自動",
+  "libmpvMissingTitle": "クリップの再生には libmpv が必要です",
+  "libmpvMissingText": "ランチャーはシステムの libmpv でクリップとボイスメッセージを再生しますが、libmpv がインストールされていません。インストールしてから、ランチャーを開き直してください。",
+  "libmpvOpenElsewhere": "別のプレーヤーで開く",
+  "libmpvCopy": "コピー",
+  "libmpvMissingVoice": "ランチャーでボイスメッセージを再生するには libmpv をインストールしてください: %@",
+  "libmpvMissingVoicePlain": "ランチャーでボイスメッセージを再生するには libmpv をインストールしてください。"
 }

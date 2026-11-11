@@ -1,3 +1,4 @@
+import 'package:anyps5_desktop/core/libmpv.dart';
 import 'package:anyps5_desktop/core/together/messages.dart';
 import 'package:anyps5_desktop/core/together/people.dart' show Person;
 import 'package:anyps5_desktop/ui/app_model.dart' hide Command, GameState;
@@ -197,6 +198,29 @@ void main() {
       await until(() => fixture.opened.length == 1);
       expect(fixture.opened.single.toString(), 'https://cdn.test/v1.ogg');
       expect(together.voiceNotes.state.value.id, isNull);
+    });
+
+    test('Linux without libmpv: a voice note goes to the system, and the first says how to install it', () async {
+      fixture = makeFixture(voicePlayback: () => throw const LibmpvMissing(['sudo apt install libmpv2']));
+      model = fixture.model;
+      openThread([voice(1, 'v1'), voice(2, 'v2')]);
+      model.together.viewChatMedia(voice(1, 'v1').media!);
+      await until(() => fixture.opened.length == 1);
+      expect(fixture.opened.single.toString(), 'https://cdn.test/v1.ogg');
+      expect(model.toast, 'Install libmpv to play voice notes in the launcher: sudo apt install libmpv2');
+      model.toast = null;
+      model.together.viewChatMedia(voice(2, 'v2').media!);
+      await until(() => fixture.opened.length == 2);
+      expect(model.toast, isNull, reason: 'said once');
+    });
+
+    test('Linux without libmpv on a distribution it does not know: the plain sentence', () async {
+      fixture = makeFixture(voicePlayback: () => throw const LibmpvMissing(SystemLibmpv.all));
+      model = fixture.model;
+      openThread([voice(1, 'v1')]);
+      model.together.viewChatMedia(voice(1, 'v1').media!);
+      await until(() => fixture.opened.length == 1);
+      expect(model.toast, 'Install libmpv to play voice notes in the launcher.');
     });
 
     test('without the launcher\'s player a voice note goes to the system', () async {

@@ -20,14 +20,17 @@ cp "$HERE/anyps5-desktop.png" "$PKG/usr/share/icons/hicolor/256x256/apps/anyps5-
 cp "$HERE/anyps5-desktop-512.png" "$PKG/usr/share/icons/hicolor/512x512/apps/anyps5-desktop.png"
 
 # The packages that hold the system libraries the bundle links directly (its NEEDED entries
-# that are not in the bundle), and the newest glibc symbol version it needs. lib/*.so.* are the
-# libraries carried with the clip player's libmpv (bundle-libmpv.sh) and SDL2 (the build
-# machine's libsdl2-2.0-0, linux/CMakeLists.txt), whose X11, Wayland, ALSA, PulseAudio, DRM/GBM and
-# xkbcommon libraries are NEEDED entries too. SDL2 opens a few more only when asked (GL, EGL and
-# Vulkan for video, PipeWire and sndio for audio, D-Bus): the launcher starts only its joystick and
-# game controller parts, which open libudev, carried in lib/ with libmpv. A NEEDED library this
+# that are not in the bundle), and the newest glibc symbol version it needs. lib/*.so.* is SDL2
+# (the build machine's libsdl2-2.0-0, linux/CMakeLists.txt), whose X11, Wayland, ALSA, PulseAudio,
+# DRM/GBM and xkbcommon libraries are NEEDED entries too. SDL2 opens a few more only when asked
+# (GL, EGL and Vulkan for video, PipeWire and sndio for audio, D-Bus): the launcher starts only its
+# joystick and game controller parts, which open the system's libudev. A NEEDED library this
 # machine cannot name a package for stops the build, so none is left out quietly: build on the
 # oldest distro it should install on, with every library installed (CI's linux job).
+#
+# libmpv is not carried (common.sh checks it): the clip player's libanyps5_mpv.so opens the
+# system's when a clip plays, so it is no NEEDED entry and is named below by hand, libmpv2
+# (Ubuntu 24.04, Debian 12 and newer) or libmpv1 (Ubuntu 22.04).
 # libjvm.so: package:jni's libdartjni.so, which only Android opens.
 not_packaged='libjvm.so'
 files=("$PKG/opt/anyps5-desktop/anyps5_desktop" "$PKG"/opt/anyps5-desktop/lib/*.so "$PKG"/opt/anyps5-desktop/lib/*.so.*)
@@ -75,7 +78,7 @@ for package in $packages; do
     *) depends="$depends, $package" ;;
   esac
 done
-depends="$depends, xdg-utils"
+depends="$depends, libmpv2 | libmpv1, xdg-utils"
 
 # The launcher's own font has Latin letters only. Flutter draws every other script with a
 # system font that has it (fontconfig), so the Noto fonts are recommended: Khmer, Lao, Ethiopic,

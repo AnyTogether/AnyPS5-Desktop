@@ -2303,5 +2303,11 @@
   "publicProfileOffNote": "Så længe din profil ikke er offentlig, fungerer Alle som Venner.",
   "publicProfileFamily": "Dine familieindstillinger begrænser din profil til venner.",
   "broadcastMicrophoneDevice": "Mikrofonenhed",
-  "broadcastMicrophoneAuto": "Automatisk"
+  "broadcastMicrophoneAuto": "Automatisk",
+  "libmpvMissingTitle": "Klip kræver libmpv",
+  "libmpvMissingText": "Launcheren afspiller klip og stemmebeskeder med systemets libmpv, og den er ikke installeret. Installer den, og åbn så launcheren igen.",
+  "libmpvOpenElsewhere": "Åbn i en anden afspiller",
+  "libmpvCopy": "Kopiér",
+  "libmpvMissingVoice": "Installer libmpv for at afspille stemmebeskeder i launcheren: %@",
+  "libmpvMissingVoicePlain": "Installer libmpv for at afspille stemmebeskeder i launcheren."
 }

@@ -2303,5 +2303,11 @@
   "publicProfileOffNote": "While your profile is not public, Everyone works like Friends.",
   "publicProfileFamily": "Your family settings keep your profile to friends.",
   "broadcastMicrophoneDevice": "Microphone device",
-  "broadcastMicrophoneAuto": "Automatic"
+  "broadcastMicrophoneAuto": "Automatic",
+  "libmpvMissingTitle": "Clips need libmpv",
+  "libmpvMissingText": "The launcher plays clips and voice notes with your system's libmpv, and it is not installed. Install it, then open the launcher again.",
+  "libmpvOpenElsewhere": "Open in another player",
+  "libmpvCopy": "Copy",
+  "libmpvMissingVoice": "Install libmpv to play voice notes in the launcher: %@",
+  "libmpvMissingVoicePlain": "Install libmpv to play voice notes in the launcher."
 }

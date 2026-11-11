@@ -2303,5 +2303,11 @@
   "publicProfileOffNote": "Amíg a profilod nem nyilvános, a Mindenki úgy működik, mint a Barátok.",
   "publicProfileFamily": "A családi beállításaid a barátaidra korlátozzák a profilodat.",
   "broadcastMicrophoneDevice": "Mikrofoneszköz",
-  "broadcastMicrophoneAuto": "Automatikus"
+  "broadcastMicrophoneAuto": "Automatikus",
+  "libmpvMissingTitle": "A klipekhez libmpv kell",
+  "libmpvMissingText": "Az indítóprogram a rendszer libmpv könyvtárával játssza le a klipeket és a hangüzeneteket, de ez nincs telepítve. Telepítse, majd nyissa meg újra az indítóprogramot.",
+  "libmpvOpenElsewhere": "Megnyitás másik lejátszóban",
+  "libmpvCopy": "Másolás",
+  "libmpvMissingVoice": "Telepítse a libmpv-t, hogy az indítóprogramban hallgathassa a hangüzeneteket: %@",
+  "libmpvMissingVoicePlain": "Telepítse a libmpv-t, hogy az indítóprogramban hallgathassa a hangüzeneteket."
 }

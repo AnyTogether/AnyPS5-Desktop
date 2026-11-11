@@ -2303,5 +2303,11 @@
   "publicProfileOffNote": "جب آپ کا پروفائل عوامی نہ ہو تو سب، دوستو کی طرح کام کرتا ہے۔",
   "publicProfileFamily": "آپ کی خاندانی ترتیبات آپ کا پروفائل دوستوں تک محدود رکھتی ہیں۔",
   "broadcastMicrophoneDevice": "مائیکروفون ڈیوائس",
-  "broadcastMicrophoneAuto": "خودکار"
+  "broadcastMicrophoneAuto": "خودکار",
+  "libmpvMissingTitle": "کلپس کے لیے libmpv درکار ہے",
+  "libmpvMissingText": "لانچر کلپس اور وائس نوٹس سسٹم کی libmpv سے چلاتا ہے، اور وہ انسٹال نہیں ہے۔ اسے انسٹال کریں، پھر لانچر دوبارہ کھولیں۔",
+  "libmpvOpenElsewhere": "کسی دوسرے پلیئر میں کھولیں",
+  "libmpvCopy": "کاپی کریں",
+  "libmpvMissingVoice": "لانچر میں وائس نوٹس سننے کے لیے libmpv انسٹال کریں: %@",
+  "libmpvMissingVoicePlain": "لانچر میں وائس نوٹس سننے کے لیے libmpv انسٹال کریں۔"
 }

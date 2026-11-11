@@ -2303,5 +2303,11 @@
   "publicProfileOffNote": "Dokud váš profil není veřejný, Všichni funguje jako Přátelé.",
   "publicProfileFamily": "Vaše rodinné nastavení omezuje váš profil na přátele.",
   "broadcastMicrophoneDevice": "Mikrofonní zařízení",
-  "broadcastMicrophoneAuto": "Automaticky"
+  "broadcastMicrophoneAuto": "Automaticky",
+  "libmpvMissingTitle": "Klipy potřebují libmpv",
+  "libmpvMissingText": "Spouštěč přehrává klipy a hlasové zprávy pomocí systémové knihovny libmpv, která není nainstalovaná. Nainstalujte ji a spouštěč otevřete znovu.",
+  "libmpvOpenElsewhere": "Otevřít v jiném přehrávači",
+  "libmpvCopy": "Kopírovat",
+  "libmpvMissingVoice": "Nainstalujte libmpv, abyste mohli přehrávat hlasové zprávy ve spouštěči: %@",
+  "libmpvMissingVoicePlain": "Nainstalujte libmpv, abyste mohli přehrávat hlasové zprávy ve spouštěči."
 }

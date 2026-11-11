@@ -40,8 +40,8 @@ env:
   # libpulse-dev: flutter_webrtc's Linux loopback capture (share play's Opus track) builds only
   # with it; the bundle then needs libpulse0, which PulseAudio and PipeWire systems have.
   LINUX_PACKAGES: clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libsdl2-2.0-0 libpulse-dev file
-  # libmpv-dev: the in-app clip player (media_kit_video links libmpv); patchelf: the bundle carries
-  # that libmpv and what it needs in lib/ (packaging/linux/bundle-libmpv.sh), and the packaging
+  # libmpv-dev: the in-app clip player's headers (media_kit_video's plugin links the launcher's
+  # libanyps5_mpv.so, which opens the system's libmpv: none is carried); patchelf: the packaging
   # takes the build folders out of the plugin libraries' RUNPATHs (packaging/linux/runpaths.sh).
   CLIP_PLAYER_PACKAGES: libmpv-dev patchelf
 
@@ -214,36 +214,22 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: bash packaging/set-version.sh "$VERSION"
       - run: flutter build linux --release
-        env:
-          # The bundle has to carry libmpv here: no patchelf or no libmpv fails the build.
-          ANYPS5_REQUIRE_LIBMPV: 1
-      - name: Bundle size and the libraries carried for the clip player
+      # The system's libmpv, never a carried one: no libmpv in the bundle, nothing in it links one,
+      # and the clip player's plugin links libanyps5_mpv.so (packaging/linux/no-libmpv.sh).
+      - name: Check the bundle carries no libmpv
         run: |
           du -sh build/linux/x64/release/bundle build/linux/x64/release/bundle/lib
           ls build/linux/x64/release/bundle/lib | grep -c . | xargs echo "files in lib/:"
-          ls build/linux/x64/release/bundle/lib/libmpv.so.*
-          ls build/linux/x64/release/bundle/lib/licenses/ | grep -c . | xargs echo "licence files in lib/licenses/:"
-          ls build/linux/x64/release/bundle/lib/licenses/libmpv*.txt
-          ls build/linux/x64/release/bundle/lib/licenses/common-licenses/ | grep -c . | xargs echo "long licences in lib/licenses/common-licenses/:"
-          test -f build/linux/x64/release/bundle/lib/licenses/common-licenses/LGPL-2.1
-          test -f build/linux/x64/release/bundle/lib/licenses/common-licenses/GPL-3
-      # Ubuntu 24.04 has libmpv.so.2, not the 22.04 build machine's libmpv.so.1: the clip player's
-      # plugin and the libmpv it carries have to find everything they link in lib/ or in what a
-      # GTK desktop has.
-      - name: Check the clip player's libraries resolve on Ubuntu 24.04 without libmpv
+          bash packaging/linux/no-libmpv.sh build/linux/x64/release/bundle
+          objdump -p build/linux/x64/release/bundle/lib/libmedia_kit_video_plugin.so | awk '/NEEDED/ {print "  plugin NEEDED " $2}'
+          objdump -T build/linux/x64/release/bundle/lib/libanyps5_mpv.so | awk '$NF ~ /^mpv_/ && $4 == ".text" {print "  libanyps5_mpv.so has " $NF}'
+      # What check-libmpv.sh runs against libanyps5_mpv.so, built here for the containers.
+      - name: Build the libanyps5_mpv.so check
         run: |
-          docker run --rm -v "$PWD/build/linux/x64/release/bundle:/bundle:ro" ubuntu:24.04 bash -euc '
-            apt-get update -qq
-            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-              libgtk-3-0t64 libegl1 libgl1 libgbm1 libdrm2 libasound2t64 libpipewire-0.3-0t64 libusb-1.0-0 \
-              libsm6 libice6 libgmp10 libgpg-error0 libpulse0 >/dev/null
-            if ldconfig -p | grep -q "libmpv\.so"; then echo "this image has a libmpv"; exit 1; fi
-            missing=$(for f in /bundle/lib/libmedia_kit_video_plugin.so /bundle/lib/libmpv.so.*; do ldd "$f" | grep "not found" || true; done | sort -u)
-            if [ -n "$missing" ]; then echo "$missing"; exit 1; fi
-            echo "every library resolves:"
-            ldd /bundle/lib/libmpv.so.* | grep -c "/bundle/lib/" | xargs echo "  from the bundle:"
-            ldd /bundle/lib/libmpv.so.* | grep -vc "/bundle/lib/" | xargs echo "  from the system:"
-          '
+          mkdir -p build/shim-check
+          cc -O1 -Wall -Wextra -Werror -o build/shim-check/mpv-shim-check packaging/linux/mpv-shim-check.c -ldl
+          # On the build machine, with its libmpv (Ubuntu 22.04's libmpv.so.1).
+          build/shim-check/mpv-shim-check build/linux/x64/release/bundle/lib/libanyps5_mpv.so with
       # On pull requests too: a few seconds, and the check after it installs it.
       - name: Package the .deb
         run: SKIP_BUILD=1 bash packaging/linux/build-deb.sh
@@ -270,7 +256,8 @@ jobs:
           done
           rm -rf "$probe"
       # The .deb on clean Ubuntu 22.04 and 24.04 with its Depends only: the launcher and every
-      # library it carries have to find all they link (packaging/linux/check-deb.sh).
+      # library it carries have to find all they link (packaging/linux/check-deb.sh). libmpv comes
+      # from apt (libmpv1 on 22.04, libmpv2 on 24.04).
       - name: Check the .deb installs and every library resolves on Ubuntu 22.04 and 24.04
         run: |
           for image in ubuntu:22.04 ubuntu:24.04; do
@@ -279,12 +266,24 @@ jobs:
               "$image" bash /scripts/check-deb.sh /packages
             echo "::endgroup::"
           done
+      # The launcher with apt's libmpv and then without any: it starts and keeps running both times,
+      # libanyps5_mpv.so reaches libmpv or fails cleanly, and without one the launcher says so
+      # (packaging/linux/check-libmpv.sh).
+      - name: Check the launcher starts with and without libmpv on Ubuntu 22.04 and 24.04
+        run: |
+          for image in ubuntu:22.04 ubuntu:24.04; do
+            echo "::group::$image"
+            docker run --rm -v "$PWD/build/packages:/packages:ro" -v "$PWD/packaging/linux:/scripts:ro" \
+              -v "$PWD/build/shim-check:/shim-check:ro" \
+              "$image" bash /scripts/check-libmpv.sh /packages /shim-check/mpv-shim-check
+            echo "::endgroup::"
+          done
       - name: Package the AppImage and the .tar.gz
         if: github.event_name != 'pull_request'
         run: |
           SKIP_BUILD=1 bash packaging/linux/build-appimage.sh
           tar -C build/linux/x64/release -czf build/packages/AnyPS5-Desktop-linux-x64.tar.gz --transform 's#^bundle#AnyPS5-Desktop#' bundle
-      - name: Check no RUNPATH in the AppImage or the .tar.gz leads out of it
+      - name: Check no RUNPATH in the AppImage or the .tar.gz leads out of it, and neither carries libmpv
         if: github.event_name != 'pull_request'
         run: |
           rm -rf build/package-contents && mkdir -p build/package-contents
@@ -292,6 +291,8 @@ jobs:
           appimage="$(ls "$PWD"/build/packages/AnyPS5-Desktop-*-x86_64.AppImage)"
           (cd build/package-contents && "$appimage" --appimage-extract >/dev/null)
           bash packaging/linux/runpaths.sh check build/package-contents/AnyPS5-Desktop build/package-contents/squashfs-root
+          bash packaging/linux/no-libmpv.sh build/package-contents/AnyPS5-Desktop
+          bash packaging/linux/no-libmpv.sh build/package-contents/squashfs-root/usr/lib/anyps5-desktop
       - uses: actions/upload-artifact@v7
         if: github.event_name != 'pull_request'
         with:

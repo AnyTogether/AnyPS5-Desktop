@@ -2303,5 +2303,11 @@
   "publicProfileOffNote": "عندما لا يكون ملفك الشخصي عامًا، يعمل الجميع مثل الأصدقاء.",
   "publicProfileFamily": "تقصر إعدادات عائلتك ملفك الشخصي على الأصدقاء.",
   "broadcastMicrophoneDevice": "جهاز الميكروفون",
-  "broadcastMicrophoneAuto": "تلقائي"
+  "broadcastMicrophoneAuto": "تلقائي",
+  "libmpvMissingTitle": "تحتاج المقاطع إلى libmpv",
+  "libmpvMissingText": "يشغّل المشغل المقاطع والرسائل الصوتية عبر libmpv الخاصة بالنظام، وهي غير مثبتة. ثبّتها ثم افتح المشغل مرة أخرى.",
+  "libmpvOpenElsewhere": "فتح في مشغل آخر",
+  "libmpvCopy": "نسخ",
+  "libmpvMissingVoice": "ثبّت libmpv لتشغيل الرسائل الصوتية في المشغل: %@",
+  "libmpvMissingVoicePlain": "ثبّت libmpv لتشغيل الرسائل الصوتية في المشغل."
 }

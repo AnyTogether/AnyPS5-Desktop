@@ -11,4 +11,5 @@ build_bundle() {
   [ -x "$BUNDLE/anyps5_desktop" ] || { echo "no release bundle in $BUNDLE" >&2; exit 1; }
   # No build folder in any library's RUNPATH: only $ORIGIN-relative folders inside the bundle.
   bash "$HERE/runpaths.sh" fix "$BUNDLE"
+  bash "$HERE/no-libmpv.sh" "$BUNDLE"
 }

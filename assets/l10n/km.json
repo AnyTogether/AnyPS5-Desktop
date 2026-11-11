@@ -2301,5 +2301,11 @@
   "publicProfileOffNote": "ពេលប្រវត្តិរូបរបស់អ្នកមិនមែនជាសាធារណៈ គ្រប់គ្នា ដំណើរការដូច មិត្តភក្តិ។",
   "publicProfileFamily": "ការកំណត់គ្រួសាររបស់អ្នករក្សាប្រវត្តិរូបរបស់អ្នកឱ្យមើលបានតែមិត្តភក្តិ។",
   "broadcastMicrophoneDevice": "ឧបករណ៍មីក្រូហ្វូន",
-  "broadcastMicrophoneAuto": "ស្វ័យប្រវត្តិ"
+  "broadcastMicrophoneAuto": "ស្វ័យប្រវត្តិ",
+  "libmpvMissingTitle": "ការចាក់ក្លីបត្រូវការ libmpv",
+  "libmpvMissingText": "កម្មវិធីបើកដំណើរការចាក់ក្លីប និងសារជាសំឡេង ដោយប្រើ libmpv របស់ប្រព័ន្ធ ប៉ុន្តែ libmpv មិនទាន់បានដំឡើងទេ។ សូមដំឡើងវា រួចបើកកម្មវិធីបើកដំណើរការម្តងទៀត។",
+  "libmpvOpenElsewhere": "បើកក្នុងកម្មវិធីចាក់ផ្សេង",
+  "libmpvCopy": "ចម្លង",
+  "libmpvMissingVoice": "ដំឡើង libmpv ដើម្បីចាក់សារជាសំឡេងក្នុងកម្មវិធីបើកដំណើរការ៖ %@",
+  "libmpvMissingVoicePlain": "ដំឡើង libmpv ដើម្បីចាក់សារជាសំឡេងក្នុងកម្មវិធីបើកដំណើរការ។"
 }

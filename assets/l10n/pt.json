@@ -2303,5 +2303,11 @@
   "publicProfileOffNote": "Enquanto seu perfil não for público, Todos funciona como Amigos.",
   "publicProfileFamily": "Suas configurações de família limitam seu perfil aos amigos.",
   "broadcastMicrophoneDevice": "Dispositivo de microfone",
-  "broadcastMicrophoneAuto": "Automático"
+  "broadcastMicrophoneAuto": "Automático",
+  "libmpvMissingTitle": "Os clipes precisam da libmpv",
+  "libmpvMissingText": "O inicializador reproduz clipes e mensagens de voz com a libmpv do sistema, e ela não está instalada. Instale-a e abra o inicializador de novo.",
+  "libmpvOpenElsewhere": "Abrir em outro reprodutor",
+  "libmpvCopy": "Copiar",
+  "libmpvMissingVoice": "Instale a libmpv para ouvir mensagens de voz no inicializador: %@",
+  "libmpvMissingVoicePlain": "Instale a libmpv para ouvir mensagens de voz no inicializador."
 }

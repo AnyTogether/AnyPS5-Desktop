@@ -2303,5 +2303,11 @@
   "publicProfileOffNote": "जब आपकी प्रोफ़ाइल सार्वजनिक नहीं होती, सभी, दोस्त की तरह काम करता है।",
   "publicProfileFamily": "आपकी परिवार सेटिंग्स आपकी प्रोफ़ाइल को दोस्तों तक सीमित रखती हैं।",
   "broadcastMicrophoneDevice": "माइक्रोफ़ोन डिवाइस",
-  "broadcastMicrophoneAuto": "स्वचालित"
+  "broadcastMicrophoneAuto": "स्वचालित",
+  "libmpvMissingTitle": "क्लिप के लिए libmpv चाहिए",
+  "libmpvMissingText": "लॉन्चर क्लिप और वॉइस नोट सिस्टम की libmpv से चलाता है, और वह इंस्टॉल नहीं है। उसे इंस्टॉल करें, फिर लॉन्चर दोबारा खोलें।",
+  "libmpvOpenElsewhere": "किसी दूसरे प्लेयर में खोलें",
+  "libmpvCopy": "कॉपी करें",
+  "libmpvMissingVoice": "लॉन्चर में वॉइस नोट सुनने के लिए libmpv इंस्टॉल करें: %@",
+  "libmpvMissingVoicePlain": "लॉन्चर में वॉइस नोट सुनने के लिए libmpv इंस्टॉल करें।"
 }

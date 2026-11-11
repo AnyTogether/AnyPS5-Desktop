@@ -241,6 +241,11 @@ class TogetherModel {
     create: app.services.voicePlayback,
     onSystemPlayer: _voiceInSystemPlayer,
     onFailed: (_) => app.show(T.text('messagesAttachmentFailed')),
+    onMissing: (missing) => app.show(
+      missing.commands.length == 1
+          ? T.format('libmpvMissingVoice', [missing.commands.single])
+          : T.text('libmpvMissingVoicePlain'),
+    ),
   );
   late final StreamSubscription<TogetherEvent> _ready;
   Timer? _flush;

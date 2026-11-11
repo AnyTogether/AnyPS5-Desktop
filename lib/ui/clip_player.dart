@@ -3,9 +3,11 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import '../core/libmpv.dart';
 import 'components.dart';
 import 'strings.dart';
 import 'theme.dart';
@@ -101,10 +103,11 @@ abstract class ClipPlayback {
 }
 
 /// The clip player on Windows and Linux: libmpv through media_kit. Windows has libmpv-2.dll beside
-/// the launcher (media_kit_libs_windows_video), the Linux bundle has the build machine's libmpv
-/// in lib/ (packaging/linux/bundle-libmpv.sh). Throws when libmpv cannot be loaded.
+/// the launcher (media_kit_libs_windows_video), Linux uses the system's (SystemLibmpv). Throws
+/// LibmpvMissing when Linux has none, anything else when libmpv cannot be loaded.
 class MediaKitClipPlayback implements ClipPlayback {
   MediaKitClipPlayback() {
+    if (SystemLibmpv.missing) throw SystemLibmpv.missingError();
     MediaKit.ensureInitialized(libmpv: loadedLibmpv());
     _player = Player(configuration: const PlayerConfiguration(title: 'AnyPS5'));
     _video = VideoController(_player);
@@ -120,8 +123,9 @@ class MediaKitClipPlayback implements ClipPlayback {
     ]);
   }
 
-  /// The libmpv the media_kit_video plugin was linked with, when the process has one loaded
-  /// (Linux): media_kit has to open that same one, not another version the system also has.
+  /// The libmpv the process has loaded already, if any (Linux): media_kit has to open that same
+  /// one, not another version the system also has. The plugin's libanyps5_mpv.so uses the one
+  /// loaded first too (linux/mpv_shim).
   static String? loadedLibmpv({String maps = '/proc/self/maps'}) {
     if (!Platform.isLinux) return null;
     try {
@@ -197,7 +201,9 @@ class MediaKitClipPlayback implements ClipPlayback {
 /// A clip playing in the launcher: [poster] until its first moment, then the clip, looping, with
 /// a bar to pause it and move through it when the pointer is over it (the macOS launcher's
 /// floating controls). Without a player ([create] null) the poster stays; when the clip cannot be
-/// opened, [onFailed] gets it once (the system's player then).
+/// opened, [onFailed] gets it once (the system's player then). On Linux without libmpv the
+/// poster stays under LibmpvNotice, which says how to install it and hands the clip to
+/// [onFailed] only when asked.
 class ClipPlayerView extends StatefulWidget {
   const ClipPlayerView({
     super.key,
@@ -220,6 +226,7 @@ class ClipPlayerView extends StatefulWidget {
 
 class _ClipPlayerViewState extends State<ClipPlayerView> {
   ClipPlayback? _playback;
+  LibmpvMissing? _missing;
   String? _failed;
   bool _hovering = false;
   Timer? _idle;
@@ -231,6 +238,9 @@ class _ClipPlayerViewState extends State<ClipPlayerView> {
     if (create == null) return;
     try {
       _playback = create()..state.addListener(_changed);
+    } on LibmpvMissing catch (missing) {
+      _missing = missing;
+      return;
     } on Object {
       _fail();
       return;
@@ -294,6 +304,16 @@ class _ClipPlayerViewState extends State<ClipPlayerView> {
     final reduced = MediaQuery.disableAnimationsOf(context) || Motion.reduced;
     final showBar = playback != null && state.ready && !state.failed && (_hovering || !state.playing);
     final poster = widget.poster;
+    final missing = _missing;
+    if (missing != null) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          ?poster,
+          LibmpvNotice(missing: missing, accent: widget.accent, onElsewhere: () => widget.onFailed(widget.source)),
+        ],
+      );
+    }
     return MouseRegion(
       onHover: (_) => _woke(),
       onExit: (_) {
@@ -344,6 +364,189 @@ class _ClipPlayerViewState extends State<ClipPlayerView> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Over a clip's picture when Linux has no libmpv: what is missing, the command that installs it
+/// on this distribution (one per family when it is not known), to copy, and the clip in another
+/// player. It rises into place as the launcher's cards do, and only fades with reduced motion.
+class LibmpvNotice extends StatelessWidget {
+  const LibmpvNotice({super.key, required this.missing, required this.accent, required this.onElsewhere});
+
+  final LibmpvMissing missing;
+  final Color accent;
+  final VoidCallback onElsewhere;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = LayoutScale.of(context);
+    final reduced = MediaQuery.disableAnimationsOf(context) || Motion.reduced;
+    final card = ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: 560 * scale),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(T.text('libmpvMissingTitle'), style: AppText.display(30 * scale, weight: FontWeight.w700, height: 1.08)),
+          SizedBox(height: 10 * scale),
+          Text(
+            T.text('libmpvMissingText'),
+            style: AppText.display(15 * scale, color: Colors.white.withValues(alpha: 0.78), height: 1.45),
+          ),
+          SizedBox(height: 18 * scale),
+          for (final command in missing.commands) ...[
+            _CommandLine(command: command, accent: accent),
+            SizedBox(height: 8 * scale),
+          ],
+          SizedBox(height: 10 * scale),
+          Pressable(
+            key: const ValueKey('libmpv-elsewhere'),
+            onTap: onElsewhere,
+            builder: (context, hovering) => AnimatedContainer(
+              duration: Motion.focus,
+              curve: Motion.settle,
+              padding: EdgeInsets.symmetric(horizontal: 22 * scale, vertical: 12 * scale),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: hovering ? 1 : 0.92),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.open_in_new_rounded, size: 18 * scale, color: Colors.black),
+                  SizedBox(width: 8 * scale),
+                  Text(
+                    T.text('libmpvOpenElsewhere'),
+                    style: AppText.display(15 * scale, weight: FontWeight.w600, color: Colors.black),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    return DecoratedBox(
+      key: const ValueKey('libmpv-missing'),
+      // The picture stays readable at the top, the words sit on the dark below it.
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.black.withValues(alpha: 0.45), Colors.black.withValues(alpha: 0.82)],
+        ),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(28 * scale),
+        child: Align(
+          alignment: AlignmentDirectional.bottomStart,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: AlignmentDirectional.bottomStart,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: Motion.overlay,
+              curve: Motion.settle,
+              builder: (context, shown, child) => Opacity(
+                opacity: shown,
+                child: Transform.translate(offset: Offset(0, reduced ? 0 : (1 - shown) * 14 * scale), child: child),
+              ),
+              child: card,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One install command as a terminal prints it, with a button that copies it.
+class _CommandLine extends StatefulWidget {
+  const _CommandLine({required this.command, required this.accent});
+
+  final String command;
+  final Color accent;
+
+  @override
+  State<_CommandLine> createState() => _CommandLineState();
+}
+
+class _CommandLineState extends State<_CommandLine> {
+  bool _copied = false;
+  Timer? _reset;
+
+  void _copy() {
+    unawaited(Clipboard.setData(ClipboardData(text: widget.command)).catchError((Object _) {}));
+    _reset?.cancel();
+    setState(() => _copied = true);
+    _reset = Timer(const Duration(milliseconds: 1600), () {
+      if (mounted) setState(() => _copied = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _reset?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = LayoutScale.of(context);
+    final mono = TextStyle(
+      fontFamily: 'NotoSansMono',
+      fontFamilyFallback: const ['monospace'],
+      fontSize: 15 * scale,
+      height: 1.3,
+      color: Colors.white,
+    );
+    return Container(
+      padding: EdgeInsets.fromLTRB(16 * scale, 6 * scale, 6 * scale, 6 * scale),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(12 * scale),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      // A command reads left to right in every language, as a terminal prints it.
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              r'$ ',
+              style: mono.copyWith(color: widget.accent, fontWeight: FontWeight.w700),
+            ),
+            // A command reads left to right in every language.
+            Text(widget.command, style: mono),
+            SizedBox(width: 14 * scale),
+            Semantics(
+              button: true,
+              label: T.text('libmpvCopy'),
+              child: Pressable(
+                key: ValueKey('libmpv-copy-${widget.command}'),
+                onTap: _copy,
+                builder: (context, hovering) => AnimatedContainer(
+                  duration: Motion.focus,
+                  curve: Motion.settle,
+                  width: 34 * scale,
+                  height: 34 * scale,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: hovering ? 0.18 : 0.08),
+                  ),
+                  child: Icon(
+                    _copied ? Icons.check_rounded : Icons.content_copy_rounded,
+                    size: 16 * scale,
+                    color: _copied ? widget.accent : Colors.white.withValues(alpha: 0.85),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

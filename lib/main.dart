@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:ui' show AppExitResponse, PlatformDispatcher;
 
 import 'package:file_selector/file_selector.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
@@ -24,6 +24,7 @@ import 'core/ffmpeg_download.dart' show FfmpegBuild;
 import 'core/host.dart';
 import 'core/opened_files.dart';
 import 'core/launcher_health.dart';
+import 'core/libmpv.dart';
 import 'core/release_signing.dart';
 import 'core/steam/steam_launch.dart';
 import 'core/toolkit_download.dart';
@@ -105,6 +106,7 @@ Future<void> main(List<String> arguments) async {
     health.closing();
   }
 
+  if (SystemLibmpv.missing) debugPrint('libmpv is not installed: clips and voice notes say how to install it');
   final model = AppModel(
     paths: paths,
     services: LauncherServices(
@@ -116,6 +118,8 @@ Future<void> main(List<String> arguments) async {
             : Process.run('xdg-open', [url.toString()]),
       ),
       // Clips play inside the launcher (libmpv); the system's player when one cannot be opened.
+      // On Linux the system's libmpv, looked for here once (SystemLibmpv.missing): without it
+      // the launcher still starts, and clips and voice notes say how to install it.
       clipPlayback: MediaKitClipPlayback.new,
       voicePlayback: MediaKitVoicePlayback.new,
       copyText: (text) => unawaited(Clipboard.setData(ClipboardData(text: text))),

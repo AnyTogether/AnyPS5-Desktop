@@ -2303,5 +2303,11 @@
   "publicProfileOffNote": "Habang hindi pampubliko ang profile mo, gumagana ang Lahat na parang Mga Kaibigan.",
   "publicProfileFamily": "Sa mga kaibigan lang ipinapakita ang profile mo dahil sa mga setting ng pamilya mo.",
   "broadcastMicrophoneDevice": "Device ng mikropono",
-  "broadcastMicrophoneAuto": "Awtomatiko"
+  "broadcastMicrophoneAuto": "Awtomatiko",
+  "libmpvMissingTitle": "Kailangan ng mga clip ang libmpv",
+  "libmpvMissingText": "Pinapatugtog ng launcher ang mga clip at voice note gamit ang libmpv ng system, at hindi ito naka-install. I-install ito, saka buksan muli ang launcher.",
+  "libmpvOpenElsewhere": "Buksan sa ibang player",
+  "libmpvCopy": "Kopyahin",
+  "libmpvMissingVoice": "I-install ang libmpv para mapatugtog ang mga voice note sa launcher: %@",
+  "libmpvMissingVoicePlain": "I-install ang libmpv para mapatugtog ang mga voice note sa launcher."
 }
