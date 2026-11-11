@@ -493,7 +493,7 @@ class Installer {
       }
     }
 
-    final found = modulesOf(game);
+    final found = modulesOf(game, toolkit.system);
     final executables = ['eboot.bin', ...found].fold(0, (sum, relative) => sum + size(source(game, relative)));
     final games = p.join(root, GameLibrary.storeName, 'Games');
     final libraryFiles = toolkit.libraryFiles;
@@ -595,10 +595,67 @@ class Installer {
 
   /// The game's modules and its update's, each once and sorted: the relinker converts the
   /// update's copy of one both have ([source]), and the engine loads the relinked ones from app0.
-  static List<String> modulesOf(Game game) {
+  /// A module the dump holds in several folders is in it once ([duplicateModules]), as the
+  /// relinker for [system] tells them apart.
+  static List<String> modulesOf(Game game, HostSystem system) {
+    final all = allModulesOf(game);
+    final duplicates = duplicateModules(all, foldCase: system == HostSystem.windows);
+    return [
+      for (final module in all)
+        if (!duplicates.containsKey(module)) module,
+    ];
+  }
+
+  /// Every module of the game and its update, the copies of one in several folders among them.
+  static List<String> allModulesOf(Game game) {
     final update = game.update;
     if (update == null) return modules(game.folder);
     return {...modules(game.folder), ...modules(update.folder)}.toList()..sort();
+  }
+
+  /// The folders next to eboot.bin the relinker reads by itself, in the order a copy is taken.
+  static const standardModuleFolders = ['sce_module', 'sce_modules', 'prx'];
+
+  /// The copies of a module the relink leaves out, each with the copy used in its place.
+  ///
+  /// The relinker names a converted module after its file alone (libc.prx becomes
+  /// libc.prx.guest.prx) and stops when two of its inputs share that name, whatever their
+  /// folders ("Conflicting guest output filename"), without regard to case for Windows
+  /// ([foldCase]). A dump can hold a module twice: a dumper's folder of decrypted copies
+  /// (decrypted/sce_module) beside sce_module, or a module next to eboot.bin and again in
+  /// sce_module. One copy goes in, by the first of these that has it:
+  ///
+  /// 1. a standard folder ([standardModuleFolders]): a module the executable needs starts with
+  ///    the game from there. From any other folder the Windows relinker has it wait until the
+  ///    game loads it from that folder, and a libc.prx taken from decrypted/sce_module never
+  ///    started (Lost in Play);
+  /// 2. next to eboot.bin;
+  /// 3. the folder nearest to eboot.bin, the first by name among equals.
+  ///
+  /// Only the folders the relinker reads count ([moduleDirectories]): a module in one place
+  /// alone is never here, wherever it is.
+  static Map<String, String> duplicateModules(List<String> modules, {required bool foldCase}) {
+    final read = moduleDirectories(modules);
+    final ranked = <(int, String)>[];
+    for (final module in modules) {
+      final slash = module.lastIndexOf('/');
+      final directory = slash < 0 ? '.' : module.substring(0, slash);
+      final standard = standardModuleFolders.indexOf(directory.toLowerCase());
+      if (standard >= 0) {
+        ranked.add((standard, module));
+      } else if (read.contains(directory)) {
+        ranked.add((standardModuleFolders.length + (slash < 0 ? 0 : directory.split('/').length), module));
+      }
+    }
+    ranked.sort((a, b) => a.$1 != b.$1 ? a.$1.compareTo(b.$1) : a.$2.compareTo(b.$2));
+    final used = <String, String>{};
+    final duplicates = <String, String>{};
+    for (final (_, module) in ranked) {
+      final name = module.substring(module.lastIndexOf('/') + 1);
+      final first = used.putIfAbsent(foldCase ? name.toLowerCase() : name, () => module);
+      if (first != module) duplicates[module] = first;
+    }
+    return duplicates;
   }
 
   /// The kept relinker output of [game] when its key is [key], null when there is none or it was
@@ -730,7 +787,7 @@ class Installer {
     final shortage = needs.shortage(free: freeSpace(root), folder: root);
     if (shortage != null) throw shortage;
     try {
-      final found = modulesOf(game);
+      final found = modulesOf(game, system);
       final (patchText, appliedResolution) = _patchText(toolkit, game, resolution);
       // An option this engine lacks is left out; one it refuses is dropped below.
       var flags = relinkerFlags.where(toolkit.supports).toList();
@@ -757,6 +814,10 @@ class Installer {
         final source = p.join(work, 'source');
         Directory(source).createSync(recursive: true);
         // Only what the dump holds goes in: a fresh folder each time, the output beside it.
+        final duplicates = duplicateModules(allModulesOf(game), foldCase: system == HostSystem.windows);
+        for (final MapEntry(key: copy, value: used) in duplicates.entries) {
+          _log('$copy: the dump has this module as $used too, the game is unlocked with that one');
+        }
         final inputs = ['eboot.bin', ...found];
         final placed = <String>[];
         for (var index = 0; index < inputs.length; index++) {
