@@ -85,6 +85,9 @@ pacman owns it: it says when a new version is out and leaves the update to the p
 The Scoop manifest and the Arch package follow the latest stable release by themselves: a
 scheduled workflow in each repository moves them within six hours of a release.
 
+The [standalone emulator library](<docs/AnyPS5 Desktop - Standalone Emulator Library.md>)
+can open PS1, PS2 and PS3 games in an emulator you have already installed.
+
 ## Layout
 
 - `lib/core/` platform-independent logic in pure Dart (no Flutter), unit tested:
