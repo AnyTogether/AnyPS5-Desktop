@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "فتح في مشغل آخر",
   "libmpvCopy": "نسخ",
   "libmpvMissingVoice": "ثبّت libmpv لتشغيل الرسائل الصوتية في المشغل: %@",
-  "libmpvMissingVoicePlain": "ثبّت libmpv لتشغيل الرسائل الصوتية في المشغل."
+  "libmpvMissingVoicePlain": "ثبّت libmpv لتشغيل الرسائل الصوتية في المشغل.",
+  "nowPlaying": "يُشغَّل الآن",
+  "nowPlayingIn": "يُشغَّل الآن في %@",
+  "nowPlayingPausedIn": "متوقف مؤقتًا في %@",
+  "nowPlayingPrevious": "المقطع السابق",
+  "nowPlayingNext": "المقطع التالي",
+  "nowPlayingPlayPause": "تشغيل أو إيقاف مؤقت",
+  "nowPlayingCard": "ما يُشغَّل الآن في القائمة السريعة",
+  "nowPlayingCardDetail": "يعرض في القائمة فوق اللعبة ما يشغّله مشغّل الموسيقى أو الفيديو على هذا الكمبيوتر، مع أزرار السابق والتشغيل أو الإيقاف المؤقت والتالي. يعمل مع أي مشغّل يخبر النظام بما يشغّله.",
+  "nowPlayingShare": "إظهار ما أستمع إليه للأصدقاء",
+  "nowPlayingShareDetail": "يرى أصدقاؤك على AnyTogether العنوان والفنان أثناء التشغيل. لا يُرسَل شيء ما دام هذا الخيار متوقفًا.",
+  "friendsListening": "يستمع إلى %@",
+  "friendsListeningBy": "يستمع إلى %1$@، %2$@"
 }

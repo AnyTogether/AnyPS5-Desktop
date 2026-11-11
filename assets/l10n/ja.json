@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "別のプレーヤーで開く",
   "libmpvCopy": "コピー",
   "libmpvMissingVoice": "ランチャーでボイスメッセージを再生するには libmpv をインストールしてください: %@",
-  "libmpvMissingVoicePlain": "ランチャーでボイスメッセージを再生するには libmpv をインストールしてください。"
+  "libmpvMissingVoicePlain": "ランチャーでボイスメッセージを再生するには libmpv をインストールしてください。",
+  "nowPlaying": "再生中",
+  "nowPlayingIn": "%@ で再生中",
+  "nowPlayingPausedIn": "%@ で一時停止中",
+  "nowPlayingPrevious": "前の曲",
+  "nowPlayingNext": "次の曲",
+  "nowPlayingPlayPause": "再生または一時停止",
+  "nowPlayingCard": "クイックメニューに再生中の曲を表示",
+  "nowPlayingCardDetail": "このコンピューターの音楽プレーヤーや動画プレーヤーで再生中のものを、ゲーム上のメニューに表示します。前へ、再生または一時停止、次へのボタンがあります。再生中の内容をシステムに伝えるプレーヤーならどれでも使えます。",
+  "nowPlayingShare": "聴いている曲をフレンドに表示",
+  "nowPlayingShareDetail": "再生中は、AnyTogether のフレンドに曲名とアーティストが表示されます。オフの間は何も送信されません。",
+  "friendsListening": "%@ を聴いています",
+  "friendsListeningBy": "%1$@、%2$@ を聴いています"
 }

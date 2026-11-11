@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "In einem anderen Player öffnen",
   "libmpvCopy": "Kopieren",
   "libmpvMissingVoice": "Installiere libmpv, um Sprachnachrichten im Launcher abzuspielen: %@",
-  "libmpvMissingVoicePlain": "Installiere libmpv, um Sprachnachrichten im Launcher abzuspielen."
+  "libmpvMissingVoicePlain": "Installiere libmpv, um Sprachnachrichten im Launcher abzuspielen.",
+  "nowPlaying": "Aktuelle Wiedergabe",
+  "nowPlayingIn": "Wiedergabe in %@",
+  "nowPlayingPausedIn": "Pausiert in %@",
+  "nowPlayingPrevious": "Vorheriger Titel",
+  "nowPlayingNext": "Nächster Titel",
+  "nowPlayingPlayPause": "Wiedergabe oder Pause",
+  "nowPlayingCard": "Aktuelle Wiedergabe im Schnellmenü",
+  "nowPlayingCardDetail": "Zeigt im Menü über einem Spiel, was ein Musik- oder Videoplayer auf diesem Computer abspielt, mit Zurück, Wiedergabe oder Pause und Weiter. Funktioniert mit jedem Player, der dem System mitteilt, was er abspielt.",
+  "nowPlayingShare": "Freunden zeigen, was ich höre",
+  "nowPlayingShareDetail": "Freunde auf AnyTogether sehen Titel und Interpret, solange etwas läuft. Solange dies aus ist, wird nichts gesendet.",
+  "friendsListening": "Hört %@",
+  "friendsListeningBy": "Hört %1$@, %2$@"
 }

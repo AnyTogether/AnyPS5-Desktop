@@ -58,6 +58,7 @@ import 'clip_player.dart' show ViewedMedia, mediaAspect;
 import 'compare_view.dart';
 import 'family_gate.dart';
 import 'livekit_room.dart';
+import 'now_playing_model.dart';
 import 'online_webrtc.dart';
 import 'sealed_photo.dart';
 import 'strings.dart';
@@ -936,15 +937,18 @@ class TogetherModel {
       PresenceState.away => T.text('friendsAway'),
       _ => T.text('friendsOnline'),
     };
+    // What they listen to, when they chose to show it: "Online · Listening to Title, Artist".
+    final listening = presence.listening;
+    final heard = listening == null ? '' : ' · ${NowPlayingModel.listeningText(listening)}';
     // Playing together with their party: "Playing Minecraft together (2/8)".
     final game = presence.game;
     if (game != null && game.together) {
-      return T.format('togetherPresence', [gameName(game.titleId), game.players, game.capacity]);
+      return T.format('togetherPresence', [gameName(game.titleId), game.players, game.capacity]) + heard;
     }
     if (presence.game?.joinable == true) text += ' · ${T.text('gameJoinable')}';
     final party = presence.party;
     if (party != null) text += ' · ${T.format('friendsInParty', [party.size, party.max])}';
-    return text;
+    return text + heard;
   }
 
   /// A friend's dot: do not disturb and idle as they chose them, else what they do (a server

@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "किसी दूसरे प्लेयर में खोलें",
   "libmpvCopy": "कॉपी करें",
   "libmpvMissingVoice": "लॉन्चर में वॉइस नोट सुनने के लिए libmpv इंस्टॉल करें: %@",
-  "libmpvMissingVoicePlain": "लॉन्चर में वॉइस नोट सुनने के लिए libmpv इंस्टॉल करें।"
+  "libmpvMissingVoicePlain": "लॉन्चर में वॉइस नोट सुनने के लिए libmpv इंस्टॉल करें।",
+  "nowPlaying": "अभी चल रहा है",
+  "nowPlayingIn": "%@ में चल रहा है",
+  "nowPlayingPausedIn": "%@ में रुका हुआ है",
+  "nowPlayingPrevious": "पिछला ट्रैक",
+  "nowPlayingNext": "अगला ट्रैक",
+  "nowPlayingPlayPause": "चलाएँ या रोकें",
+  "nowPlayingCard": "त्वरित मेनू में अभी चल रहा गाना दिखाएँ",
+  "nowPlayingCardDetail": "गेम के ऊपर के मेनू में दिखाता है कि इस कंप्यूटर का संगीत या वीडियो प्लेयर क्या चला रहा है, पिछला, चलाएँ या रोकें और अगला बटनों के साथ। यह हर उस प्लेयर के साथ काम करता है जो सिस्टम को बताता है कि वह क्या चला रहा है।",
+  "nowPlayingShare": "दोस्तों को दिखाएँ कि मैं क्या सुन रहा हूँ",
+  "nowPlayingShareDetail": "AnyTogether पर आपके दोस्त चलते समय शीर्षक और कलाकार देखते हैं। इसके बंद रहने पर कुछ नहीं भेजा जाता।",
+  "friendsListening": "%@ सुन रहे हैं",
+  "friendsListeningBy": "%1$@, %2$@ सुन रहे हैं"
 }

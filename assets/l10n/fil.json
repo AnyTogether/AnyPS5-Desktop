@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "Buksan sa ibang player",
   "libmpvCopy": "Kopyahin",
   "libmpvMissingVoice": "I-install ang libmpv para mapatugtog ang mga voice note sa launcher: %@",
-  "libmpvMissingVoicePlain": "I-install ang libmpv para mapatugtog ang mga voice note sa launcher."
+  "libmpvMissingVoicePlain": "I-install ang libmpv para mapatugtog ang mga voice note sa launcher.",
+  "nowPlaying": "Tumutugtog ngayon",
+  "nowPlayingIn": "Tumutugtog ngayon sa %@",
+  "nowPlayingPausedIn": "Naka-pause sa %@",
+  "nowPlayingPrevious": "Nakaraang track",
+  "nowPlayingNext": "Susunod na track",
+  "nowPlayingPlayPause": "I-play o i-pause",
+  "nowPlayingCard": "Tumutugtog ngayon sa quick menu",
+  "nowPlayingCardDetail": "Ipinapakita sa menu sa ibabaw ng laro kung ano ang pinapatugtog ng music o video player sa computer na ito, na may nakaraan, i-play o i-pause at susunod. Gumagana sa anumang player na nagsasabi sa system kung ano ang pinapatugtog nito.",
+  "nowPlayingShare": "Ipakita sa mga kaibigan ang pinapakinggan ko",
+  "nowPlayingShareDetail": "Nakikita ng mga kaibigan mo sa AnyTogether ang pamagat at artist habang tumutugtog ito. Walang ipinapadala habang naka-off ito.",
+  "friendsListening": "Nakikinig sa %@",
+  "friendsListeningBy": "Nakikinig sa %1$@, %2$@"
 }

@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "Öppna i en annan spelare",
   "libmpvCopy": "Kopiera",
   "libmpvMissingVoice": "Installera libmpv för att spela upp röstmeddelanden i startprogrammet: %@",
-  "libmpvMissingVoicePlain": "Installera libmpv för att spela upp röstmeddelanden i startprogrammet."
+  "libmpvMissingVoicePlain": "Installera libmpv för att spela upp röstmeddelanden i startprogrammet.",
+  "nowPlaying": "Spelas nu",
+  "nowPlayingIn": "Spelas nu i %@",
+  "nowPlayingPausedIn": "Pausad i %@",
+  "nowPlayingPrevious": "Föregående spår",
+  "nowPlayingNext": "Nästa spår",
+  "nowPlayingPlayPause": "Spela upp eller pausa",
+  "nowPlayingCard": "Spelas nu i snabbmenyn",
+  "nowPlayingCardDetail": "Visar i menyn över ett spel vad en musik- eller videospelare på den här datorn spelar, med föregående, spela upp eller pausa och nästa. Fungerar med alla spelare som talar om för systemet vad de spelar.",
+  "nowPlayingShare": "Visa vänner vad jag lyssnar på",
+  "nowPlayingShareDetail": "Vänner på AnyTogether ser titel och artist medan det spelas. Inget skickas medan detta är avstängt.",
+  "friendsListening": "Lyssnar på %@",
+  "friendsListeningBy": "Lyssnar på %1$@, %2$@"
 }

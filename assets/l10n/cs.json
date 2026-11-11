@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "Otevřít v jiném přehrávači",
   "libmpvCopy": "Kopírovat",
   "libmpvMissingVoice": "Nainstalujte libmpv, abyste mohli přehrávat hlasové zprávy ve spouštěči: %@",
-  "libmpvMissingVoicePlain": "Nainstalujte libmpv, abyste mohli přehrávat hlasové zprávy ve spouštěči."
+  "libmpvMissingVoicePlain": "Nainstalujte libmpv, abyste mohli přehrávat hlasové zprávy ve spouštěči.",
+  "nowPlaying": "Právě hraje",
+  "nowPlayingIn": "Právě hraje v aplikaci %@",
+  "nowPlayingPausedIn": "Pozastaveno v aplikaci %@",
+  "nowPlayingPrevious": "Předchozí skladba",
+  "nowPlayingNext": "Další skladba",
+  "nowPlayingPlayPause": "Přehrát nebo pozastavit",
+  "nowPlayingCard": "Právě hraje v rychlé nabídce",
+  "nowPlayingCardDetail": "V nabídce nad hrou ukazuje, co přehrává hudební nebo video přehrávač na tomto počítači, s tlačítky předchozí, přehrát nebo pozastavit a další. Funguje s každým přehrávačem, který systému sděluje, co přehrává.",
+  "nowPlayingShare": "Ukazovat přátelům, co poslouchám",
+  "nowPlayingShareDetail": "Přátelé na AnyTogether vidí název a interpreta, dokud skladba hraje. Dokud je tato možnost vypnutá, nic se neodesílá.",
+  "friendsListening": "Poslouchá %@",
+  "friendsListeningBy": "Poslouchá %1$@, %2$@"
 }

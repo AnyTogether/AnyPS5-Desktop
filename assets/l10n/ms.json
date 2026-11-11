@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "Buka dalam pemain lain",
   "libmpvCopy": "Salin",
   "libmpvMissingVoice": "Pasang libmpv untuk memainkan nota suara dalam pelancar: %@",
-  "libmpvMissingVoicePlain": "Pasang libmpv untuk memainkan nota suara dalam pelancar."
+  "libmpvMissingVoicePlain": "Pasang libmpv untuk memainkan nota suara dalam pelancar.",
+  "nowPlaying": "Sedang dimainkan",
+  "nowPlayingIn": "Sedang dimainkan dalam %@",
+  "nowPlayingPausedIn": "Dijeda dalam %@",
+  "nowPlayingPrevious": "Lagu sebelumnya",
+  "nowPlayingNext": "Lagu seterusnya",
+  "nowPlayingPlayPause": "Main atau jeda",
+  "nowPlayingCard": "Sedang dimainkan dalam menu pantas",
+  "nowPlayingCardDetail": "Menunjukkan dalam menu di atas permainan apa yang dimainkan oleh pemain muzik atau video pada komputer ini, dengan sebelumnya, main atau jeda dan seterusnya. Berfungsi dengan mana-mana pemain yang memberitahu sistem apa yang dimainkannya.",
+  "nowPlayingShare": "Tunjukkan kepada rakan apa yang saya dengar",
+  "nowPlayingShareDetail": "Rakan di AnyTogether melihat tajuk dan artis semasa ia dimainkan. Tiada apa-apa dihantar semasa ini dimatikan.",
+  "friendsListening": "Mendengar %@",
+  "friendsListeningBy": "Mendengar %1$@, %2$@"
 }

@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "在其他播放器中打开",
   "libmpvCopy": "复制",
   "libmpvMissingVoice": "安装 libmpv 即可在启动器中播放语音消息：%@",
-  "libmpvMissingVoicePlain": "安装 libmpv 即可在启动器中播放语音消息。"
+  "libmpvMissingVoicePlain": "安装 libmpv 即可在启动器中播放语音消息。",
+  "nowPlaying": "正在播放",
+  "nowPlayingIn": "正在 %@ 中播放",
+  "nowPlayingPausedIn": "已在 %@ 中暂停",
+  "nowPlayingPrevious": "上一首",
+  "nowPlayingNext": "下一首",
+  "nowPlayingPlayPause": "播放或暂停",
+  "nowPlayingCard": "在快捷菜单中显示正在播放",
+  "nowPlayingCardDetail": "在游戏上方的菜单中显示这台电脑上的音乐或视频播放器正在播放的内容，并提供上一首、播放或暂停和下一首。适用于任何会告知系统播放内容的播放器。",
+  "nowPlayingShare": "向好友显示我在听什么",
+  "nowPlayingShareDetail": "播放时，AnyTogether 上的好友会看到标题和艺人。关闭时不会发送任何内容。",
+  "friendsListening": "正在听 %@",
+  "friendsListeningBy": "正在听 %1$@，%2$@"
 }

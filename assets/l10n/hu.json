@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "Megnyitás másik lejátszóban",
   "libmpvCopy": "Másolás",
   "libmpvMissingVoice": "Telepítse a libmpv-t, hogy az indítóprogramban hallgathassa a hangüzeneteket: %@",
-  "libmpvMissingVoicePlain": "Telepítse a libmpv-t, hogy az indítóprogramban hallgathassa a hangüzeneteket."
+  "libmpvMissingVoicePlain": "Telepítse a libmpv-t, hogy az indítóprogramban hallgathassa a hangüzeneteket.",
+  "nowPlaying": "Most szól",
+  "nowPlayingIn": "Most szól itt: %@",
+  "nowPlayingPausedIn": "Szüneteltetve itt: %@",
+  "nowPlayingPrevious": "Előző szám",
+  "nowPlayingNext": "Következő szám",
+  "nowPlayingPlayPause": "Lejátszás vagy szünet",
+  "nowPlayingCard": "Most szól a gyorsmenüben",
+  "nowPlayingCardDetail": "A játék fölötti menüben megmutatja, mit játszik le egy zene- vagy videólejátszó ezen a számítógépen, előző, lejátszás vagy szünet és következő gombbal. Minden olyan lejátszóval működik, amely közli a rendszerrel, hogy mit játszik le.",
+  "nowPlayingShare": "A barátaim lássák, mit hallgatok",
+  "nowPlayingShareDetail": "Az AnyTogether-barátaid látják a címet és az előadót, amíg szól. Amíg ez ki van kapcsolva, semmi sem kerül elküldésre.",
+  "friendsListening": "Ezt hallgatja: %@",
+  "friendsListeningBy": "Ezt hallgatja: %1$@, %2$@"
 }

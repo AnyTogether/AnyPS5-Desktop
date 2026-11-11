@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "Abrir em outro reprodutor",
   "libmpvCopy": "Copiar",
   "libmpvMissingVoice": "Instale a libmpv para ouvir mensagens de voz no inicializador: %@",
-  "libmpvMissingVoicePlain": "Instale a libmpv para ouvir mensagens de voz no inicializador."
+  "libmpvMissingVoicePlain": "Instale a libmpv para ouvir mensagens de voz no inicializador.",
+  "nowPlaying": "Tocando agora",
+  "nowPlayingIn": "Tocando em %@",
+  "nowPlayingPausedIn": "Pausado em %@",
+  "nowPlayingPrevious": "Faixa anterior",
+  "nowPlayingNext": "Próxima faixa",
+  "nowPlayingPlayPause": "Reproduzir ou pausar",
+  "nowPlayingCard": "Tocando agora no menu rápido",
+  "nowPlayingCardDetail": "Mostra no menu sobre o jogo o que um player de música ou vídeo neste computador está tocando, com anterior, reproduzir ou pausar e próxima. Funciona com qualquer player que informe ao sistema o que está tocando.",
+  "nowPlayingShare": "Mostrar aos amigos o que estou ouvindo",
+  "nowPlayingShareDetail": "Seus amigos no AnyTogether veem o título e o artista enquanto toca. Nada é enviado enquanto isto estiver desativado.",
+  "friendsListening": "Ouvindo %@",
+  "friendsListeningBy": "Ouvindo %1$@, %2$@"
 }

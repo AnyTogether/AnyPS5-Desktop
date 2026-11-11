@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "다른 플레이어에서 열기",
   "libmpvCopy": "복사",
   "libmpvMissingVoice": "런처에서 음성 메시지를 재생하려면 libmpv를 설치하세요: %@",
-  "libmpvMissingVoicePlain": "런처에서 음성 메시지를 재생하려면 libmpv를 설치하세요."
+  "libmpvMissingVoicePlain": "런처에서 음성 메시지를 재생하려면 libmpv를 설치하세요.",
+  "nowPlaying": "지금 재생 중",
+  "nowPlayingIn": "%@에서 재생 중",
+  "nowPlayingPausedIn": "%@에서 일시 정지됨",
+  "nowPlayingPrevious": "이전 곡",
+  "nowPlayingNext": "다음 곡",
+  "nowPlayingPlayPause": "재생 또는 일시 정지",
+  "nowPlayingCard": "퀵 메뉴에 지금 재생 중인 곡 표시",
+  "nowPlayingCardDetail": "이 컴퓨터의 음악 또는 동영상 플레이어에서 재생 중인 항목을 게임 위 메뉴에 표시하며, 이전, 재생 또는 일시 정지, 다음 버튼이 있습니다. 재생 중인 항목을 시스템에 알려 주는 모든 플레이어에서 작동합니다.",
+  "nowPlayingShare": "친구에게 내가 듣는 곡 표시",
+  "nowPlayingShareDetail": "재생되는 동안 AnyTogether 친구에게 제목과 아티스트가 표시됩니다. 꺼져 있는 동안에는 아무것도 전송되지 않습니다.",
+  "friendsListening": "%@ 듣는 중",
+  "friendsListeningBy": "%1$@, %2$@ 듣는 중"
 }

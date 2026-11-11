@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "Abrir en otro reproductor",
   "libmpvCopy": "Copiar",
   "libmpvMissingVoice": "Instala libmpv para escuchar las notas de voz en el lanzador: %@",
-  "libmpvMissingVoicePlain": "Instala libmpv para escuchar las notas de voz en el lanzador."
+  "libmpvMissingVoicePlain": "Instala libmpv para escuchar las notas de voz en el lanzador.",
+  "nowPlaying": "Reproduciendo ahora",
+  "nowPlayingIn": "Reproduciendo en %@",
+  "nowPlayingPausedIn": "En pausa en %@",
+  "nowPlayingPrevious": "Pista anterior",
+  "nowPlayingNext": "Pista siguiente",
+  "nowPlayingPlayPause": "Reproducir o pausar",
+  "nowPlayingCard": "Reproducción actual en el menú rápido",
+  "nowPlayingCardDetail": "Muestra en el menú sobre el juego lo que reproduce un reproductor de música o vídeo de este ordenador, con anterior, reproducir o pausar y siguiente. Funciona con cualquier reproductor que informe al sistema de lo que reproduce.",
+  "nowPlayingShare": "Mostrar a mis amigos lo que escucho",
+  "nowPlayingShareDetail": "Tus amigos de AnyTogether ven el título y el artista mientras suena. No se envía nada mientras esto esté desactivado.",
+  "friendsListening": "Escuchando %@",
+  "friendsListeningBy": "Escuchando %1$@, %2$@"
 }

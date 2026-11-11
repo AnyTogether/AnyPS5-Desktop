@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "অন্য প্লেয়ারে খুলুন",
   "libmpvCopy": "কপি করুন",
   "libmpvMissingVoice": "লঞ্চারে ভয়েস নোট শুনতে libmpv ইনস্টল করুন: %@",
-  "libmpvMissingVoicePlain": "লঞ্চারে ভয়েস নোট শুনতে libmpv ইনস্টল করুন।"
+  "libmpvMissingVoicePlain": "লঞ্চারে ভয়েস নোট শুনতে libmpv ইনস্টল করুন।",
+  "nowPlaying": "এখন চলছে",
+  "nowPlayingIn": "%@-এ চলছে",
+  "nowPlayingPausedIn": "%@-এ বিরতিতে আছে",
+  "nowPlayingPrevious": "আগের ট্র্যাক",
+  "nowPlayingNext": "পরের ট্র্যাক",
+  "nowPlayingPlayPause": "চালান বা বিরতি দিন",
+  "nowPlayingCard": "দ্রুত মেনুতে এখন যা চলছে তা দেখান",
+  "nowPlayingCardDetail": "গেমের ওপরের মেনুতে দেখায় এই কম্পিউটারের মিউজিক বা ভিডিও প্লেয়ারে কী চলছে, সঙ্গে আগের, চালান বা বিরতি এবং পরের বোতাম। যে প্লেয়ার সিস্টেমকে জানায় সে কী চালাচ্ছে, তার সবগুলোর সঙ্গে কাজ করে।",
+  "nowPlayingShare": "আমি কী শুনছি তা বন্ধুদের দেখান",
+  "nowPlayingShareDetail": "চলার সময় AnyTogether-এ আপনার বন্ধুরা শিরোনাম ও শিল্পী দেখতে পান। এটি বন্ধ থাকলে কিছুই পাঠানো হয় না।",
+  "friendsListening": "%@ শুনছেন",
+  "friendsListeningBy": "%1$@, %2$@ শুনছেন"
 }

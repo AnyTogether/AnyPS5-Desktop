@@ -60,6 +60,8 @@ extension LauncherProfiles on AppModel {
     'friendsJoin',
     'discordPresence',
     'discordJoin',
+    'nowPlayingCard',
+    'nowPlayingShare',
     'onlinePlay',
     'pushToTalk',
     'noiseSuppression',

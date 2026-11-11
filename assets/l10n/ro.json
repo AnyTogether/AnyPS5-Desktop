@@ -2309,5 +2309,17 @@
   "libmpvOpenElsewhere": "Deschide în alt player",
   "libmpvCopy": "Copiază",
   "libmpvMissingVoice": "Instalați libmpv pentru a reda mesajele vocale în lansator: %@",
-  "libmpvMissingVoicePlain": "Instalați libmpv pentru a reda mesajele vocale în lansator."
+  "libmpvMissingVoicePlain": "Instalați libmpv pentru a reda mesajele vocale în lansator.",
+  "nowPlaying": "Se redă acum",
+  "nowPlayingIn": "Se redă acum în %@",
+  "nowPlayingPausedIn": "În pauză în %@",
+  "nowPlayingPrevious": "Piesa anterioară",
+  "nowPlayingNext": "Piesa următoare",
+  "nowPlayingPlayPause": "Redă sau pune pauză",
+  "nowPlayingCard": "Redarea curentă în meniul rapid",
+  "nowPlayingCardDetail": "Arată în meniul de deasupra jocului ce redă un player de muzică sau video de pe acest computer, cu anterior, redare sau pauză și următor. Funcționează cu orice player care spune sistemului ce redă.",
+  "nowPlayingShare": "Arată-le prietenilor ce ascult",
+  "nowPlayingShareDetail": "Prietenii de pe AnyTogether văd titlul și artistul cât timp se redă. Nu se trimite nimic cât timp opțiunea este dezactivată.",
+  "friendsListening": "Ascultă %@",
+  "friendsListeningBy": "Ascultă %1$@, %2$@"
 }

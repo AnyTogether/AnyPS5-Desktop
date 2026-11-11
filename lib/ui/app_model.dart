@@ -30,6 +30,7 @@ import '../core/desktop_notice.dart';
 import '../core/desktop/desktop.dart';
 import '../core/desktop/launcher_window.dart';
 import '../core/discord_presence.dart' show DiscordPresence;
+import '../core/now_playing.dart' show NowPlayingSource;
 import '../core/desktop/window_backdrop.dart';
 import '../core/font_download.dart';
 import '../core/free_space.dart';
@@ -93,6 +94,7 @@ import 'components.dart';
 import 'controllers_model.dart';
 import 'crash_model.dart';
 import 'discord_model.dart';
+import 'now_playing_model.dart';
 import 'engine_model.dart';
 import 'ffmpeg_model.dart';
 import 'fonts_model.dart';
@@ -156,6 +158,8 @@ class Preferences {
     ..friendsJoin = json['friendsJoin'] as bool? ?? true
     ..discordPresence = json['discordPresence'] as bool? ?? true
     ..discordJoin = json['discordJoin'] as bool? ?? true
+    ..nowPlayingCard = json['nowPlayingCard'] as bool? ?? true
+    ..nowPlayingShare = json['nowPlayingShare'] as bool? ?? false
     ..onlinePlay = json['onlinePlay'] == true
     ..onlinePlatformGroups = json['onlinePlatformGroups'] as bool? ?? true
     ..pushToTalk = json['pushToTalk'] as bool? ?? false
@@ -278,6 +282,12 @@ class Preferences {
   /// Join button there with the party's code (discord_model.dart).
   bool discordPresence = true;
   bool discordJoin = true;
+
+  /// Settings › Behaviour: the quick menu's Now playing card (what a media player on this
+  /// computer plays), and whether AnyTogether friends see it; the second is the user's to turn
+  /// on (now_playing_model.dart).
+  bool nowPlayingCard = true;
+  bool nowPlayingShare = false;
 
   /// Settings › AnyTogether › Online play (experimental): games are started with the launcher's
   /// online bridge (signed in as the AnyTogether user, friends, Player Sessions, game packets to
@@ -442,6 +452,8 @@ class Preferences {
     'friendsJoin': friendsJoin,
     'discordPresence': discordPresence,
     'discordJoin': discordJoin,
+    'nowPlayingCard': nowPlayingCard,
+    'nowPlayingShare': nowPlayingShare,
     'onlinePlay': onlinePlay,
     if (!onlinePlatformGroups) 'onlinePlatformGroups': false,
     'pushToTalk': pushToTalk,
@@ -1031,6 +1043,26 @@ class PanelPerson {
 /// moon), do not disturb (red, with a bar) or offline (grey).
 enum PersonStatus { playing, online, away, idle, dnd, offline }
 
+/// The quick menu's Now playing card: the track is the row's title, artist (detail) and cover
+/// (picture). Choosing it plays or pauses, ← and → go to the previous and the next track, and
+/// its three buttons do the same for the mouse.
+class MediaRow extends RowKind {
+  const MediaRow({
+    required this.label,
+    required this.playing,
+    required this.previous,
+    required this.playPause,
+    required this.next,
+  });
+
+  /// "Now playing in Rhythmbox", "Paused in Rhythmbox".
+  final String label;
+  final bool playing;
+  final void Function() previous;
+  final void Function() playPause;
+  final void Function() next;
+}
+
 /// A pad action's keys and mouse buttons; choosing it waits for a key.
 class KeysRow extends RowKind {
   const KeysRow(this.sources, {required this.capturing, required this.capture});
@@ -1114,7 +1146,12 @@ class LauncherServices {
     this.commands,
     this.discord,
     this.discordGames,
+    this.nowPlaying,
   });
+
+  /// What a media player on this computer plays (Windows' media session, MPRIS on Linux), for
+  /// the quick menu's card (now_playing_model.dart); none in the tests unless they give a fake.
+  final NowPlayingSource Function()? nowPlaying;
 
   /// Discord's IPC for the "Playing …" status (discord_model.dart); the tests give a fake.
   final DiscordPresence Function()? discord;
@@ -1326,6 +1363,10 @@ class AppModel extends ChangeNotifier {
     together = TogetherModel(this);
     // The party and its code changing (and signing out) change what Discord shows.
     together.hub.addListener(discord.update);
+    // The quick menu opening and closing, the account and the family's limits change whether
+    // the media session is followed and what friends are shown of it.
+    together.hub.addListener(nowPlaying.update);
+    addListener(nowPlaying.update);
     _applySound();
     sounds.onCue = _cueAsked;
     // Full screen the system made or ended (Maximize, Win+Up): the launcher follows it.
@@ -1584,6 +1625,9 @@ class AppModel extends ChangeNotifier {
 
   /// "Playing …" on the user's Discord profile.
   late final DiscordModel discord = DiscordModel(this);
+
+  /// Now playing: the quick menu's card and "Listening to …" for friends.
+  late final NowPlayingModel nowPlaying = NowPlayingModel(this);
 
   /// An unlock the user asked for finished (the game's id, whether it worked): Play Together
   /// joins a game it unlocked first.
@@ -4780,6 +4824,7 @@ class AppModel extends ChangeNotifier {
     stopGame();
     unawaited(_stopReplay());
     unawaited(discord.close());
+    unawaited(nowPlaying.close());
     (services.quit ?? exit)(0);
   }
 
@@ -5325,6 +5370,7 @@ class AppModel extends ChangeNotifier {
               ),
               ...media.gameRows(),
               ...sharePlay.rows(),
+              ...nowPlaying.quickRows(),
               PanelRow(
                 id: 'closeGame',
                 title: T.text('quickCloseGame'),
@@ -5867,6 +5913,7 @@ class AppModel extends ChangeNotifier {
             }),
           ),
           ...discord.settingsRows(),
+          ...nowPlaying.settingsRows(),
           PanelRow(
             id: 'checkUpdates',
             title: T.text('checkUpdates'),
@@ -7013,6 +7060,9 @@ class AppModel extends ChangeNotifier {
           case ToggleRow(:final value, :final set):
             set(!value);
             sounds.play(Cue.move);
+          case MediaRow(:final previous, :final next):
+            (delta < 0 ? previous : next)();
+            sounds.play(Cue.move);
           default:
             if (overlay == Layer.settings && categories.length > 1) {
               final next = (panelCategory + delta).clamp(0, categories.length - 1);
@@ -7034,6 +7084,9 @@ class AppModel extends ChangeNotifier {
           case ActionRow(:final run):
             sounds.play(Cue.select);
             run();
+          case MediaRow(:final playPause):
+            sounds.play(Cue.select);
+            playPause();
           case KeysRow(:final capture):
             capture();
           case TextRow():
@@ -7099,6 +7152,8 @@ class AppModel extends ChangeNotifier {
           return true;
       }
     }
+    // Now playing's card: ← and → are the previous and the next track at once, with no edit mode.
+    if (row?.kind is MediaRow && (command == Command.left || command == Command.right)) return false;
     switch (command) {
       case Command.select when editable:
         editingValue = row!.id;
@@ -7727,6 +7782,8 @@ class AppModel extends ChangeNotifier {
     fonts.dispose();
     files.dispose();
     unawaited(discord.close());
+    removeListener(nowPlaying.update);
+    unawaited(nowPlaying.close());
     together.dispose();
     updates.dispose();
     music.dispose();
