@@ -157,10 +157,12 @@ void main() {
           (rowOf(model, 'engineGitUpdate')!.kind as ActionRow).run();
           await until(() => !model.engine.git.running);
         });
-        // The last row: the list scrolls to the failure, its command and Check again.
-        focusRow(model, 'engine', 'engineGitBeforePlay');
+        model.openSettingsCategory('engine');
         await pumpLauncher(tester, model);
-        await tester.pump(const Duration(milliseconds: 600));
+        // On to the last row: the list scrolls down to the failure, its command and Check again
+        // (and the row with the checkout's folder, a temporary one here, leaves the screen).
+        focusRow(model, 'engine', 'engineGitBeforePlay');
+        await settle(tester);
         expect(find.text('sudo apt-get install -y git ninja-build gcc g++'), findsOneWidget);
         expect(find.text(T.text('engineGitRecheck')), findsOneWidget);
         await expectLater(shell, matchesGoldenFile('goldens/engine_missing_tools_$language.png'));
