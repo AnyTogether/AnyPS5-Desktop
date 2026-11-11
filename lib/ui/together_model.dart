@@ -1435,6 +1435,9 @@ class TogetherModel {
         'full' => T.text('togetherErrorFull'),
         'payload_too_large' => T.text('togetherErrorTooLarge'),
         'internal' => T.text('togetherErrorInternal'),
+        // A code the launcher has no words for yet: the server's sentence in English (which is
+        // English), the launcher's own with the code in every other language, as on the Mac.
+        _ when T.language.code == 'en' && error.title.isNotEmpty => error.title, // not a text
         final code => code.isEmpty ? T.text('togetherUnreachable') : T.format('togetherErrorOther', [code]),
       };
     }
@@ -1586,10 +1589,12 @@ class TogetherModel {
     countryReturn = null;
   }
 
-  /// [code] is the profile's country once Save is chosen (null: none), and the list closes.
+  /// [code] is the profile's country from now on (null: none): the list closes and the profile
+  /// is saved at once, as on the Mac.
   void chooseCountry(String? code) {
     countryDraft = code ?? '';
     backFromCountry();
+    unawaited(saveProfile());
   }
 
   /// The search field, None (while nothing is searched for) and the countries the search finds.

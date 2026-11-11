@@ -53,8 +53,9 @@ class Countries {
   }
 
   /// The countries whose name has every word of [query], whatever the case and the accents
-  /// ("turk" finds Türkiye, "isvec" İsveç); a two-letter code finds its country first, and the
-  /// English name finds a country in any language. All of them for an empty query.
+  /// ("turk" finds Türkiye, "isvec" İsveç); a two-letter code finds its country first, then the
+  /// names that begin with it, and the English name finds a country in any language. All of them
+  /// for an empty query.
   static List<(String, String)> search(String query) {
     final words = fold(query).split(RegExp(r'\s+')).where((word) => word.isNotEmpty).toList();
     if (words.isEmpty) return all;
@@ -65,7 +66,16 @@ class Countries {
         if (words.every((word) => fold(entry.$2).contains(word) || (english[entry.$1]?.contains(word) ?? false))) entry,
     ];
     final exact = all.where((entry) => entry.$1 == code).toList();
-    return [...exact, ...found.where((entry) => entry.$1 != code)];
+    // A name (or one of its words) that begins with what was typed comes before one that only
+    // has it somewhere inside: "al" is Almanya before Adaları.
+    final typed = words.join(' ');
+    bool begins((String, String) entry) {
+      final name = fold(entry.$2);
+      return name.startsWith(typed) || name.contains(' $typed');
+    }
+
+    final rest = found.where((entry) => entry.$1 != code).toList();
+    return [...exact, ...rest.where(begins), ...rest.where((entry) => !begins(entry))];
   }
 
   static const _accents = {

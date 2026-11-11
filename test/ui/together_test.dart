@@ -1498,8 +1498,7 @@ void main() {
       expect(rowIds(), [TogetherModel.countrySearchRow, 'country-DE']);
       (row('country-DE').kind as ActionRow).run();
       expect(model.overlay, Layer.settings, reason: 'chosen: back where the list was opened from');
-      expect(row('together-country').detail, 'Germany');
-      (row('together-save').kind as ActionRow).run();
+      // Chosen is saved: no Save to press for it, and the name typed goes with it.
       await until(() => model.toast == 'Profile saved');
       expect(server.callsTo('me/profile').single.body, {'displayName': 'Utku Halis', 'country': 'DE'});
       expect(together.user!.displayName, 'Utku Halis');

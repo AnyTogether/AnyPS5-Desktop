@@ -157,8 +157,10 @@ void main() {
           (rowOf(model, 'engineGitUpdate')!.kind as ActionRow).run();
           await until(() => !model.engine.git.running);
         });
-        focusRow(model, 'engine', 'engineGitRecheck');
+        // The last row: the list scrolls to the failure, its command and Check again.
+        focusRow(model, 'engine', 'engineGitBeforePlay');
         await pumpLauncher(tester, model);
+        await tester.pump(const Duration(milliseconds: 600));
         expect(find.text('sudo apt-get install -y git ninja-build gcc g++'), findsOneWidget);
         expect(find.text(T.text('engineGitRecheck')), findsOneWidget);
         await expectLater(shell, matchesGoldenFile('goldens/engine_missing_tools_$language.png'));
@@ -311,6 +313,8 @@ void main() {
       T.language = Language.byCode('tr');
       expect(Countries.name('DE'), 'Almanya');
       expect(Countries.search('alm').first, ('DE', 'Almanya'));
+      // The code's country first, then the names that begin with what was typed.
+      expect(Countries.search('al').take(3).map((entry) => entry.$2), ['Arnavutluk', 'Åland Adaları', 'Almanya']);
       expect(Countries.search('isvec').single, ('SE', 'İsveç'));
       expect(Countries.search('ISVEÇ').single.$1, 'SE');
       // The English name still finds it for someone who types that.
@@ -339,7 +343,7 @@ void main() {
       expect(model.overlay, Layer.settings);
       expect(together.countryDraft, isNull);
 
-      // Chosen: kept for Save, and the list opens on it the next time.
+      // Chosen (saved at once when signed in), and the list opens on it the next time.
       together.openCountryPicker();
       (together.countryRows().firstWhere((row) => row.id == 'country-TR').kind as ActionRow).run();
       expect((model.overlay, together.countryDraft), (Layer.settings, 'TR'));
