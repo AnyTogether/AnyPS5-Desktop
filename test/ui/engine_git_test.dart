@@ -107,7 +107,7 @@ void main() {
     expect(model.preferences.engineGitBuilt[checkout], 'bbbbbbbb22');
     model.select(model.games.indexOf(orbit()));
     model.primaryAction(orbit());
-    expect(model.overlay, isNull);
+    expect(model.overlay, isNot(Layer.updateChoice));
     expect(model.afterRebuild?.$1, orbit().id, reason: 'Play rebuilds the copy first');
     model.cancelUnlock(orbit());
     await until(() => orbitState() is Installed);

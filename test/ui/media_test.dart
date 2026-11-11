@@ -82,7 +82,8 @@ void main() {
       '"titleID":"PPSA01001","toolkit":"arm-5ca076a87"}',
     );
     model.rescan();
-    final playing = model.play(orbit());
+    // The copy as it is: these are about the engine it was made with, not about rebuilding it.
+    final playing = model.play(orbit(), asItIs: true);
     await until(() => model.running != null);
     return (done: playing);
   }
