@@ -982,7 +982,7 @@ class _RowView extends StatelessWidget {
   }
 }
 
-/// The quick menu's Now playing card: the cover, "Now playing in <player>" over the title and
+/// The quick menu's Now playing card: the cover, "Now playing in Rhythmbox" over the title and
 /// the artist, and previous, play or pause and next. Drawn inside the row's own focus fill, in
 /// the row's colours ([ink] for the words, [soft] for the lesser ones).
 class NowPlayingCard extends StatelessWidget {
