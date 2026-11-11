@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "recycle.h"
 #include "utils.h"
 
 namespace {
@@ -22,6 +23,25 @@ constexpr UINT kNowPlayingMessage = WM_APP + 2;
 
 void NowPlayingChangedOnItsThread(void* context) {
   ::PostMessage(static_cast<HWND>(context), kNowPlayingMessage, 0, 0);
+}
+
+// Posted from the recycle thread when a game's files are in the Recycle Bin (or could not go):
+// the launcher is answered from here, the thread the channel belongs to. wparam is the code of
+// recycle.h, lparam the RecycleRequest.
+constexpr UINT kRecycledMessage = WM_APP + 3;
+
+// One "recycle" call waiting for its answer.
+struct RecycleRequest {
+  HWND window;
+  std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result;
+};
+
+void RecycleFinishedOnItsThread(void* context, int code) {
+  auto* request = static_cast<RecycleRequest*>(context);
+  // The window gone meanwhile (the launcher closing): the request is left as it is, never
+  // answered from this thread.
+  ::PostMessage(request->window, kRecycledMessage, static_cast<WPARAM>(code),
+                reinterpret_cast<LPARAM>(request));
 }
 
 }  // namespace
@@ -107,6 +127,25 @@ bool FlutterWindow::OnCreate() {
           }
           run_marker_ = Utf16FromUtf8(*path);
           result->Success(flutter::EncodableValue(!run_marker_.empty()));
+          return;
+        }
+        // Delete game: a folder or a file into the Recycle Bin, on a thread of its own
+        // (recycle.h). Answered with its code once it is over (kRecycledMessage).
+        if (call.method_name() == "recycle") {
+          const auto* path = std::get_if<std::string>(call.arguments());
+          HWND hwnd = GetHandle();
+          if (path == nullptr || path->empty() || hwnd == nullptr) {
+            result->Error("bad_arguments", "recycle takes a path");
+            return;
+          }
+          const std::wstring target = Utf16FromUtf8(*path);
+          auto* request = new RecycleRequest{hwnd, std::move(result)};
+          if (target.empty() ||
+              RecycleStart(target.c_str(), RecycleFinishedOnItsThread,
+                           request) == 0) {
+            request->result->Success(flutter::EncodableValue(kRecycleFailed));
+            delete request;
+          }
           return;
         }
         result->NotImplemented();
@@ -291,6 +330,15 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
         MaximizeToFullscreen();
       }
       return 0;
+    case kRecycledMessage: {
+      std::unique_ptr<RecycleRequest> request(
+          reinterpret_cast<RecycleRequest*>(lparam));
+      if (request && request->result) {
+        request->result->Success(
+            flutter::EncodableValue(static_cast<int>(wparam)));
+      }
+      return 0;
+    }
     case kNowPlayingMessage:
       if (now_playing_channel_ && now_playing_ != nullptr) {
         now_playing_channel_->InvokeMethod(

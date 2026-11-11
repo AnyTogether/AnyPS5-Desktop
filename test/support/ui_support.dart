@@ -15,6 +15,7 @@ import 'package:anyps5_desktop/core/desktop/desktop.dart';
 import 'package:anyps5_desktop/core/desktop/launcher_window.dart';
 import 'package:anyps5_desktop/core/desktop/window_backdrop.dart';
 import 'package:anyps5_desktop/core/font_download.dart';
+import 'package:anyps5_desktop/core/game_deletion.dart';
 import 'package:anyps5_desktop/core/game_library.dart';
 import 'package:anyps5_desktop/core/gamepad/pad_navigation.dart';
 import 'package:anyps5_desktop/core/host.dart';
@@ -196,6 +197,7 @@ Fixture makeFixture({
   NowPlayingSource Function()? nowPlaying,
   ClipPlayback Function()? clipPlayback,
   VoicePlayback Function()? voicePlayback,
+  Trash? trash,
 }) {
   final opened = <Uri>[];
   final copied = <String>[];
@@ -292,6 +294,7 @@ Fixture makeFixture({
       // An Unreal game's own controls at once, read from its paks.
       gameControls: gameControls ?? (folder) => SynchronousFuture(UnrealControls.read(folder)),
       commands: commands,
+      trash: trash,
       discord: discord,
       nowPlaying: nowPlaying,
       discordGames: (_) async => null,

@@ -41,6 +41,7 @@ import '../core/gamepad/guide_switch.dart';
 import '../core/gamepad/pad_gate.dart';
 import '../core/gamepad/pad_navigation.dart';
 import '../core/gamepad/shortcuts.dart';
+import '../core/game_deletion.dart' show Trash;
 import '../core/game_library.dart';
 import '../core/game_log.dart';
 import '../core/game_process.dart';
@@ -100,6 +101,7 @@ import 'ffmpeg_model.dart';
 import 'fonts_model.dart';
 import 'media_model.dart';
 import 'share_play_model.dart';
+import 'game_delete_model.dart';
 import 'game_files_model.dart';
 import 'steam_model.dart';
 import 'glass.dart';
@@ -755,6 +757,9 @@ enum Layer {
   /// shader cache and its settings file, as on the Mac.
   advanced,
   confirmUninstall,
+
+  /// Game Settings › Delete game: the game's own files off the disk, asked first (ConfirmCard).
+  confirmDeleteGame,
   updateChoice,
 
   /// AnyTogether no longer answers this launcher's version (client_too_old): update.
@@ -1147,7 +1152,12 @@ class LauncherServices {
     this.discord,
     this.discordGames,
     this.nowPlaying,
+    this.trash,
   });
+
+  /// The system's trash, where Delete game puts a game's files: the Recycle Bin through the
+  /// runner on Windows, the desktop's own tool on Linux when not given.
+  final Trash? trash;
 
   /// What a media player on this computer plays (Windows' media session, MPRIS on Linux), for
   /// the quick menu's card (now_playing_model.dart); none in the tests unless they give a fake.
@@ -2091,6 +2101,34 @@ class AppModel extends ChangeNotifier {
   /// Zips dropped into the games folders and updates added from a folder.
   late final GameFilesModel files = GameFilesModel(this);
 
+  /// Game Settings › Delete game: the game itself off the disk.
+  late final GameDeleteModel deletion = GameDeleteModel(this);
+
+  /// Closed: what still runs for it (a deletion) says nothing more.
+  bool get disposed => _disposed;
+
+  /// [game] out of the library at once (Delete game), before its files are gone: the selection
+  /// stays where it is, on the game that takes its place.
+  void hideGame(Game game) {
+    final index = games.indexWhere((other) => other.id == game.id);
+    if (index < 0) return;
+    games = [...games]..removeAt(index);
+    if (selected > index) selected--;
+    selected = selected.clamp(0, games.isEmpty ? 0 : games.length - 1);
+    if (libraryIndex > index) libraryIndex--;
+    libraryIndex = libraryIndex.clamp(0, games.isEmpty ? 0 : games.length - 1);
+    _changed();
+  }
+
+  /// What the launcher held about a game that is no longer on the disk (Delete game). Its
+  /// settings stay, for the day it is added again.
+  void forgetGame(Game game) {
+    sizes.remove(game.id);
+    failures.remove(game.id);
+    trophies.remove(game.id);
+    records.remove(game.id);
+  }
+
   // The launcher's own crashes and stalls (core/launcher_health.dart).
 
   /// What an earlier run left to report, offered once the home screen is free.
@@ -2869,7 +2907,7 @@ class AppModel extends ChangeNotifier {
     final key = folders.join('\n');
     final counted = !mapEquals(folderCounts, survey.folders);
     folderCounts = survey.folders;
-    if (key != _scannedFolders || !GameLibrary.sameListing(games, survey.games)) {
+    if (key != _scannedFolders || !GameLibrary.sameListing(games, deletion.visible(survey.games))) {
       if (key != _scannedFolders) {
         _tracker.reset();
         _connected.clear();
@@ -2896,7 +2934,8 @@ class AppModel extends ChangeNotifier {
     final previous = selectedGame?.id;
     final focusedInLibrary = libraryIndex >= 0 && libraryIndex < games.length ? games[libraryIndex].id : null;
     _forgetDiskFacts();
-    games = found;
+    // A game being deleted stays out of the library until its files are gone or came back.
+    games = deletion.visible(found);
     records.clear();
     trophies.clear();
     for (final game in games) {
@@ -3676,13 +3715,15 @@ class AppModel extends ChangeNotifier {
   /// Uninstalls [game] at once: its folders are renamed aside and go after, off the screen's
   /// thread, so the launcher keeps answering while a big game goes. A second Uninstall meanwhile
   /// does nothing, and an unlock of the game waits until its old files are gone. Completes then.
-  Future<void> uninstall(Game game) async {
-    final folder = rootOf(game);
+  /// Delete game uninstalls too, from the games folder it knew ([root]) and without the notice
+  /// ([quiet]): it has its own.
+  Future<void> uninstall(Game game, {String? root, bool quiet = false}) async {
+    final folder = root ?? rootOf(game);
     if (folder == null || _removals.containsKey(game.id)) return;
     final gone = Installer.uninstall(game, folder);
     _removals[game.id] = gone;
     records.remove(game.id);
-    show(T.text('uninstallDone'));
+    if (!quiet) show(T.text('uninstallDone'));
     _changed();
     try {
       await gone;
@@ -4335,6 +4376,7 @@ class AppModel extends ChangeNotifier {
 
   void closeOverlay() {
     overlay = null;
+    deletion.ask = null;
     // A crop closed some other way (PS) keeps nothing.
     pictureCrop?.image.dispose();
     pictureCrop = null;
@@ -4612,6 +4654,7 @@ class AppModel extends ChangeNotifier {
       case Layer.settings ||
           Layer.gameSettings ||
           Layer.confirmUninstall ||
+          Layer.confirmDeleteGame ||
           Layer.copyWarning ||
           Layer.gameFiles ||
           Layer.updateChoice ||
@@ -4805,7 +4848,7 @@ class AppModel extends ChangeNotifier {
   }
 
   /// The layers that ask a plain yes or no, drawn as ConfirmCard: two answers side by side.
-  static const twoChoiceLayers = {Layer.confirmQuit, Layer.closeGame};
+  static const twoChoiceLayers = {Layer.confirmQuit, Layer.closeGame, Layer.confirmDeleteGame};
 
   bool get twoChoice => twoChoiceLayers.contains(overlay);
 
@@ -5280,6 +5323,24 @@ class AppModel extends ChangeNotifier {
                 }, destructive: true),
               ),
               PanelRow(id: 'cancel', title: T.text('cancel'), kind: ActionRow(closeOverlay)),
+            ],
+          ),
+        ];
+      case Layer.confirmDeleteGame:
+        final ask = deletion.ask;
+        if (ask == null) return const [];
+        return [
+          PanelCategory(
+            id: 'deleteGame',
+            title: T.format(ask.permanent ? 'deleteGameForeverTitle' : 'deleteGameTitle', [ask.game.name]),
+            rows: [
+              // Cancel first: where the focus starts.
+              PanelRow(id: 'cancel', title: T.text('cancel'), kind: ActionRow(deletion.cancel)),
+              PanelRow(
+                id: 'delete',
+                title: T.text(ask.permanent ? 'deleteGameForever' : 'deleteGame'),
+                kind: ActionRow(deletion.confirm, destructive: true),
+              ),
             ],
           ),
         ];
@@ -6744,6 +6805,17 @@ class AppModel extends ChangeNotifier {
         PanelRow(id: 'log', title: T.text('openLog'), kind: ActionRow(() => open(Layer.log))),
         ..._reportRows(game, settings, change),
       ],
+      // Last, after Uninstall: the game itself off the disk, whatever its state.
+      held(
+        'deleteGame',
+        T.text('deleteGame'),
+        () => PanelRow(
+          id: 'deleteGame',
+          title: T.text('deleteGame'),
+          detail: T.text('deleteGameDetail'),
+          kind: ActionRow(() => deletion.open(game), destructive: true),
+        ),
+      ),
     ];
   }
 

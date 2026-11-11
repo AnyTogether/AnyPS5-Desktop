@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 
 import 'app_model.dart';
 import 'components.dart';
+import 'game_delete_model.dart';
 import 'glass.dart';
 import 'profiles_view.dart';
+import 'strings.dart';
 import 'theme.dart';
 
-/// A plain yes or no (Quit AnyPS5?, Close the game?): a small card, the question, a line when
-/// there is more to know, and the two answers side by side as pills. The way back on the left,
+/// A plain yes or no (Quit AnyPS5?, Close the game?, Delete the game?): a small card, the
+/// question, a line when there is more to know (for a game to delete: where it is, how much it
+/// takes, what goes and what stays), and the two answers side by side as pills. The way back on the left,
 /// the one that cannot be undone on the right in red. ← and → move between them, Esc and Circle
 /// are the way back, as on the Mac.
 class ConfirmCard extends StatelessWidget {
@@ -32,7 +35,8 @@ class ConfirmCard extends StatelessWidget {
     final destructive = rows.where(_destructive).firstOrNull;
     final detail = destructive?.detail;
     final quitting = model.overlay == Layer.confirmQuit;
-    final icon = model.overlay == Layer.closeGame ? model.running?.$1.icon : null;
+    final deleting = model.overlay == Layer.confirmDeleteGame ? model.deletion.ask : null;
+    final icon = model.overlay == Layer.closeGame ? model.running?.$1.icon : deleting?.game.icon;
     final profile = model.currentProfile;
     return LayerScrim(
       opacity: 0.55,
@@ -46,7 +50,7 @@ class ConfirmCard extends StatelessWidget {
           ),
           Center(
             child: SizedBox(
-              width: 500 * scale,
+              width: (deleting == null ? 500 : 580) * scale,
               child: Glass(
                 radius: 26 * scale,
                 opacity: 0.55,
@@ -81,7 +85,10 @@ class ConfirmCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    if (detail != null) ...[
+                    if (deleting != null) ...[
+                      SizedBox(height: 18 * scale),
+                      _DeleteBody(ask: deleting, model: model),
+                    ] else if (detail != null) ...[
                       SizedBox(height: 10 * scale),
                       Text(
                         detail,
@@ -99,7 +106,13 @@ class ConfirmCard extends StatelessWidget {
                               row: rows[index],
                               focused: index == model.panelRow,
                               back: !_destructive(rows[index]),
-                              symbol: quitting ? Icons.power_settings_new_rounded : Icons.close_rounded,
+                              symbol: quitting
+                                  ? Icons.power_settings_new_rounded
+                                  : deleting == null
+                                  ? Icons.close_rounded
+                                  : deleting.permanent
+                                  ? Icons.delete_forever_rounded
+                                  : Icons.delete_outline_rounded,
                               onTap: () => model.activateRow(index),
                               onHover: () => model.hoverRow(index),
                             ),
@@ -121,6 +134,121 @@ class ConfirmCard extends StatelessWidget {
     ActionRow(:final destructive) => destructive,
     _ => false,
   };
+}
+
+/// What the Delete game card says before its answers: the game's folder as a file strip (its
+/// path, what it takes on the disk, what goes with it), then what goes and what stays.
+class _DeleteBody extends StatelessWidget {
+  const _DeleteBody({required this.ask, required this.model});
+
+  final DeleteAsk ask;
+  final AppModel model;
+
+  static const _amber = Color(0xFFFFB45C);
+  static const _green = Color(0xFF6FD99A);
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = LayoutScale.of(context);
+    final trash = model.deletion.trashName;
+    final extras = model.deletion.extraNames;
+    final faint = Colors.white.withValues(alpha: 0.6);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          key: const ValueKey('delete-files'),
+          padding: EdgeInsets.fromLTRB(14 * scale, 12 * scale, 12 * scale, 12 * scale),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(16 * scale),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: EdgeInsets.only(top: 1 * scale),
+                child: Icon(Icons.folder_rounded, size: 20 * scale, color: Colors.white.withValues(alpha: 0.8)),
+              ),
+              SizedBox(width: 12 * scale),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // A path reads left to right in every language.
+                    Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Text(
+                        ask.plan.folder,
+                        key: const ValueKey('delete-path'),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.display(13.5 * scale, weight: FontWeight.w500, height: 1.3),
+                      ),
+                    ),
+                    if (extras.isNotEmpty) ...[
+                      SizedBox(height: 6 * scale),
+                      Text(
+                        T.format('deleteGameWith', [extras.join(', ')]),
+                        key: const ValueKey('delete-extras'),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.display(12.5 * scale, color: faint, height: 1.3),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              SizedBox(width: 12 * scale),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 4 * scale),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  byteText(ask.size),
+                  key: const ValueKey('delete-size'),
+                  style: AppText.display(13 * scale, weight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 16 * scale),
+        if (ask.permanent) ...[
+          _line(scale, Icons.warning_amber_rounded, _amber, T.format('deleteGameNoTrash', [trash])),
+          SizedBox(height: 10 * scale),
+        ],
+        _line(
+          scale,
+          ask.permanent ? Icons.delete_forever_rounded : Icons.delete_outline_rounded,
+          Palette.danger,
+          ask.permanent ? T.text('deleteGameGoesForever') : T.format('deleteGameGoes', [trash]),
+        ),
+        SizedBox(height: 10 * scale),
+        _line(scale, Icons.verified_user_outlined, _green, T.text('deleteGameStays')),
+      ],
+    );
+  }
+
+  Widget _line(double scale, IconData symbol, Color tint, String text) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: EdgeInsets.only(top: 1 * scale),
+        child: Icon(symbol, size: 18 * scale, color: tint),
+      ),
+      SizedBox(width: 12 * scale),
+      Expanded(
+        child: Text(
+          text,
+          style: AppText.display(13.5 * scale, color: Colors.white.withValues(alpha: 0.72), height: 1.38),
+        ),
+      ),
+    ],
+  );
 }
 
 /// One answer: a pill. Focused, the way back turns white and the destructive one red; the
