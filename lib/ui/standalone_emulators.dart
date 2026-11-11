@@ -129,8 +129,11 @@ extension StandaloneEmulators on AppModel {
     }
 
     if (_disposed || turn != _startTurn) {
+      // The emulator of a start given up: asked to end, then ended after the same grace as Stop.
+      final end = Timer(stopGrace, run.kill);
       if (!run.stop()) run.kill();
       await run.exitCode;
+      end.cancel();
       return;
     }
     starting = null;

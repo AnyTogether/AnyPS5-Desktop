@@ -121,7 +121,8 @@ void main() {
     model.rescan();
     final game = model.games.singleWhere((game) => game.retro != null);
     model.preferences.retroEmulators['ps2'] = (File(p.join(fixture.temp.path, 'emulator'))..createSync()).path;
-    final late = FakeGameProcess();
+    final late = FakeGameProcess(ignoresTerm: true);
+    model.stopGrace = const Duration(milliseconds: 20);
     final second = FakeGameProcess();
     addTearDown(late.quit);
     addTearDown(second.quit);
@@ -143,7 +144,8 @@ void main() {
     expect(model.starting, game);
     pending[0].complete(runningFor(late));
     await first;
-    expect(late.ended, isTrue, reason: 'the emulator of the start given up is stopped');
+    expect(late.ended, isTrue, reason: 'the emulator of the start given up is ended, even one that ignores SIGTERM');
+    expect(late.signals, [ProcessSignal.sigterm, ProcessSignal.sigkill]);
     expect(model.starting, game, reason: 'the start under way is left alone');
     expect(model.running, isNull);
 
@@ -205,7 +207,7 @@ void main() {
       ..lastPlayed[legacy] = '2026-11-01T20:00:00.000';
     model.rescan();
     final a = model.games.singleWhere((game) => game.name == 'A');
-    expect(a.id, 'retro:ps1:PS1/A.cue');
+    expect(a.id, 'retro:ps1:3042:PS1/A.cue');
     expect(model.preferences.lastPlayed[a.id], '2026-11-01T20:00:00.000');
     expect(model.preferences.lastPlayed, isNot(contains(legacy)));
 

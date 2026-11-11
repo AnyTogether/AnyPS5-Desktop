@@ -435,17 +435,19 @@ abstract final class GameLibrary {
     }
   }
 
-  /// A disc's [Game.libraryId]: its console and its path inside the games folder [root], with /
-  /// between folders on every system, so that the same games folder on another drive letter or
-  /// mount point keeps its games' identifiers. Outside a games folder, the whole path.
-  static String retroId(RetroPlatform platform, String disc, String? root) {
+  /// A disc's [Game.libraryId]: its console, [key] and its path inside the games folder [root],
+  /// with / between folders on every system, so that the same games folder on another drive
+  /// letter or mount point keeps its games' identifiers. [key] tells apart two games at the same
+  /// path in two games folders: the title ID a disc names, or the size of a loose disc's files.
+  /// Outside a games folder, the whole path.
+  static String retroId(RetroPlatform platform, String key, String disc, String? root) {
     final path = root != null && p.isWithin(root, disc) ? p.relative(disc, from: root) : p.normalize(p.absolute(disc));
-    return 'retro:${platform.name}:${p.split(path).join('/')}';
+    return 'retro:${platform.name}:$key:${p.split(path).join('/')}';
   }
 
   static Game _discoveredRetro(String folder, String disc, RetroPlatform platform, String root, List<String> files) {
     final name = p.basenameWithoutExtension(disc);
-    final id = retroId(platform, disc, root);
+    final id = retroId(platform, '${filesSize(files)}', disc, root);
     final digest = sha256.convert(utf8.encode(id)).toString().substring(0, 16).toUpperCase();
     return Game(
       folder: folder,
@@ -546,7 +548,7 @@ abstract final class GameLibrary {
     final disc = p.join(folder, 'PS3_DISC.SFB');
     return Game(
       folder: folder,
-      libraryId: retroId(RetroPlatform.ps3, disc, root),
+      libraryId: retroId(RetroPlatform.ps3, titleId, disc, root),
       titleId: 'PS3-$titleId',
       name: name,
       names: {'en-US': name},
@@ -595,7 +597,7 @@ abstract final class GameLibrary {
       if (disc == null) return null;
       return Game(
         folder: folder,
-        libraryId: retroId(platform, disc, root),
+        libraryId: retroId(platform, titleId, disc, root),
         titleId: '${platform.name.toUpperCase()}-$titleId',
         name: name,
         names: {'en-US': name},

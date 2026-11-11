@@ -44,11 +44,15 @@ changing.
 
 ## Identity and size
 
-A disc's `Game.libraryId` is `retro:<console>:<path inside the games
-folder>`, with `/` separators on every system. When a drive letter or
-mount point changes and the same games folder is added again, the
-identifier stays the same, so last played and the measured size follow
-the game. The title ID of a loose disc is derived from that identifier.
+A disc's `Game.libraryId` is `retro:<console>:<key>:<path inside the games
+folder>`, with `/` separators on every system. The key is the title ID for
+a `retro.json` or PS3 folder, and the total size of a loose disc's files
+otherwise, so two games folders that hold different discs at the same path
+both list them. When a drive letter or mount point changes and the same
+games folder is added again, the identifier stays the same, so last played
+and the measured size follow the game. The title ID of a loose disc is
+derived from that identifier.
+
 Last-played entries saved under the earlier identifier (the disc's
 absolute path for loose files, or the folder for `retro.json` and PS3
 folders) are moved to the new one on the next scan.
@@ -66,8 +70,8 @@ store paths in launcher preferences and hand the selected file to the
 [existing process and log lifecycle](../lib/core/game_process.dart).
 Cancelling a start (Close on the phone) clears the Starting state at once,
 even if the emulator's process start never returns. If that process does
-start later, it is stopped, and any start begun in the meantime is left
-alone.
+start later, it is asked to end and is killed after the same grace period
+as Stop (`stopGrace`), and any start begun in the meantime is left alone.
 
 The [launcher model](../lib/ui/app_model.dart) exposes the setup rows and
 keeps standalone discs out of PS5 unlocking and trophy discovery. The

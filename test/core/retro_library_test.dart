@@ -78,7 +78,10 @@ void main() {
     }
 
     final before = discs(first), after = discs(second);
-    expect(before.map((game) => game.id), ['retro:ps1:PS1/Game B.m3u', 'retro:ps1:PS1/Solo.cue']);
+    expect(before.map((game) => game.id), [
+      matches(r'^retro:ps1:\d+:PS1/Game B\.m3u$'),
+      matches(r'^retro:ps1:\d+:PS1/Solo\.cue$'),
+    ]);
     expect(after.map((game) => game.id), before.map((game) => game.id));
     expect(after.map((game) => game.titleId), before.map((game) => game.titleId));
     final shelf = p.join(first.path, 'PS1');
@@ -87,6 +90,22 @@ void main() {
         p.join(shelf, name),
     ]);
     expect(before.last.files, [p.join(shelf, 'Solo.cue'), p.join(shelf, 'Solo.bin')]);
+  });
+
+  test('two games folders with a different disc at the same path both show it', () {
+    final roots = [temporaryFolder('retro-same-path-1'), temporaryFolder('retro-same-path-2')];
+    addTearDown(() {
+      for (final root in roots) {
+        root.deleteSync(recursive: true);
+      }
+    });
+    for (final (index, root) in roots.indexed) {
+      File(p.join(root.path, 'Game.bin')).writeAsBytesSync(List.filled(100 * (index + 1), 0));
+      File(p.join(root.path, 'Game.cue')).writeAsStringSync('FILE "Game.bin" BINARY\n  TRACK 01 MODE2/2352\n');
+    }
+    final games = GameLibrary.surveyAll([for (final root in roots) root.path], includeRetro: true, cache: RetroScanCache()).games;
+    expect(games, hasLength(2));
+    expect(games.map((game) => game.id).toSet(), hasLength(2));
   });
 
   test('a rescan reads a disc file again only when its size or modification time changed', () {
