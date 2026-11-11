@@ -566,9 +566,54 @@ class AddProfileView extends StatefulWidget {
 
 class _AddProfileViewState extends State<AddProfileView> {
   late final TextEditingController _name = TextEditingController(text: widget.model.profileFlow.name);
+  final FocusNode _node = FocusNode(debugLabel: 'profile name');
+
+  @override
+  void initState() {
+    super.initState();
+    _node.addListener(_focusChanged);
+  }
+
+  @override
+  void didUpdateWidget(AddProfileView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _follow();
+  }
+
+  /// The model says where the cursor is, as for a row's field: while the name is typed the keys
+  /// are the field's (space, Backspace and the letters that are shortcuts elsewhere), and the
+  /// launcher does not take the focus back.
+  void _follow() {
+    final editing = widget.model.editingRow == ProfileFlow.nameRow;
+    if (editing && !_node.hasFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.model.editingRow == ProfileFlow.nameRow) _node.requestFocus();
+      });
+    } else if (!editing && _node.hasFocus) {
+      _node.unfocus();
+    }
+  }
+
+  void _focusChanged() {
+    final model = widget.model;
+    if (_node.hasFocus) {
+      if (model.editingRow != ProfileFlow.nameRow) model.startEditing(ProfileFlow.nameRow);
+    } else if (model.editingRow == ProfileFlow.nameRow) {
+      model.stopEditing();
+    }
+  }
 
   @override
   void dispose() {
+    _node.removeListener(_focusChanged);
+    // Left while the name was typed: the keys go back to the launcher.
+    final model = widget.model;
+    if (model.editingRow == ProfileFlow.nameRow) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (model.editingRow == ProfileFlow.nameRow) model.stopEditing();
+      });
+    }
+    _node.dispose();
     _name.dispose();
     super.dispose();
   }
@@ -577,6 +622,7 @@ class _AddProfileViewState extends State<AddProfileView> {
   Widget build(BuildContext context) {
     final scale = LayoutScale.of(context);
     final model = widget.model;
+    final typing = model.editingRow == ProfileFlow.nameRow;
     return LayerScrim(
       opacity: 0.74,
       child: Padding(
@@ -601,11 +647,17 @@ class _AddProfileViewState extends State<AddProfileView> {
             ),
             SizedBox(height: 34 * scale),
             AnimatedOpacity(
-              opacity: model.profileFlow.modeChoice == 0 ? 1 : 0.45,
+              opacity: model.profileFlow.modeChoice == 0 || typing ? 1 : 0.45,
               duration: Motion.focus,
-              child: SizedBox(
+              child: AnimatedContainer(
+                duration: Motion.focus,
                 width: 430 * scale,
                 height: 56 * scale,
+                // The accent's edge while the name is typed, as a row's field has.
+                foregroundDecoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16 * scale),
+                  border: Border.all(color: typing ? model.accentChoice.color : Colors.transparent, width: 1.5 * scale),
+                ),
                 child: Glass(
                   radius: 16 * scale,
                   padding: EdgeInsets.symmetric(horizontal: 20 * scale),
@@ -615,8 +667,11 @@ class _AddProfileViewState extends State<AddProfileView> {
                       SizedBox(width: 14 * scale),
                       Expanded(
                         child: TextField(
+                          key: const ValueKey('profile-add-name'),
                           controller: _name,
+                          focusNode: _node,
                           onChanged: (text) => model.profileFlow.name = text,
+                          onSubmitted: (_) => model.stopEditing(),
                           style: AppText.display(20 * scale, weight: FontWeight.w500),
                           cursorColor: Colors.white,
                           decoration: InputDecoration.collapsed(

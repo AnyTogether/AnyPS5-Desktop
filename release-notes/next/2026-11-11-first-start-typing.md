@@ -1,0 +1,1 @@
+- **Add Profile's name can be typed without the mouse**. Up from the two cards puts the cursor in the name, and Enter or Esc gives the keys back to the cards. While the name is typed, space, Backspace and letters such as O, Q and E are the name's (before, they chose a card, went back or ran a shortcut, and the cursor could jump out of the field).
