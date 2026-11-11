@@ -2400,5 +2400,7 @@
   "retroShowFolders": "Klasör olarak göster",
   "retroDiscMoved": "Oyun dosyası bulunamadı. Dosyayı geri koy veya kitaplığı yeniden tara.",
   "retroEmulatorStartFailed": "%@ başlatılamadı",
-  "retroEmulatorExited": "%@, %d çıkış koduyla kapandı"
+  "retroEmulatorExited": "%@, %d çıkış koduyla kapandı",
+  "retroLibrary": "Emülatör oyunları",
+  "retroLibraryDetail": "Oyun klasörlerindeki PS1, PS2 ve PS3 oyunlarını listeler ve kurduğun bir emülatörde oynatır."
 }
