@@ -820,7 +820,12 @@ class TileRow extends StatelessWidget {
                         builder: (context, _) {
                           final focused = selected && rowFocused && model.focus.isTiles && model.overlay == null;
                           if (console != null) {
-                            return RetroFolderTile(console: console, size: size, focused: focused);
+                            return RetroFolderTile(
+                              console: console,
+                              size: size,
+                              focused: focused,
+                              accent: model.accentChoice.color,
+                            );
                           }
                           return GameTile(model: model, game: game, size: size, focused: focused);
                         },

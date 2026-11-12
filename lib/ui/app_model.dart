@@ -3018,7 +3018,6 @@ class AppModel extends ChangeNotifier {
     _forgetDiskFacts();
     // A game being deleted stays out of the library until its files are gone or came back.
     games = deletion.visible(found);
-    _adoptRetroIds();
     records.clear();
     trophies.clear();
     for (final game in games) {
@@ -3111,14 +3110,15 @@ class AppModel extends ChangeNotifier {
     if (game == null || sizes.containsKey(game.id) || _measuring) return;
     _measuring = true;
     unawaited(
-      _measure(game, services.folderSize)
-          .then((bytes) => sizes[game.id] = bytes, onError: (Object _) => sizes[game.id] = 0)
-          .whenComplete(() {
-            _measuring = false;
-            if (_disposed) return;
-            notifyListeners();
-            measureSelected();
-          }),
+      _measure(
+        game,
+        services.folderSize,
+      ).then((bytes) => sizes[game.id] = bytes, onError: (Object _) => sizes[game.id] = 0).whenComplete(() {
+        _measuring = false;
+        if (_disposed) return;
+        notifyListeners();
+        measureSelected();
+      }),
     );
   }
 

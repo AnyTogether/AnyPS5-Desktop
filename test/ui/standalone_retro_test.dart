@@ -189,7 +189,7 @@ void main() {
     expect(categories(), isNot(contains('emulators')));
   });
 
-  test('a disc beside others counts only its own files, and its last played follows the games folder', () async {
+  test('a disc beside others counts only its own files', () async {
     final fixture = makeFixture(withToolkit: false);
     final model = fixture.model;
     addTearDown(() {
@@ -201,15 +201,10 @@ void main() {
     File(p.join(shelf.path, 'A.cue')).writeAsStringSync('FILE "A.bin" BINARY\n  TRACK 01 MODE2/2352\n');
     File(p.join(shelf.path, 'B.bin')).writeAsBytesSync(List.filled(50000, 1));
     File(p.join(shelf.path, 'B.cue')).writeAsStringSync('FILE "B.bin" BINARY\n  TRACK 01 MODE2/2352\n');
-    final legacy = p.normalize(p.absolute(p.join(shelf.path, 'A.cue')));
-    model.preferences
-      ..retroLibrary = true
-      ..lastPlayed[legacy] = '2026-11-01T20:00:00.000';
+    model.preferences.retroLibrary = true;
     model.rescan();
     final a = model.games.singleWhere((game) => game.name == 'A');
     expect(a.id, 'retro:ps1:3042:PS1/A.cue');
-    expect(model.preferences.lastPlayed[a.id], '2026-11-01T20:00:00.000');
-    expect(model.preferences.lastPlayed, isNot(contains(legacy)));
 
     model.select(model.games.indexOf(a));
     await pumpEventQueue();

@@ -22,6 +22,8 @@ and its action opens the file picker.
 [Game discovery](../lib/core/game_library.dart) recognizes PS1 cue sheets
 with local tracks, PBP files and local M3U playlists, PS2 ISO images with
 a PS2 boot entry, and CHD images under a console-named PS1 or PS2 folder.
+Any cue sheet with a data track outside a PS2 folder, and any PBP (PSP ones
+included), is listed as PS1.
 [PS3 disc discovery](../lib/core/ps3_disc.dart) reads the title from
 `PS3_GAME/PARAM.SFO` in an extracted disc folder. The file
 `PS3_GAME/USRDIR/EBOOT.BIN` is the RPCS3 launch target. A PS1 or PS2 game
@@ -52,10 +54,6 @@ both list them. When a drive letter or mount point changes and the same
 games folder is added again, the identifier stays the same, so last played
 and the measured size follow the game. The title ID of a loose disc is
 derived from that identifier.
-
-Last-played entries saved under the earlier identifier (the disc's
-absolute path for loose files, or the folder for `retro.json` and PS3
-folders) are moved to the new one on the next scan.
 
 Disc images that share a folder each list their own `Game.files`: a cue
 sheet and its tracks, or a playlist with every listed sheet and its

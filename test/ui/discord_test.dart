@@ -1,4 +1,7 @@
 import 'package:anyps5_desktop/core/discord_presence.dart';
+import 'package:anyps5_desktop/core/game_library.dart';
+import 'package:anyps5_desktop/core/game_process.dart';
+import 'package:anyps5_desktop/core/together/socket.dart';
 import 'package:anyps5_desktop/core/together/parties.dart';
 import 'package:anyps5_desktop/ui/app_model.dart' hide Command, GameState;
 import 'package:anyps5_desktop/ui/strings.dart';
@@ -6,6 +9,7 @@ import 'package:anyps5_desktop/ui/together_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../core/discord_presence_test.dart' show FakePipe;
+import '../support/fake_process.dart';
 import '../support/fake_together.dart';
 import '../support/ui_support.dart';
 
@@ -104,6 +108,31 @@ void main() {
     toggle.set(false);
     await until(() => frames.last.$1 == 1 && (frames.last.$2['args'] as Map)['activity'] == null);
     expect(model.preferences.discordPresence, isFalse);
+    expect(model.discord.shown, isNull);
+  });
+
+  test('an emulator game reaches neither Discord nor AnyTogether presence', () async {
+    final process = FakeGameProcess();
+    addTearDown(process.quit);
+    final disc = Game(
+      folder: 'retro',
+      titleId: 'retro-ps1-0123456789',
+      name: 'Crash Team Racing (USA).cue',
+      names: const {},
+      defaultLanguage: 'en-US',
+      version: '',
+      executable: ExecutableKind.disc,
+      retro: (platform: RetroPlatform.ps1, path: 'Crash Team Racing (USA).cue'),
+    );
+    for (var tries = 0; tries < 300 && !model.together.connected; tries++) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    model.running = (disc, RunningGame(process, process.exitCode, DateTime.now()));
+    model.together.gameChanged();
+    model.discord.update();
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(model.together.hub.socket.presence, isA<PresenceOnline>());
+    expect(frames.where((frame) => '${frame.$2}'.contains('Crash Team Racing')), isEmpty);
     expect(model.discord.shown, isNull);
   });
 
