@@ -89,6 +89,7 @@ extension LauncherProfiles on AppModel {
     'replaySeconds',
     'shortcuts',
     'lastPlayed',
+    'retroLastDisc',
     'compatNever',
     'compatAsked',
   };

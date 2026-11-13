@@ -352,6 +352,22 @@ abstract final class GameLibrary {
     ];
   }
 
+  /// Paths in core order. Reject the whole playlist if a disc is missing.
+  static List<String> ps1PlaylistDiscs(String path) {
+    final file = File(path);
+    if (file.lengthSync() > 64 * 1024) return const [];
+    final folder = p.dirname(path);
+    final tracks = <String>[];
+    for (final line in const LineSplitter().convert(_text(file.readAsBytesSync()))) {
+      final name = line.trim();
+      if (name.isEmpty || name.startsWith('#')) continue;
+      final track = _localDiscFile(folder, name);
+      if (track == null || tracks.length == 128) return const [];
+      tracks.add(track);
+    }
+    return tracks;
+  }
+
   static String? _localDiscFile(String folder, String name) {
     if (p.isAbsolute(name) || p.windows.isAbsolute(name) || name.contains(':')) return null;
     final path = p.normalize(p.join(folder, name.replaceAll(r'\', p.separator)));

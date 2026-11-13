@@ -1,0 +1,8 @@
+find_package(Threads REQUIRED)
+add_library(anyps5_retro STATIC retro_frame.cpp retro_library.cpp retro_session.cpp)
+target_compile_features(anyps5_retro PUBLIC cxx_std_17)
+target_include_directories(anyps5_retro PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(anyps5_retro PRIVATE ${CMAKE_DL_LIBS} Threads::Threads)
+if(WIN32)
+  target_compile_definitions(anyps5_retro PRIVATE NOMINMAX)
+endif()

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.18)
 project(runner LANGUAGES CXX)
 
 # Define the application target. To change its name, change BINARY_NAME in the
@@ -9,6 +9,7 @@ project(runner LANGUAGES CXX)
 add_executable(${BINARY_NAME} WIN32
   "flutter_window.cpp"
   "main.cpp"
+  "retro_core_host.cpp"
   "utils.cpp"
   "win32_window.cpp"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
@@ -51,10 +52,12 @@ target_link_libraries(recycle PRIVATE shell32 ole32)
 
 # Add dependency libraries and include directories. Add any application-specific
 # dependencies here.
-target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
+add_subdirectory("${CMAKE_SOURCE_DIR}/../native/retro" "${CMAKE_CURRENT_BINARY_DIR}/retro")
+target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app flutter_wrapper_plugin anyps5_retro)
 target_link_libraries(${BINARY_NAME} PRIVATE now_playing)
 target_link_libraries(${BINARY_NAME} PRIVATE recycle)
-target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
+target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib" "dxgi.lib" "gdi32.lib" "winmm.lib" "d3d11.lib" "d3dcompiler.lib")
+target_link_options(${BINARY_NAME} PRIVATE "/STACK:8388608")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
