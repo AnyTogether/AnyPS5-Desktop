@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:anyps5_desktop/core/libmpv.dart';
 import 'package:anyps5_desktop/core/together/messages.dart';
 import 'package:anyps5_desktop/core/together/posts.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
@@ -237,6 +238,79 @@ void main() {
         '/opt/anyps5-desktop/lib/libmpv.so.1',
       );
       expect(MediaKitClipPlayback.libmpvIn(['7f40-7f50 rw-p 00000000 00:00 0 [heap]']), isNull);
+    });
+  });
+
+  group('Linux without libmpv: the clip says how to install it', () {
+    Future<List<String>> pump(WidgetTester tester, List<String> commands) async {
+      final handed = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Center(
+            child: SizedBox(
+              width: 960,
+              height: 540,
+              child: ClipPlayerView(
+                source: '/v/clip.mp4',
+                create: () => throw LibmpvMissing(commands),
+                onFailed: handed.add,
+                accent: Colors.blue,
+                poster: const ColoredBox(key: ValueKey('poster'), color: Colors.teal),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return handed;
+    }
+
+    testWidgets('the picture stays, with what is missing and the command for this system', (tester) async {
+      final handed = await pump(tester, ['sudo apt install libmpv2']);
+      expect(find.byKey(const ValueKey('poster')), findsOneWidget);
+      expect(find.byKey(const ValueKey('libmpv-missing')), findsOneWidget);
+      expect(find.text('Clips need libmpv'), findsOneWidget);
+      expect(find.textContaining("your system's libmpv"), findsOneWidget);
+      expect(find.text('sudo apt install libmpv2'), findsOneWidget);
+      expect(find.byKey(const ValueKey('clip-bar')), findsNothing);
+      // Not handed to the system's player by itself: only when asked.
+      expect(handed, isEmpty);
+      await tester.tap(find.byKey(const ValueKey('libmpv-elsewhere')));
+      await tester.pump();
+      expect(handed, ['/v/clip.mp4']);
+    });
+
+    testWidgets('a distribution it does not know: a line for each family', (tester) async {
+      await pump(tester, SystemLibmpv.all);
+      for (final command in SystemLibmpv.all) {
+        expect(find.text(command), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the copy button copies the command', (tester) async {
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') copied = (call.arguments as Map)['text'] as String?;
+        return null;
+      });
+      addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+      await pump(tester, ['sudo pacman -S mpv']);
+      expect(find.byIcon(Icons.content_copy_rounded), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('libmpv-copy-sudo pacman -S mpv')));
+      await tester.pump();
+      expect(copied, 'sudo pacman -S mpv');
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.byIcon(Icons.content_copy_rounded), findsOneWidget);
+    });
+
+    testWidgets('in Turkish', (tester) async {
+      T.language = Language.byCode('tr');
+      addTearDown(() => T.language = Language.english);
+      await pump(tester, ['sudo apt install libmpv1']);
+      expect(find.text('Klipler için libmpv gerekli'), findsOneWidget);
+      expect(find.text('Başka bir oynatıcıda aç'), findsOneWidget);
     });
   });
 

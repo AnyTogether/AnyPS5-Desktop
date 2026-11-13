@@ -1,1 +1,0 @@
-- **Do Not Disturb is quiet now**, as on the Mac: a message, a friend request, a party invite, a game invite, a Play Together offer and a share play invite come in without a sound while you are on Do Not Disturb (the toast still says them). Off Do Not Disturb a share play invite now brings the notice sound behind another window, like the other invites.

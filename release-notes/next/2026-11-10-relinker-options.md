@@ -1,1 +1,0 @@
-- **Relinker options per game.** A game's Advanced settings have a Rebuild options section with Trace system library calls (`--trace-imports`), so detailed logging can record the game's system library calls. It is used on the game's next rebuild (Unlock again). An engine that does not have it says so, and the game is rebuilt without it.

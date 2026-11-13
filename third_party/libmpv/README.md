@@ -8,6 +8,9 @@ The clip player (media_kit) plays through libmpv. On Windows `media_kit_libs_win
 as the DLL's own configuration strings show), where its source is, and holds the LGPL version 3, the
 GPL version 3 and mpv's Copyright file. Change it when the media_kit package brings a different libmpv.
 
-On Linux the bundle copies the build machine's libmpv with its packages' copyright files to `lib/licenses/`,
-and to `lib/licenses/common-licenses/` the long licence texts those files only name
-(packaging/linux/bundle-libmpv.sh).
+On Linux no package carries a libmpv: the launcher (GPL-2.0-only) uses the one the system's package
+manager installs (the .deb depends on `libmpv2 | libmpv1`, the Arch package on `mpv`), and the clip
+player's plugin reaches it through `libanyps5_mpv.so` (linux/mpv_shim). The 0.1.21 nightlies of 9 and 10
+November 2026 carried Ubuntu 22.04's libmpv1 in the bundle, with the 129 libraries it links (FFmpeg
+built with `--enable-gpl`, and libcdio and libcdio-paranoia under the GPL version 3 or later among
+them), which a GPL-2.0-only program cannot ship with. No stable release did.

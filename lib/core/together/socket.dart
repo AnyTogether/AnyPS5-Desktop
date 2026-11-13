@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import '../now_playing.dart';
 import 'account.dart';
 import 'notifier.dart';
 
@@ -121,6 +122,23 @@ class TogetherSocket with Notifier {
     _heartbeat();
   }
 
+  Listening? _listening;
+
+  /// What friends see this user listening to (Settings › Behaviour › Show friends what I'm
+  /// listening to): null while nothing plays or the setting is off.
+  Listening? get listening => _listening;
+
+  /// Sent at once when it changes, and with every heartbeat while there is one.
+  set listening(Listening? next) {
+    if (next == _listening) return;
+    _listening = next;
+    _heartbeat();
+  }
+
+  /// The heartbeat's presence: what the launcher does, and `listening` only while there is
+  /// something to show (a gateway before it ignores the field).
+  Map<String, Object?> get presenceFrame => {..._presence.json, 'listening': ?_listening?.json};
+
   /// Sends a frame while connected; false when it could not go.
   bool send(Map<String, dynamic> frame) {
     final socket = _socket;
@@ -129,7 +147,7 @@ class TogetherSocket with Notifier {
     return true;
   }
 
-  void _heartbeat() => send({'op': 'heartbeat', 'presence': _presence.json});
+  void _heartbeat() => send({'op': 'heartbeat', 'presence': presenceFrame});
 
   List<String> _topics = const [];
 

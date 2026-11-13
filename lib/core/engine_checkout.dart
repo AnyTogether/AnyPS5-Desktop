@@ -129,6 +129,18 @@ class EngineCheckout {
     '-DCMAKE_CXX_COMPILER=$cxxCompiler',
   ];
 
+  /// The configure with other compilers than gcc and g++ (gcc-12 and g++-12 where the system's
+  /// own GCC is older than the engine needs, as AnyPS5-ARM's guide does on Ubuntu 22.04).
+  static List<String> configureWith(String c, String cxx) => [
+    for (final argument in configureArguments)
+      if (argument.startsWith('-DCMAKE_C_COMPILER='))
+        '-DCMAKE_C_COMPILER=$c'
+      else if (argument.startsWith('-DCMAKE_CXX_COMPILER='))
+        '-DCMAKE_CXX_COMPILER=$cxx'
+      else
+        argument,
+  ];
+
   /// The build folder's CMakeCache.txt entries (NAME:TYPE=value), read once.
   late final Map<String, String> cache = () {
     final folder = buildFolder;
@@ -272,6 +284,267 @@ class SystemCommands extends CommandRunner {
   }
 }
 
+/// Something Update from Git needs on this computer before it pulls and builds.
+enum BuildNeed {
+  git,
+  cmake,
+
+  /// Ninja: setting up a build folder needs it.
+  ninja,
+
+  /// A C and C++ compiler (gcc and g++; MinGW-w64's on Windows): setting up a build folder needs
+  /// them.
+  compiler,
+
+  /// Linux: the system's GCC is older than [BuildTools.minimumGcc] and no gcc-12 stands in.
+  newerCompiler,
+
+  /// Linux: the X11, Xext and XRandR development files, without which the bundled SDL's setup
+  /// fails (upstream's build guide).
+  x11,
+}
+
+/// One thing that is missing; [found] is the version there, for a compiler too old.
+class MissingNeed {
+  const MissingNeed(this.need, [this.found]);
+  final BuildNeed need;
+  final String? found;
+
+  @override
+  bool operator ==(Object other) => other is MissingNeed && other.need == need && other.found == found;
+
+  @override
+  int get hashCode => Object.hash(need, found);
+
+  @override
+  String toString() => found == null ? need.name : '${need.name} ($found)';
+}
+
+/// A command that installs some of what is missing, as the user would type it.
+class InstallCommand {
+  const InstallCommand(
+    this.executable,
+    this.arguments, {
+    required this.needs,
+    this.admin = false,
+    this.runnable = false,
+  });
+
+  final String executable;
+  final List<String> arguments;
+
+  /// What it installs.
+  final List<BuildNeed> needs;
+
+  /// It asks for administrator rights (sudo, or an installer that raises itself): the launcher
+  /// shows it to copy and never runs it.
+  final bool admin;
+
+  /// The launcher may run it: a package manager installing for the user only.
+  final bool runnable;
+
+  String get line => [executable, ...arguments].join(' ');
+
+  @override
+  String toString() => line;
+}
+
+/// What the build guides install, and the commands that install it on each system.
+abstract final class BuildTools {
+  /// The oldest GCC AnyPS5-ARM's guide builds the tree with on Linux (Ubuntu 22.04's g++-12).
+  static const minimumGcc = 12;
+
+  /// The WinLibs build the guide and the Release workflow use (GCC 15.2.0, UCRT, POSIX threads),
+  /// by its winget version. It carries gcc, g++, CMake and Ninja.
+  static const winLibsId = 'BrechtSanders.WinLibs.POSIX.UCRT';
+  static const winLibsVersion = '15.2.0-14.0.0-r7';
+
+  /// The pkg-config modules of [BuildNeed.x11].
+  static const x11Modules = ['x11', 'xext', 'xrandr'];
+
+  static const _winget = ['--accept-source-agreements', '--accept-package-agreements'];
+
+  /// The package manager of a Linux system from its /etc/os-release: apt, dnf or pacman; null
+  /// for one the launcher has no command for.
+  static String? linuxManager(String? osRelease) {
+    final ids = <String>{};
+    for (final line in (osRelease ?? '').split('\n')) {
+      final match = RegExp(r'^(ID|ID_LIKE)=(.*)$').firstMatch(line.trim());
+      if (match == null) continue;
+      ids.addAll(match.group(2)!.replaceAll('"', '').replaceAll("'", '').toLowerCase().split(RegExp(r'\s+')));
+    }
+    if (ids.any(const {'debian', 'ubuntu', 'linuxmint', 'pop', 'raspbian'}.contains)) return 'apt';
+    if (ids.any(const {'fedora', 'rhel', 'centos', 'rocky', 'almalinux', 'nobara'}.contains)) return 'dnf';
+    if (ids.any(const {'arch', 'manjaro', 'endeavouros', 'cachyos'}.contains)) return 'pacman';
+    return null;
+  }
+
+  /// The system's packages for each need, by package manager. The development files are the ones
+  /// the build guides list for the bundled SDL (X11, Wayland, audio) and Vulkan.
+  static const _linuxPackages = <String, Map<BuildNeed, List<String>>>{
+    'apt': {
+      BuildNeed.git: ['git'],
+      BuildNeed.cmake: ['cmake'],
+      BuildNeed.ninja: ['ninja-build'],
+      BuildNeed.compiler: ['gcc', 'g++'],
+      BuildNeed.newerCompiler: ['gcc-12', 'g++-12'],
+      BuildNeed.x11: [
+        'pkg-config',
+        'libx11-dev',
+        'libxext-dev',
+        'libxrandr-dev',
+        'libwayland-dev',
+        'libxkbcommon-dev',
+        'libegl-dev',
+        'libdecor-0-dev',
+        'libpipewire-0.3-dev',
+        'libpulse-dev',
+        'libasound2-dev',
+        'libvulkan-dev',
+      ],
+    },
+    'dnf': {
+      BuildNeed.git: ['git'],
+      BuildNeed.cmake: ['cmake'],
+      BuildNeed.ninja: ['ninja-build'],
+      BuildNeed.compiler: ['gcc', 'gcc-c++'],
+      BuildNeed.newerCompiler: ['gcc', 'gcc-c++'],
+      BuildNeed.x11: [
+        'pkgconf-pkg-config',
+        'libX11-devel',
+        'libXext-devel',
+        'libXrandr-devel',
+        'wayland-devel',
+        'libxkbcommon-devel',
+        'mesa-libEGL-devel',
+        'libdecor-devel',
+        'pipewire-devel',
+        'pulseaudio-libs-devel',
+        'alsa-lib-devel',
+        'vulkan-loader-devel',
+      ],
+    },
+    'pacman': {
+      BuildNeed.git: ['git'],
+      BuildNeed.cmake: ['cmake'],
+      BuildNeed.ninja: ['ninja'],
+      BuildNeed.compiler: ['gcc'],
+      BuildNeed.newerCompiler: ['gcc'],
+      BuildNeed.x11: [
+        'pkgconf',
+        'libx11',
+        'libxext',
+        'libxrandr',
+        'wayland',
+        'libxkbcommon',
+        'libglvnd',
+        'libdecor',
+        'pipewire',
+        'libpulse',
+        'alsa-lib',
+        'vulkan-headers',
+      ],
+    },
+  };
+
+  /// The commands that install [missing] on [system]. Windows: winget's (WinLibs brings gcc, g++,
+  /// CMake and Ninja at once and, like Ninja's own package, installs for the user, so the
+  /// launcher may run it; Git's installer raises itself), or Scoop's where only Scoop is there.
+  /// Linux: one sudo line for the system's package manager, to copy. None for a Linux system
+  /// whose package manager the launcher does not know: the build guide says what to install.
+  static List<InstallCommand> fixes(
+    HostSystem system,
+    List<MissingNeed> missing, {
+    String? osRelease,
+    bool winget = true,
+    bool scoop = false,
+  }) {
+    final needs = {for (final entry in missing) entry.need};
+    if (needs.isEmpty) return const [];
+    if (system == HostSystem.windows) {
+      if (!winget && scoop) {
+        final packages = [
+          if (needs.contains(BuildNeed.git)) 'git',
+          if (needs.contains(BuildNeed.compiler)) 'mingw-winlibs',
+          if (needs.contains(BuildNeed.cmake)) 'cmake',
+          if (needs.contains(BuildNeed.ninja)) 'ninja',
+        ];
+        return [
+          InstallCommand(
+            'scoop',
+            ['install', ...packages],
+            needs: [
+              for (final need in BuildNeed.values)
+                if (needs.contains(need)) need,
+            ],
+          ),
+        ];
+      }
+      final withCompiler = needs.contains(BuildNeed.compiler);
+      return [
+        if (needs.contains(BuildNeed.git))
+          const InstallCommand(
+            'winget',
+            ['install', '-e', '--id', 'Git.Git', ..._winget],
+            needs: [BuildNeed.git],
+            admin: true,
+          ),
+        if (withCompiler)
+          InstallCommand(
+            'winget',
+            const ['install', '-e', '--id', winLibsId, '--version', winLibsVersion, ..._winget],
+            needs: [
+              BuildNeed.compiler,
+              if (needs.contains(BuildNeed.cmake)) BuildNeed.cmake,
+              if (needs.contains(BuildNeed.ninja)) BuildNeed.ninja,
+            ],
+            runnable: true,
+          ),
+        if (!withCompiler && needs.contains(BuildNeed.cmake))
+          const InstallCommand(
+            'winget',
+            ['install', '-e', '--id', 'Kitware.CMake', ..._winget],
+            needs: [BuildNeed.cmake],
+          ),
+        if (!withCompiler && needs.contains(BuildNeed.ninja))
+          const InstallCommand(
+            'winget',
+            ['install', '-e', '--id', 'Ninja-build.Ninja', ..._winget],
+            needs: [BuildNeed.ninja],
+            runnable: true,
+          ),
+      ];
+    }
+    final manager = linuxManager(osRelease);
+    final packages = _linuxPackages[manager];
+    if (manager == null || packages == null) return const [];
+    final wanted = <String>[];
+    final covered = <BuildNeed>[];
+    for (final need in BuildNeed.values) {
+      if (!needs.contains(need)) continue;
+      covered.add(need);
+      for (final package in packages[need] ?? const <String>[]) {
+        if (!wanted.contains(package)) wanted.add(package);
+      }
+    }
+    final arguments = switch (manager) {
+      'apt' => ['apt-get', 'install', '-y', ...wanted],
+      'dnf' => ['dnf', 'install', '-y', ...wanted],
+      _ => ['pacman', '-S', '--needed', ...wanted],
+    };
+    return [InstallCommand('sudo', arguments, needs: covered, admin: true)];
+  }
+
+  /// The major version in what `g++ --version` printed ("g++ (Ubuntu 11.4.0-1ubuntu1) 11.4.0"):
+  /// (11, "11.4.0"); null when it cannot be read.
+  static (int, String)? gccVersion(List<String> lines) {
+    final first = lines.firstWhere((line) => line.trim().isNotEmpty, orElse: () => '');
+    final match = RegExp(r'(\d+)\.\d+(?:\.\d+)?(?!.*\d+\.\d+)').firstMatch(first);
+    if (match == null) return null;
+    return (int.parse(match.group(1)!), match.group(0)!);
+  }
+}
+
 /// The steps of an update from git; [configuring] only for a checkout without a build folder.
 enum GitStep { checking, pulling, submodules, configuring, building }
 
@@ -288,6 +561,10 @@ enum GitFailureKind {
 
   /// No C++ compiler (g++) on PATH: setting up a build folder needs it.
   noCompiler,
+
+  /// One or more of what the update needs is missing ([GitUpdateFailure.missing] lists them all):
+  /// found before anything is pulled.
+  prerequisites,
 
   /// The folder is not a git checkout.
   notGit,
@@ -315,9 +592,12 @@ enum GitFailureKind {
 }
 
 class GitUpdateFailure implements Exception {
-  const GitUpdateFailure(this.kind, [this.tail = const []]);
+  const GitUpdateFailure(this.kind, [this.tail = const [], this.missing = const []]);
 
   final GitFailureKind kind;
+
+  /// Everything that is missing, for [GitFailureKind.prerequisites].
+  final List<MissingNeed> missing;
 
   /// The last lines the failing command printed.
   final List<String> tail;
@@ -331,6 +611,7 @@ class GitUpdateFailure implements Exception {
     GitFailureKind.noCmake,
     GitFailureKind.noNinja,
     GitFailureKind.noCompiler,
+    GitFailureKind.prerequisites,
     GitFailureKind.configure,
   }.contains(kind);
 
@@ -352,12 +633,220 @@ class GitUpdateResult {
 /// A checkout without a build folder gets one first, as the build guides set it up
 /// ([EngineCheckout.configureArguments]), once Ninja and a C++ compiler are found.
 class EngineGit {
-  EngineGit(this.checkout, {this.runner = const SystemCommands(), Map<String, String>? environment})
-    : _environment = environment ?? Platform.environment;
+  EngineGit(
+    this.checkout, {
+    this.runner = const SystemCommands(),
+    Map<String, String>? environment,
+    String? Function()? osRelease,
+  }) : _environment = environment ?? Platform.environment,
+       _osRelease = osRelease ?? _readOsRelease;
 
   final EngineCheckout checkout;
   final CommandRunner runner;
   final Map<String, String> _environment;
+  final String? Function() _osRelease;
+
+  static String? _readOsRelease() {
+    try {
+      return File('/etc/os-release').readAsStringSync();
+    } on FileSystemException {
+      return null;
+    }
+  }
+
+  /// Windows: the folders of PATH as the system has them now (the registry's, which a package
+  /// manager changes while the launcher runs), then the launcher's own; null until
+  /// [missingNeeds] read them, and elsewhere.
+  List<String>? _path;
+
+  /// The C and C++ compilers the build folder is set up with: gcc and g++, or gcc-12 and g++-12
+  /// on a Linux whose own GCC is too old ([missingNeeds] decides).
+  (String, String) _compilers = (EngineCheckout.cCompiler, EngineCheckout.cxxCompiler);
+
+  String get _pathKey => _environment.keys.firstWhere((name) => name.toUpperCase() == 'PATH', orElse: () => 'PATH');
+
+  /// PATH as read again, for every command; nothing where it was not.
+  Map<String, String> get _pathEnvironment => switch (_path) {
+    final List<String> folders => {_pathKey: folders.join(';')},
+    null => const {},
+  };
+
+  /// [tool] by its full path when the PATH read again has it (a program installed since the
+  /// launcher started is not on the launcher's own PATH, which Windows starts programs from).
+  String _resolve(String tool) {
+    final folders = _path;
+    if (folders == null || p.basename(tool) != tool) return tool;
+    for (final folder in folders) {
+      for (final ending in const ['.exe', '.cmd', '.bat', '']) {
+        final candidate = p.join(folder, '$tool$ending');
+        if (File(candidate).existsSync()) return candidate;
+      }
+    }
+    return tool;
+  }
+
+  /// Reads PATH again from the registry (the machine's, then the user's), with its %NAMES%
+  /// filled in: what a new terminal would get.
+  Future<void> _refreshPath(CommandCancel? cancel) async {
+    if (checkout.system != HostSystem.windows) return;
+    String expand(String text) => text.replaceAllMapped(RegExp('%([^%]+)%'), (match) {
+      final name = match.group(1)!.toUpperCase();
+      for (final MapEntry(:key, :value) in _environment.entries) {
+        if (key.toUpperCase() == name) return value;
+      }
+      return match.group(0)!;
+    });
+    final folders = <String>[];
+    void add(Iterable<String> more) {
+      for (final folder in more) {
+        final trimmed = folder.trim();
+        if (trimmed.isNotEmpty && !folders.any((known) => known.toLowerCase() == trimmed.toLowerCase())) {
+          folders.add(trimmed);
+        }
+      }
+    }
+
+    var read = false;
+    for (final key in const [
+      r'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment',
+      r'HKCU\Environment',
+    ]) {
+      try {
+        final (code, lines) = await _run(
+          'reg',
+          ['query', key, '/v', 'Path'],
+          missing: GitFailureKind.prerequisites,
+          cancel: cancel,
+          quiet: true,
+        );
+        if (code != 0) continue;
+        for (final line in lines) {
+          final match = RegExp(r'^\s*Path\s+REG_(?:EXPAND_)?SZ\s+(.*)$', caseSensitive: false).firstMatch(line);
+          if (match == null) continue;
+          add(expand(match.group(1)!).split(';'));
+          read = true;
+        }
+      } on GitUpdateFailure catch (stopped) {
+        if (stopped.kind == GitFailureKind.cancelled) rethrow;
+      }
+    }
+    if (!read) return;
+    add((_environment[_pathKey] ?? '').split(';'));
+    _path = folders;
+  }
+
+  /// Everything the update needs that is not there, looked for at once and before anything is
+  /// pulled: Git and CMake always; for a checkout without a build folder also Ninja, the C and
+  /// C++ compilers (on Linux GCC [BuildTools.minimumGcc] or newer, gcc-12 standing in for an
+  /// older system GCC) and, on Linux, the X11 development files. On Windows PATH is read again
+  /// first, so what was installed since the launcher started is found without restarting it.
+  Future<List<MissingNeed>> missingNeeds({CommandCancel? cancel}) async {
+    await _refreshPath(cancel);
+    Future<List<String>?> probe(String tool, List<String> arguments, {Map<String, String>? environment}) async {
+      try {
+        final (code, lines) = await _run(
+          tool,
+          arguments,
+          missing: GitFailureKind.prerequisites,
+          environment: environment,
+          cancel: cancel,
+          quiet: true,
+        );
+        return code == 0 ? lines : null;
+      } on GitUpdateFailure catch (stopped) {
+        if (stopped.kind == GitFailureKind.cancelled) rethrow;
+        return null;
+      }
+    }
+
+    final missing = <MissingNeed>[];
+    if (await probe('git', ['--version'], environment: gitEnvironment) == null) {
+      missing.add(const MissingNeed(BuildNeed.git));
+    }
+    if (await probe(checkout.cmake, ['--version'], environment: buildEnvironment) == null) {
+      missing.add(const MissingNeed(BuildNeed.cmake));
+    }
+    _compilers = (EngineCheckout.cCompiler, EngineCheckout.cxxCompiler);
+    if (checkout.buildFolder != null) return missing;
+    // What the build folder's setup needs beside CMake.
+    if (await probe('ninja', ['--version']) == null) missing.add(const MissingNeed(BuildNeed.ninja));
+    final cxx = await probe(EngineCheckout.cxxCompiler, ['--version']);
+    final c = await probe(EngineCheckout.cCompiler, ['--version']);
+    if (cxx == null || c == null) {
+      missing.add(const MissingNeed(BuildNeed.compiler));
+    } else if (checkout.system == HostSystem.linux) {
+      if (BuildTools.gccVersion(cxx) case (final major, final version) when major < BuildTools.minimumGcc) {
+        // The guide's own way on Ubuntu 22.04: gcc-12 and g++-12 beside the system's GCC.
+        const newer = ('gcc-${BuildTools.minimumGcc}', 'g++-${BuildTools.minimumGcc}');
+        if (await probe(newer.$2, ['--version']) != null && await probe(newer.$1, ['--version']) != null) {
+          _compilers = newer;
+        } else {
+          missing.add(MissingNeed(BuildNeed.newerCompiler, version));
+        }
+      }
+    }
+    if (checkout.system == HostSystem.linux) {
+      try {
+        final (code, _) = await _run(
+          'pkg-config',
+          ['--exists', ...BuildTools.x11Modules],
+          missing: GitFailureKind.prerequisites,
+          cancel: cancel,
+          quiet: true,
+        );
+        if (code != 0) missing.add(const MissingNeed(BuildNeed.x11));
+      } on GitUpdateFailure catch (stopped) {
+        if (stopped.kind == GitFailureKind.cancelled) rethrow;
+        // No pkg-config to ask: CMake's setup says what it lacks.
+      }
+    }
+    return missing;
+  }
+
+  /// The commands that install [missing] here: winget's on Windows (Scoop's where only Scoop is
+  /// installed), the system's package manager's on Linux.
+  Future<List<InstallCommand>> fixes(List<MissingNeed> missing, {CommandCancel? cancel}) async {
+    if (missing.isEmpty) return const [];
+    if (checkout.system != HostSystem.windows) {
+      return BuildTools.fixes(checkout.system, missing, osRelease: _osRelease());
+    }
+    Future<bool> has(String tool) async {
+      try {
+        final (code, _) = await _run(
+          tool,
+          ['--version'],
+          missing: GitFailureKind.prerequisites,
+          cancel: cancel,
+          quiet: true,
+        );
+        return code == 0;
+      } on GitUpdateFailure {
+        return false;
+      }
+    }
+
+    final winget = await has('winget');
+    return BuildTools.fixes(checkout.system, missing, winget: winget, scoop: !winget && await has('scoop'));
+  }
+
+  /// Runs [command] (a package manager installing for the user) and hands its lines; true when
+  /// it went through. Never one that asks for administrator rights.
+  Future<bool> install(InstallCommand command, {void Function(String line)? onLine, CommandCancel? cancel}) async {
+    if (!command.runnable || command.admin) return false;
+    output.clear();
+    try {
+      final (code, _) = await _run(
+        command.executable,
+        command.arguments,
+        missing: GitFailureKind.prerequisites,
+        onLine: onLine,
+        cancel: cancel,
+      );
+      return code == 0;
+    } on GitUpdateFailure {
+      return false;
+    }
+  }
 
   /// The most lines kept of what the commands printed.
   static const keptLines = 400;
@@ -371,6 +860,7 @@ class EngineGit {
   /// git asks nothing on a terminal the launcher does not have: a remote that wants a password
   /// fails instead of waiting forever.
   Map<String, String> get gitEnvironment => {
+    ..._pathEnvironment,
     'GIT_TERMINAL_PROMPT': '0',
     'GCM_INTERACTIVE': 'never',
     if (!_environment.containsKey('GIT_SSH_COMMAND') && !_environment.containsKey('GIT_SSH'))
@@ -382,10 +872,10 @@ class EngineGit {
 
   Map<String, String> _buildEnvironment(EngineCheckout checkout) {
     final folders = checkout.pathFolders;
-    if (folders.isEmpty) return const {};
+    if (folders.isEmpty) return _pathEnvironment;
     final windows = checkout.system == HostSystem.windows;
-    final key = _environment.keys.firstWhere((name) => name.toUpperCase() == 'PATH', orElse: () => 'PATH');
-    final rest = _environment[key];
+    final key = _pathKey;
+    final rest = _path?.join(';') ?? _environment[key];
     return {
       key: [...folders, if (rest != null && rest.isNotEmpty) rest].join(windows ? ';' : ':'),
     };
@@ -413,10 +903,10 @@ class EngineGit {
     final int code;
     try {
       code = await runner.run(
-        executable,
+        _resolve(executable),
         arguments,
         workingDirectory: checkout.root,
-        environment: environment,
+        environment: environment ?? (_path == null ? null : _pathEnvironment),
         cancel: cancel,
         onLine: (line) {
           lines.add(line);
@@ -465,37 +955,12 @@ class EngineGit {
   }) async {
     output.clear();
     onStep?.call(GitStep.checking);
-    final (gitCode, gitLines) = await _run(
-      'git',
-      ['--version'],
-      missing: GitFailureKind.noGit,
-      environment: gitEnvironment,
-      cancel: cancel,
-      quiet: true,
-    );
-    if (gitCode != 0) throw GitUpdateFailure(GitFailureKind.noGit, _tail(gitLines));
+    // Everything the update needs, looked for at once: one answer names all that is missing.
+    final missing = await missingNeeds(cancel: cancel);
+    if (missing.isNotEmpty) throw GitUpdateFailure(GitFailureKind.prerequisites, const [], missing);
     final cmake = checkout.cmake;
-    final (cmakeCode, cmakeLines) = await _run(
-      cmake,
-      ['--version'],
-      missing: GitFailureKind.noCmake,
-      environment: buildEnvironment,
-      cancel: cancel,
-      quiet: true,
-    );
-    if (cmakeCode != 0) throw GitUpdateFailure(GitFailureKind.noCmake, _tail(cmakeLines));
     if (!checkout.isGit) throw const GitUpdateFailure(GitFailureKind.notGit);
     final configure = checkout.buildFolder == null;
-    if (configure) {
-      // What the build folder's setup needs beside CMake, looked for before anything is pulled.
-      for (final (tool, missing) in [
-        ('ninja', GitFailureKind.noNinja),
-        (EngineCheckout.cxxCompiler, GitFailureKind.noCompiler),
-      ]) {
-        final (code, lines) = await _run(tool, ['--version'], missing: missing, cancel: cancel, quiet: true);
-        if (code != 0) throw GitUpdateFailure(missing, _tail(lines));
-      }
-    }
     final (statusCode, changes) = await _run(
       'git',
       ['status', '--porcelain', '--untracked-files=no'],
@@ -539,7 +1004,7 @@ class EngineGit {
       try {
         final (configureCode, configureLines) = await _run(
           cmake,
-          EngineCheckout.configureArguments,
+          EngineCheckout.configureWith(_compilers.$1, _compilers.$2),
           missing: GitFailureKind.noCmake,
           onLine: onLine,
           cancel: cancel,

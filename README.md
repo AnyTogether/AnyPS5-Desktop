@@ -61,6 +61,22 @@ winget install AnyTogether.AnyPS5Desktop
 
 The launcher's own updates run the same installer, so winget and the launcher keep one copy.
 
+**Linux:** clips and voice notes play inside the launcher through the system's libmpv, which
+the packages do not carry. The `.deb` brings it from apt (`libmpv2`, or `libmpv1` on Ubuntu
+22.04) and the Arch package depends on `mpv`. With the AppImage or the `.tar.gz`, install it
+yourself:
+
+```sh
+sudo apt install libmpv2        # Ubuntu 24.04, Debian 12 and newer (Ubuntu 22.04: libmpv1)
+sudo dnf install mpv-libs       # Fedora
+sudo pacman -S mpv              # Arch Linux
+sudo zypper install libmpv2     # openSUSE
+```
+
+Without it the launcher still starts and works. A clip shows its picture with the command for
+your distribution and a button that opens it in another player, and voice notes open in the
+system's player.
+
 **Arch Linux:** the `anyps5-desktop-bin` package (the release's `.deb`, repacked) is in
 [AnyTogether/linux-packages](https://github.com/AnyTogether/linux-packages). It is not on the AUR
 yet. Build it from there with `makepkg -si` in `aur/anyps5-desktop-bin`. The launcher sees that
@@ -455,15 +471,18 @@ use those once changed in the game.
   Both bring the `application/x-anyps5theme` MIME type (`anyps5-desktop-mime.xml`), which the
   desktop entry opens. The .deb's Depends are the packages of every library the bundle links
   (SDL2's X11, Wayland and ALSA ones too), by their 22.04 names with 24.04's t64 names as
-  alternatives. A library the build machine has no package for stops the build. CI installs it
+  alternatives, and `libmpv2 | libmpv1` for the clip player. A library the build machine has no package for stops the build. CI installs it
   on clean Ubuntu 22.04 and 24.04 with nothing else and checks every library resolves
   (`packaging/linux/check-deb.sh`).
 - The clip player (media_kit, libmpv): on Windows `libmpv-2.dll` and ANGLE come from
-  media_kit_libs_windows_video and sit beside the launcher. On Linux the build needs
-  `libmpv-dev` and `patchelf`; `packaging/linux/bundle-libmpv.sh` (run by the install step)
-  copies the build machine's libmpv and the libraries it needs that the launcher does not link
-  already into the bundle's `lib/`, with their packages' copyright files in `lib/licenses/`, so
-  the bundle, the AppImage and the .deb start on systems with another libmpv or none.
+  media_kit_libs_windows_video and sit beside the launcher. On Linux no package carries a
+  libmpv: the launcher uses the system's (`libmpv.so.2`, or `libmpv.so.1` on Ubuntu 22.04).
+  media_kit_video's plugin links the launcher's `libanyps5_mpv.so` (`linux/mpv_shim`) in place of
+  libmpv, which opens the system's libmpv when a clip plays, so the launcher starts without one.
+  The build needs `libmpv-dev` for the headers. `packaging/linux/no-libmpv.sh` stops the
+  packaging if the bundle has a libmpv or links one, and CI starts the launcher from the .deb on
+  clean Ubuntu 22.04 and 24.04 with apt's libmpv and again without it
+  (`packaging/linux/check-libmpv.sh`).
 
 - Nightly builds: `.github/workflows/nightly.yml` builds main once a day when the launcher
   changed and publishes an unsigned pre-release, `v<next>-nightly.<YYYYMMDD>.<n>`. The launcher's
@@ -503,8 +522,8 @@ play through [media_kit](https://github.com/media-kit/media-kit) (MIT) and
 [libmpv](https://mpv.io) with FFmpeg (mpv is GPL-2.0-or-later, LGPL-2.1-or-later when built
 for it); the Windows package carries its libmpv's licence as `libmpv-LICENSE.txt`
 (`third_party/libmpv/`; that build is under the LGPL version 3 or later) and ANGLE's as
-`ANGLE-LICENSE.txt`; the Linux bundle carries the Ubuntu packages' copyright files for the
-libraries it copies, in `lib/licenses/`. The optional ffmpeg the launcher offers to download is FFmpeg
+`ANGLE-LICENSE.txt`. The Linux packages carry no libmpv: they use the one the system's package
+manager installs, under that distribution's licence. The optional ffmpeg the launcher offers to download is FFmpeg
 built by [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds) under the GPL version 3,
 not shipped with the launcher; what it downloads carries the licence and a link to the exact
 source (`packaging/ffmpeg/pinned.env`, `.github/workflows/ffmpeg-release.yml`). The

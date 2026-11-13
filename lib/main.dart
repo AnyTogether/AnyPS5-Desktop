@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:ui' show AppExitResponse, PlatformDispatcher;
 
 import 'package:file_selector/file_selector.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
@@ -14,6 +14,7 @@ import 'core/desktop/desktop.dart';
 import 'core/desktop/file_types.dart';
 import 'core/desktop/url_scheme.dart';
 import 'core/link_relay.dart';
+import 'core/now_playing_mpris.dart';
 import 'core/desktop/linux_desktop.dart';
 import 'core/desktop/window_backdrop.dart';
 import 'core/desktop/windows_desktop.dart';
@@ -24,15 +25,18 @@ import 'core/ffmpeg_download.dart' show FfmpegBuild;
 import 'core/host.dart';
 import 'core/opened_files.dart';
 import 'core/launcher_health.dart';
+import 'core/libmpv.dart';
 import 'core/release_signing.dart';
 import 'core/steam/steam_launch.dart';
 import 'core/toolkit_download.dart';
 import 'ui/app_model.dart';
 import 'ui/clip_player.dart';
+import 'ui/countries.dart';
 import 'ui/crash_model.dart';
 import 'ui/launcher.dart';
 import 'ui/launcher_window_channel.dart';
 import 'ui/layer_overlay_channel.dart';
+import 'ui/now_playing_channel.dart';
 import 'ui/profile_picture.dart';
 import 'ui/sealed_photo.dart';
 import 'ui/voice_note_player.dart';
@@ -40,6 +44,7 @@ import 'ui/sharing_model.dart';
 import 'ui/strings.dart';
 import 'ui/together_model.dart' show launcherVersion;
 import 'ui/theme.dart';
+import 'ui/trash_channel.dart';
 
 /// Takes the window's close (and the other ways the launcher quits) to the launcher's health: a
 /// run that closed as it should is no crash next time.
@@ -62,6 +67,7 @@ Future<void> main(List<String> arguments) async {
   }
   // The built-in languages, and any file a translator put in the Languages folder to try it.
   await T.load(tryOut: Directory(p.join(paths.config, 'Languages')));
+  await Countries.load();
   final options = LaunchOptions.parse(arguments);
   // An anyps5:// link with a launcher already open: that one takes it, and this one quits before
   // it shows a window.
@@ -105,9 +111,12 @@ Future<void> main(List<String> arguments) async {
     health.closing();
   }
 
+  if (SystemLibmpv.missing) debugPrint('libmpv is not installed: clips and voice notes say how to install it');
   final model = AppModel(
     paths: paths,
     services: LauncherServices(
+      // Delete game: the Recycle Bin on Windows; Linux asks the desktop's own tool.
+      trash: Platform.isWindows ? const ChannelTrash() : null,
       pickFolder: (title) => getDirectoryPath(confirmButtonText: title),
       openFolder: (folder) => unawaited(Process.run(Platform.isWindows ? 'explorer' : 'xdg-open', [folder])),
       openUrl: (url) => unawaited(
@@ -116,6 +125,8 @@ Future<void> main(List<String> arguments) async {
             : Process.run('xdg-open', [url.toString()]),
       ),
       // Clips play inside the launcher (libmpv); the system's player when one cannot be opened.
+      // On Linux the system's libmpv, looked for here once (SystemLibmpv.missing): without it
+      // the launcher still starts, and clips and voice notes say how to install it.
       clipPlayback: MediaKitClipPlayback.new,
       voicePlayback: MediaKitVoicePlayback.new,
       copyText: (text) => unawaited(Clipboard.setData(ClipboardData(text: text))),
@@ -159,6 +170,8 @@ Future<void> main(List<String> arguments) async {
       desktop: desktop,
       backdrop: backdrop,
       window: window,
+      // Now playing: Windows' media session through the runner, MPRIS on the session bus on Linux.
+      nowPlaying: () => Platform.isWindows ? ChannelNowPlaying() : MprisNowPlaying(),
       quit: (code) => unawaited(shutdown.quit(code)),
     ),
   );

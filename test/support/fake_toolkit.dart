@@ -10,8 +10,12 @@ import 'package:path/path.dart' as p;
 /// cancelled), `silent` (exits 0 but writes nothing). With [failOn] (a path relative to its
 /// working directory) it fails as the real one fails a conversion, exit 2 with `FAIL:` and
 /// `Input:` lines, while that file is in its input; every run's input files go to inputs.txt.
+/// Like the real one it stops when two modules in its working directory share a file name
+/// (whatever their case with --windows; fakelib, which it is never pointed at, aside), naming the
+/// later of the two by path.
 /// With [traceImports] it knows --trace-imports and libc.prx exports what the option needs; with
-/// [refuseTrace] it stops as the real one does for a game without libc.prx when given the option.
+/// [refuseTrace] it stops as the real one does for a game without libc.prx when given the option;
+/// with [refuseOption] it stops the same way whenever its arguments hold that option.
 String makeFakeToolkit(
   String folder, {
   String mode = 'ok',
@@ -20,6 +24,7 @@ String makeFakeToolkit(
   String? failOn,
   bool traceImports = false,
   bool refuseTrace = false,
+  String? refuseOption,
 }) {
   Directory(p.join(folder, 'libs')).createSync(recursive: true);
   File(p.join(folder, 'libs', 'libkernel.prx')).writeAsStringSync('kernel library');
@@ -39,11 +44,14 @@ String makeFakeToolkit(
 ${traceImports ? '# knows --trace-imports' : '# plain'}
 printf '%s\\n' "\$*" >> "$runsFile"
 ${refuseTrace ? 'case "\$*" in *--trace-imports*) echo "FAIL: --trace-imports requires libc.prx among the libraries" >&2; echo "Input: \$PWD/eboot.bin" >&2; exit 2;; esac' : ''}
+${refuseOption != null ? 'case "\$*" in *$refuseOption*) echo "FAIL: unknown option $refuseOption" >&2; echo "Input: \$PWD/eboot.bin" >&2; exit 2;; esac' : ''}
 printf '%s\\n' "\$PWD" > "$argumentsFile"
 for argument in "\$@"; do printf '%s\\n' "\$argument" >> "$argumentsFile"; done
 for last; do :; done
 output="\$last"
 mode="$mode"
+fold=0
+case " \$* " in *" --windows "*) fold=1;; esac
 echo "run" >> "$inputsFile"
 find . -type f | sed 's|^\\./||' | sort >> "$inputsFile"
 if [ "\$mode" = slow ]; then sleep 30; fi
@@ -55,6 +63,12 @@ printf 'Instruction conversion | eboot.bin | 50%%\\n'
 printf 'PRX conversion | libgame.prx | 100%% (1/2)\\r'
 printf 'PRX conversion | libgame.prx | 100%% (2/2)\\n'
 if [ "\$mode" = fail ]; then echo "relink: unsupported relocation" >&2; exit 3; fi
+conflict=\$(find . -type f ! -name eboot.bin ! -path './fakelib/*' | sed 's|^\\./||' | LC_ALL=C sort | awk -F/ -v fold="\$fold" '{ name = \$NF; if (fold) name = tolower(name); if (name in seen) { print; exit } seen[name] = 1 }')
+if [ -n "\$conflict" ]; then
+  echo "FAIL: Conflicting guest output filename: \${conflict##*/}.guest.prx" >&2
+  echo "Input: \$PWD/\$conflict" >&2
+  exit 2
+fi
 fail_on="${failOn ?? ''}"
 if [ -n "\$fail_on" ] && [ -f "\$fail_on" ]; then
   echo "FAIL: Unsupported relocation type 0x25 (offset 0x1234)" >&2

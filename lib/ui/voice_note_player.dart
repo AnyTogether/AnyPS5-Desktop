@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 
+import '../core/libmpv.dart';
 import 'clip_player.dart' show MediaKitClipPlayback;
 
 /// How a voice note is playing: from [VoicePlayback]'s player.
@@ -47,9 +48,10 @@ abstract class VoicePlayback {
 }
 
 /// The voice note player on Windows and Linux: libmpv through media_kit, as the clip player.
-/// Throws when libmpv cannot be loaded.
+/// Throws LibmpvMissing when Linux has none, anything else when libmpv cannot be loaded.
 class MediaKitVoicePlayback implements VoicePlayback {
   MediaKitVoicePlayback() {
+    if (SystemLibmpv.missing) throw SystemLibmpv.missingError();
     MediaKit.ensureInitialized(libmpv: MediaKitClipPlayback.loadedLibmpv());
     _player = Player(configuration: const PlayerConfiguration(title: 'AnyPS5'));
     final stream = _player.stream;
@@ -115,9 +117,9 @@ class VoiceNoteState {
 /// The voice notes in chats, one at a time, as the Mac's VoicePlayer: a press plays a note and
 /// stops whichever played before it, the next pauses it; its end takes it back to the start.
 /// Without the launcher's player, or when it cannot open a note, the note goes to the system's
-/// player, as clips do.
+/// player, as clips do. On Linux without libmpv [onMissing] says how to install it, once.
 class VoiceNotes {
-  VoiceNotes({required this.create, required this.onSystemPlayer, required this.onFailed});
+  VoiceNotes({required this.create, required this.onSystemPlayer, required this.onFailed, this.onMissing});
 
   /// LauncherServices.voicePlayback; null where there is no player.
   final VoicePlayback Function()? create;
@@ -127,6 +129,11 @@ class VoiceNotes {
 
   /// The sealed note could not be opened.
   final void Function(Object error) onFailed;
+
+  /// libmpv is not installed (Linux): the first note that would have played says so; it and the
+  /// rest still go to the system's player.
+  final void Function(LibmpvMissing missing)? onMissing;
+  bool _missingSaid = false;
 
   final state = ValueNotifier(const VoiceNoteState());
 
@@ -187,6 +194,12 @@ class VoiceNotes {
       _listener = _changed;
       made.state.addListener(_listener!);
       return _playback = made;
+    } on LibmpvMissing catch (missing) {
+      if (!_missingSaid) {
+        _missingSaid = true;
+        onMissing?.call(missing);
+      }
+      return null;
     } on Object {
       return null;
     }

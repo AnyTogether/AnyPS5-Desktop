@@ -108,6 +108,9 @@ void main() {
           'shaderCache',
           'relinkerSection',
           'relinker---trace-imports',
+          'relinkerCustomOptions',
+          'launchSection',
+          'launchOptions',
           'shareSection',
           'export',
           'import',
@@ -303,6 +306,7 @@ void main() {
           ({
             required String installed,
             required Map<String, String> environment,
+            List<String> arguments = const [],
             required String logFile,
             HostSystem? system,
             bool traced = false,

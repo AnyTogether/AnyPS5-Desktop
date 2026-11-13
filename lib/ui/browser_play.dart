@@ -223,6 +223,7 @@ class BrowserPlayModel {
   List<(String, String, bool)>? _previewPads;
 
   Uri? get shownUrl => _previewUrl ?? url;
+
   /// How long the code shown is good for, in seconds.
   int get secondsLeft => _previewLeft ?? (expires?.difference(DateTime.now()).inSeconds.clamp(0, 999) ?? 0);
   List<(String, String, bool)> get shownPads => _previewPads ?? pads;
@@ -361,7 +362,7 @@ class BrowserPlayView extends StatelessWidget {
                                 ),
                               ),
                               SizedBox(width: 10 * scale),
-                              Text(name, style: AppText.display(16 * scale, weight: FontWeight.w600)),
+                              Text(PhoneLabel.title(name), style: AppText.display(16 * scale, weight: FontWeight.w600)),
                               SizedBox(width: 8 * scale),
                               Text(
                                 T.text(allowed ? 'browserPlayPlaying' : 'browserPlayAsking'),

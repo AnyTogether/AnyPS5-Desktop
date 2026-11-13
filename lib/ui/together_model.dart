@@ -27,6 +27,7 @@ import '../core/together/e2ee_client.dart';
 import '../core/together/family.dart';
 import '../core/together/friends.dart';
 import '../core/together/hub.dart';
+import '../core/together/join_advice.dart';
 import '../core/together/levels.dart';
 import '../core/together/people.dart';
 import '../core/together/self.dart';
@@ -56,8 +57,10 @@ import '../core/game_settings.dart';
 import 'app_model.dart';
 import 'clip_player.dart' show ViewedMedia, mediaAspect;
 import 'compare_view.dart';
+import 'countries.dart';
 import 'family_gate.dart';
 import 'livekit_room.dart';
+import 'now_playing_model.dart';
 import 'online_webrtc.dart';
 import 'sealed_photo.dart';
 import 'strings.dart';
@@ -68,6 +71,7 @@ part 'together_messages.dart';
 part 'together_ask.dart';
 part 'together_party.dart';
 part 'together_party_chat.dart';
+part 'together_join.dart';
 part 'together_play.dart';
 part 'together_profile.dart';
 part 'together_find.dart';
@@ -77,7 +81,7 @@ part 'together_captures.dart';
 part 'together_calls.dart';
 
 /// The launcher's version, as AnyTogether hears it.
-const launcherVersion = '0.1.20';
+const launcherVersion = '0.1.23';
 
 /// AnyTogether in the launcher: the account and how it signs in (an email code, a code approved
 /// on the website, or the paired phone), the server it uses, and the rows the settings show for
@@ -241,6 +245,11 @@ class TogetherModel {
     create: app.services.voicePlayback,
     onSystemPlayer: _voiceInSystemPlayer,
     onFailed: (_) => app.show(T.text('messagesAttachmentFailed')),
+    onMissing: (missing) => app.show(
+      missing.commands.length == 1
+          ? T.format('libmpvMissingVoice', [missing.commands.single])
+          : T.text('libmpvMissingVoicePlain'),
+    ),
   );
   late final StreamSubscription<TogetherEvent> _ready;
   Timer? _flush;
@@ -372,6 +381,11 @@ class TogetherModel {
   Set<String> togetherTryAnyway = {};
   Set<String> togetherVersionRefused = {};
 
+  /// What holds a join back, for the panel that says it whole, and the game being started while
+  /// someone the user knows plays it (together_join.dart).
+  JoinBlock? joinBlock;
+  JoinChoice? joinChoice;
+
   /// The row whose social step is asking first (together_ask.dart): it shows the question instead.
   String? askingRow;
 
@@ -494,6 +508,7 @@ class TogetherModel {
         Layer.profile,
         Layer.showcaseEdit,
         Layer.profileTheme,
+        Layer.countryPicker,
         Layer.compare,
         Layer.feed,
         Layer.captures,
@@ -599,7 +614,8 @@ class TogetherModel {
   void _followGame() {
     family.followGame();
     followGameSession();
-    final running = app.running;
+    // An emulator game is not an AnyTogether title: friends see the user online, as with none.
+    final running = app.running?.$1.retro == null ? app.running : null;
     final since = running == null ? null : DateTime.tryParse(app.preferences.lastPlayed[running.$1.id] ?? '');
     hub.socket.presence = running == null
         ? const PresenceOnline()
@@ -931,15 +947,18 @@ class TogetherModel {
       PresenceState.away => T.text('friendsAway'),
       _ => T.text('friendsOnline'),
     };
+    // What they listen to, when they chose to show it: "Online · Listening to Title, Artist".
+    final listening = presence.listening;
+    final heard = listening == null ? '' : ' · ${NowPlayingModel.listeningText(listening)}';
     // Playing together with their party: "Playing Minecraft together (2/8)".
     final game = presence.game;
     if (game != null && game.together) {
-      return T.format('togetherPresence', [gameName(game.titleId), game.players, game.capacity]);
+      return T.format('togetherPresence', [gameName(game.titleId), game.players, game.capacity]) + heard;
     }
     if (presence.game?.joinable == true) text += ' · ${T.text('gameJoinable')}';
     final party = presence.party;
     if (party != null) text += ' · ${T.format('friendsInParty', [party.size, party.max])}';
-    return text;
+    return text + heard;
   }
 
   /// A friend's dot: do not disturb and idle as they chose them, else what they do (a server
@@ -1404,11 +1423,23 @@ class TogetherModel {
         'handle_reserved' => T.text('togetherHandleReserved'),
         'handle_cooldown' => switch (DateTime.tryParse(error.extra['handleChangeAt'] as String? ?? '')) {
           final DateTime at => T.format('togetherHandleAgain', [CompareView.day(at)]),
-          null => error.title,
+          null => T.format('togetherErrorOther', [error.code]),
         },
         'links_not_allowed' => T.text('togetherNoLinks'),
         'media_server_off' => T.format('togetherMediaServerOff', [(error.extra['max'] as num?)?.toInt() ?? 4]),
-        _ => error.title.isEmpty ? T.text('togetherUnreachable') : error.title,
+        // The server's own words are English: every code gets the launcher's.
+        'bad_request' => T.text('togetherErrorBadRequest'),
+        'unauthorized' || 'session_revoked' || 'refresh_reused' => T.text('togetherErrorSignedOut'),
+        'forbidden' => T.text('togetherErrorForbidden'),
+        'not_found' => T.text('togetherErrorNotFound'),
+        'conflict' => T.text('togetherErrorConflict'),
+        'full' => T.text('togetherErrorFull'),
+        'payload_too_large' => T.text('togetherErrorTooLarge'),
+        'internal' => T.text('togetherErrorInternal'),
+        // A code the launcher has no words for yet: the server's sentence in English (which is
+        // English), the launcher's own with the code in every other language, as on the Mac.
+        _ when T.language.code == 'en' && error.title.isNotEmpty => error.title, // not a text
+        final code => code.isEmpty ? T.text('togetherUnreachable') : T.format('togetherErrorOther', [code]),
       };
     }
     return T.text('togetherUnreachable');
@@ -1502,12 +1533,9 @@ class TogetherModel {
       PanelRow(
         id: 'together-country',
         title: T.text('togetherCountry'),
-        detail: T.text('togetherCountryDetail'),
-        kind: TextRow(
-          countryDraft ?? self.country ?? '',
-          (text) => countryDraft = text,
-          submit: () => unawaited(saveProfile()),
-        ),
+        // The country by its name, chosen from the list: never a code to know and type.
+        detail: Countries.name(countryDraft ?? self.country) ?? T.text('togetherCountryChoose'),
+        kind: ActionRow(openCountryPicker),
       ),
       PanelRow(
         id: 'together-save',
@@ -1527,6 +1555,83 @@ class TogetherModel {
         title: T.text('togetherChangeHandle'),
         kind: ActionRow(() => unawaited(changeHandle())),
       ),
+    ];
+  }
+
+  // The country: a list to search, by name in the launcher's language (Layer.countryPicker).
+
+  /// The search field's row, and the rows of no country and of each one.
+  static const countrySearchRow = 'country-search';
+  static const countryNoneRow = 'country-none';
+  static String countryRowId(String code) => 'country-$code';
+
+  /// What is typed in the picker's search, and where Back from the picker goes.
+  String countryQuery = '';
+  PanelSpot? countryReturn;
+
+  /// The country the profile would get on Save: the one picked, else the profile's own.
+  String get countryChosen => (countryDraft ?? hub.self.country ?? '').trim().toUpperCase();
+
+  /// Opens the list over Settings, on the row of the country chosen now.
+  void openCountryPicker() {
+    countryReturn = app.spot;
+    countryQuery = '';
+    app.open(Layer.countryPicker);
+    final chosen = countryChosen;
+    final row = countryRows().indexWhere((row) => row.id == (chosen.isEmpty ? countryNoneRow : countryRowId(chosen)));
+    if (row > 0) app.panelRow = row;
+    app.refresh();
+  }
+
+  /// Back to the row the picker was opened from, nothing chosen.
+  void backFromCountry() {
+    app.stopEditing();
+    app.returnTo(countryReturn);
+    countryReturn = null;
+  }
+
+  /// [code] is the profile's country from now on (null: none): the list closes and the profile
+  /// is saved at once, as on the Mac.
+  void chooseCountry(String? code) {
+    countryDraft = code ?? '';
+    backFromCountry();
+    unawaited(saveProfile());
+  }
+
+  /// The search field, None (while nothing is searched for) and the countries the search finds.
+  List<PanelRow> countryRows() {
+    final found = Countries.search(countryQuery);
+    final searching = countryQuery.trim().isNotEmpty;
+    return [
+      PanelRow(
+        id: countrySearchRow,
+        title: T.text('togetherCountrySearch'),
+        kind: TextRow(
+          countryQuery,
+          (text) {
+            countryQuery = text;
+            // The rows under the field change: the focus stays on the field.
+            app.panelRow = 0;
+            app.refresh();
+          },
+          // Enter: on to the first country found.
+          submit: () {
+            if (Countries.search(countryQuery).isEmpty) return;
+            app.panelRow = 1;
+            app.refresh();
+          },
+        ),
+      ),
+      if (!searching)
+        PanelRow(id: countryNoneRow, title: T.text('togetherCountryNone'), kind: ActionRow(() => chooseCountry(null))),
+      for (final (code, name) in found)
+        PanelRow(id: countryRowId(code), title: name, kind: ActionRow(() => chooseCountry(code))),
+      if (found.isEmpty)
+        PanelRow(
+          id: 'country-no-match',
+          title: T.format('togetherCountryNoMatch', [countryQuery.trim()]),
+          kind: const InfoRow(''),
+        ),
     ];
   }
 

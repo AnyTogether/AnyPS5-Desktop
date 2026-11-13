@@ -25,12 +25,12 @@ add_definitions(-DAPPLICATION_ID="${APPLICATION_ID}")
 
 # Add dependency libraries. Add any application-specific dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter)
+# dlopen for gtk-layer-shell (layer_overlay.cc), which is loaded at run time, never linked.
 pkg_check_modules(RETRO_RENDER REQUIRED IMPORTED_TARGET egl epoxy)
 pkg_check_modules(RETRO_AUDIO REQUIRED IMPORTED_TARGET libpulse)
 set(ANYPS5_RETRO_VULKAN ON)
 add_subdirectory("${CMAKE_SOURCE_DIR}/../native/retro" "${CMAKE_CURRENT_BINARY_DIR}/retro")
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GTK PkgConfig::RETRO_RENDER PkgConfig::RETRO_AUDIO anyps5_retro_vulkan)
-# dlopen for gtk-layer-shell (layer_overlay.cc), which is loaded at run time, never linked.
 target_link_libraries(${BINARY_NAME} PRIVATE ${CMAKE_DL_LIBS})
 
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")

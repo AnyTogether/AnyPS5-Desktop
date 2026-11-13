@@ -86,7 +86,8 @@ void main() {
 
   /// Starts Orbit Runner; the future completes once the game ended.
   Future<({Future<void> done})> play() async {
-    final playing = model.play(orbit());
+    // The copy as it is: these are about the engine it was made with, not about rebuilding it.
+    final playing = model.play(orbit(), asItIs: true);
     await until(() => model.running != null);
     return (done: playing);
   }

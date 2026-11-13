@@ -107,8 +107,10 @@ void main() {
     expect(model.preferences.engineGitBuilt[checkout], 'bbbbbbbb22');
     model.select(model.games.indexOf(orbit()));
     model.primaryAction(orbit());
-    expect(model.overlay, Layer.updateChoice, reason: 'Play offers Update and play');
-    model.closeOverlay();
+    expect(model.overlay, isNot(Layer.updateChoice));
+    expect(model.afterRebuild?.$1, orbit().id, reason: 'Play rebuilds the copy first');
+    model.cancelUnlock(orbit());
+    await until(() => orbitState() is Installed);
     expect(row('engineGitRelinkAll')?.detail, T.format('engineGitRelinkAllDetail', [1]));
     choose('engineGitRelinkAll');
     expect(model.queue.contains(orbit().id) || model.progress.containsKey(orbit().id), isTrue);
@@ -166,7 +168,12 @@ void main() {
     commands.results['git --version'] = const FakeResult(missing: true);
     choose('engineGitUpdate');
     await until(() => !model.engine.git.running);
-    expect(model.toast, T.format('engineGitFailed', [T.text('engineGitNoGit')]));
+    expect(
+      model.toast,
+      T.format('engineGitFailed', [
+        T.format('engineGitMissing', ['Git']),
+      ]),
+    );
     expect(row('engineGitGuide')?.title, T.text('engineGitGuideUpstream'));
     choose('engineGitGuide');
     expect(fixture.opened.single, EngineCheckout.upstreamLinuxGuide);
@@ -201,7 +208,12 @@ void main() {
     commands.results['g++ --version'] = const FakeResult(missing: true);
     choose('engineGitUpdate');
     await until(() => !model.engine.git.running);
-    expect(model.toast, T.format('engineGitFailed', [T.text('engineGitNoCompiler')]));
+    expect(
+      model.toast,
+      T.format('engineGitFailed', [
+        T.format('engineGitMissing', [T.text('engineToolCompiler')]),
+      ]),
+    );
     expect(commands.lines.where((line) => line.startsWith('git pull')), isEmpty);
     expect(row('engineGitGuide')?.title, T.text('engineGitGuideArm'));
     choose('engineGitGuide');

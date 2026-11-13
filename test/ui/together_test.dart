@@ -5,6 +5,7 @@ import 'package:anyps5_desktop/core/installer.dart';
 import 'package:anyps5_desktop/core/online/online_identity.dart';
 import 'package:anyps5_desktop/core/online/online_wire.dart';
 import 'package:anyps5_desktop/core/together/account.dart';
+import 'package:anyps5_desktop/core/together/join_advice.dart';
 import 'package:anyps5_desktop/core/together/messages.dart';
 import 'package:anyps5_desktop/core/together/people.dart';
 import 'package:anyps5_desktop/core/together/profiles.dart';
@@ -539,6 +540,7 @@ void main() {
       await together.startParty();
       expect(rowIds(), [
         'voice-join',
+        'together-about',
         'together-start',
         'party-members',
         'party-member-u-me',
@@ -1483,18 +1485,24 @@ void main() {
       expect(row('together-edit').title, 'Your profile');
       expect((row('together-name').kind as TextRow).value, 'Utku');
       expect((row('together-bio').kind as TextRow).value, 'Night owl');
-      expect((row('together-country').kind as TextRow).value, 'TR');
-      expect(row('together-country').detail, 'Two letters: TR, DE, US…');
+      // The country by its name, on a row that opens the list: no code to type.
+      expect(row('together-country').kind, isA<ActionRow>());
+      expect(row('together-country').detail, 'Türkiye');
       expect(row('together-handle').detail, 'Can change once every 30 days.');
 
       // Only what changed goes; the country in capitals.
       (row('together-name').kind as TextRow).set('Utku Halis');
-      (row('together-country').kind as TextRow).set('de');
-      (row('together-save').kind as ActionRow).run();
+      (row('together-country').kind as ActionRow).run();
+      expect(model.overlay, Layer.countryPicker);
+      (row(TogetherModel.countrySearchRow).kind as TextRow).set('germ');
+      expect(rowIds(), [TogetherModel.countrySearchRow, 'country-DE']);
+      (row('country-DE').kind as ActionRow).run();
+      expect(model.overlay, Layer.settings, reason: 'chosen: back where the list was opened from');
+      // Chosen is saved: no Save to press for it, and the name typed goes with it.
       await until(() => model.toast == 'Profile saved');
       expect(server.callsTo('me/profile').single.body, {'displayName': 'Utku Halis', 'country': 'DE'});
       expect(together.user!.displayName, 'Utku Halis');
-      expect((row('together-country').kind as TextRow).value, 'DE');
+      expect(row('together-country').detail, 'Germany');
       // A blank bio clears it.
       (row('together-bio').kind as TextRow).set('  ');
       await together.saveProfile();
@@ -1565,7 +1573,7 @@ void main() {
       server.answers['PATCH me/privacy'] = FakeTogether.problem(403, 'forbidden', 'Not allowed');
       await together.setPrivacy(PrivacySection.presence, ProfileVisibility.everyone);
       expect((row('privacy-presence').kind as ChoiceRow).selected, 1, reason: 'put back');
-      expect(model.toast, 'Not allowed');
+      expect(model.toast, 'You\'re not allowed to do that.', reason: 'the launcher\'s words, not the server\'s');
     });
   });
 
@@ -1785,12 +1793,35 @@ void main() {
     });
 
     test('the version guard, a game not here or locked, a full game', () async {
+      PanelRow row(String id) => model.panelCategories().single.rows.firstWhere((row) => row.id == id);
+      String words(String id) => (row(id).kind as InfoRow).text;
+      // What differs is named, and both versions are whole on lines of their own.
       server.hostSession('gs-v', ana, gameVersion: '01.001.000');
       await model.together.joinFriendGame('gs-v', titleId: 'PPSA01001', host: 'Ana');
-      expect(model.toast, 'Ana plays version 01.001.000 of the game; yours is 01.000.000');
+      expect(model.overlay, Layer.joinBlocked);
+      expect(row('blocked-what').title, 'Different game version');
+      expect(
+        words('blocked-what'),
+        'Ana and you have different versions of Orbit Runner.\n'
+        'You need Orbit Runner version 01.001.000; you have 01.000.000. Add the update to your library',
+      );
+      expect([row('blocked-host').title, words('blocked-host')], ['Ana', '01.001.000']);
+      expect([row('blocked-you').title, words('blocked-you')], ['You', '01.000.000']);
       server.hostSession('gs-e', ana, engineBuild: '0.2.13-a1b2c3d4e5f6');
       await model.together.joinFriendGame('gs-e', titleId: 'PPSA01001', host: 'Ana');
-      expect(model.toast, 'Ana plays on AnyPS5 0.2.13 (a1b2c3), you on toolkit (1): update to the same one');
+      expect(model.overlay, Layer.joinBlocked);
+      expect(row('blocked-what').title, 'Different engine build');
+      expect(
+        words('blocked-what'),
+        'Ana and you run Orbit Runner on different builds of the AnyPS5 engine, so the two games cannot connect.\n'
+        'The two engines are not the same build. Use the same engine on both',
+      );
+      expect(words('blocked-host'), '0.2.13-a1b2c3d4e5f6', reason: 'whole, not "0.2.13 (a1b2c3)"');
+      expect(words('blocked-you'), 'toolkit-1');
+      expect(row('blocked-what').wraps && row('blocked-host').wraps && row('blocked-you').wraps, isTrue);
+      expect(rowIds(), ['blocked-what', 'blocked-host', 'blocked-you', 'blocked-close'], reason: 'no "update"');
+      (row('blocked-close').kind as ActionRow).run();
+      expect(model.overlay, isNull);
       expect(server.calls.where((call) => call.path.endsWith('/join')), isEmpty);
 
       await model.together.joinFriendGame('gs-x', titleId: 'PPSA09999', host: 'Ana');
@@ -1917,7 +1948,9 @@ void main() {
         'You need Orbit Runner version 01.001.000; you have 01.000.000. Add the update to your library',
       );
       (join.kind as ActionRow).run();
-      await until(() => model.toast == join.detail);
+      await until(() => model.overlay == Layer.joinBlocked);
+      expect(rowIds(), ['blocked-what', 'blocked-host', 'blocked-you', 'blocked-try-anyway', 'blocked-close']);
+      expect(model.panelCategories().single.rows.first.title, 'Different game version');
       expect(server.calls.where((call) => call.path.endsWith('/join')), isEmpty);
 
       server.gameSessions.remove('gs-v');
@@ -1932,7 +1965,11 @@ void main() {
       await model.together.hub.parties.refresh();
       model.open(Layer.party);
       final engine = model.panelCategories().single.rows.firstWhere((row) => row.id == 'together-join');
-      expect(engine.detail, 'Ana plays on AnyPS5 0.2.13 (a1b2c3); yours is toolkit (1). Ask them to update');
+      expect(
+        engine.detail,
+        'Different engine build\nThe two engines are not the same build. Use the same engine on both',
+      );
+      expect(engine.wraps, isTrue);
 
       T.language = Language.byCode('tr');
       expect(
@@ -1973,6 +2010,181 @@ void main() {
       (model.panelCategories().single.rows[6].kind as ActionRow).run();
       await until(() => server.callsTo('game-sessions/gs-ana/decline').isNotEmpty);
       expect(model.together.hub.badge, 0);
+    });
+
+    /// Ana hosts Orbit Runner in a session of her own, as her presence says it to her friends.
+    Future<void> anaHostsOrbit({bool playing = true}) async {
+      if (playing) server.hostSession('gs-ana', ana);
+      server.friends.firstWhere((friend) => friend['userId'] == 'u-ana')['presence'] = playing
+          ? {
+              'state': 'in_game',
+              'titleId': 'PPSA01001',
+              'game': {
+                'sessionId': 'gs-ana',
+                'titleId': 'PPSA01001',
+                'kind': 'online',
+                'hostId': 'u-ana',
+                'joinable': true,
+                'players': 1,
+                'capacity': 4,
+              },
+            }
+          : {'state': 'online'};
+      await model.together.hub.friends.refresh();
+    }
+
+    test('Play on a game a party member already hosts asks: join theirs (first), or start your own', () async {
+      server.inParty([ana], leader: 'u-ana');
+      await model.together.hub.parties.refresh();
+      await anaHostsOrbit();
+      final orbit = model.games.firstWhere((game) => game.titleId == 'PPSA01001');
+      final installed = Installer.installedFolder(orbit, model.root!);
+      File(p.join(installed, 'app.elf')).writeAsStringSync('#!/bin/sh\nsleep 0.4\n');
+      if (!Platform.isWindows) Process.runSync('chmod', ['755', p.join(installed, 'app.elf')]);
+      PanelRow row(String id) => model.panelCategories().single.rows.firstWhere((row) => row.id == id);
+
+      model.select(model.games.indexOf(orbit));
+      model.primaryAction(orbit);
+      expect(model.overlay, Layer.joinOrHost);
+      expect(model.starting, isNull);
+      expect(rowIds(), ['choice-ask', 'choice-join', 'choice-own']);
+      expect((row('choice-ask').kind as InfoRow).text, 'Ana is playing this. Join their game, or start your own?');
+      expect(model.panelRow, 1, reason: 'Join is the default');
+      expect(row('choice-join').title, "Join Ana's Orbit Runner");
+      expect(row('choice-own').title, 'Start my own game');
+      expect(row('choice-own').detail, 'A separate session. Ana will not be in it.');
+
+      model.handle(launcher.Command.select);
+      await until(() => server.callsTo('game-sessions/gs-ana/join').isNotEmpty);
+      await until(() => model.running != null);
+      await until(() => model.running == null);
+      await until(() => server.callsTo('game-sessions/gs-ana/leave').isNotEmpty);
+      expect(
+        server.callsTo('game-sessions', method: 'POST'),
+        isEmpty,
+        reason: 'the two are in one session: no second one was opened',
+      );
+    });
+
+    test('starting your own game anyway says a separate session was made', () async {
+      await anaHostsOrbit();
+      final orbit = model.games.firstWhere((game) => game.titleId == 'PPSA01001');
+      final installed = Installer.installedFolder(orbit, model.root!);
+      File(p.join(installed, 'app.elf')).writeAsStringSync('#!/bin/sh\nsleep 0.4\n');
+      if (!Platform.isWindows) Process.runSync('chmod', ['755', p.join(installed, 'app.elf')]);
+      model.select(model.games.indexOf(orbit));
+      model.primaryAction(orbit);
+      expect(model.overlay, Layer.joinOrHost);
+      final own = model.panelCategories().single.rows.firstWhere((row) => row.id == 'choice-own');
+      (own.kind as ActionRow).run();
+      expect(model.overlay, isNull);
+      expect(model.toast, 'You started a separate game. Ana is not in it');
+      await until(() => model.running != null);
+      await until(() => model.running == null);
+      expect(server.callsTo('game-sessions/gs-ana/join'), isEmpty);
+
+      // Nobody playing it, a full game or another title asks nothing.
+      await anaHostsOrbit(playing: false);
+      expect(model.together.joinableGame(orbit), isNull);
+    });
+
+    test('the party says for each member whose game they are in, with Join right there', () async {
+      server.inParty([ana], leader: 'u-ana');
+      await model.together.hub.parties.refresh();
+      await anaHostsOrbit();
+      PanelRow row(String id) => model.panelCategories().single.rows.firstWhere((row) => row.id == id);
+      model.open(Layer.party);
+      expect(
+        (row('together-about').kind as InfoRow).text,
+        'A party is voice and chat. A game session is what connects your games',
+      );
+      expect(row('party-member-u-ana').detail, endsWith('Playing Orbit Runner'));
+      expect(rowIds(), containsAllInOrder(['party-member-u-ana', 'party-member-join-u-ana']));
+      expect(row('party-member-join-u-ana').title, "Join Ana's Orbit Runner");
+      expect(row('party-member-u-me').detail, isNot(contains('game')), reason: "the user's own row says nothing of it");
+      // The quick menu has the same member, as the Join itself.
+      final quick = model.together.partyGameRows();
+      expect(quick.map((row) => row.id), ['party-game-u-ana']);
+      expect(quick.single.title, "Join Ana's Orbit Runner");
+      expect(quick.single.kind, isA<ActionRow>());
+
+      final together = model.together;
+      expect(together.memberGameText(const InYourGame()), 'In your game');
+      expect(
+        together.memberGameText(
+          const InOtherGame(
+            sessionId: 's',
+            titleId: 'PPSA01001',
+            hostId: 'u-ana',
+            joinable: true,
+            together: false,
+            sameTitle: true,
+          ),
+        ),
+        'In another game of Orbit Runner',
+      );
+
+      await anaHostsOrbit(playing: false);
+      model.open(Layer.party);
+      expect(row('party-member-u-ana').detail, endsWith('Not in a game'));
+      expect(rowIds(), isNot(contains('party-member-join-u-ana')));
+      expect((together.partyGameRows().single.kind as InfoRow).text, 'Not in a game');
+    });
+
+    test('a join held back names what differs, shows both builds whole and offers the action that fits', () {
+      const nightly = '0.2.36-arm-nightly.20261110.1-a6fff1ba742d';
+      const stable = '0.2.36-arm-f75c475400e3';
+      final together = model.together;
+      String advice(List<PanelRow> rows) => (rows.first.kind as InfoRow).text.split('\n').last;
+      List<String> ids(List<PanelRow> rows) => [for (final row in rows) row.id];
+      JoinBlock block(EngineAdvice advice, String host, String yours, {void Function()? rebuild}) => JoinBlock.engine(
+        advice: advice,
+        hostName: 'Mira',
+        gameName: 'Greenhollow',
+        host: host,
+        yours: yours,
+        rebuild: rebuild,
+      );
+
+      // Both launchers current, the host's copy still the nightly's: nobody here is told to update.
+      final newer = together.joinBlockedRows(block(EngineAdvice.updateHost, nightly, stable));
+      expect(newer.first.title, 'Different engine build');
+      expect(advice(newer), 'This AnyPS5 is newer. Ask Mira to update AnyPS5 and start the game again');
+      expect((newer[1].kind as InfoRow).text, nightly);
+      expect((newer[2].kind as InfoRow).text, stable);
+      expect(ids(newer), ['blocked-what', 'blocked-host', 'blocked-you', 'blocked-close']);
+
+      var rebuilt = false;
+      final stale = together.joinBlockedRows(
+        block(EngineAdvice.rebuild, stable, nightly, rebuild: () => rebuilt = true),
+      );
+      expect(advice(stale), 'Your copy was made with another engine. Rebuild it and you can join');
+      expect(ids(stale), ['blocked-what', 'blocked-host', 'blocked-you', 'blocked-rebuild', 'blocked-close']);
+      expect(stale[3].title, 'Rebuild and join');
+      together.tell(block(EngineAdvice.rebuild, stable, nightly));
+      (stale[3].kind as ActionRow).run();
+      expect(rebuilt, isTrue);
+      expect(model.overlay, isNull);
+
+      final older = together.joinBlockedRows(block(EngineAdvice.updateYours, stable, '0.2.35-arm-0123456789ab'));
+      expect(advice(older), 'Mira plays on a newer AnyPS5. Update this one, then join');
+      expect(ids(older), ['blocked-what', 'blocked-host', 'blocked-you', 'blocked-update', 'blocked-close']);
+      expect(older[3].title, 'Check for updates');
+
+      final channel = together.joinBlockedRows(
+        block(EngineAdvice.hostNightly, '0.2.37-arm-nightly.20261112.1-0123456789ab', stable),
+      );
+      expect(
+        advice(channel),
+        'Mira plays on a nightly build newer than this release. Use the same update channel on both',
+      );
+      expect(ids(channel), isNot(contains('blocked-update')));
+
+      // The advice comes from the two builds and the engine at hand.
+      expect(
+        together.engineBlock(hostName: 'Mira', titleId: 'PPSA01001', host: 'toolkit-2', yours: 'toolkit-1').advice,
+        EngineAdvice.sameEngine,
+      );
     });
   });
 }

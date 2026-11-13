@@ -116,7 +116,7 @@ extension TogetherParty on TogetherModel {
         title: T.format('partyMembers', [party.members.length, party.max]),
         kind: const InfoRow(''),
       ),
-      for (final member in party.members)
+      for (final member in party.members) ...[
         PanelRow(
           id: 'party-member-${member.id}',
           // A friend's friends-only name, with the handle (and public name) beside.
@@ -131,6 +131,9 @@ extension TogetherParty on TogetherModel {
               T.text('joinDeafened')
             else if (party.muted.contains(member.id))
               T.text('voiceMuted'),
+            // In the user's game, in another one, or in none: the party alone does not say.
+            if (member.id != me.id)
+              if (memberGame(member, party) case final MemberGame game) memberGameText(game),
           ].join(' · '),
           person: TogetherModel.card(
             member,
@@ -139,6 +142,13 @@ extension TogetherParty on TogetherModel {
           ),
           kind: const InfoRow(''),
         ),
+        // Join right under a member in another game that takes players (the party's own Play
+        // Together game has its Join above).
+        if (member.id != me.id)
+          if (memberGame(member, party) case InOtherGame(joinable: true, :final sessionId)
+              when sessionId != party.together?.sessionId)
+            ?memberJoinRow(member, party, 'party-member-join-${member.id}'),
+      ],
       if (leader)
         for (final member in party.members)
           if (member.id != me.id)

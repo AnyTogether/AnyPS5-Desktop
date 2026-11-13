@@ -18,6 +18,13 @@
 # It never reaches Stable: --prerelease and --latest=false keep it out of the release GitHub calls
 # latest, which is what the Stable channel and the download links read. The tag and the release
 # are made with GITHUB_TOKEN, so they start no other workflow.
+#
+# GITHUB_TOKEN can make no tag at a commit whose .github/workflows/ has a file main lacks or has
+# otherwise (GitHub answers 403 Resource not accessible by integration; that needs the Workflows
+# permission, which GITHUB_TOKEN cannot be given). The built commit is main as it was when the run
+# began, so that happens when main gets a workflow change while the build runs. The publish job
+# then publishes nothing and starts this workflow again on main, which builds main as it is by
+# then; it ends green with a warning.
 name: Nightly
 
 on:
@@ -129,6 +136,8 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
+      # To start the workflow again when the built commit cannot be tagged (see the top).
+      actions: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -172,14 +181,27 @@ jobs:
           TAG: ${{ needs.plan.outputs.tag }}
           SHA: ${{ needs.plan.outputs.sha }}
           VERSION: ${{ needs.plan.outputs.version }}
+          FORCE: ${{ inputs.force || false }}
         run: |
           set -euo pipefail
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
             echo "::error::$TAG exists already"; exit 1
           fi
+          # GITHUB_TOKEN cannot tag the built commit once main has other workflows than it (see the
+          # top): main's nightly is then left to a new run of this workflow.
+          start_over() {
+            local changed
+            git fetch -q origin main
+            changed="$(git diff --name-only --no-renames --diff-filter=d FETCH_HEAD "$SHA" -- .github/workflows)"
+            [ -n "$changed" ] || return 1
+            echo "::warning::$TAG is not published: main ($(git rev-parse --short=10 FETCH_HEAD)) changed workflows while ${SHA:0:10} was built (${changed//$'\n'/ }), and GITHUB_TOKEN cannot tag such a commit. Starting the nightly again on main."
+            gh workflow run nightly.yml --repo "$REPO" --ref main -f force="$FORCE"
+          }
+          if start_over; then exit 0; fi
           # The tag is made on GitHub at the built commit.
           gh release create "$TAG" dist/* --repo "$REPO" --target "$SHA" --prerelease --latest=false \
-            --title "AnyPS5 Desktop $VERSION (nightly)" --notes-file "$RUNNER_TEMP/notes.md"
+            --title "AnyPS5 Desktop $VERSION (nightly)" --notes-file "$RUNNER_TEMP/notes.md" ||
+            { if start_over; then exit 0; fi; exit 1; }
           # Stable must never see it.
           [ "$(gh release view "$TAG" --repo "$REPO" --json isPrerelease --jq .isPrerelease)" = true ] ||
             { echo "::error::$TAG is not a pre-release"; exit 1; }
