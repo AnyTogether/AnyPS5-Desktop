@@ -1,7 +1,7 @@
 ; AnyPS5 Desktop installer (Inno Setup 6).
 ;
 ; Built by build-installer.ps1, which passes the version and the Flutter release folder:
-;     ISCC.exe /DAppVersion=0.1.22 /DSourceDir=..\..\build\windows\x64\runner\Release AnyPS5-Desktop.iss
+;     ISCC.exe /DAppVersion=0.1.23 /DSourceDir=..\..\build\windows\x64\runner\Release AnyPS5-Desktop.iss
 ;
 ; Installs for the current user by default (%LOCALAPPDATA%\Programs\AnyPS5 Desktop, no
 ; administrator rights); the first page offers an install for all users instead.
