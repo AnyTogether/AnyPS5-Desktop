@@ -2652,6 +2652,34 @@ class AppModel extends ChangeNotifier {
   /// Unlocks paused by hand that stepped aside so another unlock could start: game id → its
   /// installer. They stay frozen (or run again after Resume) until they end.
   final Map<String, Installer> _parked = {};
+
+  /// Parked unlocks whose Resume was pressed while another unlock runs: they wait their turn
+  /// (shown as queued) so only one unlock works at a time.
+  final List<String> _resumeWaiting = [];
+
+  /// Puts the parked unlock [id] in the running place; the one there (paused) steps aside.
+  void _promote(String id) {
+    final target = _parked.remove(id);
+    if (target == null) return;
+    final current = _installer;
+    final currentId = _installerId;
+    if (current != null && currentId != null) _parked[currentId] = current;
+    _installer = target;
+    _installerId = id;
+  }
+
+  /// Starts the first parked unlock waiting to go on, when nothing else runs.
+  void _startResumed() {
+    if (_resumeWaiting.isEmpty) return;
+    if (_installer != null && !_handPaused.contains(_installerId)) return;
+    while (_resumeWaiting.isNotEmpty) {
+      final id = _resumeWaiting.removeAt(0);
+      if (!_parked.containsKey(id)) continue;
+      _promote(id);
+      _installer?.resume();
+      return;
+    }
+  }
   String? _playAfterInstall;
 
   /// What goes on once a copy made by another engine is rebuilt ([rebuildFirst]): the game's
@@ -3208,6 +3236,7 @@ class AppModel extends ChangeNotifier {
       return standaloneEmulator(disc.platform) == null ? const NeedsEmulator() : const Installed();
     }
     final installed = records.containsKey(game.id);
+    if (_resumeWaiting.contains(game.id)) return Queued(updating: installed);
     final current = progress[game.id];
     if (current != null) {
       return Installing(
@@ -3578,6 +3607,7 @@ class AppModel extends ChangeNotifier {
     sounds.play(Cue.select);
     _changed();
     // A paused unlock does not hold the others back: the next one waiting starts now.
+    _startResumed();
     _startNext();
   }
 
@@ -3590,6 +3620,15 @@ class AppModel extends ChangeNotifier {
       _changed();
       return;
     }
+    // Another unlock runs: this one waits its turn instead of working alongside it.
+    if (_parked.containsKey(game.id) && _installer != null && !_handPaused.contains(_installerId)) {
+      _handPaused.remove(game.id);
+      _resumeWaiting.add(game.id);
+      sounds.play(Cue.select);
+      _changed();
+      return;
+    }
+    if (_parked.containsKey(game.id)) _promote(game.id);
     final installer = _installerOf(game);
     _handPaused.remove(game.id);
     // A game that plays holds a background unlock back until it closes.
@@ -3639,6 +3678,7 @@ class AppModel extends ChangeNotifier {
     if (progress.containsKey(game.id)) {
       _cancelling.add(game.id);
       _handPaused.remove(game.id);
+      _resumeWaiting.remove(game.id);
       _installerOf(game)?.cancel();
       _changed();
     }
@@ -3766,6 +3806,7 @@ class AppModel extends ChangeNotifier {
       if (failure == null && installer.leftOut.isNotEmpty) show(leftOutText(game, installer.leftOut), icon: game.icon);
       _changed();
       _publishActivity();
+      _startResumed();
       _startNext();
       _stepPrepare();
     }());
