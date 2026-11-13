@@ -2417,6 +2417,6 @@
   "quitPauseAndQuit": "Pausar e sair",
   "quitCancelAndQuit": "Cancelar e sair",
   "quitAnyway": "Sair mesmo assim",
-  "quitUnlocksDetail": "Pausar e sair guarda o ponto: os jogos mostram Retomar na próxima vez, recomeçando do início. Cancelar e sair descarta o trabalho.",
+  "quitUnlocksDetail": "Cancelar e sair descarta o trabalho. Para parar e continuar depois, volte e use Pausar, mantendo o launcher aberto.",
   "quitRemovingNote": "Remover jogos não pode ser pausado nem cancelado."
 }

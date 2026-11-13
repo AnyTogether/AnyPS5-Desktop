@@ -2417,6 +2417,6 @@
   "quitPauseAndQuit": "Duraklat ve çık",
   "quitCancelAndQuit": "İptal et ve çık",
   "quitAnyway": "Yine de çık",
-  "quitUnlocksDetail": "Duraklat ve çık yerini korur: oyunlarda bir sonraki sefer Devam et görünür ve baştan başlar. İptal et ve çık işi çöpe atar.",
+  "quitUnlocksDetail": "İptal et ve çık işi çöpe atar. Durdurup sonra devam etmek için geri dön ve Duraklat'ı kullan, başlatıcıyı açık tut.",
   "quitRemovingNote": "Oyunları kaldırma duraklatılamaz ve iptal edilemez."
 }

@@ -2417,6 +2417,6 @@
   "quitPauseAndQuit": "Mettre en pause et quitter",
   "quitCancelAndQuit": "Annuler et quitter",
   "quitAnyway": "Quitter quand même",
-  "quitUnlocksDetail": "Mettre en pause et quitter garde votre place : les jeux afficheront Reprendre la prochaine fois, depuis le début. Annuler et quitter jette le travail.",
+  "quitUnlocksDetail": "Annuler et quitter jette le travail. Pour arrêter et reprendre plus tard, revenez et utilisez Pause, en gardant le lanceur ouvert.",
   "quitRemovingNote": "La suppression de jeux ne peut être ni mise en pause ni annulée."
 }

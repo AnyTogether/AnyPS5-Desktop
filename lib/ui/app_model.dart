@@ -5991,12 +5991,6 @@ class AppModel extends ChangeNotifier {
             title: T.text(unlocks ? 'quitUnlocksTitle' : 'quitRemovingTitle'),
             rows: [
               PanelRow(id: 'back', title: T.text('quitGoBack'), kind: ActionRow(closeOverlay)),
-              if (unlocks)
-                PanelRow(
-                  id: 'pauseQuit',
-                  title: T.text('quitPauseAndQuit'),
-                  kind: ActionRow(() => unawaited(quitWithUnlocks(pause: true))),
-                ),
               PanelRow(
                 id: 'quit',
                 title: T.text(unlocks ? 'quitCancelAndQuit' : 'quitAnyway'),

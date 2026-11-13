@@ -2417,6 +2417,6 @@
   "quitPauseAndQuit": "Pausieren und beenden",
   "quitCancelAndQuit": "Abbrechen und beenden",
   "quitAnyway": "Trotzdem beenden",
-  "quitUnlocksDetail": "Pausieren und beenden merkt sich den Stand: Die Spiele zeigen beim nächsten Mal Fortsetzen, und es beginnt von vorn. Abbrechen und beenden verwirft die Arbeit.",
+  "quitUnlocksDetail": "Abbrechen und beenden verwirft die Arbeit. Um später weiterzumachen, geh zurück und nutze Pausieren, und lass den Launcher geöffnet.",
   "quitRemovingNote": "Das Entfernen von Spielen lässt sich weder pausieren noch abbrechen."
 }

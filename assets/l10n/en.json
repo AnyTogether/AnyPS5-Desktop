@@ -2417,6 +2417,6 @@
   "quitPauseAndQuit": "Pause and quit",
   "quitCancelAndQuit": "Cancel and quit",
   "quitAnyway": "Quit anyway",
-  "quitUnlocksDetail": "Pause and quit keeps your place: the games show Resume next time, and it starts again from the beginning. Cancel and quit throws the work away.",
+  "quitUnlocksDetail": "Cancel and quit throws the work away. To stop and go on later, go back and use Pause, and keep the launcher open.",
   "quitRemovingNote": "Removing games can be neither paused nor cancelled."
 }
