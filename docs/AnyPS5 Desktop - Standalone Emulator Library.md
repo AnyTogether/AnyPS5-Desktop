@@ -74,9 +74,12 @@ as Stop (`stopGrace`), and any start begun in the meantime is left alone.
 On Linux an emulator starts with the launcher's environment minus what the
 launcher's AppImage set (`GameProcess.withoutAppImage`): the AppImage
 runtime's `APPIMAGE`, `APPDIR`, `ARGV0` and `OWD`, and the AppRun's own
-`usr/share` folder at the front of `XDG_DATA_DIRS`. An emulator that is not
-an AppImage then cannot pick up the launcher's paths, and one that is starts
-as it would from the desktop. Outside an AppImage nothing is removed.
+`usr/share` folder at the front of `XDG_DATA_DIRS`. The AppRun names that
+folder with symbolic links resolved, so it is matched both as `APPDIR` gives
+it and resolved. An emulator that is not an AppImage then cannot pick up the
+launcher's paths, and one that is starts as it would from the desktop.
+Outside an AppImage none of those variables is set, so the emulator gets the
+launcher's environment unchanged.
 
 The [launcher model](../lib/ui/app_model.dart) exposes the setup rows and
 keeps standalone discs out of PS5 unlocking and trophy discovery. The
@@ -95,7 +98,9 @@ launcher copy.
 libraries, cue-sheet grouping, identifiers that survive a moved games
 folder, per-game file lists and the cache.
 [Installer tests](../test/core/installer_test.dart) check the environment
-an emulator gets from the launcher's AppImage.
+an emulator gets from the launcher's AppImage, including a data folder named
+through a symbolic link, and that a program started without the parent
+environment gets only the one given.
 [Standalone launcher tests](../test/ui/standalone_retro_test.dart) use
 synthetic files and fake processes to verify the off-by-default switch,
 selection, navigation, the launch arguments for all three consoles, a

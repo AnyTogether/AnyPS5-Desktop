@@ -107,8 +107,13 @@ abstract final class GameProcess {
   /// [launcher]'s environment without what its AppImage set: the AppImage runtime's `APPIMAGE`,
   /// `APPDIR`, `ARGV0` and `OWD`, and the AppRun's own folder at the front of `XDG_DATA_DIRS`.
   /// Another program started from it (an emulator) then cannot pick up the launcher's paths, and
-  /// one that is an AppImage itself starts as it would from the desktop.
-  static Map<String, String> withoutAppImage(Map<String, String> launcher) {
+  /// one that is an AppImage itself starts as it would from the desktop. The AppRun names its
+  /// folder with symbolic links resolved, so `APPDIR` is matched both as given and as [resolve]
+  /// gives it.
+  static Map<String, String> withoutAppImage(
+    Map<String, String> launcher, {
+    String Function(String path) resolve = _resolved,
+  }) {
     const runtime = {'APPIMAGE', 'APPDIR', 'ARGV0', 'OWD'};
     final environment = {
       for (final entry in launcher.entries)
@@ -117,9 +122,11 @@ abstract final class GameProcess {
     final appDir = launcher['APPDIR'];
     final dataDirs = launcher['XDG_DATA_DIRS'];
     if (appDir != null && appDir.isNotEmpty && dataDirs != null) {
-      final own = p.posix.join(appDir, 'usr', 'share');
+      final own = {
+        for (final folder in {appDir, resolve(appDir)}) p.posix.join(folder, 'usr', 'share'),
+      };
       final entries = dataDirs.split(':');
-      if (entries.first == own) {
+      if (own.contains(entries.first)) {
         final rest = entries.skip(1).join(':');
         if (rest.isEmpty) {
           environment.remove('XDG_DATA_DIRS');
@@ -129,5 +136,13 @@ abstract final class GameProcess {
       }
     }
     return environment;
+  }
+
+  static String _resolved(String path) {
+    try {
+      return Directory(path).resolveSymbolicLinksSync();
+    } on FileSystemException {
+      return path;
+    }
   }
 }

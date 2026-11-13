@@ -969,6 +969,34 @@ void main() {
       }, reason: 'outside an AppImage nothing changes');
     });
 
+    test("the AppImage's data folder is taken off when the AppRun named it through a link", () {
+      expect(
+        GameProcess.withoutAppImage({
+          'APPDIR': '/tmp/.mount_a',
+          'XDG_DATA_DIRS': '/private/tmp/.mount_a/usr/share:/usr/share',
+        }, resolve: (path) => path == '/tmp/.mount_a' ? '/private/tmp/.mount_a' : path),
+        {'XDG_DATA_DIRS': '/usr/share'},
+      );
+    });
+
+    test('without the parent environment the program gets only the one given', () async {
+      final folder = Directory(p.join(temp.path, 'env'))..createSync();
+      final program = File(p.join(folder.path, 'show-env'))..writeAsStringSync('#!/bin/sh\nenv\n');
+      await Process.run('chmod', ['+x', program.path]);
+      final log = p.join(temp.path, 'logs', 'env.log');
+      final running = await GameProcess.start(
+        installed: folder.path,
+        program: program.path,
+        environment: {'ONLY_THIS': '1'},
+        inheritEnvironment: false,
+        logFile: log,
+      );
+      expect(await running.exitCode, 0);
+      final text = File(log).readAsStringSync();
+      expect(text, contains('ONLY_THIS=1'));
+      expect(text, isNot(contains('HOME=')));
+    }, skip: Platform.isWindows ? 'needs a POSIX shell' : null);
+
     test('a game that is not installed does not start', () async {
       expect(
         () => GameProcess.start(
