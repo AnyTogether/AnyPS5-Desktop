@@ -1149,6 +1149,8 @@ class StateLabel extends StatelessWidget {
         dim,
       ),
       Queued() => (Icons.schedule_rounded, T.text('queued'), dim),
+      Installing(cancelling: true) => (Icons.close_rounded, T.text('unlockCancelling'), dim),
+      Installing(preparing: false, paused: true) => (Icons.pause_circle_rounded, T.text('unlockPausedState'), dim),
       Installing(preparing: true, paused: true) => (Icons.pause_circle_rounded, T.text('preparingPaused'), dim),
       Installing(preparing: true) => (Icons.downloading_rounded, T.text('preparing'), accent),
       // One string: the step is beside the game's buttons already.
@@ -1249,14 +1251,28 @@ class HeroInfo extends StatelessWidget {
                 model.primaryAction(game);
               },
             ),
+            // Stops the unlock for good (it asks first when work was done); Pause is the main button.
+            if (model.canCancelUnlock(state)) ...[
+              SizedBox(width: 16 * scale),
+              ConsoleButton(
+                key: const ValueKey('cancel-unlock'),
+                title: '',
+                icon: Icons.close_rounded,
+                focused: model.focus == HomeFocus.actions(model.cancelAction) && model.overlay == null,
+                onPressed: () {
+                  model.focus = HomeFocus.actions(model.cancelAction);
+                  model.askCancelUnlock(game);
+                },
+              ),
+            ],
             if (model.trophies[game.id] case final set?) ...[
               SizedBox(width: 16 * scale),
               ConsoleButton(
                 title: '${set.unlockedCount}/${set.trophies.length}',
                 icon: Icons.emoji_events_rounded,
-                focused: model.focus == const HomeFocus.actions(1) && model.overlay == null,
+                focused: model.focus == HomeFocus.actions(model.trophiesAction) && model.overlay == null,
                 onPressed: () {
-                  model.focus = const HomeFocus.actions(1);
+                  model.focus = HomeFocus.actions(model.trophiesAction);
                   model.open(Layer.trophies);
                 },
               ),
@@ -1287,6 +1303,10 @@ class HeroInfo extends StatelessWidget {
                                 ? (state.paused
                                       ? T.text('preparingPaused')
                                       : T.format('preparingStep', [InstallSpan.title(state.step)]))
+                                : state.cancelling
+                                ? T.text('unlockCancelling')
+                                : state.paused
+                                ? T.text('unlockPausedState')
                                 : InstallSpan.title(state.step),
                             style: AppText.display(
                               15 * scale,
@@ -1306,10 +1326,18 @@ class HeroInfo extends StatelessWidget {
                         ],
                       ),
                       SizedBox(height: 8 * scale),
-                      if (state.step.name == 'relink' && state.fraction == 0)
+                      if (state.step.name == 'relink' && state.fraction == 0 && !state.paused)
                         IndeterminateLine(color: accent)
                       else
                         ProgressLine(fraction: state.overall, color: accent),
+                      // After a Pause and quit the work folder is gone: Resume starts again.
+                      if (state.restored) ...[
+                        SizedBox(height: 6 * scale),
+                        Text(
+                          T.text('unlockPausedRestarts'),
+                          style: AppText.display(12 * scale, color: Colors.white.withValues(alpha: 0.55)),
+                        ),
+                      ],
                     ],
                   ),
                 ),

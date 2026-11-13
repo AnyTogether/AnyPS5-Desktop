@@ -2402,5 +2402,21 @@
   "retroEmulatorStartFailed": "%@ başlatılamadı",
   "retroEmulatorExited": "%@, %d çıkış koduyla kapandı",
   "retroLibrary": "Emülatör oyunları",
-  "retroLibraryDetail": "Oyun klasörlerindeki PS1, PS2 ve PS3 oyunlarını listeler ve kurduğun bir emülatörde oynatır."
+  "retroLibraryDetail": "Oyun klasörlerindeki PS1, PS2 ve PS3 oyunlarını listeler ve kurduğun bir emülatörde oynatır.",
+  "unlockPause": "Duraklat",
+  "unlockResume": "Devam et",
+  "unlockCancelling": "İptal ediliyor…",
+  "unlockPausedState": "Duraklatıldı",
+  "unlockPausedRestarts": "Duraklatıldı. Devam et, baştan başlar.",
+  "keepGoing": "Devam edilsin",
+  "cancelUnlockAskTitle": "%@ kilidini açma iptal edilsin mi?",
+  "cancelUnlockAskDetail": "Şimdiye kadar yapılan iş kaybolur. Bunun yerine duraklatıp daha sonra devam edebilirsin.",
+  "quitUnlocksTitle": "Oyunların kilidi açılırken çıkılsın mı?",
+  "quitRemovingTitle": "Oyunlar kaldırılırken çıkılsın mı?",
+  "quitGoBack": "Geri dön",
+  "quitPauseAndQuit": "Duraklat ve çık",
+  "quitCancelAndQuit": "İptal et ve çık",
+  "quitAnyway": "Yine de çık",
+  "quitUnlocksDetail": "Duraklat ve çık yerini korur: oyunlarda bir sonraki sefer Devam et görünür ve baştan başlar. İptal et ve çık işi çöpe atar.",
+  "quitRemovingNote": "Oyunları kaldırma duraklatılamaz ve iptal edilemez."
 }

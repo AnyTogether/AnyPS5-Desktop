@@ -214,6 +214,11 @@ class Preferences {
         if (id is String) id,
     }
     ..prepareNewGames = json['prepareNewGames'] as bool? ?? true
+    ..pausedUnlocks = {
+      if (json['pausedUnlocks'] case final Map<String, dynamic> saved)
+        for (final entry in saved.entries)
+          if (entry.value is num) entry.key: (entry.value as num).toInt().clamp(0, 100),
+    }
     ..displayDefaults = DisplayDefaults.fromJson(json['displayDefaults'])
     ..launcherFullscreen = json['launcherFullscreen'] as bool?
     ..windowButtons = json['windowButtons'] as bool? ?? true
@@ -409,6 +414,10 @@ class Preferences {
   /// Settings › Game Library: new games unlocked in the background like a console installing them.
   bool prepareNewGames = true;
 
+  /// Unlocks paused when the launcher was closed (Pause and quit): game id → share done, in
+  /// percent. The game shows Resume; the work folder is gone by then, so Resume starts again.
+  Map<String, int> pausedUnlocks = {};
+
   /// Settings › Default Display: how the games without display choices of their own start.
   /// The same for every profile, as the game settings are.
   DisplayDefaults displayDefaults = const DisplayDefaults();
@@ -512,6 +521,7 @@ class Preferences {
     'assistPlayerOne': assistPlayerOne,
     'cjkGames': cjkGames.toList()..sort(),
     'prepareNewGames': prepareNewGames,
+    if (pausedUnlocks.isNotEmpty) 'pausedUnlocks': pausedUnlocks,
     if (!displayDefaults.isBuiltIn) 'displayDefaults': displayDefaults.toJson(),
     'launcherFullscreen': launcherFullscreen,
     'windowButtons': windowButtons,
@@ -619,9 +629,19 @@ class Installing extends GameState {
     this.paused = false,
     this.updating = false,
     this.playsAfter = false,
+    this.cancelling = false,
+    this.restoredOverall,
   });
   final InstallStep step;
   final double fraction;
+
+  /// Being stopped for good: the button waits until the work has ended.
+  final bool cancelling;
+
+  /// Paused when the launcher was closed (Pause and quit): the share it had reached. Nothing
+  /// runs; Resume starts again from the beginning.
+  final double? restoredOverall;
+  bool get restored => restoredOverall != null;
 
   /// Prepared in the background (a new game), not asked for by the user.
   final bool preparing;
@@ -636,7 +656,7 @@ class Installing extends GameState {
   final bool playsAfter;
 
   /// The share of the whole install done, for one bar.
-  double get overall => InstallSpan.overall(step, fraction);
+  double get overall => restoredOverall ?? InstallSpan.overall(step, fraction);
 }
 
 class Failed extends GameState {
@@ -877,6 +897,13 @@ enum Layer {
 
   /// Escape on the home screen: Quit AnyPS5? (Cancel first).
   confirmQuit,
+
+  /// Cancel on an unlock that has done work: Keep going, or drop it for good.
+  confirmCancelUnlock,
+
+  /// Closing the launcher while games are unlocked or removed: Pause and quit, Cancel and quit,
+  /// or Go back.
+  confirmQuitUnlocks,
 
   /// A zip in a games folder to unpack, or an update to put beside a game, and the job's
   /// progress (game_files_model.dart).
@@ -3180,13 +3207,18 @@ class AppModel extends ChangeNotifier {
         current.$1,
         current.$2,
         preparing: isPreparing(game),
-        paused: isPreparing(game) && prepare.paused,
+        paused: (isPreparing(game) && prepare.paused) || _handPaused.contains(game.id),
         updating: installed,
         playsAfter: _playAfterInstall == game.id,
+        cancelling: _cancelling.contains(game.id),
       );
     }
     final job = engine.git.job;
     if (queue.contains(game.id)) return Queued(updating: installed, waitingForEngine: job != null && !job.checking);
+    // Paused when the launcher was closed: Resume starts it again.
+    if (preferences.pausedUnlocks[game.id] case final int saved) {
+      return Installing(InstallStep.unwrap, 0, paused: true, updating: installed, restoredOverall: saved / 100);
+    }
     final failure = failures[game.id];
     if (failure != null) return Failed(failure);
     final record = records[game.id];
@@ -3394,13 +3426,21 @@ class AppModel extends ChangeNotifier {
         unlock(game);
       case Installing(preparing: true):
         _promotePreparation(game);
+      // Being stopped for good: nothing to press until it has ended.
+      case Installing(cancelling: true):
+        break;
+      // Paused by hand, or when the launcher closed: Resume.
+      case Installing(paused: true):
+        resumeUnlock(game);
       // An update (or one the game starts after) is not given up by a second press on its button:
       // Game Settings › Cancel Update does it.
       case Installing(updating: true) || Queued(updating: true):
         show(T.format('gameUpdatingHint', [game.name]));
       case Installing(playsAfter: true):
         show(T.format('gameUnlockingHint', [game.name]));
-      case Installing() || Queued():
+      case Installing():
+        pauseUnlock(game);
+      case Queued():
         cancelUnlock(game);
       case Unreadable():
         show(T.text('unreadableDump'));
@@ -3500,9 +3540,82 @@ class AppModel extends ChangeNotifier {
     unlock(game);
   }
 
+  /// Unlocks the user paused by hand: the relinker stands still until Resume.
+  final Set<String> _handPaused = {};
+
+  /// Unlocks being stopped for good, until their work has ended.
+  final Set<String> _cancelling = {};
+
+  /// The unlock the cancel question (Layer.confirmCancelUnlock) is about.
+  Game? cancelAsking;
+
+  /// Whether the small Cancel button follows the main button: an unlock under way or paused.
+  bool canCancelUnlock(GameState state) => switch (state) {
+    Installing(preparing: false, cancelling: false) => true,
+    _ => false,
+  };
+
+  Installer? _installerOf(Game game) {
+    if (prepare.active == game.id) return _preparer;
+    return progress.containsKey(game.id) ? _installer : null;
+  }
+
+  /// Stops the unlock where it is: the relinker is frozen and the file work waits before its
+  /// next file. Nothing is lost; [resumeUnlock] goes on.
+  void pauseUnlock(Game game) {
+    final installer = _installerOf(game);
+    if (installer == null || _cancelling.contains(game.id)) return;
+    installer.pause();
+    _handPaused.add(game.id);
+    sounds.play(Cue.select);
+    _changed();
+  }
+
+  /// Goes on from where it stood; after a Pause and quit it starts again from the beginning.
+  void resumeUnlock(Game game) {
+    if (preferences.pausedUnlocks.remove(game.id) != null) {
+      savePreferences();
+      sounds.play(Cue.select);
+      unlock(game);
+      _changed();
+      return;
+    }
+    final installer = _installerOf(game);
+    _handPaused.remove(game.id);
+    // A game that plays holds a background unlock back until it closes.
+    if (installer != null && !(identical(installer, _preparer) && prepare.paused)) installer.resume();
+    sounds.play(Cue.select);
+    _changed();
+  }
+
+  /// The small Cancel button: an unlock that has done work asks first (Keep going is where the
+  /// focus starts); one that only waits loses nothing and is dropped at once.
+  void askCancelUnlock(Game game) {
+    final state = stateOf(game);
+    if (state is Installing && !state.restored && !state.cancelling && !state.preparing) {
+      cancelAsking = game;
+      open(Layer.confirmCancelUnlock);
+      return;
+    }
+    cancelUnlock(game);
+  }
+
+  void _cancelUnlockAnswered() {
+    final game = cancelAsking;
+    cancelAsking = null;
+    closeOverlay();
+    if (game != null) cancelUnlock(game);
+  }
+
   void cancelUnlock(Game game) {
     if (_playAfterInstall == game.id) _playAfterInstall = null;
     if (afterRebuild?.$1 == game.id) afterRebuild = null;
+    // Paused when the launcher closed: there is no work to stop, only the note to drop.
+    if (preferences.pausedUnlocks.remove(game.id) != null) {
+      savePreferences();
+      sounds.play(Cue.back);
+      return _changed();
+    }
     if (prepare.contains(game.id)) {
       if (prepare.cancel(game.id)) _preparer?.cancel();
       sounds.play(Cue.back);
@@ -3513,14 +3626,19 @@ class AppModel extends ChangeNotifier {
       _stepPrepare();
       return;
     }
-    if (progress.containsKey(game.id)) _installer?.cancel();
+    if (progress.containsKey(game.id)) {
+      _cancelling.add(game.id);
+      _handPaused.remove(game.id);
+      _installer?.cancel();
+      _changed();
+    }
     sounds.play(Cue.back);
   }
 
   void _startNext() {
     // While the engine is built in place the unlocks wait for it (engineJobEnded goes on).
     if (engine.git.running) return;
-    if (_installer != null || queue.isEmpty || root == null) return;
+    if (_installer != null || queue.isEmpty || root == null || _quitting) return;
     final next = games.where((game) => game.id == queue.first).firstOrNull;
     final kit = next == null ? toolkit : toolkitFor(next);
     if (next != null && kit == null && missingEngine(next) == null) return; // No engine yet: it waits.
@@ -3618,6 +3736,8 @@ class AppModel extends ChangeNotifier {
         failure = error;
       }
       progress.remove(id);
+      _handPaused.remove(id);
+      _cancelling.remove(id);
       if (_disposed) return;
       done(failure);
       if (failure == null && installer.leftOut.isNotEmpty) show(leftOutText(game, installer.leftOut), icon: game.icon);
@@ -3706,7 +3826,7 @@ class AppModel extends ChangeNotifier {
   List<(String, PrepareSkip)> _stepPrepare({bool quiet = false}) {
     final kit = toolkit;
     final skipped = <(String, PrepareSkip)>[];
-    if (root == null || kit == null || _disposed) return skipped;
+    if (root == null || kit == null || _disposed || _quitting) return skipped;
     final conditions = _prepareConditions;
     while (true) {
       final action = prepare.step(
@@ -3751,7 +3871,8 @@ class AppModel extends ChangeNotifier {
           _preparer?.pause();
           notifyListeners();
         case PrepareResume():
-          _preparer?.resume();
+          // Paused by hand, it stays so until Resume.
+          if (!_handPaused.contains(prepare.active)) _preparer?.resume();
           notifyListeners();
         case PrepareSkipped(:final id, :final reason):
           skipped.add((id, reason));
@@ -4618,7 +4739,16 @@ class AppModel extends ChangeNotifier {
   }
 
   /// Play, the trophies when the game has any, and the settings.
-  int get actionCount => selectedGame != null && trophies.containsKey(selectedGame!.id) ? 3 : 2;
+  int get actionCount => 2 + (_hasTrophies ? 1 : 0) + (cancelShown ? 1 : 0);
+
+  bool get _hasTrophies => selectedGame != null && trophies.containsKey(selectedGame!.id);
+
+  /// The small Cancel button after the main one: an unlock under way or paused.
+  bool get cancelShown => selectedGame != null && canCancelUnlock(stateOf(selectedGame!));
+
+  /// Which of the buttons under the title is Cancel, and which the trophies.
+  int get cancelAction => 1;
+  int get trophiesAction => cancelShown ? 2 : 1;
 
   /// Which of the buttons under the title opens the settings.
   int get settingsAction => actionCount - 1;
@@ -4874,6 +5004,8 @@ class AppModel extends ChangeNotifier {
           Layer.closeGame ||
           Layer.homeMenu ||
           Layer.confirmQuit ||
+          Layer.confirmCancelUnlock ||
+          Layer.confirmQuitUnlocks ||
           Layer.launcherReport ||
           Layer.cloudQuestion ||
           Layer.cloudStorage ||
@@ -4972,7 +5104,9 @@ class AppModel extends ChangeNotifier {
       case ('actions', Command.select):
         if (focus.index == 0) {
           primaryAction(game!);
-        } else if (focus.index == 1 && actionCount == 3) {
+        } else if (cancelShown && focus.index == cancelAction) {
+          askCancelUnlock(game!);
+        } else if (_hasTrophies && focus.index == trophiesAction) {
           open(Layer.trophies);
         } else {
           open(Layer.gameSettings);
@@ -5074,7 +5208,13 @@ class AppModel extends ChangeNotifier {
   }
 
   /// The layers that ask a plain yes or no, drawn as ConfirmCard: two answers side by side.
-  static const twoChoiceLayers = {Layer.confirmQuit, Layer.closeGame, Layer.confirmDeleteGame};
+  static const twoChoiceLayers = {
+    Layer.confirmQuit,
+    Layer.confirmCancelUnlock,
+    Layer.confirmQuitUnlocks,
+    Layer.closeGame,
+    Layer.confirmDeleteGame,
+  };
 
   bool get twoChoice => twoChoiceLayers.contains(overlay);
 
@@ -5086,8 +5226,51 @@ class AppModel extends ChangeNotifier {
     }
     // The profile list opened with the pointer: Escape closes it first.
     if (profileFlow.listShown) return false;
-    open(Layer.confirmQuit);
+    open(hasManualUnlock || _removals.isNotEmpty ? Layer.confirmQuitUnlocks : Layer.confirmQuit);
     return true;
+  }
+
+  /// Unlocks the user asked for are under way or waiting (the games prepared on their own while
+  /// the computer idles do not count: closing with only those asks nothing and waits for nothing).
+  bool get hasManualUnlock => _installer != null || queue.isNotEmpty || (_preparer != null && prepare.promoted);
+
+  bool _quitting = false;
+
+  /// The window's close button and the home menu's Quit: asks first when work would be lost.
+  void requestQuit() {
+    if (hasManualUnlock || _removals.isNotEmpty) {
+      open(Layer.confirmQuitUnlocks);
+    } else {
+      quitLauncher();
+    }
+  }
+
+  /// Pause and quit ([pause]) saves the unlocks so the games show Resume next start; Cancel and
+  /// quit drops them. The work is stopped either way, then the launcher closes.
+  Future<void> quitWithUnlocks({required bool pause}) async {
+    if (_quitting) return;
+    _quitting = true;
+    if (pause) {
+      for (final entry in progress.entries) {
+        if (entry.key == prepare.active && !prepare.promoted) continue;
+        final (step, fraction) = entry.value;
+        preferences.pausedUnlocks[entry.key] = (InstallSpan.overall(step, fraction) * 100).round().clamp(0, 99);
+      }
+      for (final id in queue) {
+        preferences.pausedUnlocks.putIfAbsent(id, () => 0);
+      }
+      savePreferences();
+    }
+    queue.clear();
+    closeOverlay();
+    _installer?.cancel();
+    _preparer?.cancel();
+    _changed();
+    // The relinker is stopped and its work folder removed before the window goes.
+    for (var waited = 0; waited < 100 && (_installer != null || _preparer != null); waited++) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    quitLauncher();
   }
 
   /// Quit AnyPS5 (the home menu): the game playing closes with it.
@@ -5732,7 +5915,7 @@ class AppModel extends ChangeNotifier {
                 id: 'quit',
                 title: T.text('quitLauncher'),
                 detail: running == null ? null : T.format('quitLauncherGame', [running!.$1.name]),
-                kind: ActionRow(quitLauncher, destructive: true),
+                kind: ActionRow(requestQuit, destructive: true),
               ),
             ],
           ),
@@ -5771,6 +5954,61 @@ class AppModel extends ChangeNotifier {
                 title: T.text('quit'),
                 detail: running == null ? null : T.format('quitLauncherGame', [running!.$1.name]),
                 kind: ActionRow(quitLauncher, destructive: true),
+              ),
+            ],
+          ),
+        ];
+      case Layer.confirmCancelUnlock when cancelAsking != null:
+        final asking = cancelAsking!;
+        return [
+          PanelCategory(
+            id: 'cancelUnlock',
+            title: T.format('cancelUnlockAskTitle', [asking.name]),
+            rows: [
+              // Keep going first: where the focus starts.
+              PanelRow(
+                id: 'keep',
+                title: T.text('keepGoing'),
+                kind: ActionRow(() {
+                  cancelAsking = null;
+                  closeOverlay();
+                }),
+              ),
+              PanelRow(
+                id: 'cancel',
+                title: T.text('cancelUnlock'),
+                detail: T.text('cancelUnlockAskDetail'),
+                kind: ActionRow(_cancelUnlockAnswered, destructive: true),
+              ),
+            ],
+          ),
+        ];
+      case Layer.confirmQuitUnlocks:
+        final unlocks = hasManualUnlock;
+        return [
+          PanelCategory(
+            id: 'confirmQuitUnlocks',
+            title: T.text(unlocks ? 'quitUnlocksTitle' : 'quitRemovingTitle'),
+            rows: [
+              PanelRow(id: 'back', title: T.text('quitGoBack'), kind: ActionRow(closeOverlay)),
+              if (unlocks)
+                PanelRow(
+                  id: 'pauseQuit',
+                  title: T.text('quitPauseAndQuit'),
+                  kind: ActionRow(() => unawaited(quitWithUnlocks(pause: true))),
+                ),
+              PanelRow(
+                id: 'quit',
+                title: T.text(unlocks ? 'quitCancelAndQuit' : 'quitAnyway'),
+                // A removal can be neither paused nor cancelled: the panel says so.
+                detail: [
+                  if (unlocks) T.text('quitUnlocksDetail'),
+                  if (_removals.isNotEmpty) T.text('quitRemovingNote'),
+                ].join(' '),
+                kind: ActionRow(
+                  unlocks ? () => unawaited(quitWithUnlocks(pause: false)) : quitLauncher,
+                  destructive: true,
+                ),
               ),
             ],
           ),
@@ -7089,12 +7327,24 @@ class AppModel extends ChangeNotifier {
   /// (an update or unlock, the engine's build it waits for, the game playing).
   List<PanelRow> _jobRows(Game game, GameState state) => switch (state) {
     Installing(preparing: true) => const [],
-    Installing(:final step, :final overall, :final updating) => [
+    Installing(:final step, :final overall, :final updating, :final paused, :final cancelling) => [
+      if (!cancelling)
+        PanelRow(
+          id: 'pauseJob',
+          title: T.text(paused ? 'unlockResume' : 'unlockPause'),
+          detail: '${InstallSpan.title(step)} · ${T.percent((overall * 100).round())}',
+          kind: ActionRow(() {
+            if (paused) {
+              resumeUnlock(game);
+            } else {
+              pauseUnlock(game);
+            }
+          }),
+        ),
       PanelRow(
         id: 'cancelJob',
         title: T.text(updating ? 'cancelUpdate' : 'cancelUnlock'),
-        detail: '${InstallSpan.title(step)} · ${T.percent((overall * 100).round())}',
-        kind: ActionRow(() => cancelUnlock(game), destructive: true),
+        kind: ActionRow(() => askCancelUnlock(game), destructive: true),
       ),
     ],
     Queued(:final updating, :final waitingForEngine) => [
@@ -7338,6 +7588,24 @@ class AppModel extends ChangeNotifier {
     if (_searchCommand(command)) return;
     // A plain yes or no (ConfirmCard): its two answers side by side, ← to the way back, → to the
     // destructive one, from the keys and the pad alike.
+    if (twoChoice && rows.length > 2 && (command == Command.left || command == Command.right)) {
+      // Three answers, in the order they are drawn: the ways back first, the destructive one last.
+      bool destructive(int index) => rows[index].kind is ActionRow && (rows[index].kind as ActionRow).destructive;
+      final order = [
+        for (var index = 0; index < rows.length; index++)
+          if (!destructive(index)) index,
+        for (var index = 0; index < rows.length; index++)
+          if (destructive(index)) index,
+      ];
+      final at = order.indexOf(panelRow);
+      final next = order[((at < 0 ? 0 : at) + (command == Command.right ? 1 : -1)).clamp(0, order.length - 1)];
+      if (next != panelRow) {
+        panelRow = next;
+        sounds.play(Cue.move);
+        _changed();
+      }
+      return;
+    }
     if (twoChoice && (command == Command.left || command == Command.right)) {
       final target = rows.indexWhere(
         (row) => row.kind is ActionRow && (row.kind as ActionRow).destructive == (command == Command.right),
@@ -7984,6 +8252,8 @@ class AppModel extends ChangeNotifier {
               Installed(:final outdated) => outdated ? RemoteGameState.update : RemoteGameState.installed,
               Locked() || Failed() || FamilyLocked() => RemoteGameState.locked,
               // The phone has no word for the engine's build: busy with the game, as an unlock is.
+              // Paused (not by a game playing) is as good as locked to the phone: nothing goes on.
+              Installing(paused: true, preparing: false) => RemoteGameState.locked,
               Queued() || Installing() || WaitingForEngine() => RemoteGameState.installing,
               Starting() => RemoteGameState.starting,
               Running() || Stopping() => RemoteGameState.running,
