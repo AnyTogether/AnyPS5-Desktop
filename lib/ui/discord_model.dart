@@ -78,7 +78,8 @@ class DiscordModel {
     final presence = this.presence;
     if (presence == null) return;
     final together = app.together;
-    final running = app.running;
+    // An emulator game's name is its disc's file name: Discord never sees it.
+    final running = app.running?.$1.retro == null ? app.running : null;
     final party = together.signedIn ? together.hub.parties.party : null;
     if (party?.id != _partySince?.$1) _partySince = party == null ? null : (party.id, DateTime.now());
     DateTime? refreshAt;

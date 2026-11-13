@@ -2389,5 +2389,18 @@
   "togetherErrorOther": "AnyTogether bunu yapamadı (%@).",
   "phoneBrowserName": "%@ tarayıcısı",
   "phoneBrowserGeneric": "Telefon tarayıcısı",
-  "phoneRemoveOnline": "Şu an bağlı, kaldırmak için seç"
+  "phoneRemoveOnline": "Şu an bağlı, kaldırmak için seç",
+  "retroEmulators": "Emülatörler",
+  "retroGames": "%@ oyunları",
+  "retroSelectExecutable": "%@ yürütülebilir dosyasını seç",
+  "retroChooseExecutable": "Kurulu bir yürütülebilir dosya seç",
+  "retroEmulatorPickerFailed": "Emülatör dosya seçicisi açılamadı",
+  "retroChooseEmulator": "Emülatör seç",
+  "retroEmulatorNeeded": "Emülatör gerekli",
+  "retroShowFolders": "Klasör olarak göster",
+  "retroDiscMoved": "Oyun dosyası bulunamadı. Dosyayı geri koy veya kütüphaneyi yeniden tara.",
+  "retroEmulatorStartFailed": "%@ başlatılamadı",
+  "retroEmulatorExited": "%@, %d çıkış koduyla kapandı",
+  "retroLibrary": "Emülatör oyunları",
+  "retroLibraryDetail": "Oyun klasörlerindeki PS1, PS2 ve PS3 oyunlarını listeler ve kurduğun bir emülatörde oynatır."
 }

@@ -614,7 +614,8 @@ class TogetherModel {
   void _followGame() {
     family.followGame();
     followGameSession();
-    final running = app.running;
+    // An emulator game is not an AnyTogether title: friends see the user online, as with none.
+    final running = app.running?.$1.retro == null ? app.running : null;
     final since = running == null ? null : DateTime.tryParse(app.preferences.lastPlayed[running.$1.id] ?? '');
     hub.socket.presence = running == null
         ? const PresenceOnline()

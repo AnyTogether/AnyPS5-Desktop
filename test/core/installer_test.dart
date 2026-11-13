@@ -936,6 +936,67 @@ void main() {
       expect(text, contains('--- exit 0'));
     });
 
+    test('an emulator started from the AppImage gets none of its variables', () {
+      final launcher = {
+        'APPIMAGE': '/home/u/AnyPS5.AppImage',
+        'APPDIR': '/tmp/.mount_AnyPS5x',
+        'ARGV0': 'AnyPS5.AppImage',
+        'OWD': '/home/u',
+        'XDG_DATA_DIRS': '/tmp/.mount_AnyPS5x/usr/share:/usr/local/share:/usr/share',
+        'HOME': '/home/u',
+        'PATH': '/usr/bin',
+      };
+      expect(GameProcess.withoutAppImage(launcher), {
+        'XDG_DATA_DIRS': '/usr/local/share:/usr/share',
+        'HOME': '/home/u',
+        'PATH': '/usr/bin',
+      });
+      expect(launcher, hasLength(7), reason: 'the launcher keeps its own environment');
+    });
+
+    test("only the AppImage's own data folder at the front is taken off", () {
+      expect(
+        GameProcess.withoutAppImage({'APPDIR': '/tmp/.mount_a', 'XDG_DATA_DIRS': '/usr/share:/tmp/.mount_a/usr/share'}),
+        {'XDG_DATA_DIRS': '/usr/share:/tmp/.mount_a/usr/share'},
+      );
+      expect(
+        GameProcess.withoutAppImage({'APPDIR': '/tmp/.mount_a', 'XDG_DATA_DIRS': '/tmp/.mount_a/usr/share'}),
+        isEmpty,
+      );
+      expect(GameProcess.withoutAppImage({'XDG_DATA_DIRS': '/opt/x/usr/share:/usr/share', 'HOME': '/h'}), {
+        'XDG_DATA_DIRS': '/opt/x/usr/share:/usr/share',
+        'HOME': '/h',
+      }, reason: 'outside an AppImage nothing changes');
+    });
+
+    test("the AppImage's data folder is taken off when the AppRun named it through a link", () {
+      expect(
+        GameProcess.withoutAppImage({
+          'APPDIR': '/tmp/.mount_a',
+          'XDG_DATA_DIRS': '/private/tmp/.mount_a/usr/share:/usr/share',
+        }, resolve: (path) => path == '/tmp/.mount_a' ? '/private/tmp/.mount_a' : path),
+        {'XDG_DATA_DIRS': '/usr/share'},
+      );
+    });
+
+    test('without the parent environment the program gets only the one given', () async {
+      final folder = Directory(p.join(temp.path, 'env'))..createSync();
+      final program = File(p.join(folder.path, 'show-env'))..writeAsStringSync('#!/bin/sh\nenv\n');
+      await Process.run('chmod', ['+x', program.path]);
+      final log = p.join(temp.path, 'logs', 'env.log');
+      final running = await GameProcess.start(
+        installed: folder.path,
+        program: program.path,
+        environment: {'ONLY_THIS': '1'},
+        inheritEnvironment: false,
+        logFile: log,
+      );
+      expect(await running.exitCode, 0);
+      final text = File(log).readAsStringSync();
+      expect(text, contains('ONLY_THIS=1'));
+      expect(text, isNot(contains('HOME=')));
+    }, skip: Platform.isWindows ? 'needs a POSIX shell' : null);
+
     test('a game that is not installed does not start', () async {
       expect(
         () => GameProcess.start(
