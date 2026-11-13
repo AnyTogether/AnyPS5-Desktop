@@ -2645,6 +2645,13 @@ class AppModel extends ChangeNotifier {
   Timer? _trophyWatch;
   Set<String> _earned = {};
   Installer? _installer;
+
+  /// The game [_installer] unlocks.
+  String? _installerId;
+
+  /// Unlocks paused by hand that stepped aside so another unlock could start: game id → its
+  /// installer. They stay frozen (or run again after Resume) until they end.
+  final Map<String, Installer> _parked = {};
   String? _playAfterInstall;
 
   /// What goes on once a copy made by another engine is rebuilt ([rebuildFirst]): the game's
@@ -3243,7 +3250,7 @@ class AppModel extends ChangeNotifier {
   }
 
   /// An unlock runs now (asked for, or a new game prepared in the background).
-  bool get unlocking => _installer != null || _preparer != null;
+  bool get unlocking => _installer != null || _parked.isNotEmpty || _preparer != null;
 
   GameSettings settingsFor(Game game) => settingsStore.load(game.slug);
 
@@ -3557,6 +3564,7 @@ class AppModel extends ChangeNotifier {
 
   Installer? _installerOf(Game game) {
     if (prepare.active == game.id) return _preparer;
+    if (_parked[game.id] case final Installer parked) return parked;
     return progress.containsKey(game.id) ? _installer : null;
   }
 
@@ -3569,6 +3577,8 @@ class AppModel extends ChangeNotifier {
     _handPaused.add(game.id);
     sounds.play(Cue.select);
     _changed();
+    // A paused unlock does not hold the others back: the next one waiting starts now.
+    _startNext();
   }
 
   /// Goes on from where it stood; after a Pause and quit it starts again from the beginning.
@@ -3629,7 +3639,7 @@ class AppModel extends ChangeNotifier {
     if (progress.containsKey(game.id)) {
       _cancelling.add(game.id);
       _handPaused.remove(game.id);
-      _installer?.cancel();
+      _installerOf(game)?.cancel();
       _changed();
     }
     sounds.play(Cue.back);
@@ -3638,7 +3648,15 @@ class AppModel extends ChangeNotifier {
   void _startNext() {
     // While the engine is built in place the unlocks wait for it (engineJobEnded goes on).
     if (engine.git.running) return;
-    if (_installer != null || queue.isEmpty || root == null || _quitting) return;
+    if (queue.isEmpty || root == null || _quitting) return;
+    if (_installer != null) {
+      // The one under way was paused by hand: it steps aside and the next one starts.
+      final current = _installerId;
+      if (current == null || !_handPaused.contains(current)) return;
+      _parked[current] = _installer!;
+      _installer = null;
+      _installerId = null;
+    }
     final next = games.where((game) => game.id == queue.first).firstOrNull;
     final kit = next == null ? toolkit : toolkitFor(next);
     if (next != null && kit == null && missingEngine(next) == null) return; // No engine yet: it waits.
@@ -3653,13 +3671,18 @@ class AppModel extends ChangeNotifier {
       return _startNext();
     }
     final folder = rootOf(game)!;
+    _installerId = id;
     _installer = _runUnlock(
       game,
       kit,
       folder,
       background: false,
       done: (error) {
-        _installer = null;
+        // A parked unlock ends without touching the one that runs now.
+        if (_parked.remove(id) == null) {
+          _installer = null;
+          _installerId = null;
+        }
         switch (error) {
           case null:
             sounds.play(Cue.unlocked);
@@ -5232,7 +5255,7 @@ class AppModel extends ChangeNotifier {
 
   /// Unlocks the user asked for are under way or waiting (the games prepared on their own while
   /// the computer idles do not count: closing with only those asks nothing and waits for nothing).
-  bool get hasManualUnlock => _installer != null || queue.isNotEmpty || (_preparer != null && prepare.promoted);
+  bool get hasManualUnlock => _installer != null || _parked.isNotEmpty || queue.isNotEmpty || (_preparer != null && prepare.promoted);
 
   bool _quitting = false;
 
@@ -5264,10 +5287,15 @@ class AppModel extends ChangeNotifier {
     queue.clear();
     closeOverlay();
     _installer?.cancel();
+    for (final parked in _parked.values) {
+      parked.cancel();
+    }
     _preparer?.cancel();
     _changed();
     // The relinker is stopped and its work folder removed before the window goes.
-    for (var waited = 0; waited < 100 && (_installer != null || _preparer != null); waited++) {
+    for (var waited = 0;
+        waited < 100 && (_installer != null || _parked.isNotEmpty || _preparer != null);
+        waited++) {
       await Future<void>.delayed(const Duration(milliseconds: 100));
     }
     quitLauncher();
@@ -8379,6 +8407,9 @@ class AppModel extends ChangeNotifier {
     sharePlay.dispose();
     _navigator?.dispose();
     _installer?.cancel();
+    for (final parked in _parked.values) {
+      parked.cancel();
+    }
     _preparer?.cancel();
     _prepareTimer?.cancel();
     engine.cancel();
