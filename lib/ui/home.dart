@@ -740,8 +740,9 @@ class PhoneIndicator extends StatelessWidget {
 }
 
 /// The row of game tiles: the selected one is larger, sits at the row's start and carries the
-/// game's name under it, as on the console. The tiles are top-aligned and the next ones follow
-/// right after the selected one; the previous game stays visible on the left, cut by the edge.
+/// game's name beside it, under the next tiles and with the state as a small icon, as on the
+/// console. The tiles are top-aligned and the next ones follow right after the selected one; the
+/// previous game stays visible on the left, cut by the edge.
 class TileRow extends StatelessWidget {
   const TileRow({super.key, required this.model, this.folderContents = false});
 
@@ -757,7 +758,6 @@ class TileRow extends StatelessWidget {
     final large = (folderContents ? 148 : 176) * scale;
     final gap = 16 * scale;
     final label = 300 * scale;
-    final labelGap = 10 * scale;
     final leading = 64 * scale;
     final tiles = folderContents ? model.homeFolderTiles : model.homeTiles;
     final at = preview ? 0 : model.homeTileIndex(tiles, folderContents: folderContents);
@@ -768,7 +768,7 @@ class TileRow extends StatelessWidget {
       folderContents: folderContents,
       step: small + gap,
       child: SizedBox(
-        height: large + (preview ? 10 : 58) * scale,
+        height: large + 10 * scale,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -839,25 +839,30 @@ class TileRow extends StatelessWidget {
                   if (selected && !preview)
                     PositionedDirectional(
                       key: ValueKey('label-$id'),
-                      start: leading + peek + 4 * scale,
-                      top: large + labelGap,
+                      start: leading + peek + large + gap * 0.75,
+                      top: large - 28 * scale,
                       width: label,
                       child: Legible(
                         softness: 12,
-                        child: Column(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              console == null
-                                  ? game.nameFor([T.language.code])
-                                  : T.format('retroGames', [console.name.toUpperCase()]),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppText.display(18 * scale, weight: FontWeight.w500),
+                            Flexible(
+                              child: Text(
+                                console == null
+                                    ? game.nameFor([T.language.code])
+                                    : T.format('retroGames', [console.name.toUpperCase()]),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppText.display(18 * scale, weight: FontWeight.w500),
+                              ),
                             ),
-                            SizedBox(height: 4 * scale),
-                            if (folder == null) StateLabel(model: model, state: model.stateOf(game)),
+                            // The state is only an icon here (the hero says it in words); a plain
+                            // locked game shows none, its tile carries the padlock already.
+                            if (folder == null) ...[
+                              SizedBox(width: 8 * scale),
+                              StateLabel(model: model, state: model.stateOf(game), iconOnly: true),
+                            ],
                           ],
                         ),
                       ),
@@ -1124,7 +1129,14 @@ class GameTile extends StatelessWidget {
 }
 
 class StateLabel extends StatelessWidget {
-  const StateLabel({super.key, required this.model, required this.state, this.size = 14, this.compact = false});
+  const StateLabel({
+    super.key,
+    required this.model,
+    required this.state,
+    this.size = 14,
+    this.compact = false,
+    this.iconOnly = false,
+  });
 
   final AppModel model;
   final GameState state;
@@ -1132,6 +1144,9 @@ class StateLabel extends StatelessWidget {
 
   /// One short line (the Status card): the step is under the main button already.
   final bool compact;
+
+  /// Only the state's icon, no words (the tile row); nothing for a state with no icon of its own.
+  final bool iconOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -1180,6 +1195,9 @@ class StateLabel extends StatelessWidget {
       Starting() => (Icons.hourglass_top_rounded, T.text('starting'), accent),
       Running() => (Icons.play_circle_rounded, T.text('running'), accent),
     };
+    if (iconOnly) {
+      return icon == null ? const SizedBox.shrink() : Icon(icon, size: (size + 4) * scale, color: tint);
+    }
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
