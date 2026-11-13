@@ -517,7 +517,8 @@ extension TogetherProfiles on TogetherModel {
 
   // Playing together.
 
-  /// The engine a game was unlocked with: only the same build is relied on to talk to itself.
+  /// The engine a game was unlocked with (its install record's, never the launcher's own version
+  /// while a copy stands): only the same build is relied on to talk to itself.
   String engineBuild(Game game) =>
       GameSession.cleanEngineBuild(app.records[game.id]?.toolkit ?? app.toolkit?.version ?? launcherVersion);
 
@@ -572,41 +573,76 @@ extension TogetherProfiles on TogetherModel {
     }
   }
 
-  /// A friend's game, from their presence or an invite: the same game here, checked first.
-  Future<void> joinFriendGame(String sessionId, {required String titleId, required String host}) async {
+  /// A friend's game, from their presence or an invite: the same game here, checked first as
+  /// Play Together checks it. A copy made by an older engine than the one at hand, when that one
+  /// is the host's, is rebuilt and the join goes on ([rebuilt]: it just was); a different game
+  /// version or engine build is said whole in its panel.
+  Future<void> joinFriendGame(
+    String sessionId, {
+    required String titleId,
+    required String host,
+    bool rebuilt = false,
+  }) async {
     if (!signedIn) return;
     final game = app.games.where((game) => game.titleId == titleId).firstOrNull;
     if (game == null) return app.show(T.format('gameNotHere', [titleId]));
     final running = app.running;
     if (running != null) return app.show(T.format('gameCloseFirst', [running.$1.name]));
     if (app.stateOf(game) is! Installed) return app.show(T.format('gameUnlockFirst', [game.name]));
-    final version = gameVersion(game);
-    final engine = engineBuild(game);
+    void again() => unawaited(joinFriendGame(sessionId, titleId: titleId, host: host, rebuilt: true));
     try {
       final session = await hub.games.get(sessionId);
-      switch (session.mismatch(gameVersion: version, engineBuild: engine)) {
-        case SessionMismatch.gameVersion:
-          return app.show(T.format('gameVersionMismatch', [host, session.gameVersion, version]));
-        case SessionMismatch.engineBuild:
-          return app.show(
-            T.format('gameEngineMismatch', [
-              host,
-              GameSession.release(session.engineBuild),
-              GameSession.release(engine),
-            ]),
+      final seen = PlayTogetherOffer.fromSession(session);
+      final hostName = host.isNotEmpty ? host : seen.hostName;
+      final verdict = PlayTogetherCheck.verdict(
+        seen,
+        signedIn: true,
+        copies: togetherCopies(),
+        running: app.running?.$1.name,
+      );
+      final Game copy;
+      switch (verdict) {
+        case JoinWith(:final gameId):
+          final found = app.games.where((game) => game.id == gameId).firstOrNull;
+          if (found == null) return;
+          copy = found;
+        case UpdateAndPlay(:final gameId):
+          final stale = app.games.where((game) => game.id == gameId).firstOrNull;
+          if (rebuilt || stale == null) return app.show(T.text('togetherStartFailed'));
+          return app.rebuildFirst(stale, again);
+        case UnlockAndPlay():
+          return app.show(T.format('gameUnlockFirst', [game.name]));
+        case OtherGameVersion(:final have, :final need, :final youUpdate):
+          return tell(
+            JoinBlock.gameVersion(
+              youUpdate: youUpdate,
+              hostName: hostName,
+              gameName: game.name,
+              host: need,
+              yours: have,
+            ),
           );
-        case null:
-          break;
+        case OtherEngine(:final have, :final need):
+          return tell(engineBlock(hostName: hostName, titleId: titleId, host: need, yours: have, rebuild: again));
+        case CloseFirst(running: final name):
+          return app.show(T.format('gameCloseFirst', [name]));
+        case SessionFull():
+          return app.show(T.text('gameSessionFull'));
+        case MissingGame() || SignInFirst():
+          return app.show(T.format('gameNotHere', [titleId]));
       }
-      await hub.games.join(sessionId, gameVersion: version, engineBuild: engine);
-      app.show(T.format('gameJoined', [host, game.name]));
+      await hub.games.join(sessionId, gameVersion: gameVersion(copy), engineBuild: engineBuild(copy));
+      app.show(T.format('gameJoined', [hostName, copy.name]));
       if (app.overlay != null) app.closeOverlay();
-      app.select(app.games.indexOf(game));
-      unawaited(app.play(game));
+      app.select(app.games.indexOf(copy));
+      // The copy's engine is the host's: it starts as it is.
+      unawaited(app.play(copy, asItIs: true));
     } on TogetherProblem catch (problem) {
+      if (JoinRefusal.of(problem) case final JoinRefusal refusal) {
+        return tell(refusalBlock(refusal, hostName: host, titleId: titleId));
+      }
       app.show(switch (problem.code) {
         'full' => T.text('gameSessionFull'),
-        'version_mismatch' => problem.title,
         _ => message(problem),
       });
     } on Object catch (error) {

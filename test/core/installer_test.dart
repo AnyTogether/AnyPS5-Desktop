@@ -429,6 +429,190 @@ void main() {
       expect(fakeRelinkerInputs(toolkitFolder), hasLength(2), reason: 'not run again');
     });
 
+    /// A dump whose [modules] are plain ELF files, those in [containers] SELF containers.
+    Game makeDumpOf(String name, List<String> modules, {Set<String> containers = const {}}) {
+      final folder = makeDump(root, name, titleId: 'PPSA22116', names: {'en-US': name});
+      for (final module in modules) {
+        final file = File(p.join(folder, p.joinAll(module.split('/'))))..parent.createSync(recursive: true);
+        file.writeAsBytesSync(containers.contains(module) ? typicalSelf(seed: 3) : [...elfHead, 4, 5, 6]);
+      }
+      return GameLibrary.inspect(folder)!;
+    }
+
+    // Slick Daddy's Lost in Play (Desktop #144): the dump holds libc.prx and libSceNpCppWebApi.prx
+    // in sce_module and again in decrypted/sce_module. The relinker stopped twice with
+    // "Conflicting guest output filename", each time naming sce_module's copy, which was left out.
+    // The game was unlocked with the copies from decrypted/sce_module, where the Windows relinker
+    // leaves libc.prx unstarted, and stopped at its start.
+    const lostInPlay = [
+      'Media/Modules/Il2cppUserAssemblies.prx',
+      'Media/Modules/PS5Util.prx',
+      'Media/Plugins/CommonDialog.prx',
+      'Media/Plugins/PSN.prx',
+      'Media/Plugins/SaveData.prx',
+      'Media/Plugins/Share.prx',
+      'Media/Plugins/lib_burst_generated.prx',
+      'Media/Plugins/libfmod.prx',
+      'Media/Plugins/libfmodstudio.prx',
+      'Media/Plugins/libresonanceaudio.prx',
+      'decrypted/sce_module/libSceNpCppWebApi.prx',
+      'decrypted/sce_module/libc.prx',
+      'sce_module/libSceNpCppWebApi.prx',
+      'sce_module/libc.prx',
+    ];
+    for (final system in HostSystem.values) {
+      test('Lost in Play on ${system.name}: of the copies in decrypted/sce_module and sce_module, '
+          'sce_module\'s are relinked', () async {
+        makeFakeToolkit(toolkitFolder, windowsDlls: system == HostSystem.windows);
+        final game = makeDumpOf(
+          'Lost in Play',
+          lostInPlay,
+          containers: {'sce_module/libSceNpCppWebApi.prx', 'sce_module/libc.prx'},
+        );
+        final lines = <String>[];
+        final installer = Installer(
+          game: game,
+          toolkit: Toolkit(toolkitFolder, system: system),
+          root: root,
+          onLog: lines.add,
+        );
+        final installed = await installer.run();
+        final kept = lostInPlay.where((module) => !module.startsWith('decrypted/')).toList();
+        // One run, without a conflict: nothing is left out, and nothing came from decrypted.
+        expect(fakeRelinkerInputs(toolkitFolder), [
+          [...kept.sublist(0, 10), 'eboot.bin', ...kept.sublist(10)],
+        ]);
+        expect(installer.leftOut, isEmpty);
+        expect(lines.where((line) => line.contains('Conflicting')), isEmpty);
+        // What upstream's guide passes for a Unity game, and the folder of eboot.bin as ever.
+        final arguments = fakeRelinkerArguments(toolkitFolder);
+        expect(arguments.sublist(arguments.indexOf('--module-dir'), arguments.length - 1), [
+          '--module-dir',
+          '.',
+          '--module-dir',
+          'Media/Modules',
+          '--module-dir',
+          'Media/Plugins',
+          'eboot.bin',
+        ]);
+        expect(
+          lines,
+          containsAll([
+            'decrypted/sce_module/libSceNpCppWebApi.prx: the dump has this module as '
+                'sce_module/libSceNpCppWebApi.prx too, the game is unlocked with that one',
+            'decrypted/sce_module/libc.prx: the dump has this module as sce_module/libc.prx too, '
+                'the game is unlocked with that one',
+          ]),
+        );
+        // The game's files are all there, the copies too; the dump is as it was.
+        expect(File(p.join(installed, 'app0', 'decrypted', 'sce_module', 'libc.prx')).existsSync(), isTrue);
+        expect(File(p.join(game.folder, 'decrypted', 'sce_module', 'libc.prx')).readAsBytesSync(), [
+          ...elfHead,
+          4,
+          5,
+          6,
+        ]);
+      });
+    }
+
+    // Lenny4250gh's report (Desktop #145): Minecraft and other dumps with modules next to
+    // eboot.bin that sce_module holds too. An engine before v0.1.4 names eboot.bin in the
+    // conflict, which stopped the unlock; a later one named sce_module's copy, which was left out.
+    test('modules next to eboot.bin and again in sce_module: sce_module\'s are relinked, '
+        'one next to eboot.bin alone still is', () async {
+      final game = makeDumpOf('Minecraft', [
+        'libSceFace.prx',
+        'libc.prx',
+        'libcohtml.Prospero.prx',
+        'sce_module/libSceFace.prx',
+        'sce_module/libc.prx',
+      ]);
+      final lines = <String>[];
+      final installer = Installer(game: game, toolkit: Toolkit(toolkitFolder), root: root, onLog: lines.add);
+      await installer.run();
+      expect(fakeRelinkerInputs(toolkitFolder), [
+        ['eboot.bin', 'libcohtml.Prospero.prx', 'sce_module/libSceFace.prx', 'sce_module/libc.prx'],
+      ]);
+      expect(installer.leftOut, isEmpty);
+      final arguments = fakeRelinkerArguments(toolkitFolder);
+      expect(arguments.sublist(1, arguments.length - 1), ['--module-dir', '.', 'eboot.bin']);
+      expect(
+        lines,
+        contains('libc.prx: the dump has this module as sce_module/libc.prx too, the game is unlocked with that one'),
+      );
+    });
+
+    test('a Unity game: one plugin that sce_module holds too costs the folder none of its others', () async {
+      final game = makeDumpOf('Unity', [
+        'Media/Modules/PS5Util.prx',
+        'Media/Plugins/PSN.prx',
+        'Media/Plugins/libfmod.prx',
+        'sce_module/libc.prx',
+        'sce_module/libfmod.prx',
+      ]);
+      final installer = Installer(game: game, toolkit: Toolkit(toolkitFolder), root: root);
+      await installer.run();
+      expect(fakeRelinkerInputs(toolkitFolder), [
+        [
+          'Media/Modules/PS5Util.prx',
+          'Media/Plugins/PSN.prx',
+          'eboot.bin',
+          'sce_module/libc.prx',
+          'sce_module/libfmod.prx',
+        ],
+      ]);
+      final arguments = fakeRelinkerArguments(toolkitFolder);
+      expect(arguments.sublist(1, arguments.length - 1), [
+        '--module-dir',
+        '.',
+        '--module-dir',
+        'Media/Modules',
+        '--module-dir',
+        'Media/Plugins',
+        'eboot.bin',
+      ]);
+      expect(installer.leftOut, isEmpty);
+    });
+
+    test('a dump without a module in two places is relinked as before, each module where it is', () async {
+      final game = makeDumpOf('Unity', [
+        'Media/Modules/Il2cppUserAssemblies.prx',
+        'Media/Plugins/PSN.prx',
+        'decrypted/extra.prx',
+        'sce_module/libc.prx',
+        'top.prx',
+      ]);
+      final toolkit = Toolkit(toolkitFolder);
+      final all = Installer.modules(game.folder);
+      expect(Installer.modulesOf(game, HostSystem.linux), all);
+      expect(Installer.modulesOf(game, HostSystem.windows), all);
+      final lines = <String>[];
+      await Installer(game: game, toolkit: toolkit, root: root, onLog: lines.add).run();
+      expect(fakeRelinkerInputs(toolkitFolder), [
+        [
+          'Media/Modules/Il2cppUserAssemblies.prx',
+          'Media/Plugins/PSN.prx',
+          'decrypted/extra.prx',
+          'eboot.bin',
+          'sce_module/libc.prx',
+          'top.prx',
+        ],
+      ]);
+      final arguments = fakeRelinkerArguments(toolkitFolder);
+      expect(arguments.sublist(1, arguments.length - 1), [
+        '--module-dir',
+        '.',
+        '--module-dir',
+        'Media/Modules',
+        '--module-dir',
+        'Media/Plugins',
+        '--module-dir',
+        'decrypted',
+        'eboot.bin',
+      ]);
+      expect(lines.where((line) => line.contains('the dump has this module')), isEmpty);
+    });
+
     test('a failed executable stops the unlock with the relinker\'s whole reason', () async {
       makeFakeToolkit(toolkitFolder, failOn: 'eboot.bin');
       final game = makeGame();
@@ -752,6 +936,67 @@ void main() {
       expect(text, contains('--- exit 0'));
     });
 
+    test('an emulator started from the AppImage gets none of its variables', () {
+      final launcher = {
+        'APPIMAGE': '/home/u/AnyPS5.AppImage',
+        'APPDIR': '/tmp/.mount_AnyPS5x',
+        'ARGV0': 'AnyPS5.AppImage',
+        'OWD': '/home/u',
+        'XDG_DATA_DIRS': '/tmp/.mount_AnyPS5x/usr/share:/usr/local/share:/usr/share',
+        'HOME': '/home/u',
+        'PATH': '/usr/bin',
+      };
+      expect(GameProcess.withoutAppImage(launcher), {
+        'XDG_DATA_DIRS': '/usr/local/share:/usr/share',
+        'HOME': '/home/u',
+        'PATH': '/usr/bin',
+      });
+      expect(launcher, hasLength(7), reason: 'the launcher keeps its own environment');
+    });
+
+    test("only the AppImage's own data folder at the front is taken off", () {
+      expect(
+        GameProcess.withoutAppImage({'APPDIR': '/tmp/.mount_a', 'XDG_DATA_DIRS': '/usr/share:/tmp/.mount_a/usr/share'}),
+        {'XDG_DATA_DIRS': '/usr/share:/tmp/.mount_a/usr/share'},
+      );
+      expect(
+        GameProcess.withoutAppImage({'APPDIR': '/tmp/.mount_a', 'XDG_DATA_DIRS': '/tmp/.mount_a/usr/share'}),
+        isEmpty,
+      );
+      expect(GameProcess.withoutAppImage({'XDG_DATA_DIRS': '/opt/x/usr/share:/usr/share', 'HOME': '/h'}), {
+        'XDG_DATA_DIRS': '/opt/x/usr/share:/usr/share',
+        'HOME': '/h',
+      }, reason: 'outside an AppImage nothing changes');
+    });
+
+    test("the AppImage's data folder is taken off when the AppRun named it through a link", () {
+      expect(
+        GameProcess.withoutAppImage({
+          'APPDIR': '/tmp/.mount_a',
+          'XDG_DATA_DIRS': '/private/tmp/.mount_a/usr/share:/usr/share',
+        }, resolve: (path) => path == '/tmp/.mount_a' ? '/private/tmp/.mount_a' : path),
+        {'XDG_DATA_DIRS': '/usr/share'},
+      );
+    });
+
+    test('without the parent environment the program gets only the one given', () async {
+      final folder = Directory(p.join(temp.path, 'env'))..createSync();
+      final program = File(p.join(folder.path, 'show-env'))..writeAsStringSync('#!/bin/sh\nenv\n');
+      await Process.run('chmod', ['+x', program.path]);
+      final log = p.join(temp.path, 'logs', 'env.log');
+      final running = await GameProcess.start(
+        installed: folder.path,
+        program: program.path,
+        environment: {'ONLY_THIS': '1'},
+        inheritEnvironment: false,
+        logFile: log,
+      );
+      expect(await running.exitCode, 0);
+      final text = File(log).readAsStringSync();
+      expect(text, contains('ONLY_THIS=1'));
+      expect(text, isNot(contains('HOME=')));
+    }, skip: Platform.isWindows ? 'needs a POSIX shell' : null);
+
     test('a game that is not installed does not start', () async {
       expect(
         () => GameProcess.start(
@@ -803,6 +1048,67 @@ void main() {
         ]),
         ['.', 'Media/Modules', 'Media/Plugins'],
       );
+    });
+
+    test('a module in several folders: the standard folder\'s copy, else the one next to eboot.bin, '
+        'else the nearest', () {
+      Map<String, String> duplicates(List<String> modules, {bool foldCase = false}) =>
+          Installer.duplicateModules(modules, foldCase: foldCase);
+      // A dumper's folder beside sce_module, a backup folder, a copy next to eboot.bin.
+      expect(
+        duplicates([
+          'backup/libc.prx',
+          'decrypted/sce_module/libc.prx',
+          'libc.prx',
+          'sce_module/libc.prx',
+          'sce_module/libSceFios2.sprx',
+        ]),
+        {
+          'backup/libc.prx': 'sce_module/libc.prx',
+          'decrypted/sce_module/libc.prx': 'sce_module/libc.prx',
+          'libc.prx': 'sce_module/libc.prx',
+        },
+      );
+      // sce_module before prx, any standard folder before the rest.
+      expect(duplicates(['Media/Plugins/a.prx', 'prx/a.prx', 'sce_module/a.prx']), {
+        'Media/Plugins/a.prx': 'sce_module/a.prx',
+        'prx/a.prx': 'sce_module/a.prx',
+      });
+      expect(duplicates(['Media/Plugins/a.prx', 'prx/a.prx']), {'Media/Plugins/a.prx': 'prx/a.prx'});
+      // In no standard folder: next to eboot.bin, then the nearest folder, then the first by name.
+      expect(duplicates(['Media/Plugins/a.prx', 'a.prx', 'old/a.prx']), {
+        'Media/Plugins/a.prx': 'a.prx',
+        'old/a.prx': 'a.prx',
+      });
+      expect(duplicates(['Media/Plugins/a.prx', 'old/a.prx']), {'Media/Plugins/a.prx': 'old/a.prx'});
+      expect(duplicates(['Media/Modules/a.prx', 'Media/Plugins/a.prx', 'Media/Plugins/b.prx']), {
+        'Media/Plugins/a.prx': 'Media/Modules/a.prx',
+      });
+      // A module in one place alone stays, wherever it is, and a name is a whole file name.
+      expect(
+        duplicates([
+          'Media/Modules/x.prx',
+          'Media/Plugins/y.prx',
+          'decrypted/sce_module/only.prx',
+          'sce_module/x.sprx',
+          'top.prx',
+        ]),
+        isEmpty,
+      );
+      // Folders the relinker never reads are no one's copy: fakelib, one below sce_module, one
+      // with no .prx in it.
+      expect(
+        duplicates(['Media/Other/libc.sprx', 'fakelib/libc.prx', 'sce_module/libc.prx', 'sce_module/old/libc.prx']),
+        isEmpty,
+      );
+      // The Windows relinker tells names apart without their case, the Linux one with it.
+      expect(duplicates(['Media/Plugins/LibFmod.prx', 'sce_module/libfmod.prx']), isEmpty);
+      expect(duplicates(['Media/Plugins/LibFmod.prx', 'sce_module/libfmod.prx'], foldCase: true), {
+        'Media/Plugins/LibFmod.prx': 'sce_module/libfmod.prx',
+      });
+      // The folders that go to the relinker are those of what is left.
+      expect(Installer.moduleDirectories(['Media/Plugins/a.prx', 'sce_module/libc.prx']), ['.', 'Media/Plugins']);
+      expect(Installer.moduleDirectories(['sce_module/libc.prx']), ['.']);
     });
 
     test('relink progress rises through the phases and never goes back', () {

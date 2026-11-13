@@ -1,1 +1,0 @@
-- **Uninstall no longer freezes the launcher on a big game.** The game is uninstalled at once and its files are removed in the background, so the screen keeps answering however often it is clicked meanwhile. Unlocking it again right away waits until the old files are gone.

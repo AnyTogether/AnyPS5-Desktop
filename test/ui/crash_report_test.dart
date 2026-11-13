@@ -255,7 +255,8 @@ exit 3''';
         );
         model.rescan();
         expect(model.records[orbit().id]?.toolkit, 'arm-5ca076a87');
-        await model.play(orbit());
+        // The copy as it is: this is about the engine it was made with, not about rebuilding it.
+        await model.play(orbit(), asItIs: true);
         await model.crash.pending;
         expect(rowIds(), isNot(contains('playGoArm')));
         expect(rowIds().first, 'playGoInstalled');

@@ -120,7 +120,7 @@ void main() {
     test('keeps the key as it was when no option is chosen', () {
       final game = makeGame();
       final kit = Toolkit(toolkitFolder);
-      final found = Installer.modulesOf(game);
+      final found = Installer.modulesOf(game, kit.system);
       final none = Installer.relinkKey(game, kit, found, null);
       expect(none.split('\n')[2], 'system linux ');
       expect(Installer.relinkKey(game, kit, found, null, flags: const [RelinkerFlag.traceImports]), isNot(none));

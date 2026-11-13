@@ -96,14 +96,6 @@ class GameSession {
     final cleaned = cleanEngineBuild(raw);
     return cleaned.length > 32 ? cleaned.substring(0, 32) : cleaned;
   }
-
-  /// "0.2.13-a1b2c3d4e5f6" → "0.2.13 (a1b2c3)": the release, then which build of it.
-  static String release(String engine) {
-    final at = engine.indexOf('-');
-    if (at < 0) return engine;
-    final build = engine.substring(at + 1);
-    return '${engine.substring(0, at)} (${build.length > 6 ? build.substring(0, 6) : build})';
-  }
 }
 
 /// A game session's join code and its page.

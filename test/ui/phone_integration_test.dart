@@ -79,15 +79,18 @@ void main() {
     expect(count(), T.text('phonesNone'));
     final phone = await pairedPhone();
     expect(count(), '1 connected');
-    expect(phoneRow('device-phone-1').title, 'Pixel · Connected');
-    expect(phoneRow('device-phone-1').detail, T.text('phoneRemove'));
+    // The name alone in the title, with the sign for its kind; connected now is said under it.
+    expect(phoneRow('device-phone-1').title, 'Pixel');
+    expect(phoneRow('device-phone-1').icon, PanelIcon.phone);
+    expect(phoneRow('device-phone-1').detail, 'Connected now, select to remove');
     T.language = Language.byCode('tr');
     expect(count(), '1 bağlı');
-    expect(phoneRow('device-phone-1').title, 'Pixel · Bağlı');
+    expect(phoneRow('device-phone-1').detail, 'Şu an bağlı, kaldırmak için seç');
     T.language = Language.english;
     await phone.close();
     await until(() => model.remote!.connectedDevices.isEmpty);
     expect(phoneRow('device-phone-1').title, 'Pixel', reason: 'still paired, not connected');
+    expect(phoneRow('device-phone-1').detail, T.text('phoneRemove'));
     expect(count(), '');
   });
 

@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:anyps5_desktop/core/discord_presence.dart';
+import 'package:anyps5_desktop/core/now_playing.dart';
 import 'package:anyps5_desktop/core/ffmpeg_download.dart';
 import 'package:anyps5_desktop/core/engine_checkout.dart';
 import 'package:anyps5_desktop/core/audio/atrac9.dart';
@@ -14,6 +15,7 @@ import 'package:anyps5_desktop/core/desktop/desktop.dart';
 import 'package:anyps5_desktop/core/desktop/launcher_window.dart';
 import 'package:anyps5_desktop/core/desktop/window_backdrop.dart';
 import 'package:anyps5_desktop/core/font_download.dart';
+import 'package:anyps5_desktop/core/game_deletion.dart';
 import 'package:anyps5_desktop/core/game_library.dart';
 import 'package:anyps5_desktop/core/gamepad/pad_navigation.dart';
 import 'package:anyps5_desktop/core/host.dart';
@@ -58,7 +60,10 @@ Future<void> loadFonts() async {
   _fontsLoaded = true;
   final figtree = FontLoader('Figtree')..addFont(rootBundle.load('assets/fonts/Figtree.ttf'));
   final icons = FontLoader('MaterialIcons')..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
-  await Future.wait([figtree.load(), icons.load()]);
+  final mono = FontLoader('NotoSansMono')
+    ..addFont(rootBundle.load('assets/system-fonts/NotoSansMono-Regular.ttf'))
+    ..addFont(rootBundle.load('assets/system-fonts/NotoSansMono-Bold.ttf'));
+  await Future.wait([figtree.load(), icons.load(), mono.load()]);
 }
 
 /// A PNG written in Dart: [color] gives each pixel's RGBA.
@@ -189,8 +194,10 @@ Fixture makeFixture({
   Future<List<String>?> Function()? pickPictures,
   CommandRunner? commands,
   DiscordPresence Function()? discord,
+  NowPlayingSource Function()? nowPlaying,
   ClipPlayback Function()? clipPlayback,
   VoicePlayback Function()? voicePlayback,
+  Trash? trash,
 }) {
   final opened = <Uri>[];
   final copied = <String>[];
@@ -287,7 +294,9 @@ Fixture makeFixture({
       // An Unreal game's own controls at once, read from its paks.
       gameControls: gameControls ?? (folder) => SynchronousFuture(UnrealControls.read(folder)),
       commands: commands,
+      trash: trash,
       discord: discord,
+      nowPlaying: nowPlaying,
       discordGames: (_) async => null,
       systemInfo: () async =>
           const SystemInfo(os: 'Ubuntu 24.04.1 LTS, kernel 6.8.0-45-generic', cpu: 'AMD Ryzen 7 5800X', memoryGB: 32),

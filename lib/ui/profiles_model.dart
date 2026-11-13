@@ -18,6 +18,9 @@ enum ProfileOrigin {
 /// Where the profile screens are: the picker's focus, adding a profile (offline or signing in),
 /// and the sign-in a profile going online waits on.
 class ProfileFlow {
+  /// Add Profile's name field, as the row being typed in (AppModel.editingRow).
+  static const nameRow = 'profile-add-name';
+
   /// The picker's focused tile (the last one is Add Profile).
   int pickerIndex = 0;
 
@@ -28,6 +31,12 @@ class ProfileFlow {
   int modeChoice = 0;
   String name = '';
   ProfileOrigin origin = ProfileOrigin.adding;
+
+  /// Home's profile list is open because the pointer is on the picture or on the list (the
+  /// keys open it through the focus, HomeFocus.switcher); [listLeave] closes it a moment after
+  /// the pointer left both, so it can cross the gap between them.
+  bool listShown = false;
+  Timer? listLeave;
 
   /// A new online profile's ID while it signs in, and the profile to go back to on Cancel.
   String? pendingId;
@@ -60,6 +69,8 @@ extension LauncherProfiles on AppModel {
     'friendsJoin',
     'discordPresence',
     'discordJoin',
+    'nowPlayingCard',
+    'nowPlayingShare',
     'onlinePlay',
     'pushToTalk',
     'noiseSuppression',
@@ -420,6 +431,12 @@ extension LauncherProfiles on AppModel {
   /// The two cards (Add Profile and the first start's last step): left and right pick one.
   void modeChoiceCommand(Command command) {
     switch (command) {
+      // Add Profile: the name is over the cards. Up puts the cursor in it (Enter and Esc give
+      // the keys back to the cards).
+      case Command.up when overlay == Layer.addProfile:
+        sounds.play(Cue.move);
+        startEditing(ProfileFlow.nameRow);
+        return;
       case Command.left || Command.right:
         final next = command == Command.left ? 0 : 1;
         if (next == profileFlow.modeChoice) return;
@@ -436,6 +453,73 @@ extension LauncherProfiles on AppModel {
         }
       default:
         break;
+    }
+    _changed();
+  }
+
+  // Home's profile list: under the picture at the top right, the other profiles and Add profile.
+
+  /// The profiles the list offers: every one but the one playing, as they were made.
+  List<LauncherProfile> get switcherProfiles {
+    final current = currentProfile;
+    return [
+      for (final profile in profiles.book.profiles)
+        if (profile.id != current?.id) profile,
+    ];
+  }
+
+  /// The list's entries: the other profiles, then Add profile.
+  int get switcherCount => switcherProfiles.length + 1;
+
+  /// The list shows: the keys are on the picture or in the list, or the pointer is.
+  bool get profileListOpen => preferences.onboarded && overlay == null && (focus.isSwitcher || profileFlow.listShown);
+
+  /// The pointer came onto the picture or the list (or clicked the picture).
+  void showProfileList() {
+    profileFlow.listLeave?.cancel();
+    profileFlow.listLeave = null;
+    if (profileFlow.listShown) return;
+    profileFlow.listShown = true;
+    sounds.play(Cue.hover);
+    _changed();
+  }
+
+  /// The pointer left the picture or the list: closed a moment later, unless it came back.
+  void leaveProfileList() {
+    if (!profileFlow.listShown) return;
+    profileFlow.listLeave?.cancel();
+    profileFlow.listLeave = Timer(const Duration(milliseconds: 220), () {
+      profileFlow.listLeave = null;
+      if (_disposed || !profileFlow.listShown) return;
+      profileFlow.listShown = false;
+      _changed();
+    });
+  }
+
+  /// Escape, Back or a click elsewhere: the list closes and the keys are back on the games.
+  void closeProfileList() {
+    profileFlow.listLeave?.cancel();
+    profileFlow.listLeave = null;
+    if (!profileFlow.listShown && !focus.isSwitcher) return;
+    profileFlow.listShown = false;
+    if (focus.isSwitcher) focus = HomeFocus.tiles;
+    sounds.play(Cue.back);
+    _changed();
+  }
+
+  /// The list's entry [entry] chosen, from 0: that profile plays from now on, as from the
+  /// picker (not while a game runs or saves sync: said as there), or Add profile for the last.
+  void chooseFromProfileList(int entry) {
+    final others = switcherProfiles;
+    if (entry < 0 || entry > others.length) return;
+    profileFlow.listLeave?.cancel();
+    profileFlow.listLeave = null;
+    profileFlow.listShown = false;
+    if (focus.isSwitcher) focus = HomeFocus.tiles;
+    if (entry < others.length) {
+      unawaited(switchProfile(others[entry].id));
+    } else {
+      openAddProfile();
     }
     _changed();
   }

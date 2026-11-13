@@ -1,11 +1,15 @@
 part of 'app_model.dart';
 
+/// PS1, PS2 and PS3 discs in the games folders, played in an emulator installed on the computer
+/// (DuckStation, PCSX2, RPCS3): the library's switch, the emulators' settings and the start.
 extension StandaloneEmulators on AppModel {
+  /// The emulator chosen for [platform], while its executable is still there.
   String? standaloneEmulator(RetroPlatform platform) {
     final program = preferences.retroEmulators[platform.name];
     return program != null && p.isAbsolute(program) && File(program).existsSync() ? program : null;
   }
 
+  /// Asks for [platform]'s emulator executable and keeps it.
   Future<void> chooseStandaloneEmulator(RetroPlatform platform) async {
     final String? selected;
     try {
@@ -26,6 +30,25 @@ extension StandaloneEmulators on AppModel {
     savePreferences();
   }
 
+  /// Settings › Game Library › Emulator games: turns the discs' discovery on or off, and with it
+  /// Settings › Emulators. The scan that follows announces none of the discs as new games.
+  void setRetroLibrary(bool enabled) {
+    if (preferences.retroLibrary == enabled) return;
+    preferences.retroLibrary = enabled;
+    if (!enabled) _homeRetroFolder = null;
+    savePreferences();
+    _tracker.reset();
+    rescan();
+  }
+
+  PanelRow _retroLibraryRow() => PanelRow(
+    id: 'retroLibrary',
+    title: T.text('retroLibrary'),
+    detail: T.text('retroLibraryDetail'),
+    kind: ToggleRow(preferences.retroLibrary, setRetroLibrary),
+  );
+
+  /// Settings › Emulators, shown while Emulator games is on.
   PanelCategory _standaloneEmulatorSettings() => PanelCategory(
     id: 'emulators',
     title: T.text('retroEmulators'),
@@ -46,7 +69,9 @@ extension StandaloneEmulators on AppModel {
     ],
   );
 
-  Future<void> _playRetro(Game game, RetroDisc disc) async {
+  /// Starts [game]'s disc in its emulator. Given up while the emulator starts ([cancelStart]),
+  /// the start lets the slot go at once, and an emulator that starts after all is stopped.
+  Future<void> _playStandalone(Game game, RetroDisc disc) async {
     if (_disposed || _embeddedSetupBusy || starting != null || running != null || _retroDiscLaunch != null) return;
     final launchPreferences = preferences;
     final managed = _embeddedReady(disc.platform) ? _managedRetro : null;
@@ -115,12 +140,8 @@ extension StandaloneEmulators on AppModel {
               logFile: paths.logFile(game.titleId),
             );
     } on Object catch (error) {
-      if (_disposed) return;
+      if (_disposed || turn != _startTurn) return;
       starting = null;
-      if (turn != _startTurn) {
-        _changed();
-        return;
-      }
       _padLog?.call('Could not start ${disc.platform.emulator}: $error');
       show(
         managed == null
@@ -132,12 +153,11 @@ extension StandaloneEmulators on AppModel {
     }
 
     if (_disposed || turn != _startTurn) {
+      // The emulator of a start given up: asked to end, then ended after the same grace as Stop.
+      final end = Timer(stopGrace, run.kill);
       if (!run.stop()) run.kill();
       await run.exitCode;
-      if (!_disposed) {
-        starting = null;
-        _changed();
-      }
+      end.cancel();
       return;
     }
     if (run is! EmbeddedRetroGame) starting = null;

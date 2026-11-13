@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:anyps5_desktop/ui/countries.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// HttpClient answers every request with a 400 in the files that talk to fake servers.
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   await T.load(bundle: _NoAssets(), tryOut: Directory('assets/l10n'));
+  await Countries.load(file: File(Countries.asset));
   if (!autoUpdateGoldenFiles) {
     final comparator = goldenFileComparator;
     if (Platform.environment['ANYPS5_SKIP_GOLDENS'] == '1') {

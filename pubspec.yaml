@@ -1,7 +1,7 @@
 name: anyps5_desktop
 description: "AnyPS5 launcher for Windows and Linux."
 publish_to: 'none'
-version: 0.1.20+21
+version: 0.1.23+24
 
 environment:
   sdk: ^3.13.1
@@ -52,10 +52,19 @@ flutter:
     # The launcher's languages, one JSON file each (TRANSLATING.md): a new file there is a new
     # language in Settings, found through the asset manifest.
     - assets/l10n/
+    # The countries' names in each language, from ICU's data (tool/make_countries.mjs).
+    - assets/countries.json
   fonts:
     - family: Figtree
       fonts:
         - asset: assets/fonts/Figtree.ttf
+    # Commands to copy, as a terminal prints them (the libmpv notice over a clip on Linux): the
+    # Noto Sans Mono the engine's typewriter font set already carries, so nothing more is shipped.
+    - family: NotoSansMono
+      fonts:
+        - asset: assets/system-fonts/NotoSansMono-Regular.ttf
+        - asset: assets/system-fonts/NotoSansMono-Bold.ttf
+          weight: 700
 
 hooks:
   user_defines:

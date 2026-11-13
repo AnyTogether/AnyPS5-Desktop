@@ -65,6 +65,7 @@ void main() {
           jsonEncode({'platform': platform.name, 'titleId': 'TEST12345', 'name': 'Retro game', 'disc': relativeDisc}),
         );
       }
+      model.preferences.retroLibrary = true;
       model.rescan();
       final game = model.games.singleWhere((game) => game.retro != null);
       expect(model.records, isNot(contains(game.id)));
@@ -105,7 +106,7 @@ void main() {
     });
   }
 
-  test('canceling a retro launch stops the late process before releasing the launch slot', () async {
+  test('a start given up while the emulator never answers lets the slot go, and a late emulator is stopped', () async {
     final fixture = makeFixture(withToolkit: false);
     final model = fixture.model;
     addTearDown(() {
@@ -116,30 +117,98 @@ void main() {
     File(p.join(folder.path, 'game.iso')).createSync();
     File(p.join(folder.path, 'retro.json'))
         .writeAsStringSync('{"platform":"ps2","titleId":"TEST12345","name":"Retro game","disc":"game.iso"}');
+    model.preferences.retroLibrary = true;
     model.rescan();
     final game = model.games.singleWhere((game) => game.retro != null);
     model.preferences.retroEmulators['ps2'] = (File(p.join(fixture.temp.path, 'emulator'))..createSync()).path;
-    final process = FakeGameProcess();
-    addTearDown(process.quit);
-    final pending = Completer<RunningGame>();
+    final late = FakeGameProcess(ignoresTerm: true);
+    model.stopGrace = const Duration(milliseconds: 20);
+    final second = FakeGameProcess();
+    addTearDown(late.quit);
+    addTearDown(second.quit);
+    final pending = [Completer<RunningGame>(), Completer<RunningGame>()];
     var launches = 0;
-    model.startRetroGame = ({required installed, required program, required arguments, required logFile}) {
-      launches++;
-      return pending.future;
-    };
+    model.startRetroGame = ({required installed, required program, required arguments, required logFile}) =>
+        pending[launches++].future;
 
-    final play = model.play(game);
+    final first = model.play(game);
     await pumpEventQueue();
-    expect(model.starting, game);
+    expect(model.stateOf(game), isA<Starting>());
     model.cancelStart();
-    await model.play(game);
-    expect(launches, 1);
-    pending.complete(runningFor(process));
-    await play;
-    expect(process.ended, isTrue);
-    expect(model.running, isNull);
     expect(model.starting, isNull);
-    expect(model.preferences.lastPlayed[game.id], isNull);
+    expect(model.stateOf(game), isA<Installed>());
+
+    final again = model.play(game);
+    await pumpEventQueue();
+    expect(launches, 2, reason: 'a start that never answered does not hold the next one back');
+    expect(model.starting, game);
+    pending[0].complete(runningFor(late));
+    await first;
+    expect(late.ended, isTrue, reason: 'the emulator of the start given up is ended, even one that ignores SIGTERM');
+    expect(late.signals, [ProcessSignal.sigterm, ProcessSignal.sigkill]);
+    expect(model.starting, game, reason: 'the start under way is left alone');
+    expect(model.running, isNull);
+
+    final run = runningFor(second);
+    pending[1].complete(run);
+    await pumpEventQueue();
+    expect(model.running, (game, run));
+    second.quit();
+    await again;
+    expect(model.running, isNull);
+  });
+
+  test('a PS5 library is scanned as before until Emulator games is turned on', () {
+    final fixture = makeFixture(withToolkit: false);
+    final model = fixture.model;
+    addTearDown(() {
+      model.dispose();
+      fixture.dispose();
+    });
+    File(p.join(model.root!, 'Loose.bin')).createSync();
+    File(p.join(model.root!, 'Loose.cue')).writeAsStringSync('FILE "Loose.bin" BINARY\n  TRACK 01 MODE2/2352\n');
+    final ps5 = model.games.length;
+    model.rescan();
+    expect(model.games, hasLength(ps5));
+    expect(model.games.where((game) => game.retro != null), isEmpty);
+    model.open(Layer.settings);
+    List<String> categories() => [for (final category in model.panelCategories()) category.id];
+    expect(categories(), isNot(contains('emulators')));
+    final library = model.panelCategories().firstWhere((category) => category.id == 'library');
+    expect(library.rows.last.id, 'retroLibrary');
+    expect((library.rows.last.kind as ToggleRow).value, isFalse);
+
+    model.setRetroLibrary(true);
+    expect(model.preferences.retroLibrary, isTrue);
+    expect(model.games.where((game) => game.retro != null).map((game) => game.name), ['Loose']);
+    expect(categories(), contains('emulators'));
+    expect(model.toast ?? '', isNot(contains('Loose')), reason: 'turning it on announces no new games');
+
+    model.setRetroLibrary(false);
+    expect(model.games, hasLength(ps5));
+    expect(categories(), isNot(contains('emulators')));
+  });
+
+  test('a disc beside others counts only its own files', () async {
+    final fixture = makeFixture(withToolkit: false);
+    final model = fixture.model;
+    addTearDown(() {
+      model.dispose();
+      fixture.dispose();
+    });
+    final shelf = Directory(p.join(model.root!, 'PS1'))..createSync();
+    File(p.join(shelf.path, 'A.bin')).writeAsBytesSync(List.filled(3000, 1));
+    File(p.join(shelf.path, 'A.cue')).writeAsStringSync('FILE "A.bin" BINARY\n  TRACK 01 MODE2/2352\n');
+    File(p.join(shelf.path, 'B.bin')).writeAsBytesSync(List.filled(50000, 1));
+    File(p.join(shelf.path, 'B.cue')).writeAsStringSync('FILE "B.bin" BINARY\n  TRACK 01 MODE2/2352\n');
+    model.preferences.retroLibrary = true;
+    model.rescan();
+    final a = model.games.singleWhere((game) => game.name == 'A');
+    expect(a.id, 'retro:ps1:3042:PS1/A.cue');
+
+    model.select(model.games.indexOf(a));
+    await pumpEventQueue();
+    expect(model.sizes[a.id], 3000 + File(p.join(shelf.path, 'A.cue')).lengthSync());
   });
 
   test('a failed native file picker leaves emulator preferences alone', () async {
@@ -173,7 +242,7 @@ void main() {
         }),
       );
     }
-    model.rescan();
+    model.setRetroLibrary(true);
     model.setShowRetroFolders(true);
     expect(model.homeTiles.map((tile) => tile.folder), everyElement(isNull));
 

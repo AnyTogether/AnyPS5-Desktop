@@ -1,3 +1,4 @@
+import '../now_playing.dart';
 import 'levels.dart';
 
 /// Someone on AnyTogether as the API's name cards show them.
@@ -131,6 +132,7 @@ class Presence {
     this.party,
     this.game,
     this.share,
+    this.listening,
   });
 
   factory Presence.fromJson(Map<String, dynamic>? json) {
@@ -171,6 +173,7 @@ class Presence {
             )
           : null,
       share: _share(json['share']),
+      listening: Listening.fromJson(json['listening']),
     );
   }
 
@@ -183,6 +186,9 @@ class Presence {
   final PresenceParty? party;
   final PresenceGame? game;
   final PresenceShare? share;
+
+  /// What they listen to, when they chose to show it (a server before it sends none).
+  final Listening? listening;
 
   static PresenceShare? _share(Object? share) {
     if (share is! Map<String, dynamic> || share['sharePlayId'] is! String) return null;

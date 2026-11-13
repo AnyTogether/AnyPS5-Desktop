@@ -9,32 +9,133 @@ section is copied into the release.
 
 ## Next release
 
+Nothing yet.
+
+## 0.1.23
+
+- **PS1, PS2 and PS3 games in an emulator you installed.** Settings › Game Library has a new switch,
+  Emulator games, off until you turn it on: then the library also lists the discs in your games
+  folders (PS1 cue sheets, PBP files and M3U playlists, PS2 ISOs, CHDs in a folder named PS1 or PS2,
+  extracted PS3 discs, and game folders described by a retro.json), and Settings › Emulators
+  appears, where you pick DuckStation, PCSX2 or RPCS3. Play starts the game in that emulator, in its
+  own window. A game whose emulator is not picked yet says Emulator required, and Show as folders
+  gathers each console's games in one tile on the home screen. With the switch off, the games
+  folders are scanned as before and nothing of this shows. Designed and written by B-Howell.
+
+## 0.1.22
+
+- **Delete game.** Game Settings has a new action under Remove installation that takes the game
+  itself off the disk: its own folder, the update and add-ons dumped beside it, and the zip or
+  .ffpfsc it was unpacked from go to the Recycle Bin (the trash on Linux), and the installation
+  AnyPS5 made from them is removed. The card names the folder and its size and starts on Cancel.
+  Your saves and trophies are kept and come back when you add the game to the same folder again.
+  Backups, cloud saves, captures and your AnyTogether profile are not touched. Where the files
+  cannot go to the Recycle Bin (a drive without one, a folder too big for it), AnyPS5 asks again
+  before deleting them for good. It never deletes a games folder itself, a game reached through a
+  link that leads out of your games folders, or a game that is playing or being unlocked.
+- **A module the dump holds twice no longer spoils the unlock.** Some dumps carry the same module in
+  two folders: a `decrypted/sce_module` folder beside `sce_module` (Lost in Play), or `.prx` files
+  next to `eboot.bin` that `sce_module` holds too (Minecraft). The relinker refuses two modules with
+  one name. On older engines the unlock stopped with "Conflicting guest output filename". On newer
+  ones it went on with the wrong copy, and Lost in Play stopped as it started. AnyPS5 now takes one
+  copy of each such module, the one in `sce_module` first, and the unlock log names the copy it set
+  aside. Every other module is converted where the dump has it, as before. For a game that failed
+  this way, choose ⋯ → Unlock Again. Thanks to Slick Daddy for the report and its log, and to
+  Lenny4250gh for tracking down the Minecraft case and proposing a fix.
+- **Add Profile's name can be typed without the mouse**. Up from the two cards puts the cursor in
+  the name, and Enter or Esc gives the keys back to the cards. While the name is typed, space,
+  Backspace and letters such as O, Q and E are the name's (before, they chose a card, went back or
+  ran a shortcut, and the cursor could jump out of the field).
+- **A game made with another engine is rebuilt before it starts**. After an engine update (or
+  another engine chosen), a game unlocked with the old one was offered "Update and play or Play
+  now", and Play Together and a friend's game started it as it was, so two up-to-date launchers
+  could end up with different builds that cannot connect. Play, Play Together and Join now rebuild
+  the copy first with the usual progress, then go on. A newer engine to download is still offered,
+  and after a rebuild that fails the old copy can still be played as it is.
+- **A join that cannot go on says why in full**. A different game version or engine build opens a
+  panel that names which of the two differs and shows the host's and yours whole, each on its own
+  line (before: a one-line notice with the builds cut to six characters, such as "arm-ni" and
+  "arm-f7"). It offers what fits: Rebuild and join when only your copy is stale, Check for updates
+  when your release is the older one, Try anyway for a game version, and it no longer says "update"
+  to the side that is already newer.
+- **Play on a game a friend already hosts asks first**. When a party member or friend hosts a game
+  of the same title that still has room, Play asks "Ana is playing this. Join their game, or start
+  your own?" with Join first, instead of quietly opening a second session. Start my own game says
+  that a separate session was made.
+- **The party shows who is in whose game**. Each member's row in the party, and the quick menu over
+  a game, says "In your game", "In another game of Orbit Runner", "Playing Orbit Runner" or "Not in
+  a game", with Join right there for a game that takes players. Play Together explains in one line
+  that a party is voice and chat and that the game session is what connects the games.
+- **Now playing in the quick menu** (asked for by Slick Daddy), as on the Mac. While a music or
+  video player plays or is paused, the menu over a game shows its title, artist, player and cover,
+  with previous, play or pause and next: left, right and ✕ on the controller, the arrow keys and
+  Enter, or the mouse. It reads Windows' media session and MPRIS on Linux, so it works with any
+  player that tells the system what it plays and needs no account. Settings › Behaviour has its
+  switch, and a second one, off until you turn it on, that shows your AnyTogether friends what you
+  are listening to. The player is read only while the menu is open or while friends are shown it.
+- **Remove installation keeps your saves.** A game's saves and trophies live inside the installation
+  AnyPS5 builds, and Remove installation used to delete them with it without saying so. It now keeps
+  them, together with the game's download data, in the games folder under `.AnyPS5/Saves`, and they
+  come back when you unlock the game again, the same way as after Delete game. The card says they
+  are kept. When they cannot be moved aside the installation stays as it is and AnyPS5 says why.
+  Saves are also safe when an unlock is interrupted or fails just as the new installation takes the
+  old one's place: they go back into the game or wait for the next unlock.
+- **Update from Git says everything it needs at once, and how to install it.** When build tools were
+  missing, Update from Git named one, and after you installed it, the next. Now it looks for all of
+  them before it pulls anything (Git, CMake and, for a checkout without a build folder, Ninja and
+  the C and C++ compilers, plus the X11 development files on Linux) and lists every missing one
+  together. Under the failure there is the command that installs them, ready to copy: winget on
+  Windows (WinLibs GCC 15.2, which brings gcc, g++, CMake and Ninja), Scoop where only Scoop is
+  installed, and apt, dnf or pacman on Linux. On Windows, WinLibs and Ninja install for your user
+  only, so the launcher can also run that command itself and show what it prints. Commands that need
+  administrator rights (Git's installer, sudo on Linux) are only ever shown to copy. Check again
+  looks for the tools again without restarting AnyPS5: on Windows it reads PATH anew, so what you
+  just installed is found. On an Ubuntu whose own GCC is older than 12, gcc-12 and g++-12 are used
+  when they are installed, as the build guide does. Reported by Slick Daddy.
+- **Switch profile from the picture on Home.** Point at your profile picture at the top right (or
+  click it, or move to it with the keys or the controller, one step past the last button) and a list
+  drops down under it: the other profiles with their picture and name, AnyTogether's mark on the
+  ones linked to an account, and Add profile at the end. Choosing one plays as that profile at once,
+  with the same rules as the "Who's playing?" screen (not while a game runs or saves sync). Escape,
+  Back, moving the pointer away or a click elsewhere closes it. Suggested by Slick Daddy.
+- **Pick your country by name.** Settings › AnyTogether › Country was a text field that wanted a
+  two-letter code and took more than two letters. It is now a list of countries by name in the
+  launcher's language, with a search that ignores capitals and accents and also finds a country by
+  its English name or its code, and None at the top to clear it. Messages AnyTogether sends back
+  when it refuses something are now said in the launcher's language too, where the server's English
+  sentence was shown before. Reported by Slick Daddy.
+- **Paired phones show what they are.** In Settings › Phones each paired device has a sign before
+  its name: Android, an iPhone or iPad, a browser, or a plain phone when the name does not say. A
+  browser used as a controller is listed as "Android browser" or "iPhone browser" in your language
+  in place of "Android · Web", and a device connected now says so under its name. Suggested by Slick
+  Daddy.
+
+## 0.1.21
+
 - **A game in one .ffpfsc file installs like a zip**, as on the Mac: drop it in a games folder or
-  use Add game file in Settings. AnyPS5 unpacks it into a normal game folder with its name, title
-  ID and icon, and says so plainly when a file is compressed or of a kind it cannot unpack.
+  use Add game file in Settings. AnyPS5 unpacks it into a normal game folder with its name, title ID
+  and icon, and says so plainly when a file is compressed or of a kind it cannot unpack.
 - **ffmpeg can be downloaded with one press** when Replay, Remote Play, Go Live, a video background
   or clip tools need it and none is found: progress, Stop and a true error message, from a signed
   build this project publishes, kept beside the toolkits. An ffmpeg already beside the launcher or
-  on the PATH keeps being used. Until that build is published the launcher says it is not
-  available yet.
-- **The activity feed reads as on the Mac**: game icons from the server, a new friend's picture
-  and milestone signs when a game isn't in your library, the rarity on trophies, hidden trophies
-  labelled instead of left out, and the four reactions as emoji, shown on the focused item and
-  where someone chose them. A new item coming in no longer moves the focus.
+  on the PATH keeps being used.
+- **The activity feed reads as on the Mac**: game icons from the server, a new friend's picture and
+  milestone signs when a game isn't in your library, the rarity on trophies, hidden trophies
+  labelled instead of left out, and the four reactions as emoji, shown on the focused item and where
+  someone chose them. A new item coming in no longer moves the focus.
 - **Captures says when this server keeps no files** instead of a read failure.
-- **Leaderboards**: the number of players next to the board, and Enter (or the new chip) on a
-  game's trophies opens its board.
-- **Challenges**: the page shows who is leading before it is final, says "Score" and a plain
-  number for a metric this launcher doesn't know, says when a challenge was deleted, and reads
-  it again after a conflict on Join or Leave.
-- **Play Together player rows say how each player is reached** (Direct or Relay, with the round
-  trip in ms), as on the Mac. Where the system cannot say, the row stays at Connected.
+- **Leaderboards**: the number of players next to the board, and Enter (or the new chip) on a game's
+  trophies opens its board.
+- **Challenges**: the page shows who is leading before it is final, says "Score" and a plain number
+  for a metric this launcher doesn't know, says when a challenge was deleted, and reads it again
+  after a conflict on Join or Leave.
+- **Play Together player rows say how each player is reached** (Direct or Relay, with the round trip
+  in ms), as on the Mac. Where the system cannot say, the row stays at Connected.
 - **A Play Together offer or a game invite is said over the game** in a desktop notice, as on the
   Mac, unless you're on Do Not Disturb. The party offer shows a friend's private name.
 - **Party chat has quick replies**, as on the Mac: Hello, GG and the others, sent with one press.
   The Party tile gets a dot when someone writes while the party screen is closed, a parent's rule
-  against messages hides the chat, and after a lost connection the chat reads every page it
-  missed.
+  against messages hides the chat, and after a lost connection the chat reads every page it missed.
 - **Play on a second game from the phone switches games**, as on the Mac. The game playing closes
   and the one you picked starts once it has gone and its saves have synced. Before, the first game
   closed and nothing else happened.
@@ -54,13 +155,13 @@ section is copied into the release.
   output can take it. Otherwise the game keeps the resolution it was installed with.
 - **Choose the broadcast microphone on Windows** in Settings › Broadcasting.
 - **The replay buffer, Remote Play and broadcasting can record under Wayland on Linux.** Your
-  desktop asks which window to share, and you choose the game. The launcher says so when you turn the
-  replay buffer on, and the desktop can remember the window next time. It needs PipeWire,
+  desktop asks which window to share, and you choose the game. The launcher says so when you turn
+  the replay buffer on, and the desktop can remember the window next time. It needs PipeWire,
   xdg-desktop-portal and GStreamer's tools with its PipeWire plugin. The launcher names what is
   missing. Not yet tested on a real Wayland desktop. X11 records as before.
-- **Join with a code works for watching a share play too**, as on the Mac: Party › Join with a
-  code looks a code up as you type it (a party's or a share play's), even while you're in a party,
-  and asks to join or to watch. A yes shows up as an invite.
+- **Join with a code works for watching a share play too**, as on the Mac: Party › Join with a code
+  looks a code up as you type it (a party's or a share play's), even while you're in a party, and
+  asks to join or to watch. A yes shows up as an invite.
 - **A share play guest can help player 1** instead of playing their own, as on the Mac: Assist
   Player 1 in the share play's quick menu rows.
 - **A friend's trophy level and the party's lead now say so**, as on the Mac: a word when a friend
@@ -74,152 +175,257 @@ section is copied into the release.
   so no location or camera data goes along.
 - **Drop pictures on an open chat** to send them, as on the Mac.
 - **Voice notes play inside the launcher**, as on the Mac: play and pause in the bubble, bars and
-  the time as it goes, one at a time. One the launcher cannot open goes to the system's player,
-  as before.
+  the time as it goes, one at a time. One the launcher cannot open goes to the system's player, as
+  before.
 - **The typing line names everyone who is typing** in a group, as on the Mac.
-- **Update from Git sets up the build folder itself**, as on the Mac. An engine folder that is a
-  git checkout without a build folder no longer stops at "no build folder yet". With Git, CMake,
-  Ninja and a C++ compiler (g++) on PATH, the launcher runs the CMake setup the build guide
-  shows, with its progress, then pulls and builds. When a tool is missing it names it and opens
-  the right guide: upstream AnyPS5's build guide for an upstream checkout, AnyPS5-ARM's for its own.
-- **A new install gets the AnyPS5-ARM engine.** On a first start the welcome downloads
-  AnyPS5-ARM's engine, which reads the phone controller and opens games full screen or at the
-  window size you chose. If you already use upstream's engine, nothing changes on its own.
+- **Update from Git sets up the build folder itself**, as on the Mac. An engine folder that is a git
+  checkout without a build folder no longer stops at "no build folder yet". With Git, CMake, Ninja
+  and a C++ compiler (g++) on PATH, the launcher runs the CMake setup the build guide shows, with
+  its progress, then pulls and builds. When a tool is missing it names it and opens the right guide:
+  upstream AnyPS5's build guide for an upstream checkout, AnyPS5-ARM's for its own.
+- **A new install gets the AnyPS5-ARM engine.** On a first start the welcome downloads AnyPS5-ARM's
+  engine, which reads the phone controller and opens games full screen or at the window size you
+  chose. If you already use upstream's engine, nothing changes on its own.
 - **Switch to the AnyPS5-ARM engine in one press when your phone can't reach a game.** With
-  upstream's engine in use, connecting a phone or a browser pad, or ending a game that ran with
-  one, offers the switch. It downloads the engine and uses it, and Update and play unlocks each
-  game with it. Settings › Phones offers the same.
+  upstream's engine in use, connecting a phone or a browser pad, or ending a game that ran with one,
+  offers the switch. It downloads the engine and uses it, and Update and play unlocks each game with
+  it. Settings › Phones offers the same.
 - **A dump without PlayGo chunk files no longer ends at a dead end.** When a game stops because
-  sce_sys/playgo-chunk.dat and playgo-scenario.json are missing, the crash report offers to
-  switch to the AnyPS5-ARM engine and play again, or to play once more with the missing chunks
-  counted as installed (that start only).
+  sce_sys/playgo-chunk.dat and playgo-scenario.json are missing, the crash report offers to switch
+  to the AnyPS5-ARM engine and play again, or to play once more with the missing chunks counted as
+  installed (that start only).
 - **Quit AnyPS5? is a small yes or no**, as on the Mac: Cancel and Quit side by side, ← and →
   between them, Esc still cancels, Quit in red. Close the game? asks the same way.
-- **Linked profiles show it on Who's playing?**: AnyTogether's mark on the tile of a profile
-  linked to an account, with its @handle, and Local under one that stays on this PC.
-- **Appearance › Themes opens beside the home screen**, like the Theme Studio, so a theme you
-  pick shows behind the list at once. A row that takes the focus no longer reads dark on dark
-  while its highlight fades in.
-- **A game's window or full screen is easier to find**: the row in the game's options (… / △)
-  is now called Window or full screen, and says that full screen is borderless with the
-  AnyPS5-ARM engine. Settings › Default display still sets it for every game.
+- **Linked profiles show it on Who's playing?**: AnyTogether's mark on the tile of a profile linked
+  to an account, with its @handle, and Local under one that stays on this PC.
+- **Appearance › Themes opens beside the home screen**, like the Theme Studio, so a theme you pick
+  shows behind the list at once. A row that takes the focus no longer reads dark on dark while its
+  highlight fades in.
+- **A game's window or full screen is easier to find**: the row in the game's options (… / △) is now
+  called Window or full screen, and says that full screen is borderless with the AnyPS5-ARM engine.
+  Settings › Default display still sets it for every game.
 - **Clearer words in Turkish for friends**: Arkadaşlardan çıkar, and what your handle is for.
 - **Clips play inside the launcher**, as on the Mac. A clip in a game's gallery, a clip post in
   Captures and a clip in a chat play over the whole screen, from the start and over again, with
   their sound. In the gallery ← and → move to the next picture or clip, and ✕ or ○ close it. The
   pointer brings a bar to pause and move through the clip. A clip the launcher cannot open goes to
   the system's video player, as before. Photos in chats open over the whole screen too.
-- **Photos sent from the website show in chats**, with their caption and in their own shape.
-  A photo sent as it is (not end-to-end encrypted) used to show only as "[photo]".
+- **Photos sent from the website show in chats**, with their caption and in their own shape. A photo
+  sent as it is (not end-to-end encrypted) used to show only as "[photo]".
 - **Delete for everyone** is what the message menu calls removing your own message now (it was
   Unsend, "Geri al" in Turkish). It still asks first.
 - **Devices in the encryption sheet go by their kind** ("Windows PC", "iPhone") and the day they
   were added, never by the computer's own name. This launcher now registers itself as "AnyPS5 on
   Windows" or "AnyPS5 on Linux".
 - **How many are online now** by Find players' heading, as on the Mac and the website. It is a
-  number only. Accounts that are invisible or hide their status are not counted, and the
-  line's tooltip says so.
-- **A game's name in recent activity opens its hub**, as the website links it to the game's
-  page. Click the name in the feed or on a profile, or select an item on a profile.
-- **The browser pad goes full screen when you turn the phone**, as on the Mac. Turned to
-  landscape, the next touch on the pad takes it full screen and holds it in landscape, where the
-  browser allows it (Android, iPad). Before, it tried once on the first press, which browsers
-  refuse, so full screen was only in the menu. On an iPhone, add the page to the Home Screen.
-- **Share play for more than four viewers**, as on the Mac. With AnyTogether's media server
-  (up to 16 viewers now), the Viewers row goes up to what the server takes. Past four, the
-  game's picture and sound go once to the media server and everyone watches from there, while
-  viewers you let play keep their direct link. A viewer's line says when they watch through the
+  number only. Accounts that are invisible or hide their status are not counted, and the line's
+  tooltip says so.
+- **A game's name in recent activity opens its hub**, as the website links it to the game's page.
+  Click the name in the feed or on a profile, or select an item on a profile.
+- **The browser pad goes full screen when you turn the phone**, as on the Mac. Turned to landscape,
+  the next touch on the pad takes it full screen and holds it in landscape, where the browser allows
+  it (Android, iPad). Before, it tried once on the first press, which browsers refuse, so full
+  screen was only in the menu. On an iPhone, add the page to the Home Screen.
+- **Share play for more than four viewers**, as on the Mac. With AnyTogether's media server (up to
+  16 viewers now), the Viewers row goes up to what the server takes. Past four, the game's picture
+  and sound go once to the media server and everyone watches from there, while viewers you let play
+  keep their direct link. A viewer's line says when they watch through the media server.
+- **List your share play in public**, as on the Mac: off, anyone can ask, or anyone can watch, under
+  Live now if you like, and in a language. People who ask to watch show in the quick menu with Let
+  them watch and Not now, and the ones who asked with your code say so.
+- **A join code for your share play**, as on the Mac: make one, copy it or its link, make a new one
+  or stop it. Anyone with it can ask to watch, and you still say yes to each one.
+- **Watch a big share play through the media server**, as on the Mac. In a share play with more than
+  four viewers you watch from the media server until the host lets you play, then straight from the
+  host, and back when they take the pad. The corner chip says when the picture comes through the
   media server.
-- **List your share play in public**, as on the Mac: off, anyone can ask, or anyone can watch,
-  under Live now if you like, and in a language. People who ask to watch show in the quick menu
-  with Let them watch and Not now, and the ones who asked with your code say so.
-- **A join code for your share play**, as on the Mac: make one, copy it or its link, make a
-  new one or stop it. Anyone with it can ask to watch, and you still say yes to each one.
-- **Watch a big share play through the media server**, as on the Mac. In a share play with
-  more than four viewers you watch from the media server until the host lets you play, then
-  straight from the host, and back when they take the pad. The corner chip says when the
-  picture comes through the media server.
-- **A controller's battery in percent** where the system measures it, as on the Mac. On Linux
-  it comes from the pad's power supply (DualSense, DualShock 4 and other pads whose driver gives
-  a percentage). On Windows a DualSense or DualShock 4 is read from its own report. Pads the
-  system has no percentage for keep the four levels.
-- **An iPhone on a USB cable reaches the launcher without Wi-Fi**, as on the Mac. The launcher
-  opens the phone app's port over the cable through usbmuxd and joins it to its phone server.
-  On Windows that is Apple Mobile Device Support (it comes with iTunes or the Apple Devices app),
-  on Linux the usbmuxd package (libimobiledevice).
-- **Arabic and Urdu are laid out right to left**, as on the Mac. Every screen is mirrored, the
-  games after the selected one sit on its left, and ← and → (and a mouse drag on the games and
-  the sliders) follow what the screen shows. A share play you watch keeps the controller as it is.
+- **A controller's battery in percent** where the system measures it, as on the Mac. On Linux it
+  comes from the pad's power supply (DualSense, DualShock 4 and other pads whose driver gives a
+  percentage). On Windows a DualSense or DualShock 4 is read from its own report. Pads the system
+  has no percentage for keep the four levels.
+- **An iPhone on a USB cable reaches the launcher without Wi-Fi**, as on the Mac. The launcher opens
+  the phone app's port over the cable through usbmuxd and joins it to its phone server. On Windows
+  that is Apple Mobile Device Support (it comes with iTunes or the Apple Devices app), on Linux the
+  usbmuxd package (libimobiledevice).
+- **Arabic and Urdu are laid out right to left**, as on the Mac. Every screen is mirrored, the games
+  after the selected one sit on its left, and ← and → (and a mouse drag on the games and the
+  sliders) follow what the screen shows. A share play you watch keeps the controller as it is.
 - **Hide the launcher while a game runs**, as on the Mac (Settings › Behaviour). The launcher's
-  window is minimized once the game starts and comes back when it closes. PS still brings it
-  back with the quick menu, and Resume puts it aside again.
-- **Check for updates can be turned off**, as on the Mac (Settings › Behaviour). Off, the
-  launcher and the engine look for new versions only when you ask in Settings › About.
-- **A game's Advanced page**, as on the Mac (Game settings › Advanced): each stick's dead zone,
-  the mouse as the camera (sensitivity, vertical speed, response curve, minimum tilt, maximum
-  speed, smoothing, center after), the slow movement amount and the keyboard's stick and trigger
-  ramps, written to the engine's input file as the Mac writes them. The shader cache switch and
-  Export and Import settings moved there, with Reset advanced settings.
+  window is minimized once the game starts and comes back when it closes. PS still brings it back
+  with the quick menu, and Resume puts it aside again.
+- **Check for updates can be turned off**, as on the Mac (Settings › Behaviour). Off, the launcher
+  and the engine look for new versions only when you ask in Settings › About.
+- **A game's Advanced page**, as on the Mac (Game settings › Advanced): each stick's dead zone, the
+  mouse as the camera (sensitivity, vertical speed, response curve, minimum tilt, maximum speed,
+  smoothing, center after), the slow movement amount and the keyboard's stick and trigger ramps,
+  written to the engine's input file as the Mac writes them. The shader cache switch and Export and
+  Import settings moved there, with Reset advanced settings.
 - **Edit your AnyTogether profile here**, as on the Mac: **Settings › AnyTogether › Your profile**
   has your display name, bio and two-letter country, with **Save profile**, and your handle with
   **Change handle** and the day it may change again.
 - **Who sees what**, as on the Mac: under it, a choice of Everyone, Friends or Only me for your
-  games and play time, trophies, friends list and being online and playing, and whether people
-  find you by name. Where the server keeps files, your gallery has its own choice too.
-- **Start a group chat**, as on the Mac: **Messages** lists **New group** under your
-  conversations. Pick the friends, give it a name if you like, and **Start the group** opens it
-  to write in.
-- **Call a friend**, as on the Mac: **Friends** has **Call** under every online friend. A call
-  to you rings with their picture over the launcher (Enter answers, Esc declines). Over a game a
-  notice says who calls, and where the launcher reads keys over a game (Windows, and X11 on
-  Linux, as for the talk key) Alt+A answers or Alt+D declines without leaving it. A call
-  nobody answers is said as a missed call. In a call, Friends shows who you talk to, whether they
-  muted or deafened, the microphone, Deafen, push-to-talk and **Hang up**. The voice is the
-  party's, so the same microphone and talk key work.
+  games and play time, trophies, friends list and being online and playing, and whether people find
+  you by name. Where the server keeps files, your gallery has its own choice too.
+- **Start a group chat**, as on the Mac: **Messages** lists **New group** under your conversations.
+  Pick the friends, give it a name if you like, and **Start the group** opens it to write in.
+- **Call a friend**, as on the Mac: **Friends** has **Call** under every online friend. A call to
+  you rings with their picture over the launcher (Enter answers, Esc declines). Over a game a notice
+  says who calls, and where the launcher reads keys over a game (Windows, and X11 on Linux, as for
+  the talk key) Alt+A answers or Alt+D declines without leaving it. A call nobody answers is said as
+  a missed call. In a call, Friends shows who you talk to, whether they muted or deafened, the
+  microphone, Deafen, push-to-talk and **Hang up**. The voice is the party's, so the same microphone
+  and talk key work.
 - **Captures**, as on the Mac: **Friends › Captures** shows the screenshots and clips you, your
   friends and players you met shared. Like one at once, read and write comments with one level of
   replies (quick ones like GG too), view the picture, delete your own, and △ opens who posted it.
 - **Share from the gallery**, as on the Mac: △ on a screenshot or clip opens **Share**. **Share to
   AnyTogether** writes a post with a caption and Friends or Public, **Send to** puts it in one of
-  your chats (sealed where the chat is end-to-end encrypted), and **Share to my gallery** pins it
-  to your profile. A clip longer than a post takes is said before anything goes up, and one too
-  big is made smaller with ffmpeg first. Without a server that keeps files, △ shows the file in
-  its folder. Photos and clips sent this way show in the chat, here and on the Mac.
+  your chats (sealed where the chat is end-to-end encrypted), and **Share to my gallery** pins it to
+  your profile. A clip longer than a post takes is said before anything goes up, and one too big is
+  made smaller with ffmpeg first. Without a server that keeps files, △ shows the file in its folder.
+  Photos and clips sent this way show in the chat, here and on the Mac.
 - **Place and zoom your profile picture**, as on the Mac: a picture you choose opens in a crop,
   where you drag it inside the circle and zoom with the slider or ← →, then **Save**. Signed in,
   **Use as my AnyTogether picture** puts it on your AnyTogether profile, and **Use my AnyTogether
   picture** brings the one there to this profile.
 - **Deafen in party voice**, as on the Mac: hear nobody, with your microphone off, and the others
-  see you deafened. Turning it off puts your microphone back as it was, and turning the
-  microphone on hears everyone again.
-- **Each game can have its own engine**, as on the Mac: Game Settings › Engine picks the default
-  or any downloaded engine, of either source, with what unlocked the game under it. A game whose
-  chosen engine is not on this computer says so before unlocking and offers the download.
-- **Delete one engine version**: a row for each downloaded version in Settings › AnyPS5 Engine,
-  as on the Mac. An engine a game or the default is using stays.
-- **Battery & heat can lower the resolution**, the row the Mac already had: a game with a
-  resolution option is installed one step lower while the profile holds. On Windows and Linux the
-  resolution is written when a game is installed, so it takes effect at the next install.
+  see you deafened. Turning it off puts your microphone back as it was, and turning the microphone
+  on hears everyone again.
+- **Each game can have its own engine**, as on the Mac: Game Settings › Engine picks the default or
+  any downloaded engine, of either source, with what unlocked the game under it. A game whose chosen
+  engine is not on this computer says so before unlocking and offers the download.
+- **Delete one engine version**: a row for each downloaded version in Settings › AnyPS5 Engine, as
+  on the Mac. An engine a game or the default is using stays.
+- **Battery & heat can lower the resolution**, the row the Mac already had: a game with a resolution
+  option is installed one step lower while the profile holds. On Windows and Linux the resolution is
+  written when a game is installed, so it takes effect at the next install.
 - **About has What's new, Made by, GitHub and the upstream project**, as on the Mac. What's new
   shows while an update is on offer and opens that release's page.
 - **Settings › Fonts lists Latin Italic**, the row the Mac has, beside Latin.
-- **Settings › Phones says which paired phone is connected now**: the count at the top and
-  Connected beside the phone's name, as on the Mac.
+- **Settings › Phones says which paired phone is connected now**: the count at the top and Connected
+  beside the phone's name, as on the Mac.
 - **Broadcasting has a microphone**, as on the Mac: Settings › Broadcasting mixes your commentary
   over the game's sound at the level you set, and it can be switched while you are live. Windows
   shows a small LIVE badge over the game that viewers do not see. Linux has no badge, because
   anything drawn over the game would be recorded too.
 - **Cloud storage lists your photos, clips and voice notes**, as on the Mac: delete one with a
   second press, and a bar shows how much saves and media take.
-- **Restore saves… restores the backup you choose**, as on the Mac. The latest backup can still
-  be restored in one press.
+- **Restore saves… restores the backup you choose**, as on the Mac. The latest backup can still be
+  restored in one press.
 - **A profile shows its pinned gallery**, as on the Mac: the photos and clips someone pinned, as
   their privacy setting shows them, open over the whole screen.
 - **The community's verdict is on the home screen**, as on the Mac: how the game runs on this
   platform, once people have said so.
 - **A game's options lead to its hub**, as on the Mac.
-- **Family notifications say what they're about**, as on the Mac: who asks for more time or a
-  game, what a parent answered, and family alerts and invites.
+- **Family notifications say what they're about**, as on the Mac: who asks for more time or a game,
+  what a parent answered, and family alerts and invites.
+- **Notices while you play are now a card over the game**, as on the Mac: captures, phone pairing,
+  invites, calls and family time limits on Windows and X11. Wayland, where nothing can be placed
+  over a game, keeps the system notice.
+- **One player now reads as one player** in Find players, leaderboards and game invites, instead of
+  "1 players".
+- **Screen readers now read Activity, Leaderboards, Challenges, Compare, Profile, Share Play and the
+  first-start steps**, and Party, Play Together and Find Players rows read their words, as on the
+  Mac.
+- **Stop share play and Remove ask first** in the quick menu, in place with Cancel focused, as on
+  the Mac.
+- **Launcher crash reports say how the run ended.** After the launcher closed without being closed,
+  Send Report now adds what Windows Error Reporting kept of it (the module that faulted and the
+  exception code, with the report file to attach) or Linux's core dump of it (the signal and the
+  crashed thread), or the kernel's out-of-memory kill, and says so when the system kept nothing.
+  Each line of the last seconds also has the launcher's memory.
+- **The .deb names every library the launcher needs**: 0.1.20's Depends left out the libraries the
+  bundled SDL2 links (ALSA, Wayland, xkbcommon, Xcursor, Xi, Xinerama and the rest), so on a system
+  without them SDL2 could not load and controllers fell back to the older reader. The packaging now
+  stops when a linked library has no package to name, Ubuntu 24.04's renamed packages are listed as
+  alternatives (`libasound2 | libasound2t64`), and every change installs the .deb on clean Ubuntu
+  22.04 and 24.04 and checks that the launcher and each library it carries find everything they
+  link.
+- **Do Not Disturb is quiet now**, as on the Mac: a message, a friend request, a party invite, a
+  game invite, a Play Together offer and a share play invite come in without a sound while you are
+  on Do Not Disturb (the toast still says them). Off Do Not Disturb a share play invite now brings
+  the notice sound behind another window, like the other invites.
+- **Do Not Disturb keeps the controller still for invites**, as on the Mac: a game invite, a party
+  invite and a Play Together offer no longer ring on the controller while you are on Do Not Disturb.
+  Off Do Not Disturb they ring as before, and a call still rings either way.
+- **The LIVE badge on Linux (X11)**, as on the Mac and Windows: while you broadcast, the small badge
+  shows over the game and viewers do not see it. The broadcast now records the game's window by
+  itself (x11grab's window_id, ffmpeg 4.4 or later) instead of its area of the screen, so under a
+  compositor nothing drawn over the game is in it. The badge needs a compositor and stays hidden
+  while the replay buffer or Remote Play records the screen. Under Wayland it stays off for now.
+- **No build folders in the Linux packages' library paths**: some plugin libraries in the .deb, the
+  AppImage and the .tar.gz kept the release build machine's folders (`/home/runner/...`) in their
+  RUNPATH, which namcap reports as insecure, as a folder by that name could hand them other
+  libraries. The packaging now leaves every bundled library looking only beside itself and in the
+  bundle (`$ORIGIN`), and every change checks that no library in the bundle, the .deb, the AppImage
+  or the .tar.gz looks anywhere else.
+- **Scoop and Arch package copies leave updates to their package manager**: the launcher sees when
+  Scoop installed it (its app folder, also under a custom `SCOOP` or `SCOOP_GLOBAL` root) or when
+  pacman owns it (`anyps5-desktop-bin`). It still checks for updates when **Settings → Behaviour →
+  Check for updates** is on, but instead of downloading and running the installer, which under Scoop
+  put a second copy in `%LOCALAPPDATA%\Programs\AnyPS5 Desktop`, it says a new version is out and
+  how to get it: `scoop update anyps5-desktop` (Settings › About copies the command), or your
+  package manager on Arch. These copies follow the stable releases, so Update Channel is not shown
+  for them. The installer, the zip, the AppImage, the .deb and winget update as before.
+- **Install with Scoop or winget.** On Windows, `scoop bucket add anytogether
+  https://github.com/AnyTogether/scoop-bucket` then `scoop install anytogether/anyps5-desktop`
+  installs the portable zip with a Start menu shortcut. `winget install AnyTogether.AnyPS5Desktop`
+  installs the installer once its submission to winget's repository is accepted (pending review).
+  Update a Scoop copy with `scoop update anyps5-desktop`. On Arch Linux, the `anyps5-desktop-bin`
+  package is in [AnyTogether/linux-packages](https://github.com/AnyTogether/linux-packages) (not on
+  the AUR yet). The Scoop manifest and the Arch package follow each stable release by themselves.
+- **Relinker options per game.** A game's Advanced settings have a Rebuild options section with
+  Trace system library calls (`--trace-imports`), so detailed logging can record the game's system
+  library calls. It is used on the game's next rebuild (Unlock again). An engine that does not have
+  it says so, and the game is rebuilt without it.
+- **Friends, parties and messages reach you over the game**, as on the Mac: a friend request, a
+  party invite, a message, a share play invite, someone in for your Find players post, someone
+  asking to join your party or to watch, and being let in from a post now show as the card over the
+  game (the system notice on Wayland or with no game open). Do Not Disturb keeps requests, invites
+  and messages off the game. A request to join your party now reads "asks to join your party", as on
+  the Mac.
+- **Uninstall no longer freezes the launcher on a big game.** The game is uninstalled at once and
+  its files are removed in the background, so the screen keeps answering however often it is clicked
+  meanwhile. Unlocking it again right away waits until the old files are gone.
+- **Cards over the game under Wayland on KDE Plasma, Sway, Hyprland and the other desktops with
+  wlr-layer-shell**, as on the Mac: trophies and notices while you play are a card over the game
+  instead of a system notice, and the LIVE badge shows while you broadcast (the desktop shares the
+  game's window alone, so viewers do not see it). It needs gtk-layer-shell (libgtk-layer-shell0 on
+  Ubuntu and Debian, which the .deb recommends). GNOME has no such layer and keeps the system
+  notice.
+- **The heat profile works on Windows**, as on the Mac and Linux: the launcher reads the graphics
+  card's temperature from the NVIDIA or AMD driver (on a laptop only while a game runs, so a
+  sleeping card is not woken) and the thermal zones Windows gives every program. Where the
+  processor's temperature needs administrator rights, Settings › Battery & heat offers Read the
+  processor's temperature: Windows asks once each time the launcher starts and a small reader runs
+  beside it, while the launcher itself never runs as administrator. Say no and the row says so, and
+  the battery profile keeps working.
+- **Your own relinker options and launch options per game** (asked for by Hog). A game's Advanced
+  settings have Custom relinker options under Rebuild options, added after the launcher's own on the
+  next rebuild (Unlock again), and Launch options in a new Launch section: variables as NAME=value
+  first, then arguments for the game, as in `APS5_REPORT=0 --aps5-report=off`. A variable the
+  launcher already sets keeps the launcher's value, and the game's log says which ones. Every
+  keystroke is checked: an option the launcher sets itself, one that would break the rebuilt game,
+  one the relinker does not have, or a quote left open is not saved and the row says why. A relinker
+  that stops with your options rebuilds the game without them.
+- **Linux uses the system's libmpv for clips and voice notes**: the packages no longer carry a
+  libmpv and the 129 libraries it pulled in, so the .deb, the AppImage and the .tar.gz are much
+  smaller. The .deb brings libmpv from apt (`libmpv2`, or `libmpv1` on Ubuntu 22.04), and the Arch
+  package depends on `mpv`. With the AppImage or the .tar.gz on a system without libmpv the launcher
+  still starts and works: a clip shows its picture with the command that installs libmpv on your
+  distribution and a button that opens it in another player, and voice notes open in the system's
+  player.
+- **Remote Play recovers faster on Windows and Linux**: when the phone loses part of the picture and
+  asks for a key frame, ffmpeg now makes one on request instead of the phone waiting for the next
+  regular key frame, up to a second away. An older ffmpeg without this ability keeps the
+  once-a-second key frame.
+- **The Windows package now carries the clip player's licences**: `libmpv-LICENSE.txt` beside
+  `libmpv-2.dll` (GNU LGPL version 3 or later, with where its source is) and `ANGLE-LICENSE.txt`
+  beside the ANGLE libraries. The .zip and the installer both take them. On Linux the bundle now
+  also carries the full licence texts its libraries' copyright files refer to.
+- **A Windows build can no longer leave out SDL2**: a failed `SDL2.dll` download now stops the build
+  (three tries first), and packaging stops if the DLL is missing from the build output, so no
+  package goes out with SDL2 controller support missing.
 
 ## 0.1.20
 

@@ -87,14 +87,54 @@ void main() {
     expect(model.failures, isEmpty, reason: 'a cancel is not a failure');
   });
 
-  test('a game made with an older toolkit is offered an update', () {
+  test('a game made with an older toolkit is rebuilt before it starts, not started as it is', () async {
     final orbit = model.games[indexOf('PPSA01001')];
+    File(p.join(orbit.folder, 'eboot.bin')).writeAsBytesSync(typicalSelf());
     expect(model.stateOf(orbit), isA<Installed>().having((state) => state.outdated, 'outdated', isFalse));
+    expect(model.needsRebuild(orbit), isFalse);
     makeFakeToolkit(fixture.toolkit, version: 'toolkit-2');
     // The toolkit is read again with the library (or when the launcher comes back in front), not
     // on every frame.
     model.rescan();
     expect(model.stateOf(orbit), isA<Installed>().having((state) => state.outdated, 'outdated', isTrue));
+    expect(model.needsRebuild(orbit), isTrue);
+    expect(model.records[orbit.id]!.toolkit, 'toolkit-1');
+    model.primaryAction(orbit);
+    expect(model.overlay, isNull, reason: 'no question: the stale copy is rebuilt');
+    expect(model.toast, 'Orbit Runner was made with another engine. Rebuilding it first');
+    expect(model.starting, isNull, reason: 'the stale copy did not start');
+    expect(model.afterRebuild?.$1, orbit.id, reason: 'the start waits on the rebuild');
+    expect(model.queue.contains(orbit.id) || model.progress.containsKey(orbit.id), isTrue);
+    // What waits goes on once the copy is the new engine's (the start itself is the next test's).
+    var went = false;
+    model.afterRebuild = (orbit.id, () => went = true);
+    await until(() => went);
+    expect(model.records[orbit.id]!.toolkit, 'toolkit-2');
+    expect(model.needsRebuild(orbit), isFalse);
+    expect(model.afterRebuild, isNull);
+  });
+
+  test('a rebuild that is cancelled or fails starts nothing, and the copy can still be played as it is', () async {
+    final orbit = model.games[indexOf('PPSA01001')];
+    File(p.join(orbit.folder, 'eboot.bin')).writeAsBytesSync(typicalSelf());
+    makeFakeToolkit(fixture.toolkit, mode: 'slow', version: 'toolkit-2');
+    model.rescan();
+    var went = false;
+    model.rebuildFirst(orbit, () => went = true);
+    expect(model.afterRebuild?.$1, orbit.id);
+    model.cancelUnlock(orbit);
+    expect(model.afterRebuild, isNull);
+    await until(() => model.stateOf(orbit) is Installed);
+    expect(went, isFalse);
+
+    makeFakeToolkit(fixture.toolkit, mode: 'fail', version: 'toolkit-3');
+    model.rescan();
+    model.rebuildFirst(orbit, () => went = true);
+    await until(() => model.stateOf(orbit) is Failed);
+    expect(went, isFalse);
+    expect(model.afterRebuild, isNull);
+    // The copy is still there: Play offers to try again or to play it as it is.
+    model.select(indexOf('PPSA01001'));
     model.primaryAction(orbit);
     expect(model.overlay, Layer.updateChoice);
     expect(model.panelCategories().single.rows.map((row) => row.id), ['update', 'play']);

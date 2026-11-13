@@ -129,7 +129,9 @@ void main() {
           .writeAsStringSync('FILE "${p.basename(image.path)}" BINARY\nTRACK 01 MODE2/2352\n');
     }
     final playlist = File(p.join(folder.path, 'game.m3u'))..writeAsStringSync('first.cue\nsecond.cue\n');
-    model.preferences.gamesFolders.add(p.dirname(folder.path));
+    model.preferences
+      ..retroLibrary = true
+      ..gamesFolders.add(p.dirname(folder.path));
     model.rescan();
     final game = model.games.singleWhere((game) => game.retro?.path == playlist.path);
     final firstPlay = model.play(game);

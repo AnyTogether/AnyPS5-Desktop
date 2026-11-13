@@ -129,7 +129,7 @@ void main() {
       write('PPSA01234-UPDATE/sce_module/libshared.prx', 'updated shared');
       write('PPSA01234-UPDATE/sce_module/libnew.prx', 'update only');
       final game = GameLibrary.inspect(folder)!;
-      expect(Installer.modulesOf(game), ['sce_module/libbase.prx', 'sce_module/libnew.prx', 'sce_module/libshared.prx']);
+      expect(Installer.modulesOf(game, HostSystem.linux), ['sce_module/libbase.prx', 'sce_module/libnew.prx', 'sce_module/libshared.prx']);
       expect(Installer.source(game, 'eboot.bin'), p.join(root, 'PPSA01234-UPDATE', 'eboot.bin'));
       expect(Installer.source(game, 'sce_module/libshared.prx'), p.join(root, 'PPSA01234-UPDATE', 'sce_module', 'libshared.prx'));
       expect(Installer.source(game, 'sce_module/libbase.prx'), p.join(folder, 'sce_module', 'libbase.prx'));
@@ -150,10 +150,10 @@ void main() {
       final folder = makeDump(root, 'PPSA01234', titleId: 'PPSA01234');
       final toolkit = Toolkit(makeFakeToolkit(p.join(temp.path, 'toolkit')));
       final before = GameLibrary.inspect(folder)!;
-      final key = Installer.relinkKey(before, toolkit, Installer.modulesOf(before), null);
+      final key = Installer.relinkKey(before, toolkit, Installer.modulesOf(before, toolkit.system), null);
       makeDump(root, 'PPSA01234-UPDATE', titleId: 'PPSA01234', version: '01.004.000');
       final after = GameLibrary.inspect(folder)!;
-      expect(Installer.relinkKey(after, toolkit, Installer.modulesOf(after), null), isNot(key));
+      expect(Installer.relinkKey(after, toolkit, Installer.modulesOf(after, toolkit.system), null), isNot(key));
     });
 
     test('old install records have no update', () {

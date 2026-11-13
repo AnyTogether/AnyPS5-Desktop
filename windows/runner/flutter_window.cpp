@@ -4,9 +4,12 @@
 #include <flutter/plugin_registrar_windows.h>
 
 #include <optional>
+#include <string>
 #include <variant>
+#include <vector>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "recycle.h"
 #include "utils.h"
 
 namespace {
@@ -14,6 +17,33 @@ namespace {
 // Posted when the window was maximized some way other than the system menu's command (Aero
 // Snap's drag to the top): turned into full screen once that is done.
 constexpr UINT kMaximizedMessage = WM_APP + 1;
+
+// Posted from the Now playing thread when the track changed: told to the launcher from here,
+// the thread the channel belongs to.
+constexpr UINT kNowPlayingMessage = WM_APP + 2;
+
+void NowPlayingChangedOnItsThread(void* context) {
+  ::PostMessage(static_cast<HWND>(context), kNowPlayingMessage, 0, 0);
+}
+
+// Posted from the recycle thread when a game's files are in the Recycle Bin (or could not go):
+// the launcher is answered from here, the thread the channel belongs to. wparam is the code of
+// recycle.h, lparam the RecycleRequest.
+constexpr UINT kRecycledMessage = WM_APP + 3;
+
+// One "recycle" call waiting for its answer.
+struct RecycleRequest {
+  HWND window;
+  std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result;
+};
+
+void RecycleFinishedOnItsThread(void* context, int code) {
+  auto* request = static_cast<RecycleRequest*>(context);
+  // The window gone meanwhile (the launcher closing): the request is left as it is, never
+  // answered from this thread.
+  ::PostMessage(request->window, kRecycledMessage, static_cast<WPARAM>(code),
+                reinterpret_cast<LPARAM>(request));
+}
 
 }  // namespace
 
@@ -105,6 +135,70 @@ bool FlutterWindow::OnCreate() {
           result->Success(flutter::EncodableValue(!run_marker_.empty()));
           return;
         }
+        // Delete game: a folder or a file into the Recycle Bin, on a thread of its own
+        // (recycle.h). Answered with its code once it is over (kRecycledMessage).
+        if (call.method_name() == "recycle") {
+          const auto* path = std::get_if<std::string>(call.arguments());
+          HWND hwnd = GetHandle();
+          if (path == nullptr || path->empty() || hwnd == nullptr) {
+            result->Error("bad_arguments", "recycle takes a path");
+            return;
+          }
+          const std::wstring target = Utf16FromUtf8(*path);
+          auto* request = new RecycleRequest{hwnd, std::move(result)};
+          if (target.empty() ||
+              RecycleStart(target.c_str(), RecycleFinishedOnItsThread,
+                           request) == 0) {
+            request->result->Success(flutter::EncodableValue(kRecycleFailed));
+            delete request;
+          }
+          return;
+        }
+        result->NotImplemented();
+      });
+
+  now_playing_ = NowPlayingCreate(NowPlayingChangedOnItsThread, GetHandle());
+  now_playing_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "anyps5/now_playing",
+          &flutter::StandardMethodCodec::GetInstance());
+  now_playing_channel_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
+                 result) {
+        if (call.method_name() == "watch") {
+          const auto* on = std::get_if<bool>(call.arguments());
+          if (on == nullptr) {
+            result->Error("bad_arguments", "watch takes a bool");
+            return;
+          }
+          NowPlayingWatch(now_playing_, *on ? 1 : 0);
+          result->Success(flutter::EncodableValue(now_playing_ != nullptr));
+          return;
+        }
+        if (call.method_name() == "get") {
+          result->Success(NowPlayingValue());
+          return;
+        }
+        if (call.method_name() == "command") {
+          const auto* name = std::get_if<std::string>(call.arguments());
+          int command = -1;
+          if (name != nullptr && *name == "playPause") {
+            command = kNowPlayingPlayPause;
+          } else if (name != nullptr && *name == "next") {
+            command = kNowPlayingNext;
+          } else if (name != nullptr && *name == "previous") {
+            command = kNowPlayingPrevious;
+          }
+          if (command < 0) {
+            result->Error("bad_arguments",
+                          "command takes playPause, next or previous");
+            return;
+          }
+          NowPlayingCommand(now_playing_, command);
+          result->Success(flutter::EncodableValue(now_playing_ != nullptr));
+          return;
+        }
         result->NotImplemented();
       });
 
@@ -181,7 +275,34 @@ void FlutterWindow::MaximizeToFullscreen() {
   }
 }
 
+flutter::EncodableValue FlutterWindow::NowPlayingValue() {
+  NowPlayingTrack track{};
+  NowPlayingRead(now_playing_, &track);
+  if (!track.present) {
+    return flutter::EncodableValue();
+  }
+  flutter::EncodableMap map;
+  map[flutter::EncodableValue("title")] =
+      flutter::EncodableValue(std::string(track.title ? track.title : ""));
+  map[flutter::EncodableValue("artist")] =
+      flutter::EncodableValue(std::string(track.artist ? track.artist : ""));
+  map[flutter::EncodableValue("player")] =
+      flutter::EncodableValue(std::string(track.player ? track.player : ""));
+  map[flutter::EncodableValue("playing")] =
+      flutter::EncodableValue(track.playing != 0);
+  if (track.artwork != nullptr && track.artwork_size > 0) {
+    map[flutter::EncodableValue("artwork")] = flutter::EncodableValue(
+        std::vector<uint8_t>(track.artwork, track.artwork + track.artwork_size));
+  }
+  NowPlayingFree(&track);
+  return flutter::EncodableValue(map);
+}
+
 void FlutterWindow::OnDestroy() {
+  // Its thread is waited for, so no "changed" is posted to a window that is gone.
+  NowPlayingDestroy(now_playing_);
+  now_playing_ = nullptr;
+  now_playing_channel_ = nullptr;
   retro_core_.reset();
   window_channel_ = nullptr;
   if (flutter_controller_) {
@@ -214,6 +335,22 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     case kMaximizedMessage:
       if (::IsZoomed(hwnd)) {
         MaximizeToFullscreen();
+      }
+      return 0;
+    case kRecycledMessage: {
+      std::unique_ptr<RecycleRequest> request(
+          reinterpret_cast<RecycleRequest*>(lparam));
+      if (request && request->result) {
+        request->result->Success(
+            flutter::EncodableValue(static_cast<int>(wparam)));
+      }
+      return 0;
+    }
+    case kNowPlayingMessage:
+      if (now_playing_channel_ && now_playing_ != nullptr) {
+        now_playing_channel_->InvokeMethod(
+            "changed",
+            std::make_unique<flutter::EncodableValue>(NowPlayingValue()));
       }
       return 0;
   }
