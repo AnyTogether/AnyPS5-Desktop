@@ -1,7 +1,7 @@
 name: anyps5_desktop
 description: "AnyPS5 launcher for Windows and Linux."
 publish_to: 'none'
-version: 0.1.22+23
+version: 0.1.23+24
 
 environment:
   sdk: ^3.13.1

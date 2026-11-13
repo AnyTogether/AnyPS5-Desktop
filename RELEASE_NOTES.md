@@ -11,6 +11,17 @@ section is copied into the release.
 
 Nothing yet.
 
+## 0.1.23
+
+- **PS1, PS2 and PS3 games in an emulator you installed.** Settings › Game Library has a new switch,
+  Emulator games, off until you turn it on: then the library also lists the discs in your games
+  folders (PS1 cue sheets, PBP files and M3U playlists, PS2 ISOs, CHDs in a folder named PS1 or PS2,
+  extracted PS3 discs, and game folders described by a retro.json), and Settings › Emulators
+  appears, where you pick DuckStation, PCSX2 or RPCS3. Play starts the game in that emulator, in its
+  own window. A game whose emulator is not picked yet says Emulator required, and Show as folders
+  gathers each console's games in one tile on the home screen. With the switch off, the games
+  folders are scanned as before and nothing of this shows. Designed and written by B-Howell.
+
 ## 0.1.22
 
 - **Delete game.** Game Settings has a new action under Remove installation that takes the game
