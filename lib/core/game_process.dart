@@ -47,7 +47,7 @@ abstract final class GameProcess {
   /// maps /app0 under it) and [environment] on top of the launcher's; its output is appended to
   /// [logFile]: set aside first when it grew past [GameLog.rollLimit], started again past
   /// [logCap] while the game runs. [traced] marks the start line of a start with detailed
-  /// logging.
+  /// logging. Without [inheritEnvironment], [environment] is the whole environment.
   static Future<RunningGame> start({
     required String installed,
     required Map<String, String> environment,
@@ -59,6 +59,7 @@ abstract final class GameProcess {
     bool traced = false,
     int logCap = GameLog.cap,
     List<String> notes = const [],
+    bool inheritEnvironment = true,
   }) async {
     final host = system ?? HostSystem.current;
     final executable = program ?? p.join(installed, host.executableName);
@@ -76,7 +77,13 @@ abstract final class GameProcess {
     }
     final Process process;
     try {
-      process = await Process.start(executable, arguments, workingDirectory: installed, environment: environment);
+      process = await Process.start(
+        executable,
+        arguments,
+        workingDirectory: installed,
+        environment: environment,
+        includeParentEnvironment: inheritEnvironment,
+      );
     } on Object {
       log.close();
       rethrow;
@@ -95,5 +102,32 @@ abstract final class GameProcess {
       done.complete(code);
     }());
     return RunningGame(process, done.future, started);
+  }
+
+  /// [launcher]'s environment without what its AppImage set: the AppImage runtime's `APPIMAGE`,
+  /// `APPDIR`, `ARGV0` and `OWD`, and the AppRun's own folder at the front of `XDG_DATA_DIRS`.
+  /// Another program started from it (an emulator) then cannot pick up the launcher's paths, and
+  /// one that is an AppImage itself starts as it would from the desktop.
+  static Map<String, String> withoutAppImage(Map<String, String> launcher) {
+    const runtime = {'APPIMAGE', 'APPDIR', 'ARGV0', 'OWD'};
+    final environment = {
+      for (final entry in launcher.entries)
+        if (!runtime.contains(entry.key)) entry.key: entry.value,
+    };
+    final appDir = launcher['APPDIR'];
+    final dataDirs = launcher['XDG_DATA_DIRS'];
+    if (appDir != null && appDir.isNotEmpty && dataDirs != null) {
+      final own = p.posix.join(appDir, 'usr', 'share');
+      final entries = dataDirs.split(':');
+      if (entries.first == own) {
+        final rest = entries.skip(1).join(':');
+        if (rest.isEmpty) {
+          environment.remove('XDG_DATA_DIRS');
+        } else {
+          environment['XDG_DATA_DIRS'] = rest;
+        }
+      }
+    }
+    return environment;
   }
 }

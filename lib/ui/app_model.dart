@@ -4225,8 +4225,10 @@ class AppModel extends ChangeNotifier {
     primaryAction(game);
   }
 
+  /// Starts a standalone emulator. On Linux it gets the launcher's environment without what the
+  /// launcher's AppImage set ([GameProcess.withoutAppImage]).
   @visibleForTesting
-  Future<RunningGame> Function({
+  late Future<RunningGame> Function({
     required String installed,
     required String program,
     required List<String> arguments,
@@ -4237,7 +4239,10 @@ class AppModel extends ChangeNotifier {
     program: program,
     arguments: arguments,
     logFile: logFile,
-    environment: const {},
+    environment: system == HostSystem.linux
+        ? GameProcess.withoutAppImage(services.environment ?? Platform.environment)
+        : const {},
+    inheritEnvironment: system != HostSystem.linux,
   );
 
   /// While a game runs, a trophy it earns shows and goes to the phones.

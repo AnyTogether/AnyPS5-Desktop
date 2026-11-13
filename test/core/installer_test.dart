@@ -936,6 +936,39 @@ void main() {
       expect(text, contains('--- exit 0'));
     });
 
+    test('an emulator started from the AppImage gets none of its variables', () {
+      final launcher = {
+        'APPIMAGE': '/home/u/AnyPS5.AppImage',
+        'APPDIR': '/tmp/.mount_AnyPS5x',
+        'ARGV0': 'AnyPS5.AppImage',
+        'OWD': '/home/u',
+        'XDG_DATA_DIRS': '/tmp/.mount_AnyPS5x/usr/share:/usr/local/share:/usr/share',
+        'HOME': '/home/u',
+        'PATH': '/usr/bin',
+      };
+      expect(GameProcess.withoutAppImage(launcher), {
+        'XDG_DATA_DIRS': '/usr/local/share:/usr/share',
+        'HOME': '/home/u',
+        'PATH': '/usr/bin',
+      });
+      expect(launcher, hasLength(7), reason: 'the launcher keeps its own environment');
+    });
+
+    test("only the AppImage's own data folder at the front is taken off", () {
+      expect(
+        GameProcess.withoutAppImage({'APPDIR': '/tmp/.mount_a', 'XDG_DATA_DIRS': '/usr/share:/tmp/.mount_a/usr/share'}),
+        {'XDG_DATA_DIRS': '/usr/share:/tmp/.mount_a/usr/share'},
+      );
+      expect(
+        GameProcess.withoutAppImage({'APPDIR': '/tmp/.mount_a', 'XDG_DATA_DIRS': '/tmp/.mount_a/usr/share'}),
+        isEmpty,
+      );
+      expect(GameProcess.withoutAppImage({'XDG_DATA_DIRS': '/opt/x/usr/share:/usr/share', 'HOME': '/h'}), {
+        'XDG_DATA_DIRS': '/opt/x/usr/share:/usr/share',
+        'HOME': '/h',
+      }, reason: 'outside an AppImage nothing changes');
+    });
+
     test('a game that is not installed does not start', () async {
       expect(
         () => GameProcess.start(
