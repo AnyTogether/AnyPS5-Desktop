@@ -27,6 +27,7 @@ dependencies:
   media_kit_video: ^2.0.1
   native_toolchain_c: ^0.19.5
   path: ^1.9.1
+  xml: ^7.1.0
   pinenacl: ^0.6.0
   qr: ^3.0.2
 

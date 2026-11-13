@@ -1,0 +1,3 @@
+tool/build-rpcs3-preview.sh text eol=lf
+# Unified diff context lines have intentional leading spaces.
+tool/patches/rpcs3-libretro-frontend.patch text eol=lf -whitespace

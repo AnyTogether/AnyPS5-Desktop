@@ -1,6 +1,7 @@
 #include "flutter_window.h"
 
 #include <flutter/standard_method_codec.h>
+#include <flutter/plugin_registrar_windows.h>
 
 #include <optional>
 #include <string>
@@ -67,6 +68,11 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  auto* engine = flutter_controller_->engine();
+  auto* registrar = flutter::PluginRegistrarManager::GetInstance()
+                        ->GetRegistrar<flutter::PluginRegistrarWindows>(
+                            engine->GetRegistrarForPlugin("AnyPS5RetroCore"));
+  retro_core_ = std::make_unique<RetroCoreHost>(engine->messenger(), registrar->texture_registrar());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   window_channel_ =
@@ -297,6 +303,7 @@ void FlutterWindow::OnDestroy() {
   NowPlayingDestroy(now_playing_);
   now_playing_ = nullptr;
   now_playing_channel_ = nullptr;
+  retro_core_.reset();
   window_channel_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;

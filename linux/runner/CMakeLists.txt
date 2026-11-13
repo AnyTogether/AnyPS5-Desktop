@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.18)
 project(runner LANGUAGES CXX)
 
 # Define the application target. To change its name, change BINARY_NAME in the
@@ -10,6 +10,9 @@ add_executable(${BINARY_NAME}
   "main.cc"
   "my_application.cc"
   "layer_overlay.cc"
+  "retro_core_host_linux.cc"
+  "retro_linux_audio.cc"
+  "retro_linux_video.cc"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
 )
 
@@ -22,8 +25,12 @@ add_definitions(-DAPPLICATION_ID="${APPLICATION_ID}")
 
 # Add dependency libraries. Add any application-specific dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter)
-target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GTK)
 # dlopen for gtk-layer-shell (layer_overlay.cc), which is loaded at run time, never linked.
+pkg_check_modules(RETRO_RENDER REQUIRED IMPORTED_TARGET egl epoxy)
+pkg_check_modules(RETRO_AUDIO REQUIRED IMPORTED_TARGET libpulse)
+set(ANYPS5_RETRO_VULKAN ON)
+add_subdirectory("${CMAKE_SOURCE_DIR}/../native/retro" "${CMAKE_CURRENT_BINARY_DIR}/retro")
+target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GTK PkgConfig::RETRO_RENDER PkgConfig::RETRO_AUDIO anyps5_retro_vulkan)
 target_link_libraries(${BINARY_NAME} PRIVATE ${CMAKE_DL_LIBS})
 
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")

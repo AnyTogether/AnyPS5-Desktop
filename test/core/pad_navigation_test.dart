@@ -53,6 +53,22 @@ void main() {
       expect(commands, [PadCommand.select]);
     });
 
+    test('resuming a game clears held menu controls before the next PS press', () {
+      navigator.dispose();
+      navigator = PadNavigator((command) {
+        commands.add(command);
+        if (command == PadCommand.select) navigator.reset();
+      });
+      navigator
+        ..handle(down(PadButton.dpadDown))
+        ..handle(down(PadButton.south))
+        ..handle(down(PadButton.guide))
+        ..handle(up(PadButton.guide));
+
+      expect(commands, [PadCommand.down, PadCommand.select, PadCommand.home]);
+      expect(navigator.held, isNull);
+    });
+
     test('buttons the launcher has no use for do nothing', () {
       for (final button in [PadButton.west, PadButton.l2, PadButton.r2, PadButton.select, PadButton.l3]) {
         navigator.handle(down(button));

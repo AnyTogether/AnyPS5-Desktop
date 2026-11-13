@@ -169,20 +169,25 @@ void main() {
       final model = fixture.model;
       model.preferences
         ..theme = 2
-        ..sounds = false;
+        ..sounds = false
+        ..retroLastDisc['ps1-game'] = 'disc-2.cue';
       final selin = model.profiles.add(name: 'Selin', mode: ProfileMode.offline);
       await model.switchProfile(selin.id);
       expect(model.currentProfile?.name, 'Selin');
       expect(model.preferences.theme, 0, reason: 'a new profile starts from the defaults');
       expect(model.preferences.sounds, isTrue);
       expect(model.preferences.profileName, 'Selin');
+      expect(model.preferences.retroLastDisc, isEmpty);
       expect(model.preferences.gamesFolders, isNotEmpty, reason: "the computer's settings stay");
       model.preferences.theme = 1;
+      model.preferences.retroLastDisc['ps1-game'] = 'disc-1.cue';
       await model.switchProfile(LauncherProfile.legacyId);
       expect(model.preferences.theme, 2);
       expect(model.preferences.sounds, isFalse);
+      expect(model.preferences.retroLastDisc['ps1-game'], 'disc-2.cue');
       await model.switchProfile(selin.id);
       expect(model.preferences.theme, 1);
+      expect(model.preferences.retroLastDisc['ps1-game'], 'disc-1.cue');
     });
 
     test("each profile's saves and trophies are its own", () async {

@@ -33,6 +33,7 @@ import 'messages_view.dart';
 import 'picture_crop_view.dart';
 import 'profile_view.dart';
 import 'onboarding.dart';
+import 'embedded_retro_view.dart';
 import 'panels.dart';
 import 'profiles_view.dart';
 import 'strings.dart';
@@ -185,6 +186,19 @@ class _LauncherShellState extends State<LauncherShell> {
 
   KeyEventResult _key(FocusNode node, KeyEvent event) {
     final model = widget.model;
+    final game = model.embeddedGame;
+    if (game != null && model.overlay == null) {
+      if (event.logicalKey == LogicalKeyboardKey.escape) {
+        if (event is KeyDownEvent) unawaited(model.openQuickMenu());
+        return KeyEventResult.handled;
+      }
+      final button = embeddedRetroKeys[event.logicalKey];
+      if (button != null) {
+        if (event is KeyDownEvent || event is KeyUpEvent) game.key(button, event is KeyDownEvent);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey != LogicalKeyboardKey.f11) return KeyEventResult.ignored;
+    }
     // A keyboard's Back and Forward keys (and mouse drivers that send them for the side
     // buttons) are the mouse's side buttons.
     if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.browserBack) {
@@ -322,7 +336,7 @@ class _LauncherShellState extends State<LauncherShell> {
     final model = widget.model;
     if (action == HintAction.previousGame || action == HintAction.nextGame) {
       final delta = action == HintAction.nextGame ? 1 : -1;
-      if (model.overlay == Layer.settings) return model.moveCategory(delta);
+      if (model.hasSettingsSections) return model.moveCategory(delta);
     }
     model.handle(switch (action) {
       HintAction.previousGame => Command.previousGame,
@@ -358,6 +372,11 @@ class _LauncherShellState extends State<LauncherShell> {
     if (_wheel.abs() < 40) return;
     model.handle(_wheel > 0 ? Command.nextGame : Command.previousGame);
     _wheel = 0;
+  }
+
+  bool get _retroStarting {
+    final model = widget.model;
+    return model.overlay == null && (model.starting?.retro != null || model.embeddedGame?.progress != null);
   }
 
   @override
@@ -422,28 +441,41 @@ class _LauncherShellState extends State<LauncherShell> {
                                     child: Stack(
                                       fit: StackFit.expand,
                                       children: [
-                                        Backdrop(model: model, time: widget.time),
-                                        RepaintBoundary(
-                                          // Glass's see-through window: under a layer the home screen
-                                          // fades out, the layer a pane over the desktop (LayerScrim).
-                                          child: AnimatedOpacity(
-                                            opacity: model.glassWindow.seeThrough && model.overlay != null ? 0 : 1,
-                                            duration: Motion.overlay,
-                                            curve: Motion.settle,
-                                            child: AnimatedSwitcher(
-                                              layoutBuilder: uniqueSwitcherLayout(),
-                                              duration: Motion.fade,
-                                              switchInCurve: Motion.settle,
-                                              child: model.preferences.onboarded
-                                                  ? HomeView(key: const ValueKey('home'), model: model, now: widget.now)
-                                                  : OnboardingView(
-                                                      key: const ValueKey('onboarding'),
-                                                      model: model,
-                                                      time: widget.time,
-                                                    ),
+                                        if (model.embeddedGame case final game?) EmbeddedRetroView(game: game),
+                                        if (model.embeddedGame == null || _retroStarting)
+                                          Backdrop(
+                                            key: const ValueKey('launcher-backdrop'),
+                                            model: model,
+                                            time: widget.time,
+                                            game: _retroStarting ? model.starting ?? model.running?.$1 : null,
+                                          ),
+                                        if (model.embeddedGame == null && !_retroStarting)
+                                          RepaintBoundary(
+                                            // Glass's see-through window: under a layer the home screen
+                                            // fades out, the layer a pane over the desktop (LayerScrim).
+                                            child: AnimatedOpacity(
+                                              opacity: model.glassWindow.seeThrough && model.overlay != null ? 0 : 1,
+                                              duration: Motion.overlay,
+                                              curve: Motion.settle,
+                                              child: AnimatedSwitcher(
+                                                layoutBuilder: uniqueSwitcherLayout(),
+                                                duration: Motion.fade,
+                                                switchInCurve: Motion.settle,
+                                                child: model.preferences.onboarded
+                                                    ? HomeView(
+                                                        key: const ValueKey('home'),
+                                                        model: model,
+                                                        now: widget.now,
+                                                      )
+                                                    : OnboardingView(
+                                                        key: const ValueKey('onboarding'),
+                                                        model: model,
+                                                        time: widget.time,
+                                                      ),
+                                              ),
                                             ),
                                           ),
-                                        ),
+                                        if (_retroStarting) _StartingCard(model: model, retro: true),
                                         RepaintBoundary(
                                           child: AnimatedSwitcher(
                                             layoutBuilder: uniqueSwitcherLayout(),
@@ -514,7 +546,9 @@ class _LauncherShellState extends State<LauncherShell> {
                                             ),
                                           ),
                                         ),
-                                        if (model.starting != null) _StartingCard(model: model),
+
+                                        if (model.starting != null && model.starting!.retro == null)
+                                          _StartingCard(model: model),
                                         if (model.together.ringing != null && model.pairing == null)
                                           RingingCard(model: model),
                                         if (model.pairing != null) PairingCard(model: model),
@@ -569,14 +603,17 @@ class _WindowBase extends StatelessWidget {
 }
 
 class _StartingCard extends StatelessWidget {
-  const _StartingCard({required this.model});
+  const _StartingCard({required this.model, this.retro = false});
 
   final AppModel model;
+  final bool retro;
 
   @override
   Widget build(BuildContext context) {
     final scale = LayoutScale.of(context);
-    final game = model.starting!;
+    final game = model.starting ?? model.running!.$1;
+    final progress = model.embeddedGame?.progress;
+    final percent = progress?.percent;
     return ColoredBox(
       color: Colors.black.withValues(alpha: 0.6),
       child: Center(
@@ -596,17 +633,30 @@ class _StartingCard extends StatelessWidget {
             SizedBox(height: 12 * scale),
             SizedBox(
               width: 520 * scale,
+              height: retro ? 68 * scale : null,
               child: Text(
-                T.text('startingText'),
+                T.text(progress == null ? 'startingText' : 'retroPs3Preparing'),
                 textAlign: TextAlign.center,
+                maxLines: retro ? 3 : null,
+                overflow: retro ? TextOverflow.ellipsis : null,
                 style: AppText.display(16 * scale, color: Colors.white.withValues(alpha: 0.65), height: 1.4),
               ),
             ),
             SizedBox(height: 24 * scale),
             SizedBox(
               width: 260 * scale,
-              child: IndeterminateLine(color: model.accentChoice.color),
+              height: retro ? 4 * scale : null,
+              child: percent == null
+                  ? IndeterminateLine(color: model.accentChoice.color)
+                  : LinearProgressIndicator(value: percent / 100, color: model.accentChoice.color),
             ),
+            if (retro || percent != null) ...[
+              SizedBox(height: 8 * scale),
+              SizedBox(
+                height: retro ? 18 * scale : null,
+                child: percent == null ? null : Text(T.percent(percent), style: AppText.display(14 * scale)),
+              ),
+            ],
           ],
         ),
       ),

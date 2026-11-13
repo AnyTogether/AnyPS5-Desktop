@@ -43,6 +43,7 @@ import '../core/gamepad/pad_navigation.dart';
 import '../core/gamepad/shortcuts.dart';
 import '../core/game_deletion.dart' show Trash;
 import '../core/game_library.dart';
+import '../core/managed_retro.dart';
 import '../core/game_log.dart';
 import '../core/game_process.dart';
 import '../core/game_presets.dart';
@@ -112,13 +113,16 @@ import 'profile_picture.dart';
 import 'save_sync_model.dart';
 import 'sharing_model.dart';
 import 'strings.dart';
+import 'ps3_settings_model.dart';
 import 'theme.dart';
 import 'theme_hub_model.dart';
 import 'together_model.dart';
 import 'update_model.dart';
 import 'trophy_card.dart';
+import 'embedded_retro_game.dart';
 
 part 'profiles_model.dart';
+part 'embedded_emulators.dart';
 part 'retro_home_folders.dart';
 part 'standalone_emulators.dart';
 part 'settings_search.dart';
@@ -150,6 +154,15 @@ class Preferences {
       if (json['retroEmulators'] case final Map<dynamic, dynamic> entries)
         for (final platform in RetroPlatform.values)
           if (entries[platform.name] case final String path) platform.name: path,
+    }
+    ..retroGraphics = {
+      if (json['retroGraphics'] case final Map<dynamic, dynamic> games)
+        for (final entry in games.entries)
+          if (entry.key is String && entry.value is Map)
+            entry.key as String: {
+              for (final option in (entry.value as Map).entries)
+                if (option.key is String && option.value is String) option.key as String: option.value as String,
+            },
     }
     ..showRetroFolders = json['showRetroFolders'] == true
     ..toolkitFolder = json['toolkitFolder'] as String?
@@ -232,6 +245,11 @@ class Preferences {
       for (final entry in (json['compatAsked'] as Map<String, dynamic>? ?? const {}).entries)
         if (entry.value is String) entry.key: entry.value as String,
     }
+    ..retroLastDisc = {
+      if (json['retroLastDisc'] case final Map<dynamic, dynamic> discs)
+        for (final entry in discs.entries)
+          if (entry.key is String && entry.value is String) entry.key as String: entry.value as String,
+    }
     ..lastPlayed = {
       for (final entry in (json['lastPlayed'] as Map<String, dynamic>? ?? const {}).entries)
         entry.key: entry.value as String,
@@ -270,6 +288,7 @@ class Preferences {
 
   /// The emulator chosen for each console ([RetroPlatform.name]), by its executable's path.
   Map<String, String> retroEmulators = {};
+  Map<String, Map<String, String>> retroGraphics = {};
 
   /// Settings › Emulators › Show as folders: a console's games in one tile on the home screen.
   bool showRetroFolders = false;
@@ -340,6 +359,7 @@ class Preferences {
   /// silent, null is 100. Games keep their own volume.
   int? launcherVolume;
   Map<String, String> lastPlayed = {};
+  Map<String, String> retroLastDisc = {};
 
   /// Which engine the settings offer: 'upstream' (boykopovar/AnyPS5) or 'arm' (AnyPS5-ARM's,
   /// with the phone controller, full screen and window size). A first start chooses 'arm'
@@ -460,6 +480,8 @@ class Preferences {
     'gamesFolders': gamesFolders,
     if (retroLibrary) 'retroLibrary': true,
     if (retroEmulators.isNotEmpty) 'retroEmulators': retroEmulators,
+    if (retroGraphics.isNotEmpty) 'retroGraphics': retroGraphics,
+    if (retroLastDisc.isNotEmpty) 'retroLastDisc': retroLastDisc,
     if (showRetroFolders) 'showRetroFolders': true,
     // The first one under the old name too, for an older launcher started again.
     'gamesFolder': gamesFolders.firstOrNull,
@@ -864,6 +886,8 @@ enum Layer {
 
   /// PS in a game: the game paused under Resume, Game Settings and Close Game.
   quickMenu,
+  retroDiscs,
+  retroStartDisc,
 
   /// A friend's share play watched full screen (share_play_model.dart): the controller is the
   /// game's, PS leaves.
@@ -1899,6 +1923,9 @@ class AppModel extends ChangeNotifier {
   /// A controller's event past the gate: to the navigator, or to Settings › Shortcuts while it
   /// waits for buttons.
   void _padEvent(PadEvent event) {
+    if (_embeddedOwnsPad) {
+      if (event is PadAxisEvent || (event is PadButtonEvent && event.button != PadButton.guide)) return;
+    }
     if (shortcutCapture != null && event is PadButtonEvent) return _capturePad(event);
     _navigator?.handle(event);
   }
@@ -1983,7 +2010,7 @@ class AppModel extends ChangeNotifier {
       return;
     }
     if (capturing != null && mapped != Command.back) return;
-    if (overlay == Layer.settings && (mapped == Command.previousGame || mapped == Command.nextGame)) {
+    if (hasSettingsSections && (mapped == Command.previousGame || mapped == Command.nextGame)) {
       return moveCategory(mapped == Command.nextGame ? 1 : -1);
     }
     _viaPad = true;
@@ -2130,7 +2157,7 @@ class AppModel extends ChangeNotifier {
         unawaited(toggleFullscreen());
       case LauncherAction.previousSection || LauncherAction.nextSection:
         final delta = action == LauncherAction.nextSection ? 1 : -1;
-        if (overlay == Layer.settings) return moveCategory(delta);
+        if (hasSettingsSections) return moveCategory(delta);
         command(delta > 0 ? Command.nextGame : Command.previousGame);
     }
   }
@@ -2436,6 +2463,8 @@ class AppModel extends ChangeNotifier {
   List<Game> games = [];
   int selected = 0;
   RetroPlatform? _homeRetroFolder;
+  bool _embeddedSetupBusy = false;
+  bool _embeddedOwnsPad = false;
   int libraryIndex = 0;
   HomeFocus focus = HomeFocus.tiles;
   Layer? overlay;
@@ -2625,6 +2654,7 @@ class AppModel extends ChangeNotifier {
   (String, void Function())? afterRebuild;
 
   Game? starting;
+  ({Game game, List<String> paths, Completer<String?> selection})? _retroDiscLaunch;
   (Game, RunningGame)? running;
 
   /// A short message at the bottom of the screen, with a trophy level's badge before it when
@@ -2759,6 +2789,7 @@ class AppModel extends ChangeNotifier {
   /// The game back in front, the launcher behind it (or minimized again, with Hide the
   /// launcher while a game runs).
   Future<void> _showGame(RunningGame run) async {
+    if (run is EmbeddedRetroGame) return;
     final shown = await desktop.focusGame(run.pid);
     _padLog?.call('PS: game ${shown ? 'in front' : 'could not be brought in front'}');
     if (preferences.hideWhilePlaying && running?.$2 == run) await _hideForGame();
@@ -3021,7 +3052,10 @@ class AppModel extends ChangeNotifier {
     records.clear();
     trophies.clear();
     for (final game in games) {
-      if (game.retro != null) continue;
+      if (game.retro != null) {
+        if (game.retro?.platform == RetroPlatform.ps3) _loadTrophies(game);
+        continue;
+      }
       final installed = Installer.installedFolder(game, rootOf(game)!);
       // Being uninstalled: not installed, whatever is left of it on the disk.
       final record = _removals.containsKey(game.id) ? null : Installer.record(installed, system: system);
@@ -3069,6 +3103,15 @@ class AppModel extends ChangeNotifier {
   }
 
   void _loadTrophies(Game game) {
+    if (game.retro?.platform == RetroPlatform.ps3) {
+      final set = Trophies.loadPs3(game, system: _managedRetro?.systemPath, languages: [T.language.code]);
+      if (set == null) {
+        trophies.remove(game.id);
+      } else {
+        trophies[game.id] = set;
+      }
+      return;
+    }
     final folder = rootOf(game);
     if (folder == null) return;
     final installed = Installer.installedFolder(game, folder);
@@ -3171,7 +3214,9 @@ class AppModel extends ChangeNotifier {
     if (starting?.id == game.id) return const Starting();
     if (together.family.ageLock(game) case final FamilyLocked lock) return lock;
     if (game.retro case final RetroDisc disc) {
-      return standaloneEmulator(disc.platform) == null ? const NeedsEmulator() : const Installed();
+      return standaloneEmulator(disc.platform) != null || _embeddedReady(disc.platform)
+          ? const Installed()
+          : const NeedsEmulator();
     }
     final installed = records.containsKey(game.id);
     final current = progress[game.id];
@@ -4470,6 +4515,7 @@ class AppModel extends ChangeNotifier {
     sounds.play(cue);
     if (overlay != next) together.askingRow = null;
     overlay = next;
+    if (next != Layer.retroStartDisc) _cancelRetroDiscPicker();
     panelRow = 0;
     // Settings open with every section; a search is over.
     if (next == Layer.settings) {
@@ -4488,6 +4534,9 @@ class AppModel extends ChangeNotifier {
     if (next == Layer.gameSettings) _gameFacts.clear();
     if (next == Layer.log) shownLog = selectedGame == null ? '' : logText(selectedGame!);
     if (next == Layer.trophies) {
+      if (selectedGame case final game? when game.retro?.platform == RetroPlatform.ps3) {
+        _loadTrophies(game);
+      }
       trophyIndex = 0;
       revealedTrophies = {};
     }
@@ -4575,8 +4624,13 @@ class AppModel extends ChangeNotifier {
   }
 
   void closeOverlay() {
+    if (overlay == Layer.retroDiscs && embeddedGame != null) {
+      open(Layer.quickMenu, cue: Cue.back);
+      return;
+    }
     overlay = null;
     deletion.ask = null;
+    _cancelRetroDiscPicker();
     // A crop closed some other way (PS) keeps nothing.
     pictureCrop?.image.dispose();
     pictureCrop = null;
@@ -4659,6 +4713,14 @@ class AppModel extends ChangeNotifier {
     if (overlay == Layer.shareWatch) return sharePlay.watchCommand(command);
     // At start a profile is picked first: PS waits.
     if (overlay == Layer.profilePicker && profileFlow.atLaunch && command == Command.home) return sounds.play(Cue.bump);
+    if (command == Command.home && embeddedGame != null) {
+      if (overlay == null) {
+        unawaited(openQuickMenu());
+      } else {
+        resumeGame();
+      }
+      return;
+    }
     if (command == Command.home) {
       // PS/Guide: from the game to the launcher and back; behind another window, to the front.
       final run = running?.$2;
@@ -4815,6 +4877,9 @@ class AppModel extends ChangeNotifier {
       case Layer.shareWatch:
         // Taken above; here only for the switch's sake.
         return sharePlay.watchCommand(command);
+      case Layer.retroDiscs when command == Command.back || command == Command.options:
+        closeOverlay();
+        return;
       case Layer.quickMenu || Layer.closeGame when command == Command.back || command == Command.options:
         // A share play question asked in place (together_ask.dart) is answered Cancel first.
         if (!together.cancelAsk()) resumeGame();
@@ -4871,6 +4936,8 @@ class AppModel extends ChangeNotifier {
           Layer.party ||
           Layer.family ||
           Layer.quickMenu ||
+          Layer.retroDiscs ||
+          Layer.retroStartDisc ||
           Layer.closeGame ||
           Layer.homeMenu ||
           Layer.confirmQuit ||
@@ -5044,6 +5111,10 @@ class AppModel extends ChangeNotifier {
   /// PS held: Close Game? over a game in front; the home menu in the launcher.
   void homeHeld() {
     if (!preferences.onboarded) return;
+    if (embeddedGame != null) {
+      open(Layer.closeGame);
+      return;
+    }
     if (overlay == Layer.profilePicker && profileFlow.atLaunch) return;
     final front = _frontForGuide;
     if (running != null && !front) {
@@ -5092,11 +5163,53 @@ class AppModel extends ChangeNotifier {
 
   /// Quit AnyPS5 (the home menu): the game playing closes with it.
   void quitLauncher() {
+    if (embeddedGame != null || _embeddedStarting) {
+      unawaited(_quitLauncher());
+    } else {
+      _quitImmediately();
+    }
+  }
+
+  bool _quitting = false;
+
+  Future<void> _quitLauncher() async {
+    if (_quitting) return;
+    _quitting = true;
+    if (!await prepareToQuit()) {
+      _quitting = false;
+      return;
+    }
+    _quitImmediately();
+  }
+
+  void _quitImmediately() {
     stopGame();
     unawaited(_stopReplay());
     unawaited(discord.close());
     unawaited(nowPlaying.close());
     (services.quit ?? exit)(0);
+  }
+
+  bool get _embeddedStarting {
+    final disc = starting?.retro;
+    return disc != null && _embeddedReady(disc.platform);
+  }
+
+  Future<bool> prepareToQuit() async {
+    final run = embeddedGame;
+    if (run == null) {
+      if (!_embeddedStarting) return true;
+      show(T.text('retroEmbeddedStarting'));
+      return false;
+    }
+    unawaited(stopRunningGame());
+    try {
+      await run.exitCode.timeout(stopGrace + const Duration(seconds: 1));
+      return true;
+    } on TimeoutException {
+      show(T.text('retroEmbeddedClosing'));
+      return false;
+    }
   }
 
   // Captures: Share, the replay buffer, screenshots.
@@ -5530,6 +5643,11 @@ class AppModel extends ChangeNotifier {
       case Layer.settings:
         return _searchedSettings(_settingsCategories());
       case Layer.gameSettings when game != null:
+        if (game.retro?.platform == RetroPlatform.ps3 &&
+            _managedRetro?.isInstalled(RetroPlatform.ps3) == true &&
+            running?.$1.id != game.id) {
+          return _ps3GameSettings(game);
+        }
         return [PanelCategory(id: 'game', title: game.name, rows: _gameRows(game))];
       case Layer.controls when game != null:
         return [PanelCategory(id: 'controls', title: game.name, rows: _controlRows(game))];
@@ -5661,8 +5779,17 @@ class AppModel extends ChangeNotifier {
                 title: T.text('gameSettings'),
                 kind: ActionRow(() => open(Layer.gameSettings)),
               ),
-              ...media.gameRows(),
-              ...sharePlay.rows(),
+              if (embeddedGame?.discs case final discs?)
+                PanelRow(
+                  id: 'retro-disc-menu',
+                  title: T.text('retroChangeDisc'),
+                  detail: discs.inserted != null
+                      ? _embeddedDiscLabel(discs, discs.inserted!)
+                      : T.text('retroDiscEmpty'),
+                  kind: ActionRow(() => open(Layer.retroDiscs)),
+                ),
+              if (embeddedGame == null) ...media.gameRows(),
+              if (embeddedGame == null) ...sharePlay.rows(),
               // The party next to the game playing: who is in it, who plays another one (Join).
               ...together.partyGameRows(),
               ...nowPlaying.quickRows(),
@@ -5675,6 +5802,10 @@ class AppModel extends ChangeNotifier {
             ],
           ),
         ];
+      case Layer.retroStartDisc:
+        return [PanelCategory(id: 'retroStartDisc', title: T.text('retroSelectDisc'), rows: _retroLaunchDiscRows())];
+      case Layer.retroDiscs:
+        return [PanelCategory(id: 'retroDiscs', title: T.text('retroChangeDisc'), rows: _embeddedDiscRows())];
       case Layer.closeGame when running != null:
         return [
           PanelCategory(
@@ -6779,6 +6910,8 @@ class AppModel extends ChangeNotifier {
   };
 
   List<PanelRow> _gameRows(Game game) {
+    final session = embeddedGame;
+    if (session != null && running?.$1.id == game.id) return _embeddedGameRows(session);
     if (game.retro case final RetroDisc disc) {
       return [
         PanelRow(
@@ -7402,7 +7535,7 @@ class AppModel extends ChangeNotifier {
             (delta < 0 ? previous : next)();
             sounds.play(Cue.move);
           default:
-            if (overlay == Layer.settings && categories.length > 1) {
+            if (_settingsSectionLayer && categories.length > 1) {
               final next = (panelCategory + delta).clamp(0, categories.length - 1);
               if (next != panelCategory) sounds.play(Cue.move);
               panelCategory = next;
@@ -7448,11 +7581,11 @@ class AppModel extends ChangeNotifier {
   /// A controller's command in a panel: the sections' column and edit mode (the keys and the
   /// mouse keep the old ways). True when it was handled here.
   bool _padPanelCommand(Command command, PanelRow? row, List<PanelCategory> categories) {
-    final sections = overlay == Layer.settings && categories.length > 1;
+    final sections = _settingsSectionLayer && categories.length > 1;
     if (panelSections && sections) {
       switch (command) {
         // ↑ on the first section: onto the search field.
-        case Command.up when panelCategory == 0:
+        case Command.up when panelCategory == 0 && overlay == Layer.settings:
           _toSearch();
         case Command.up || Command.down:
           moveCategory(command == Command.down ? 1 : -1);
@@ -7607,6 +7740,11 @@ class AppModel extends ChangeNotifier {
     preferences.theme = index;
     _changed();
   }
+
+  bool get _settingsSectionLayer => overlay == Layer.settings || overlay == Layer.gameSettings;
+
+  bool get hasSettingsSections =>
+      overlay == Layer.settings || (overlay == Layer.gameSettings && panelCategories().length > 1);
 
   /// The settings' category tabs move with Q and E as well.
   void moveCategory(int delta) {
@@ -8088,14 +8226,23 @@ class AppModel extends ChangeNotifier {
   @override
   void notifyListeners() {
     if (_disposed) return;
+    final session = embeddedGame;
+    final ownsPad = session != null && overlay == null && !stopping;
+    if (_embeddedOwnsPad != ownsPad) {
+      _embeddedOwnsPad = ownsPad;
+      _navigator?.reset();
+    }
+    session?.playback(playing: overlay == null && !stopping, focused: active);
     super.notifyListeners();
     _updateMusic();
   }
 
   @override
   void dispose() {
+    embeddedGame?.stop();
     _disposed = true;
     profileFlow.listLeave?.cancel();
+    _cancelRetroDiscPicker();
     saveSync.dispose();
     powerWatch.stop();
     for (final watcher in _libraries.values) {
