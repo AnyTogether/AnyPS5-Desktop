@@ -740,7 +740,8 @@ class PhoneIndicator extends StatelessWidget {
 }
 
 /// The row of game tiles: the selected one is larger, sits at the row's start and carries the
-/// game's name beside it, as on the console.
+/// game's name under it, as on the console. The tiles are top-aligned and the next ones follow
+/// right after the selected one; the previous game stays visible on the left, cut by the edge.
 class TileRow extends StatelessWidget {
   const TileRow({super.key, required this.model, this.folderContents = false});
 
@@ -756,6 +757,7 @@ class TileRow extends StatelessWidget {
     final large = (folderContents ? 148 : 176) * scale;
     final gap = 16 * scale;
     final label = 300 * scale;
+    final labelGap = 10 * scale;
     final leading = 64 * scale;
     final tiles = folderContents ? model.homeFolderTiles : model.homeTiles;
     final at = preview ? 0 : model.homeTileIndex(tiles, folderContents: folderContents);
@@ -766,7 +768,7 @@ class TileRow extends StatelessWidget {
       folderContents: folderContents,
       step: small + gap,
       child: SizedBox(
-        height: large + 10 * scale,
+        height: large + (preview ? 10 : 58) * scale,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -784,7 +786,7 @@ class TileRow extends StatelessWidget {
                     ? leading + peek + offset * (small + gap)
                     : offset == 0
                     ? leading + peek
-                    : leading + peek + large + gap + label + (offset - 1) * (small + gap);
+                    : leading + peek + large + gap + (offset - 1) * (small + gap);
                 final size = selected && !preview ? large : small;
                 return [
                   AnimatedPositionedDirectional(
@@ -792,7 +794,7 @@ class TileRow extends StatelessWidget {
                     duration: Motion.layout,
                     curve: Motion.settle,
                     start: x,
-                    top: selected || preview ? 0 : (large - small) * 0.18,
+                    top: 0,
                     width: size,
                     height: size,
                     child: AnimatedOpacity(
@@ -837,9 +839,9 @@ class TileRow extends StatelessWidget {
                   if (selected && !preview)
                     PositionedDirectional(
                       key: ValueKey('label-$id'),
-                      start: leading + peek + large + gap * 1.4,
-                      top: large * 0.32,
-                      width: label - gap,
+                      start: leading + peek + 4 * scale,
+                      top: large + labelGap,
+                      width: label,
                       child: Legible(
                         softness: 12,
                         child: Column(
@@ -850,11 +852,11 @@ class TileRow extends StatelessWidget {
                               console == null
                                   ? game.nameFor([T.language.code])
                                   : T.format('retroGames', [console.name.toUpperCase()]),
-                              maxLines: 2,
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: AppText.display(22 * scale, weight: FontWeight.w600),
+                              style: AppText.display(18 * scale, weight: FontWeight.w500),
                             ),
-                            SizedBox(height: 6 * scale),
+                            SizedBox(height: 4 * scale),
                             if (folder == null) StateLabel(model: model, state: model.stateOf(game)),
                           ],
                         ),
