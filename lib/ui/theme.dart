@@ -117,6 +117,12 @@ abstract final class Motion {
   static const Curve inOut = Cubic(0.65, 0, 0.35, 1);
 }
 
+/// The game right before the selected one stays on the home tile row, dimmed and partly past the
+/// window's edge, as on the console. Both values tune that look: a shift of 0 keeps the selected
+/// tile aligned with the hero title and shows a thinner strip of the previous tile.
+const double tilePeekShift = 28;
+const double tilePeekOpacity = 0.4;
+
 /// Text styles: Figtree, white over the background.
 abstract final class AppText {
   static const family = 'Figtree';
