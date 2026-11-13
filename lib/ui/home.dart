@@ -759,6 +759,8 @@ class TileRow extends StatelessWidget {
     final leading = 64 * scale;
     final tiles = folderContents ? model.homeFolderTiles : model.homeTiles;
     final at = preview ? 0 : model.homeTileIndex(tiles, folderContents: folderContents);
+    // From the second game on the row moves right, so the previous tile (dimmed) stays in view.
+    final peek = !preview && at > 0 ? tilePeekShift * scale : 0.0;
     return _TileDrag(
       model: model,
       folderContents: folderContents,
@@ -779,10 +781,10 @@ class TileRow extends StatelessWidget {
                 final x = preview
                     ? leading + index * (small + gap)
                     : offset < 0
-                    ? leading + offset * (small + gap)
+                    ? leading + peek + offset * (small + gap)
                     : offset == 0
-                    ? leading
-                    : leading + large + gap + label + (offset - 1) * (small + gap);
+                    ? leading + peek
+                    : leading + peek + large + gap + label + (offset - 1) * (small + gap);
                 final size = selected && !preview ? large : small;
                 return [
                   AnimatedPositionedDirectional(
@@ -795,7 +797,7 @@ class TileRow extends StatelessWidget {
                     height: size,
                     child: AnimatedOpacity(
                       duration: Motion.layout,
-                      opacity: offset < 0 ? 0 : 1,
+                      opacity: offset < 0 ? (offset == -1 ? tilePeekOpacity : 0) : 1,
                       // A click selects at once (a GestureDetector with a double tap would wait to
                       // see whether a second click comes); a second click plays.
                       child: Pressable(
@@ -835,7 +837,7 @@ class TileRow extends StatelessWidget {
                   if (selected && !preview)
                     PositionedDirectional(
                       key: ValueKey('label-$id'),
-                      start: leading + large + gap * 1.4,
+                      start: leading + peek + large + gap * 1.4,
                       top: large * 0.32,
                       width: label - gap,
                       child: Legible(
