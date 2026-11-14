@@ -35,7 +35,7 @@ class GameAction {
       tone: ActionTone.busy,
       indeterminate: true,
     ),
-    // Paused by hand (or when the launcher closed): the button goes on from there.
+    // Paused by hand: the button goes on from there.
     Installing(paused: true, preparing: false) => GameAction(T.text('unlockResume'), Icons.play_arrow_rounded),
     Installing(preparing: true) => GameAction(T.text('playWhenReady'), Icons.play_arrow_rounded),
     // Updating (or unlocking to play): the button says so and carries the progress; the press

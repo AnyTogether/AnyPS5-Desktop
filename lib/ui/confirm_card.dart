@@ -50,7 +50,7 @@ class ConfirmCard extends StatelessWidget {
           ),
           Center(
             child: SizedBox(
-              width: (deleting != null ? 580 : rows.length > 2 ? 660 : 500) * scale,
+              width: (deleting == null ? 500 : 580) * scale,
               child: Glass(
                 radius: 26 * scale,
                 opacity: 0.55,

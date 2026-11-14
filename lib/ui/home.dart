@@ -1150,6 +1150,7 @@ class StateLabel extends StatelessWidget {
       ),
       Queued() => (Icons.schedule_rounded, T.text('queued'), dim),
       Installing(cancelling: true) => (Icons.close_rounded, T.text('unlockCancelling'), dim),
+      Installing(preparing: false, waiting: true) => (Icons.schedule_rounded, T.text('queued'), dim),
       Installing(preparing: false, paused: true) => (Icons.pause_circle_rounded, T.text('unlockPausedState'), dim),
       Installing(preparing: true, paused: true) => (Icons.pause_circle_rounded, T.text('preparingPaused'), dim),
       Installing(preparing: true) => (Icons.downloading_rounded, T.text('preparing'), accent),
@@ -1254,15 +1255,23 @@ class HeroInfo extends StatelessWidget {
             // Stops the unlock for good (it asks first when work was done); Pause is the main button.
             if (model.canCancelUnlock(state)) ...[
               SizedBox(width: 16 * scale),
-              ConsoleButton(
-                key: const ValueKey('cancel-unlock'),
-                title: '',
-                icon: Icons.close_rounded,
-                focused: model.focus == HomeFocus.actions(model.cancelAction) && model.overlay == null,
-                onPressed: () {
-                  model.focus = HomeFocus.actions(model.cancelAction);
-                  model.askCancelUnlock(game);
-                },
+              Tooltip(
+                message: T.text('cancelUnlock'),
+                child: Semantics(
+                  button: true,
+                  label: T.text('cancelUnlock'),
+                  child:
+                  ConsoleButton(
+                    key: const ValueKey('cancel-unlock'),
+                    title: '',
+                    icon: Icons.close_rounded,
+                    focused: model.focus == HomeFocus.actions(model.cancelAction) && model.overlay == null,
+                    onPressed: () {
+                      model.focus = HomeFocus.actions(model.cancelAction);
+                      model.askCancelUnlock(game);
+                    },
+                  ),
+                ),
               ),
             ],
             if (model.trophies[game.id] case final set?) ...[
@@ -1305,6 +1314,8 @@ class HeroInfo extends StatelessWidget {
                                       : T.format('preparingStep', [InstallSpan.title(state.step)]))
                                 : state.cancelling
                                 ? T.text('unlockCancelling')
+                                : state.waiting
+                                ? T.text('queued')
                                 : state.paused
                                 ? T.text('unlockPausedState')
                                 : InstallSpan.title(state.step),
@@ -1330,14 +1341,6 @@ class HeroInfo extends StatelessWidget {
                         IndeterminateLine(color: accent)
                       else
                         ProgressLine(fraction: state.overall, color: accent),
-                      // After a Pause and quit the work folder is gone: Resume starts again.
-                      if (state.restored) ...[
-                        SizedBox(height: 6 * scale),
-                        Text(
-                          T.text('unlockPausedRestarts'),
-                          style: AppText.display(12 * scale, color: Colors.white.withValues(alpha: 0.55)),
-                        ),
-                      ],
                     ],
                   ),
                 ),
