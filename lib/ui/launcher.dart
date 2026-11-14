@@ -502,6 +502,8 @@ class _LauncherShellState extends State<LauncherShell> {
                                                 // A plain yes or no: Quit AnyPS5?, Close the game?,
                                                 // Delete the game?
                                                 Layer.confirmQuit ||
+                                                Layer.confirmCancelUnlock ||
+                                                Layer.confirmQuitUnlocks ||
                                                 Layer.closeGame ||
                                                 Layer.confirmDeleteGame => ConfirmCard(model: model),
                                                 Layer.challenge => WithBackPill(
@@ -529,7 +531,7 @@ class _LauncherShellState extends State<LauncherShell> {
                                             accent: model.accentChoice.color,
                                             onMinimize: model.minimizeLauncher,
                                             onWindowed: () => unawaited(model.setLauncherFullscreen(false)),
-                                            onQuit: model.quitLauncher,
+                                            onQuit: model.requestQuit,
                                           ),
                                       ],
                                     ),

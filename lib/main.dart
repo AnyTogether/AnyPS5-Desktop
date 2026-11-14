@@ -186,6 +186,10 @@ Future<void> main(List<String> arguments) async {
   health.runnerRemovesMarker = await window.removeAfterClose(health.markerPath);
   _exit = AppLifecycleListener(
     onExitRequested: () async {
+      // Every close of the window comes through here (the title bar, Alt+F4, the taskbar, and
+      // the launcher's own quit): a user's unlock under way, paused or waiting asks first. A
+      // close the launcher started after the answer (LauncherShutdown.quit) goes through.
+      if (!model.allowExit()) return AppExitResponse.cancel;
       closing();
       return AppExitResponse.exit;
     },
