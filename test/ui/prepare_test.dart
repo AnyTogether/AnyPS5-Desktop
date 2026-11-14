@@ -218,9 +218,15 @@ void main() {
       expect(model.stateOf(comet), isA<Installing>());
       model.select(model.games.indexOf(comet));
       model.open(Layer.gameSettings);
-      final cancel = model.panelCategories().single.rows.first;
+      // Pause is the first row now; Cancel unlock follows and asks before it gives the work up.
+      final rows = model.panelCategories().single.rows;
+      expect(rows.first.id, 'pauseJob');
+      final cancel = rows.firstWhere((row) => row.id == 'cancelJob');
       expect(cancel.title, T.text('cancelUnlock'));
       (cancel.kind as ActionRow).run();
+      expect(model.overlay, Layer.confirmCancelUnlock);
+      final sure = model.panelCategories().single.rows.firstWhere((row) => row.id == 'cancel');
+      (sure.kind as ActionRow).run();
       await until(() => model.stateOf(comet) is Locked);
     }, skip: Platform.isWindows ? 'the fake relinker is a shell script' : false);
 
