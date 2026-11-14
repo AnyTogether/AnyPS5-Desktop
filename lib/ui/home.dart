@@ -761,7 +761,8 @@ class TileRow extends StatelessWidget {
     final leading = 64 * scale;
     final tiles = folderContents ? model.homeFolderTiles : model.homeTiles;
     final at = preview ? 0 : model.homeTileIndex(tiles, folderContents: folderContents);
-    // From the second game on the row moves right, so the previous tile (dimmed) stays in view.
+    // From the second game on the row moves right, so the previous tile (a little dimmer, at
+    // tilePeekOpacity) stays in view.
     final peek = !preview && at > 0 ? tilePeekShift * scale : 0.0;
     return _TileDrag(
       model: model,
@@ -839,8 +840,10 @@ class TileRow extends StatelessWidget {
                   if (selected && !preview)
                     PositionedDirectional(
                       key: ValueKey('label-$id'),
-                      start: leading + peek + large + gap * 0.75,
-                      top: large - 28 * scale,
+                      // Where the next tile starts, and the name's bottom edge on the selected
+                      // tile's, whatever the text's height and the row's tile size.
+                      start: leading + peek + large + gap,
+                      bottom: 10 * scale,
                       width: label,
                       child: Legible(
                         softness: 12,
@@ -1196,7 +1199,13 @@ class StateLabel extends StatelessWidget {
       Running() => (Icons.play_circle_rounded, T.text('running'), accent),
     };
     if (iconOnly) {
-      return icon == null ? const SizedBox.shrink() : Icon(icon, size: (size + 4) * scale, color: tint);
+      // The words stay reachable: a screen reader reads them and the pointer gets them as a hint.
+      return icon == null
+          ? const SizedBox.shrink()
+          : Tooltip(
+              message: text,
+              child: Icon(icon, size: (size + 4) * scale, color: tint, semanticLabel: text),
+            );
     }
     return Row(
       mainAxisSize: MainAxisSize.min,
