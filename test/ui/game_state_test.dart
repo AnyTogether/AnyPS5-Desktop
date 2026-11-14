@@ -39,7 +39,9 @@ void main() {
       (const Installed(), 'Play', ActionTone.normal),
       (const Installed(outdated: true), 'Play', ActionTone.normal),
       (const Queued(), 'Cancel', ActionTone.normal),
-      (const Installing(InstallStep.copy, 0.5), 'Cancel', ActionTone.normal),
+      (const Installing(InstallStep.copy, 0.5), 'Pause', ActionTone.normal),
+      (const Installing(InstallStep.copy, 0.5, paused: true), 'Resume', ActionTone.normal),
+      (const Installing(InstallStep.copy, 0.5, cancelling: true), 'Cancelling…', ActionTone.busy),
       (const Installing(InstallStep.copy, 0.5, preparing: true), 'Play when ready', ActionTone.normal),
       (const Queued(updating: true), 'Waiting to update', ActionTone.busy),
       (const Queued(updating: true, waitingForEngine: true), 'Waiting for engine', ActionTone.busy),
@@ -282,8 +284,11 @@ void main() {
       await settle(tester);
       expect(tester.takeException(), isNull);
       expect(model.overlay, Layer.gameSettings);
-      expect(settingsRows().first.id, 'cancelJob');
-      expect(settingsRows().first.title, 'Cancel update');
+      // Pause comes first (the unlock stops without being lost), Cancel update right after it.
+      expect(settingsRows().first.id, 'pauseJob');
+      expect(settingsRows().first.title, 'Pause');
+      expect(settingsRows()[1].id, 'cancelJob');
+      expect(settingsRows()[1].title, 'Cancel update');
       expect(find.text('Cancel update'), findsOneWidget);
       for (final id in ['reinstall', 'uninstall']) {
         expect(row(id).kind, isA<InfoRow>().having((kind) => kind.text, 'why', T.text('gameBusyUpdating')));
@@ -300,7 +305,7 @@ void main() {
       model.rescan();
       await settle(tester);
       expect(row('reinstall').kind, isA<ActionRow>(), reason: 'usable again once done');
-      expect(settingsRows().first.id, isNot('cancelJob'));
+      expect(settingsRows().map((row) => row.id), isNot(anyOf(contains('pauseJob'), contains('cancelJob'))));
     });
 
     testWidgets('the engine build shows on Home and on the game; its settings can stop it', (tester) async {
