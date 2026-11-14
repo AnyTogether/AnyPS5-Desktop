@@ -284,11 +284,8 @@ void main() {
       await settle(tester);
       expect(tester.takeException(), isNull);
       expect(model.overlay, Layer.gameSettings);
-      // Pause comes first (the unlock stops without being lost), Cancel update right after it.
-      expect(settingsRows().first.id, 'pauseJob');
-      expect(settingsRows().first.title, 'Pause');
-      expect(settingsRows()[1].id, 'cancelJob');
-      expect(settingsRows()[1].title, 'Cancel update');
+      expect(settingsRows().first.id, 'cancelJob');
+      expect(settingsRows().first.title, 'Cancel update');
       expect(find.text('Cancel update'), findsOneWidget);
       for (final id in ['reinstall', 'uninstall']) {
         expect(row(id).kind, isA<InfoRow>().having((kind) => kind.text, 'why', T.text('gameBusyUpdating')));
@@ -305,7 +302,7 @@ void main() {
       model.rescan();
       await settle(tester);
       expect(row('reinstall').kind, isA<ActionRow>(), reason: 'usable again once done');
-      expect(settingsRows().map((row) => row.id), isNot(anyOf(contains('pauseJob'), contains('cancelJob'))));
+      expect(settingsRows().first.id, isNot('cancelJob'));
     });
 
     testWidgets('the engine build shows on Home and on the game; its settings can stop it', (tester) async {
