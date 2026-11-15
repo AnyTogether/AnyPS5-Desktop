@@ -78,6 +78,9 @@ void main() {
     // The leader has no code: one is made for the button. The fake's code is already out of
     // time, so it is not asked for again and no button shows.
     await until(() => server.callsTo('parties/${model.together.hub.parties.party!.id}/code').isNotEmpty);
+    // The answer is in (the code on the party), so it cannot land after the working code below
+    // and put the expired one back.
+    await until(() => model.together.hub.parties.party?.joinCode != null);
     await until(() => lastActivity() != null);
     final activity = lastActivity()!;
     expect(activity['details'], 'In a party');
@@ -86,7 +89,6 @@ void main() {
       'id': model.together.hub.parties.party!.id,
       'size': [2, 8],
     });
-    await Future<void>.delayed(const Duration(milliseconds: 50));
     expect(server.callsTo('parties/${model.together.hub.parties.party!.id}/code'), hasLength(1));
 
     // A code that works: the button opens its page.
@@ -109,6 +111,8 @@ void main() {
     await until(() => frames.last.$1 == 1 && (frames.last.$2['args'] as Map)['activity'] == null);
     expect(model.preferences.discordPresence, isFalse);
     expect(model.discord.shown, isNull);
+    // The code that came back out of time was never asked for again.
+    expect(server.callsTo('parties/${party.id}/code'), hasLength(1));
   });
 
   test('an emulator game reaches neither Discord nor AnyTogether presence', () async {
