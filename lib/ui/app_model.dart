@@ -3624,6 +3624,13 @@ class AppModel extends ChangeNotifier {
     _startNext();
   }
 
+  /// The goldens draw an unlock paused by hand without a relinker to freeze.
+  @visibleForTesting
+  void showPausedForTest(Game game) {
+    _handPaused.add(game.id);
+    _changed();
+  }
+
   /// Goes on from where it stood.
   void resumeUnlock(Game game) {
     // Another unlock runs: this one waits its turn instead of working alongside it.
