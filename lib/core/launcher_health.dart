@@ -411,6 +411,25 @@ class StallDetector {
   }
 }
 
+/// What each of the interface's pings carries to the watchdog, as on the Mac: the last seconds
+/// whenever a line was added since the ping before (a line a second), and the first uncaught
+/// error once it is caught. A stall's report then ends at most a second before the stall began:
+/// sent every fourth second, its last seconds could stop up to four seconds short of it.
+class PingFeed {
+  int _sentLines = -1;
+  String? _sentError;
+
+  /// What the next ping carries: [lines] when [added] (the lines added so far) changed, [error]
+  /// when it is new; null for what the watchdog has already.
+  ({List<String>? lines, String? error}) next({required int added, required List<String> lines, String? error}) {
+    final freshLines = added != _sentLines;
+    _sentLines = added;
+    final freshError = error != null && error != _sentError;
+    if (freshError) _sentError = error;
+    return (lines: freshLines ? List.of(lines) : null, error: freshError ? error : null);
+  }
+}
+
 /// [LauncherHealth]'s watchdog in an isolate of its own, which keeps running while the
 /// interface's isolate is stuck: it writes the stall to problem.json as soon as it is long, again
 /// with its length when it ends, and the run's marker every few seconds with what [ping] told it.

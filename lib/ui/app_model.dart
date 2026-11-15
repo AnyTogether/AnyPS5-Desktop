@@ -2225,7 +2225,12 @@ class AppModel extends ChangeNotifier {
   /// last: a report's last seconds.
   final List<String> recentLines = [];
 
+  /// How many lines [addRecentLine] took so far: the watchdog is sent the last seconds when it
+  /// changed (PingFeed).
+  int recentLinesAdded = 0;
+
   void addRecentLine(String line) {
+    recentLinesAdded++;
     recentLines.add(line);
     if (recentLines.length > LauncherHealth.keptLines) recentLines.removeAt(0);
   }

@@ -224,6 +224,26 @@ void main() {
     expect(detector.tick(at(60500)), isFalse);
   });
 
+  test('each ping carries the last seconds once a line was added since the one before, the error once', () {
+    final feed = PingFeed();
+    final lines = ['12:00:00 frames 31 | look aurora layer home in front'];
+    var ping = feed.next(added: 1, lines: lines);
+    expect(ping.lines, lines, reason: 'the first ping has them');
+    expect(ping.error, isNull);
+    ping = feed.next(added: 1, lines: lines);
+    expect(ping.lines, isNull, reason: 'no new line: nothing to send again');
+    lines.add('12:00:01 frames 31 | look aurora layer home starting PPSA99313 in front');
+    ping = feed.next(added: 2, lines: lines, error: 'Bad state: No element');
+    expect(ping.lines!.last, contains('starting PPSA99313'), reason: 'the newest second, not four seconds late');
+    expect(ping.error, 'Bad state: No element');
+    lines.add('changed after');
+    expect(ping.lines, hasLength(2), reason: 'a copy, not the list the interface goes on changing');
+    ping = feed.next(added: 2, lines: lines, error: 'Bad state: No element');
+    expect(ping.error, isNull, reason: 'the watchdog keeps it');
+    // Past the 30 kept lines the list keeps its length: the count still tells a new line came.
+    expect(feed.next(added: 3, lines: lines).lines, isNotNull);
+  });
+
   test('the watchdog\'s isolate writes a stall the interface never comes back from', () async {
     final health = run(100)..start();
     final watch = await StallWatch.start(health, started: DateTime.now());
