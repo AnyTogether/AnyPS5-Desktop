@@ -740,7 +740,9 @@ class PhoneIndicator extends StatelessWidget {
 }
 
 /// The row of game tiles: the selected one is larger, sits at the row's start and carries the
-/// game's name beside it, as on the console.
+/// game's name beside it, under the next tiles and with the state as a small icon, as on the
+/// console. The tiles are top-aligned and the next ones follow right after the selected one; the
+/// previous game stays visible on the left, cut by the edge.
 class TileRow extends StatelessWidget {
   const TileRow({super.key, required this.model, this.folderContents = false});
 
@@ -759,6 +761,9 @@ class TileRow extends StatelessWidget {
     final leading = 64 * scale;
     final tiles = folderContents ? model.homeFolderTiles : model.homeTiles;
     final at = preview ? 0 : model.homeTileIndex(tiles, folderContents: folderContents);
+    // From the second game on the row moves right, so the previous tile (a little dimmer, at
+    // tilePeekOpacity) stays in view.
+    final peek = !preview && at > 0 ? tilePeekShift * scale : 0.0;
     return _TileDrag(
       model: model,
       folderContents: folderContents,
@@ -779,10 +784,10 @@ class TileRow extends StatelessWidget {
                 final x = preview
                     ? leading + index * (small + gap)
                     : offset < 0
-                    ? leading + offset * (small + gap)
+                    ? leading + peek + offset * (small + gap)
                     : offset == 0
-                    ? leading
-                    : leading + large + gap + label + (offset - 1) * (small + gap);
+                    ? leading + peek
+                    : leading + peek + large + gap + (offset - 1) * (small + gap);
                 final size = selected && !preview ? large : small;
                 return [
                   AnimatedPositionedDirectional(
@@ -790,12 +795,12 @@ class TileRow extends StatelessWidget {
                     duration: Motion.layout,
                     curve: Motion.settle,
                     start: x,
-                    top: selected || preview ? 0 : (large - small) * 0.18,
+                    top: 0,
                     width: size,
                     height: size,
                     child: AnimatedOpacity(
                       duration: Motion.layout,
-                      opacity: offset < 0 ? 0 : 1,
+                      opacity: offset < 0 ? (offset == -1 ? tilePeekOpacity : 0) : 1,
                       // A click selects at once (a GestureDetector with a double tap would wait to
                       // see whether a second click comes); a second click plays.
                       child: Pressable(
@@ -835,25 +840,32 @@ class TileRow extends StatelessWidget {
                   if (selected && !preview)
                     PositionedDirectional(
                       key: ValueKey('label-$id'),
-                      start: leading + large + gap * 1.4,
-                      top: large * 0.32,
-                      width: label - gap,
+                      // Where the next tile starts, and the name's bottom edge on the selected
+                      // tile's, whatever the text's height and the row's tile size.
+                      start: leading + peek + large + gap,
+                      bottom: 10 * scale,
+                      width: label,
                       child: Legible(
                         softness: 12,
-                        child: Column(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              console == null
-                                  ? game.nameFor([T.language.code])
-                                  : T.format('retroGames', [console.name.toUpperCase()]),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppText.display(22 * scale, weight: FontWeight.w600),
+                            Flexible(
+                              child: Text(
+                                console == null
+                                    ? game.nameFor([T.language.code])
+                                    : T.format('retroGames', [console.name.toUpperCase()]),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppText.display(18 * scale, weight: FontWeight.w500),
+                              ),
                             ),
-                            SizedBox(height: 6 * scale),
-                            if (folder == null) StateLabel(model: model, state: model.stateOf(game)),
+                            // The state is only an icon here (the hero says it in words); a plain
+                            // locked game shows none, its tile carries the padlock already.
+                            if (folder == null) ...[
+                              SizedBox(width: 8 * scale),
+                              StateLabel(model: model, state: model.stateOf(game), iconOnly: true),
+                            ],
                           ],
                         ),
                       ),
@@ -1120,7 +1132,14 @@ class GameTile extends StatelessWidget {
 }
 
 class StateLabel extends StatelessWidget {
-  const StateLabel({super.key, required this.model, required this.state, this.size = 14, this.compact = false});
+  const StateLabel({
+    super.key,
+    required this.model,
+    required this.state,
+    this.size = 14,
+    this.compact = false,
+    this.iconOnly = false,
+  });
 
   final AppModel model;
   final GameState state;
@@ -1128,6 +1147,9 @@ class StateLabel extends StatelessWidget {
 
   /// One short line (the Status card): the step is under the main button already.
   final bool compact;
+
+  /// Only the state's icon, no words (the tile row); nothing for a state with no icon of its own.
+  final bool iconOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -1176,6 +1198,15 @@ class StateLabel extends StatelessWidget {
       Starting() => (Icons.hourglass_top_rounded, T.text('starting'), accent),
       Running() => (Icons.play_circle_rounded, T.text('running'), accent),
     };
+    if (iconOnly) {
+      // The words stay reachable: a screen reader reads them and the pointer gets them as a hint.
+      return icon == null
+          ? const SizedBox.shrink()
+          : Tooltip(
+              message: text,
+              child: Icon(icon, size: (size + 4) * scale, color: tint, semanticLabel: text),
+            );
+    }
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
