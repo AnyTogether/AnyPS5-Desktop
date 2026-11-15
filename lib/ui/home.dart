@@ -1291,8 +1291,7 @@ class HeroInfo extends StatelessWidget {
                 child: Semantics(
                   button: true,
                   label: T.text('cancelUnlock'),
-                  child:
-                  ConsoleButton(
+                  child: ConsoleButton(
                     key: const ValueKey('cancel-unlock'),
                     title: '',
                     icon: Icons.close_rounded,
