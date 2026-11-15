@@ -2,7 +2,6 @@ import 'package:anyps5_desktop/core/discord_presence.dart';
 import 'package:anyps5_desktop/core/game_library.dart';
 import 'package:anyps5_desktop/core/game_process.dart';
 import 'package:anyps5_desktop/core/together/socket.dart';
-import 'package:anyps5_desktop/core/together/parties.dart';
 import 'package:anyps5_desktop/ui/app_model.dart' hide Command, GameState;
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:anyps5_desktop/ui/together_model.dart';
@@ -47,6 +46,10 @@ void main() {
     await model.together.sendCode();
     model.together.code = '123456';
     await model.together.verify();
+    // Signing in opens the live socket, and its ready asks for the party again. Both are done
+    // before a test starts, so that answer does not land in the middle of one.
+    await until(() => model.together.hub.socket.session != null);
+    await until(() => server.callsTo('me/party').isNotEmpty);
   });
 
   tearDown(() async {
@@ -91,16 +94,15 @@ void main() {
     });
     expect(server.callsTo('parties/${model.together.hub.parties.party!.id}/code'), hasLength(1));
 
-    // A code that works: the button opens its page.
+    // A code that works: the button opens its page. It is the server's, so a refresh of the
+    // party in between keeps it.
     final party = model.together.hub.parties.party!;
-    model.together.hub.parties.party = party.copyWith(
-      joinCode: () => JoinCode(
-        code: 'H8NZ4WRB',
-        url: Uri.parse('https://anytogether.net/join/H8NZ4WRB'),
-        expiresAt: DateTime.now().add(const Duration(hours: 1)),
-      ),
-    );
-    model.discord.update();
+    server.party!['joinCode'] = {
+      'code': 'H8NZ4WRB',
+      'url': 'https://anytogether.net/join/H8NZ4WRB',
+      'expiresAt': DateTime.now().add(const Duration(hours: 1)).toUtc().toIso8601String(),
+    };
+    await model.together.hub.parties.refresh();
     await until(() => lastActivity()?['buttons'] != null);
     expect(lastActivity()!['buttons'], [
       {'label': 'Join on AnyTogether', 'url': 'https://anytogether.net/join/H8NZ4WRB'},
