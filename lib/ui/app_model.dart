@@ -2982,11 +2982,16 @@ class AppModel extends ChangeNotifier {
 
   void _changed() {
     if (launcherProblem != null) offerLauncherReport();
-    // The small Cancel went away (the unlock ended): a focus on it goes back to the main button
-    // instead of silently landing on the trophies or settings.
+    // The small Cancel went away (the unlock ended): a focus on it goes back to the main button,
+    // and a focus on a button after it moves one place left, so it stays on the same button
+    // (the trophies, the settings) instead of landing past the last one.
     final cancelNow = cancelShown;
-    if (_cancelWasShown && !cancelNow && focus.isActions && focus.index == cancelAction) {
-      focus = const HomeFocus.actions(0);
+    if (_cancelWasShown && !cancelNow && focus.isActions) {
+      if (focus.index == cancelAction) {
+        focus = const HomeFocus.actions(0);
+      } else if (focus.index > cancelAction) {
+        focus = HomeFocus.actions(focus.index - 1);
+      }
     }
     _cancelWasShown = cancelNow;
     notifyListeners();
@@ -4364,7 +4369,7 @@ class AppModel extends ChangeNotifier {
       // the game end. A crash keeps it open on its report.
       if (_quitAfterGame == game.id) {
         _quitAfterGame = null;
-        if (code == 0 || _stopped) (services.quit ?? exit)(0);
+        if (code == 0 || _stopped) exitWithoutAsking(0);
       }
     } on Object catch (error) {
       // A start given up meanwhile has nothing more to say.
@@ -5347,6 +5352,15 @@ class AppModel extends ChangeNotifier {
     }
     cancelUnlocksForExit();
     return true;
+  }
+
+  /// A quit the launcher decides on its own, with nobody to ask (the Steam shortcut's game ended,
+  /// the update's Install now): the unlocks are cancelled as Cancel and quit does, and the exit
+  /// request in lib/main.dart lets the close through instead of opening the question.
+  void exitWithoutAsking(int code) {
+    _exitApproved = true;
+    cancelUnlocksForExit();
+    (services.quit ?? exit)(code);
   }
 
   /// Quit AnyPS5 (the home menu): the game playing closes with it.
