@@ -2419,8 +2419,6 @@
   "quitRemovingNote": "لا يمكن إيقاف إزالة الألعاب مؤقتًا ولا إلغاؤها.",
   "retroHostPs1": "تشغيل ألعاب PS1 في المضيف المنفصل",
   "retroHostPs1Detail": "تُلعب ألعاب PS1 في هذه النافذة عبر مضيف المحاكاة في AnyPS5 بدلًا من DuckStation.",
-  "retroHostUnchecked": "محاكي PS1 غير مُتحقَّق منه (إصدار تجريبي)",
-  "retroHostUncheckedDetail": "هذا الإصدار للاختبار: يشغّل محاكي PS1 الذي يحدده ANYPS5_RETRO_HOST دون التحقق من توقيعه أو ملفاته. الإصدارات العادية لا تشغّل إلا المحاكي الموقَّع.",
   "retroHostDownload": "تنزيل محاكي PS1",
   "retroHostDownloadDetail": "مضيف المحاكاة في AnyPS5 مع SwanStation، لتلعب ألعاب PS1 في هذه النافذة. ملفاته موقّعة ويُتحقق منها قبل كل لعبة. لا يُنزَّل شيء حتى تحدد هذا.",
   "retroHostInstalled": "محاكي PS1 %@",

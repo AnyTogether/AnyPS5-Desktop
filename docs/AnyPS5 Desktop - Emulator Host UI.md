@@ -340,17 +340,12 @@ below on, since the player asked for the emulator to play PS1 games with it.
 **The setting.** Settings › Emulators › **Run PS1 games in the separate
 host** (`Preferences.retroHostPs1`) is off by default. The row shows only
 where a host is found (`AppModel.retroHostInstall`): the downloaded release
-(`RetroHostStore.installed`), or in a debug or test build the host that
+(`RetroHostStore.installed`), or in a debug build the host that
 `ANYPS5_RETRO_HOST` names (`RetroHostInstall.locate`), as protocol.md
 "Finding and checking the host" allows: "Debug builds of the launcher MAY run
 the host named by the environment variable `ANYPS5_RETRO_HOST`, and any core,
-without the checks. Release builds ignore that variable." (A test build is a
-release-mode build compiled to allow it, never published:
-[Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>) "Debug and test builds".) That
-unchecked host comes first, and while it is used no download row is shown;
-instead **Unchecked PS1 emulator (test build)** says that this build runs it
-without checking its signature or files, and that normal releases only run the
-signed emulator. The core is the
+without the checks. Release builds ignore that variable." That debug host
+comes first, and while it is used no download row is shown. The core is the
 SwanStation library beside the host (`swanstation_libretro.dll` on Windows,
 `swanstation_libretro.so` on Linux), as a host release's zip holds the two.
 With no host found the row is hidden and a PS1 disc goes to DuckStation as
@@ -584,7 +579,7 @@ native memory as a real ring slot would be, so no host is started.
 - [`retro_host_play_golden_test.dart`](../test/ui/retro_host_play_golden_test.dart)
   draws the loading screen, the error screen, the game's picture, the menu's
   first page over it, its Console page, and Settings › Emulators with the
-  host's rows: the debug host's with its unchecked notice, the download offered
+  host's rows: the debug host's, the download offered
   before a host is installed, and the downloaded release installed and turned on.
 - [`retro_host_release_play_test.dart`](../test/ui/retro_host_release_play_test.dart)
   plays a PS1 disc the release way, with the recorded signed release of
@@ -603,18 +598,13 @@ native memory as a real ring slot would be, so no host is started.
   says none is published yet. A download stopped while the kept host is
   still exiting is not put in place, and once the new host is being put in
   place the row no longer offers to stop it. Nothing downloads while a game plays, and a debug
-  build that runs `ANYPS5_RETRO_HOST` shows no download but says its host is
-  unchecked, which the signed release's rows never say.
+  build that runs `ANYPS5_RETRO_HOST` shows no download.
 - [`retro_keyboard_test.dart`](../test/core/retro_host/retro_keyboard_test.dart)
   checks the keyboard layout as a PS1 pad, a moved key, the stick modifier
   and the keys joining a controller.
   [`retro_host_install_test.dart`](../test/core/retro_host/retro_host_install_test.dart)
-  checks where the host and core are found, that a debug or test build finds
-  the named one and a release build none (even with an environment variable
-  named like the test build's define), that a launcher compiled without
-  `--dart-define=ANYPS5_UNCHECKED_RETRO_HOST_BUILD=true` is a release when it
-  is not a debug build, and that no workflow, packaging script or tool names
-  that define.
+  checks where the host and core are found, and that a release build finds
+  none.
 
 A widget test runs in fake time, but images are made by the engine in real
 time. So the view test waits for a picture by taking turns: a short real wait

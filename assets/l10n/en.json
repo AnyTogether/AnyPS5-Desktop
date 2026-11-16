@@ -2419,8 +2419,6 @@
   "quitRemovingNote": "Removing games can be neither paused nor cancelled.",
   "retroHostPs1": "Run PS1 games in the separate host",
   "retroHostPs1Detail": "PS1 games play in this window through the AnyPS5 emulator host instead of DuckStation.",
-  "retroHostUnchecked": "Unchecked PS1 emulator (test build)",
-  "retroHostUncheckedDetail": "This build is for testing: it runs the PS1 emulator that ANYPS5_RETRO_HOST names without checking its signature or files. Normal releases only run the signed emulator.",
   "retroHostDownload": "Download the PS1 emulator",
   "retroHostDownloadDetail": "The AnyPS5 emulator host with SwanStation, to play PS1 games in this window. Its files are signed and checked before every game. Nothing is downloaded until you select this.",
   "retroHostInstalled": "PS1 emulator %@",

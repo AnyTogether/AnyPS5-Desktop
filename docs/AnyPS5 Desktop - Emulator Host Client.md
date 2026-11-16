@@ -23,7 +23,7 @@ described in [The emulator host in the launcher's UI](<AnyPS5 Desktop - Emulator
 | [`lib/core/retro_host/retro_host_client.dart`](../lib/core/retro_host/retro_host_client.dart) | One host process, as described in the sections below. |
 | [`lib/core/retro_host/retro_host_release.dart`](../lib/core/retro_host/retro_host_release.dart) | Checks a signed host release before it is unpacked and before each start, and installs it whole or not at all (see "Finding and checking the host" below). |
 | [`lib/core/retro_host/retro_host_store.dart`](../lib/core/retro_host/retro_host_store.dart) | `RetroHostStore`: the host downloaded from the host repository's signed GitHub releases into the launcher's own storage, and its check before each start. |
-| [`lib/core/retro_host/retro_host_install.dart`](../lib/core/retro_host/retro_host_install.dart) | `RetroHostInstall`: the host and SwanStation a build runs, the downloaded release's (checked) or, in a debug or test build (`RetroHostBuild`), the one `ANYPS5_RETRO_HOST` names (unchecked). |
+| [`lib/core/retro_host/retro_host_install.dart`](../lib/core/retro_host/retro_host_install.dart) | `RetroHostInstall`: the host and SwanStation a build runs, the downloaded release's (checked) or, in a debug build, the one `ANYPS5_RETRO_HOST` names (unchecked). |
 | [`lib/core/retro_host/checked_file.dart`](../lib/core/retro_host/checked_file.dart) | A release file held open while it is checked and started: no sharing for writing or deleting on Windows, a close-on-exec descriptor above 3 elsewhere. It hashes what it holds, never the path again. |
 
 `retro_host_client.dart` handles:
@@ -234,90 +234,14 @@ where the maintainers sign.
 - **When a check fails.** `RetroHostReleaseFailure` is thrown and the host is
   not started. The UI says that the emulator needs to be downloaded again
   ([Emulator host UI](<AnyPS5 Desktop - Emulator Host UI.md>), "In the launcher").
-- **Debug and test builds.** `RetroHostInstall.locate`
+- **Debug builds.** `RetroHostInstall.locate`
   ([`retro_host_install.dart`](../lib/core/retro_host/retro_host_install.dart))
   finds the host that `ANYPS5_RETRO_HOST` names, with the SwanStation library
-  beside it, only in a debug build or a test build (`RetroHostBuild`, below).
-  That host is started without any check, and Settings › Emulators says so
-  ("Unchecked PS1 emulator (test build)"). A release, and a profile build,
-  ignore the variable and only run the downloaded release's host
+  beside it, only in a debug build (`kDebugMode`), as the protocol allows. That
+  host is started without any check. Release and profile builds ignore the
+  variable and only run the downloaded release's host
   (`RetroHostStore.installed`, a `RetroHostInstall` with `checked` set), and
   only with that release's SwanStation.
-
-## Debug and test builds
-
-A tester's PS1 host is usually one they built themselves, and no signed host
-release exists yet. A debug launcher can run it, but a debug Windows build
-links Microsoft's debug C++ runtime (`MSVCP140D`, `VCRUNTIME140D`,
-`ucrtbased`), which may not be redistributed, so a friend without Visual
-Studio cannot start it. A **test build** is the way to hand someone an
-unchecked host: it is compiled in release mode, so it ships the normal
-release runtime (`windows/CMakeLists.txt` installs it beside the launcher with
-`InstallRequiredSystemLibraries`), and it is told at compile time that it may
-run the host `ANYPS5_RETRO_HOST` names.
-
-```bash
-flutter build windows --release --dart-define=ANYPS5_UNCHECKED_RETRO_HOST_BUILD=true
-flutter build linux --release --dart-define=ANYPS5_UNCHECKED_RETRO_HOST_BUILD=true
-```
-
-Then start it with `ANYPS5_RETRO_HOST` set to the absolute path of the host
-executable, with `swanstation_libretro.dll` (or `.so`) beside it, as for a
-debug build.
-
-On Windows the build folder's path must stay short (MSBuild's 260-character
-limit). Built this way with Flutter 3.47.1 and the VS 2022 Build Tools, the
-launcher and every plugin import only the release runtime (`MSVCP140`,
-`VCRUNTIME140`, `VCRUNTIME140_1` and the system's UCRT), and
-`runner/Release` holds those DLLs. media_kit's ANGLE archive also brings a
-`zlib.dll` that imports `VCRUNTIME140D` and `ucrtbased`; release builds leave
-it out and check that nothing in the bundle needs the debug runtime (#156,
-README "Packages"), so a test build passes the same check.
-
-**How it is decided.** `RetroHostBuild.of(debug: kDebugMode)` gives `debug`,
-`test` or `release`. `test` comes only from `RetroHostBuild.testDefined`,
-which is `const bool.fromEnvironment('ANYPS5_UNCHECKED_RETRO_HOST_BUILD')`:
-the Dart compiler folds it into the compiled program, so it is `true` only
-when that `--dart-define` was given to `flutter build`. No setting, file,
-command-line argument or environment variable of the running launcher can
-change it (an environment variable of that name is ignored, which the tests
-check). A build without it is a `release`, and `RetroHostInstall.locate`
-returns nothing for a `release` whatever the environment holds. The official
-builds are made by `.github/workflows` and `packaging/`, and none of them
-gives the define: a test fails if any of them, or anything in `tool/`, names
-it. So everything a normal release does is unchanged: only the signed,
-checked host runs.
-
-**Why this design.** It is the usual way to keep a developer route out of a
-shipped program:
-
-- Flutter's own build modes leave no room for it. A debug build has the debug
-  runtime above, and Flutter's documentation keeps profile mode for measuring
-  performance, with DevTools still able to connect and some service
-  extensions on (<https://docs.flutter.dev/testing/build-modes>); release mode
-  is the one for deploying. Flutter's `--flavor` is not offered for Windows
-  and Linux builds, so `--dart-define` read by `bool.fromEnvironment` is
-  Flutter's way to make a release-mode build that differs at compile time.
-- Firefox enforces add-on signatures the same way: release and beta builds are
-  compiled with `MOZ_REQUIRE_SIGNING`, which makes the
-  `xpinstall.signatures.required` preference ignored, and developers who need
-  unsigned add-ons use differently built (unbranded, Developer Edition or
-  Nightly) builds instead of a switch in the release
-  (<https://wiki.mozilla.org/Add-ons/Extension_Signing>).
-- RetroArch and Lutris let a tester point at any core or runner build, but
-  they check no signatures, so they have no secure path to keep. Emulators
-  that publish both kinds, as Dolphin does with its development builds and
-  releases, make them separate builds on separate update tracks; that is the
-  part that applies here: a test build is a different program, not a setting.
-
-A runtime switch (a setting, a command-line flag, a variable read by a
-release) was rejected: anyone, or any program, able to set it for a normal
-user's launcher could make that launcher run an unchecked program.
-
-**What a test build is not.** It is never published. It still checks a
-downloaded host as a release does; it only also runs the named one, which
-comes first, as in a debug build. It is still updated by the launcher's own
-update check like any build, and an update replaces it with a normal release.
 
 ## Threads and the UI
 
@@ -609,13 +533,6 @@ when `ANYPS5_RETRO_HOST_CHECKOUT` is set.
 
 ## Not yet
 
-- **protocol.md names debug builds only.** The host repository's protocol.md
-  at 9052aff, "Finding and checking the host", says "Debug builds of the
-  launcher MAY run the host named by the environment variable
-  `ANYPS5_RETRO_HOST`" and "Release builds ignore that variable". A test build
-  ("Debug and test builds" above) is compiled in release mode but is no
-  release and is never published. The host's release pull request adds test
-  builds to that text.
 - **No signed release yet.** The download reads the host repository's
   GitHub releases, and none is published there yet: until the maintainers
   sign and publish one (that repository's `docs/host.md` "Releases"), a

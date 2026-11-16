@@ -2419,8 +2419,6 @@
   "quitRemovingNote": "Eliminar juegos no se puede pausar ni cancelar.",
   "retroHostPs1": "Ejecutar los juegos de PS1 en el host aparte",
   "retroHostPs1Detail": "Los juegos de PS1 se juegan en esta ventana con el host de emulación de AnyPS5 en lugar de DuckStation.",
-  "retroHostUnchecked": "Emulador de PS1 sin verificar (versión de prueba)",
-  "retroHostUncheckedDetail": "Esta versión es para pruebas: ejecuta el emulador de PS1 que indica ANYPS5_RETRO_HOST sin comprobar su firma ni sus archivos. Las versiones normales solo ejecutan el emulador firmado.",
   "retroHostDownload": "Descargar el emulador de PS1",
   "retroHostDownloadDetail": "El host de emulación de AnyPS5 con SwanStation, para jugar a juegos de PS1 en esta ventana. Sus archivos están firmados y se comprueban antes de cada juego. No se descarga nada hasta que selecciones esto.",
   "retroHostInstalled": "Emulador de PS1 %@",

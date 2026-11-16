@@ -118,17 +118,14 @@ const retroMenuSections = {
 /// window through the emulator host, with the launcher's controllers and keyboard, and the game's
 /// menu on PS.
 extension RetroHostPlaying on AppModel {
-  /// The host this build runs: in a debug or test build ([RetroHostBuild]) the one
-  /// `ANYPS5_RETRO_HOST` names, unchecked; otherwise the signed host downloaded in Settings ›
-  /// Emulators, checked before each start. Null when neither is there.
-  RetroHostInstall? get retroHostInstall => _uncheckedRetroHost ?? retroHostDownload.store.installed();
+  /// The host this build runs: in a debug build the one `ANYPS5_RETRO_HOST` names, unchecked;
+  /// otherwise the signed host downloaded in Settings › Emulators, checked before each start.
+  /// Null when neither is there.
+  RetroHostInstall? get retroHostInstall => _debugRetroHost ?? retroHostDownload.store.installed();
 
-  /// What this launcher was compiled as: a debug build, a test build, or a release.
-  static final retroHostBuild = RetroHostBuild.of(debug: kDebugMode);
-
-  RetroHostInstall? get _uncheckedRetroHost => RetroHostInstall.locate(
+  RetroHostInstall? get _debugRetroHost => RetroHostInstall.locate(
     services.environment ?? Platform.environment,
-    build: retroHostBuild,
+    debug: kDebugMode,
     system: HostSystem.current,
   );
 
@@ -154,20 +151,13 @@ extension RetroHostPlaying on AppModel {
     _changed();
   }
 
-  /// Settings › Emulators' rows for the host: its download, or the notice that this build runs an
-  /// unchecked host, and where a host is found, the setting and the BIOS folder.
+  /// Settings › Emulators' rows for the host: its download, and where a host is found, the
+  /// setting and the BIOS folder.
   List<PanelRow> _retroHostSettingsRows() {
-    final unchecked = _uncheckedRetroHost != null;
-    final download = retroHostDownload.rows(uncheckedHost: unchecked);
+    final download = retroHostDownload.rows(debugHost: _debugRetroHost != null);
     if (retroHostInstall == null) return download;
     return [
       ...download,
-      if (unchecked)
-        PanelRow(
-          id: 'retro-host-unchecked',
-          title: T.text('retroHostUnchecked'),
-          kind: InfoRow(T.text('retroHostUncheckedDetail')),
-        ),
       PanelRow(
         id: 'retro-host-ps1',
         title: T.text('retroHostPs1'),

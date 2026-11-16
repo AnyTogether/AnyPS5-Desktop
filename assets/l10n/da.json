@@ -2419,8 +2419,6 @@
   "quitRemovingNote": "Fjernelse af spil kan hverken sættes på pause eller annulleres.",
   "retroHostPs1": "Kør PS1-spil i den separate vært",
   "retroHostPs1Detail": "PS1-spil spilles i dette vindue gennem AnyPS5-emulatorværten i stedet for DuckStation.",
-  "retroHostUnchecked": "Ukontrolleret PS1-emulator (testversion)",
-  "retroHostUncheckedDetail": "Denne version er til test: Den kører den PS1-emulator, som ANYPS5_RETRO_HOST angiver, uden at kontrollere dens signatur eller filer. Almindelige udgivelser kører kun den signerede emulator.",
   "retroHostDownload": "Download PS1-emulatoren",
   "retroHostDownloadDetail": "AnyPS5-emulatorværten med SwanStation, så du kan spille PS1-spil i dette vindue. Dens filer er signeret og kontrolleres før hvert spil. Intet downloades, før du vælger dette.",
   "retroHostInstalled": "PS1-emulator %@",

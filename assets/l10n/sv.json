@@ -2419,8 +2419,6 @@
   "quitRemovingNote": "Borttagning av spel kan varken pausas eller avbrytas.",
   "retroHostPs1": "Kör PS1-spel i den separata värden",
   "retroHostPs1Detail": "PS1-spel spelas i det här fönstret via AnyPS5:s emulatorvärd i stället för DuckStation.",
-  "retroHostUnchecked": "Okontrollerad PS1-emulator (testversion)",
-  "retroHostUncheckedDetail": "Den här versionen är för test: den kör den PS1-emulator som ANYPS5_RETRO_HOST anger utan att kontrollera dess signatur eller filer. Vanliga versioner kör bara den signerade emulatorn.",
   "retroHostDownload": "Ladda ner PS1-emulatorn",
   "retroHostDownloadDetail": "AnyPS5:s emulatorvärd med SwanStation, för att spela PS1-spel i det här fönstret. Dess filer är signerade och kontrolleras före varje spel. Inget laddas ner förrän du väljer detta.",
   "retroHostInstalled": "PS1-emulator %@",

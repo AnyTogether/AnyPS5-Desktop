@@ -2419,8 +2419,6 @@
   "quitRemovingNote": "ゲームの削除は一時停止もキャンセルもできません。",
   "retroHostPs1": "PS1 のゲームを別のホストで実行",
   "retroHostPs1Detail": "PS1 のゲームを DuckStation ではなく AnyPS5 エミュレーター ホストを使ってこのウィンドウでプレイします。",
-  "retroHostUnchecked": "未検証の PS1 エミュレーター（テストビルド）",
-  "retroHostUncheckedDetail": "このビルドはテスト用です。ANYPS5_RETRO_HOST が指定する PS1 エミュレーターを、署名やファイルを確認せずに実行します。通常のリリースは署名済みのエミュレーターだけを実行します。",
   "retroHostDownload": "PS1 エミュレーターをダウンロード",
   "retroHostDownloadDetail": "SwanStation を含む AnyPS5 エミュレーター ホストで、このウィンドウで PS1 のゲームをプレイできます。ファイルは署名されており、ゲームのたびに確認されます。これを選択するまで何もダウンロードされません。",
   "retroHostInstalled": "PS1 エミュレーター %@",
