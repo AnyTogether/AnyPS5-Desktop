@@ -60,6 +60,7 @@ extension StandaloneEmulators on AppModel {
           detail: standaloneEmulator(platform) ?? T.text('retroChooseExecutable'),
           kind: ActionRow(() => unawaited(chooseStandaloneEmulator(platform))),
         ),
+      ..._retroHostSettingsRows(),
       PanelRow(
         id: 'retro-show-folders',
         title: T.text('retroShowFolders'),
@@ -73,7 +74,13 @@ extension StandaloneEmulators on AppModel {
   Future<void> _playStandalone(Game game, RetroDisc disc) async {
     if (starting != null || running != null) return;
     final allowed = together.family.beforePlay(game);
-    if (!(allowed is bool ? allowed : await allowed) || starting != null || running != null || _disposed) return;
+    if (!(allowed is bool ? allowed : await allowed) ||
+        starting != null ||
+        running != null ||
+        retroPlay != null ||
+        _disposed) {
+      return;
+    }
 
     final program = standaloneEmulator(disc.platform);
     if (program == null) {

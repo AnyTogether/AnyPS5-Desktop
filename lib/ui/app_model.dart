@@ -7,7 +7,7 @@ import 'dart:ui' as ui show Image;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show Color, IconData, Icons;
-import 'package:flutter/services.dart' show LogicalKeyboardKey, PlatformException;
+import 'package:flutter/services.dart' show HardwareKeyboard, LogicalKeyboardKey, PlatformException;
 import 'package:path/path.dart' as p;
 
 import '../core/audio/atrac9.dart';
@@ -56,6 +56,11 @@ import '../core/package_install.dart';
 import '../core/power.dart';
 import '../core/prepare_queue.dart';
 import '../core/relinker_flags.dart';
+import '../core/retro_host/retro_host_client.dart' show RetroHostClient, RetroHostEnd;
+import '../core/retro_host/retro_host_install.dart';
+import '../core/retro_host/retro_host_protocol.dart' show RetroErrorCode, RetroOption;
+import '../core/retro_host/retro_host_session.dart' show RetroHostSession, RetroHostStartRequest;
+import '../core/retro_host/retro_keyboard.dart';
 import '../core/remote/adb_tunnel.dart';
 import '../core/remote/assist.dart';
 import '../core/remote/mdns.dart';
@@ -101,6 +106,11 @@ import 'engine_model.dart';
 import 'ffmpeg_model.dart';
 import 'fonts_model.dart';
 import 'media_model.dart';
+import 'retro_host/retro_game_menu.dart';
+import 'retro_host/retro_host_controls.dart';
+import 'retro_host/retro_host_game.dart';
+import 'retro_host/retro_host_keeper.dart';
+import 'retro_host/retro_option_sections.dart';
 import 'share_play_model.dart';
 import 'game_delete_model.dart';
 import 'game_files_model.dart';
@@ -120,6 +130,7 @@ import 'trophy_card.dart';
 
 part 'profiles_model.dart';
 part 'retro_home_folders.dart';
+part 'retro_host_play.dart';
 part 'standalone_emulators.dart';
 part 'settings_search.dart';
 part 'themes_model.dart';
@@ -152,6 +163,17 @@ class Preferences {
           if (entries[platform.name] case final String path) platform.name: path,
     }
     ..showRetroFolders = json['showRetroFolders'] == true
+    ..retroHostPs1 = json['retroHostPs1'] == true
+    ..retroHostVolume = switch (json['retroHostVolume']) {
+      final num value => value.toInt().clamp(0, 100),
+      _ => 100,
+    }
+    ..retroHostMuted = json['retroHostMuted'] == true
+    ..retroHostOptions = {
+      if (json['retroHostOptions'] case final Map<dynamic, dynamic> entries)
+        for (final MapEntry(:key, :value) in entries.entries)
+          if (key is String && value is String) key: value,
+    }
     ..toolkitFolder = json['toolkitFolder'] as String?
     ..onboarded = json['onboarded'] as bool? ?? false
     ..gameArtwork = json['gameArtwork'] as bool? ?? true
@@ -273,6 +295,20 @@ class Preferences {
 
   /// Settings › Emulators › Show as folders: a console's games in one tile on the home screen.
   bool showRetroFolders = false;
+
+  /// Settings › Emulators › Run PS1 games in the separate host: a PS1 disc plays in the
+  /// launcher's window through the emulator host (retro_host_play.dart) instead of DuckStation.
+  /// Off until turned on; it acts only where a host is found ([RetroHostInstall.locate]).
+  bool retroHostPs1 = false;
+
+  /// The emulator host's volume in percent and whether it is muted, as the player last set them
+  /// in the game's menu; every PS1 game in the host starts with them.
+  int retroHostVolume = 100;
+  bool retroHostMuted = false;
+
+  /// The SwanStation options the player chose in the game's menu, by key, given to every PS1 game
+  /// the host starts (protocol.md "start": `options`).
+  Map<String, String> retroHostOptions = {};
   String? toolkitFolder;
   bool onboarded = false;
   bool gameArtwork = true;
@@ -461,6 +497,10 @@ class Preferences {
     if (retroLibrary) 'retroLibrary': true,
     if (retroEmulators.isNotEmpty) 'retroEmulators': retroEmulators,
     if (showRetroFolders) 'showRetroFolders': true,
+    if (retroHostPs1) 'retroHostPs1': true,
+    if (retroHostVolume != 100) 'retroHostVolume': retroHostVolume,
+    if (retroHostMuted) 'retroHostMuted': true,
+    if (retroHostOptions.isNotEmpty) 'retroHostOptions': retroHostOptions,
     // The first one under the old name too, for an older launcher started again.
     'gamesFolder': gamesFolders.firstOrNull,
     'toolkitFolder': toolkitFolder,
@@ -873,6 +913,10 @@ enum Layer {
 
   /// PS in a game: the game paused under Resume, Game Settings and Close Game.
   quickMenu,
+
+  /// PS in a PS1 game playing in the emulator host (retro_host_play.dart): the game paused under
+  /// Resume, its discs, its options, the volume and Close Game.
+  retroMenu,
 
   /// A friend's share play watched full screen (share_play_model.dart): the controller is the
   /// game's, PS leaves.
@@ -1594,6 +1638,12 @@ class AppModel extends ChangeNotifier {
   /// A command from the keys or a controller: handled, and a direction that did nothing bumps
   /// (once per press, once in a hold that reaches the end).
   void command(Command command, {bool repeat = false}) {
+    // The game's own screen in the emulator host: the command is the game's (PS its menu), with
+    // none of the launcher's sounds or pulses for a direction that moved nothing.
+    if (retroInGame) {
+      _retroCommand(command);
+      return;
+    }
     if (pointerFocus) {
       // The keys or the pad move the focus from here: the lists follow it again.
       pointerFocus = false;
@@ -1714,6 +1764,7 @@ class AppModel extends ChangeNotifier {
         !active ||
         running != null ||
         starting != null ||
+        retroPlay != null ||
         musicVolume == 0 ||
         launcherVolume == 0;
     // The theme's (or the user's own) menu music when the selected game has no song.
@@ -1879,7 +1930,9 @@ class AppModel extends ChangeNotifier {
 
   /// Whether a phone's pad moves the launcher now: with no game starting or playing and the
   /// launcher in front, as a controller does; otherwise its input is the game's alone.
-  bool get phonePadMovesLauncher => running == null && starting == null && launcherInFront;
+  /// A phone's pad moves the launcher, not a game: none in front, nor a PS1 game on its own screen
+  /// in the emulator host (a phone's pad does not play it yet).
+  bool get phonePadMovesLauncher => running == null && starting == null && !retroInGame && launcherInFront;
 
   void _phonePadEvent(PadEvent event) {
     final navigator = _padNavigator;
@@ -1970,7 +2023,12 @@ class AppModel extends ChangeNotifier {
       case PadCommand.menu:
         // Options/Start on Home: Switch Profile, online or offline (Triangle stays the game's).
         mapped = Command.options;
-        if (overlay == null && preferences.onboarded && inFront && pairing == null && starting == null) {
+        if (overlay == null &&
+            preferences.onboarded &&
+            inFront &&
+            pairing == null &&
+            starting == null &&
+            retroPlay == null) {
           haptics.padInUse = true;
           _usedInput(InputMode.pad);
           return openProfileMenu();
@@ -2682,6 +2740,17 @@ class AppModel extends ChangeNotifier {
   Game? starting;
   (Game, RunningGame)? running;
 
+  /// A PS1 game playing in the launcher's window through the emulator host (retro_host_play.dart).
+  RetroPlay? retroPlay;
+
+  /// The emulator host of the last PS1 game, kept for the next one (retro_host_play.dart).
+  @visibleForTesting
+  final retroHostKeeper = RetroHostKeeper();
+
+  /// How often a PS1 game in the host is asked its `status`; tests ask by hand.
+  @visibleForTesting
+  Duration retroStatusEvery = const Duration(milliseconds: 500);
+
   /// A short message at the bottom of the screen, with a trophy level's badge before it when
   /// it says one was reached.
   String? toast;
@@ -3003,6 +3072,7 @@ class AppModel extends ChangeNotifier {
     _publishLibrary();
     _publishActivity();
     _prepareWhenChanged();
+    _letUnwantedRetroHostGo();
   }
 
   void savePreferences() {
@@ -3241,7 +3311,7 @@ class AppModel extends ChangeNotifier {
     if (starting?.id == game.id) return const Starting();
     if (together.family.ageLock(game) case final FamilyLocked lock) return lock;
     if (game.retro case final RetroDisc disc) {
-      return standaloneEmulator(disc.platform) == null ? const NeedsEmulator() : const Installed();
+      return retroPlayable(disc.platform) ? const Installed() : const NeedsEmulator();
     }
     final installed = records.containsKey(game.id);
     final current = progress[game.id];
@@ -4198,7 +4268,11 @@ class AppModel extends ChangeNotifier {
   /// launchers on the same release always play the same build; [asItIs] starts the copy as it is
   /// (it was just rebuilt, it joins a host on that very engine, or the user chose to).
   Future<void> play(Game game, {bool trace = false, Map<String, String> once = const {}, bool asItIs = false}) async {
-    if (game.retro case final RetroDisc disc) return _playStandalone(game, disc);
+    // One game at a time: a PS1 game in the emulator host is one too.
+    if (retroPlay != null) return;
+    if (game.retro case final RetroDisc disc) {
+      return playsInHost(disc.platform) ? _playInHost(game, disc) : _playStandalone(game, disc);
+    }
     final folder = rootOf(game);
     if (folder == null || starting != null || running != null || saveSync.syncing != null) return;
     if (!asItIs && needsRebuild(game)) {
@@ -4207,12 +4281,14 @@ class AppModel extends ChangeNotifier {
     // The profile's own saves and trophies in the game's folder before anything reads them.
     activateProfileSaves(game);
     final allowed = together.family.beforePlay(game);
-    if (!(allowed is bool ? allowed : await allowed) || starting != null || running != null) return;
+    if (!(allowed is bool ? allowed : await allowed) || starting != null || running != null || retroPlay != null) {
+      return;
+    }
     // Settings › Behaviour › Save Sync: the saves from the other computers (or the cloud) first.
     // Off, the game starts at once, as it always did.
     if (saveSync.on) {
       await saveSync.sync(game);
-      if (starting != null || running != null) return;
+      if (starting != null || running != null || retroPlay != null) return;
     }
     var settings = launchSettings(game);
     // Settings › Controllers › Stick Dead Zone, for a game that set none of its own.
@@ -4424,6 +4500,21 @@ class AppModel extends ChangeNotifier {
     primaryAction(game);
   }
 
+  /// Starts the emulator host for a PS1 game (retro_host_play.dart); tests give a fake session. On
+  /// Linux it gets the launcher's environment without what the launcher's AppImage set
+  /// ([RetroHostInstall.environmentFor]), as a standalone emulator does.
+  @visibleForTesting
+  late RetroHostOpener openRetroHost = (install, {required volume, required muted}) {
+    final environment = RetroHostInstall.environmentFor(system, services.environment ?? Platform.environment);
+    return RetroHostClient.start(
+      command: [install.host],
+      environment: environment,
+      inheritEnvironment: environment == null,
+      volume: volume,
+      muted: muted,
+    );
+  };
+
   /// Starts a standalone emulator. On Linux it gets the launcher's environment without what the
   /// launcher's AppImage set ([GameProcess.withoutAppImage]).
   @visibleForTesting
@@ -4632,6 +4723,7 @@ class AppModel extends ChangeNotifier {
   /// Asks the game playing to close as its window would (a family limit): the launcher closed
   /// it, so no crash report follows.
   Future<void> closeGame() async {
+    if (retroPlay != null) return closeRetroGame();
     if (running == null) return;
     _stopped = true;
     await running!.$2.close();
@@ -4639,6 +4731,9 @@ class AppModel extends ChangeNotifier {
 
   /// Ends the game playing at once (a family limit after its grace).
   void killGame() {
+    // A game in the emulator host is closed at once: the host is killed if it does not exit in
+    // time (RetroHostClient's limits).
+    if (retroPlay != null) return unawaited(closeRetroGame());
     if (running != null) _stopped = true;
     running?.$2.kill();
   }
@@ -4691,7 +4786,7 @@ class AppModel extends ChangeNotifier {
       revealedTrophies = {};
     }
     if (next == Layer.trophies || next == Layer.gallery) _loadShots();
-    if (next == Layer.controls && selectedGame != null) _readControls(selectedGame!);
+    if (next == Layer.controls && selectedGame?.retro == null && selectedGame != null) _readControls(selectedGame!);
     // The screens that show the own name and handle read them again first.
     if (next == Layer.friends || next == Layer.profile || next == Layer.settings || next == Layer.profilePicker) {
       together.refreshOwnProfile();
@@ -4863,6 +4958,8 @@ class AppModel extends ChangeNotifier {
       return;
     }
     if (!preferences.onboarded) return _onboardingCommand(command);
+    // A PS1 game in the emulator host: the controller is the game's, PS opens its menu.
+    if (_retroCommand(command)) return;
     // Watching a share play: the controller is the game's.
     if (overlay == Layer.shareWatch) return sharePlay.watchCommand(command);
     // At start a profile is picked first: PS waits.
@@ -5079,6 +5176,7 @@ class AppModel extends ChangeNotifier {
           Layer.party ||
           Layer.family ||
           Layer.quickMenu ||
+          Layer.retroMenu ||
           Layer.closeGame ||
           Layer.homeMenu ||
           Layer.confirmQuit ||
@@ -5220,6 +5318,7 @@ class AppModel extends ChangeNotifier {
   /// Behaviour › Pause Game When Opening the Menu) while it is still in front, then the
   /// launcher in front with Resume, Game Settings and Close Game.
   Future<void> openQuickMenu() async {
+    if (retroPlay != null) return openRetroMenu();
     final playing = running;
     if (playing == null || !preferences.onboarded) return;
     final (game, run) = playing;
@@ -5256,6 +5355,10 @@ class AppModel extends ChangeNotifier {
   /// PS held: Close Game? over a game in front; the home menu in the launcher.
   void homeHeld() {
     if (!preferences.onboarded) return;
+    // A PS1 game in the emulator host: held PS is its menu, or back to the game from it.
+    if (retroPlay != null && (overlay == null || overlay == Layer.retroMenu)) {
+      return overlay == null ? openRetroMenu() : resumeRetroGame();
+    }
     if (overlay == Layer.profilePicker && profileFlow.atLaunch) return;
     final front = _frontForGuide;
     if (running != null && !front) {
@@ -5299,7 +5402,12 @@ class AppModel extends ChangeNotifier {
   /// Escape on the home screen, the games in focus and nothing over them, asks Quit AnyPS5?
   /// (Cancel first); everywhere else Escape keeps its meaning.
   bool askQuit() {
-    if (!preferences.onboarded || overlay != null || pairing != null || starting != null || !focus.isTiles) {
+    if (!preferences.onboarded ||
+        overlay != null ||
+        pairing != null ||
+        starting != null ||
+        retroPlay != null ||
+        !focus.isTiles) {
       return false;
     }
     // The profile list opened with the pointer: Escape closes it first.
@@ -5927,6 +6035,8 @@ class AppModel extends ChangeNotifier {
             rows: updates.requiredRows(together.account.tooOld!),
           ),
         ];
+      case Layer.retroMenu:
+        return _retroMenuCategories();
       case Layer.quickMenu when running != null:
         return [
           PanelCategory(
@@ -7122,6 +7232,14 @@ class AppModel extends ChangeNotifier {
           detail: standaloneEmulator(disc.platform),
           kind: ActionRow(() => unawaited(chooseStandaloneEmulator(disc.platform))),
         ),
+        // In the emulator host the keyboard plays too, with the keys of the game's Controls.
+        if (playsInHost(disc.platform))
+          PanelRow(
+            id: 'controls',
+            title: T.text('controls'),
+            detail: T.text('retroHostControlsDetail'),
+            kind: ActionRow(() => open(Layer.controls)),
+          ),
         PanelRow(id: 'log', title: T.text('openLog'), kind: ActionRow(() => open(Layer.log))),
       ];
     }
@@ -7577,7 +7695,7 @@ class AppModel extends ChangeNotifier {
     // The game's own actions, when its files name them, under each button.
     final actions = gameControls[game.id] ?? const <PadAction, List<String>>{};
     return [
-      ..._gyroRows(game, settings),
+      if (game.retro == null) ..._gyroRows(game, settings),
       if (actions.isNotEmpty) PanelRow(id: 'fromGame', title: T.text('controlsFromGame'), kind: const InfoRow('')),
       for (final action in PadAction.values)
         PanelRow(
@@ -8445,6 +8563,7 @@ class AppModel extends ChangeNotifier {
   @override
   void notifyListeners() {
     if (_disposed) return;
+    _syncRetroMenu();
     super.notifyListeners();
     _updateMusic();
   }
@@ -8452,6 +8571,8 @@ class AppModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _disposeRetroPlay();
+    unawaited(retroHostKeeper.shutdown());
     profileFlow.listLeave?.cancel();
     saveSync.dispose();
     powerWatch.stop();

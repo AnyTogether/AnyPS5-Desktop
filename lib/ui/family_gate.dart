@@ -180,20 +180,24 @@ class FamilyGate {
     return true;
   }
 
-  /// The running game changed: its play time is watched while it runs.
+  /// The running game changed: its play time is watched while it runs, a PS1 game in the
+  /// emulator host as well (AppModel.retroPlay).
   void followGame() {
-    final running = app.running;
-    if (running == null) {
+    final retro = app.retroPlay;
+    final hosted = retro == null || retro.over ? null : retro;
+    final playing = app.running?.$1 ?? hosted?.game;
+    final since = app.running?.$2.started ?? hosted?.started;
+    if (playing == null || since == null) {
       _session?.stop();
       _session = null;
       _watching = null;
       _since = null;
       return;
     }
-    if (_watching == running.$1 && _session != null) return;
+    if (_watching == playing && _session != null) return;
     _session?.stop();
-    _watching = running.$1;
-    _since = running.$2.started;
+    _watching = playing;
+    _since = since;
     _session = PlayTimeSession(check: _check, onEvent: _event, now: now)..start();
   }
 

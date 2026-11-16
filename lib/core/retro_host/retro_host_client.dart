@@ -11,6 +11,7 @@ import 'package:ffi/ffi.dart';
 import 'frame_ring.dart';
 import 'retro_host_native.dart';
 import 'retro_host_protocol.dart';
+import 'retro_host_session.dart';
 import 'strict_json.dart';
 
 /// How a connection to the emulator host ended (anyps5-retro-host docs/protocol.md "Fixtures",
@@ -87,7 +88,7 @@ class _Pending {
 /// and what to report when the host fails. It reads and writes the stream only through the native
 /// threads in native/retro_host, never on this isolate, so the UI thread never waits on the host
 /// (protocol.md "Timeouts").
-class RetroHostClient {
+class RetroHostClient implements RetroHostSession {
   RetroHostClient._(this._volume, this._muted, this._offeredFormats);
 
   static const welcomeLimit = Duration(seconds: 10);
@@ -147,22 +148,30 @@ class RetroHostClient {
   FrameRing? _frameRing;
 
   /// Starts the host: [command] is the executable's absolute path and any arguments before the
-  /// protocol's own; [environment] adds to the launcher's environment for the host. [volume] and
-  /// [muted] are sent as the first call after `welcome`.
+  /// protocol's own; [environment] adds to the launcher's environment for the host, or, with
+  /// [inheritEnvironment] false, is the host's whole environment. A whole environment cannot be
+  /// empty, since native/retro_host gives the launcher's own for none. [volume] and [muted] are
+  /// sent as the first call after `welcome`.
   static RetroHostClient start({
     required List<String> command,
     Map<String, String>? environment,
+    bool inheritEnvironment = true,
     double volume = 1,
     bool muted = false,
     List<String> pixelFormats = const [RetroPixelFormat.rgba8, RetroPixelFormat.bgra8],
   }) {
     if (command.isEmpty) throw ArgumentError.value(command, 'command', 'names no program');
+    if (!inheritEnvironment && (environment == null || environment.isEmpty)) {
+      throw ArgumentError.value(environment, 'environment', "is empty, so the host would get the launcher's own");
+    }
+    final env = !inheritEnvironment
+        ? retroHostEnvironment(const {}, environment!, windows: Platform.isWindows)
+        : environment == null
+        ? const <String>[]
+        : retroHostEnvironment(Platform.environment, environment, windows: Platform.isWindows);
     final client = RetroHostClient._(volume, muted, pixelFormats);
     final token = _nextToken++;
     client._callback = NativeCallable<RetroHostCallbackNative>.listener(client._onEvent);
-    final env = environment == null
-        ? const <String>[]
-        : retroHostEnvironment(Platform.environment, environment, windows: Platform.isWindows);
     final error = calloc<Uint8>(512).cast<Utf8>();
     final argv = _strings(command);
     final envp = _strings(env);
@@ -216,9 +225,11 @@ class RetroHostClient {
 
   /// Completes once `welcome` came and the first `volume` call was answered; fails with
   /// [RetroHostGone] when the connection ended first.
+  @override
   Future<void> get ready => _ready.future;
 
   /// How the connection ended.
+  @override
   Future<RetroHostEnd> get ended => _ended.future;
 
   /// The host's exit code, once it has exited.
@@ -232,20 +243,24 @@ class RetroHostClient {
   String? get pixelFormat => _pixelFormat;
 
   /// Each `frame` message, after its frame was pinned and checked.
+  @override
   Stream<RetroFrameEvent> get frames => _frames.stream;
 
   /// The newest frame of the current game, pinned; null before one came. Its ring stays mapped while
   /// it is the frame shown.
+  @override
   PinnedFrame? get frame => _frame;
 
   /// Vibration to forward to the controller at a port; nothing while paused, without input focus, or
   /// for a port that `connectedPorts` left without a controller.
   /// Events come asynchronously, so a listener may call anything on the client, [close] included.
+  @override
   Stream<RetroRumble> get rumble => _rumble.stream;
 
   /// Whether the launcher's window has input focus; losing it zeroes the controllers' input and
   /// their motors (protocol.md "input" and "rumble"). Once the connection has ended there is no
   /// input to zero and no rumble to forward, so a change is ignored.
+  @override
   set inputFocus(bool focused) {
     if (_ended.isCompleted || _inputFocus == focused) return;
     _inputFocus = focused;
@@ -265,6 +280,7 @@ class RetroHostClient {
   /// failure with a game loaded this gives what protocol.md "Host failure" lists, until `release`.
   ///
   /// `stop` goes through [stopGame], which enforces its time limit.
+  @override
   Future<Object?> call(String method, [Object? args]) {
     if (method == 'stop') throw ArgumentError.value(method, 'method', 'use stopGame');
     return _send(method, args);
@@ -299,10 +315,12 @@ class RetroHostClient {
   }
 
   /// `start`: loads a game and gives its epoch.
+  @override
   Future<int> startGame(Map<String, Object?> args) async => ((await call('start', args))! as Map)['epoch'] as int;
 
   /// `status`: null with no game loaded, and the short report of protocol.md "Host failure" after
   /// one.
+  @override
   Future<RetroStatus?> status() async {
     final result = await call('status');
     if (result == null) return null;
@@ -318,6 +336,7 @@ class RetroHostClient {
   /// `stop`, then `status` until the game has ended, which it gives. The host is killed if the
   /// game has not ended 10 seconds after `stop` (protocol.md "Timeouts"), and the status then is the
   /// failure report. Null when no game was loaded.
+  @override
   Future<RetroStatus?> stopGame() async {
     if (!_ended.isCompleted) {
       if (!_greeted) throw StateError('No call may be sent before welcome.');
@@ -338,6 +357,7 @@ class RetroHostClient {
   }
 
   /// The controller state of one port (protocol.md "input").
+  @override
   void input(int port, int buttons, {int leftX = 0, int leftY = 0, int rightX = 0, int rightY = 0}) {
     if (port < 0 || port > 1) throw RangeError.range(port, 0, 1, 'port');
     if (buttons < 0 || buttons > 0xFFFF) throw RangeError.range(buttons, 0, 0xFFFF, 'buttons');
@@ -358,6 +378,7 @@ class RetroHostClient {
 
   /// Asks the host to stop its game and exit; it is killed if it has not exited 15 seconds later.
   /// Before `welcome` nothing may be sent, so the host is killed instead.
+  @override
   void shutdown() {
     if (_shutdownSent || _ended.isCompleted || _connection == nullptr || _unsupportedSeen) return;
     if (!_greeted) {
@@ -370,6 +391,7 @@ class RetroHostClient {
   }
 
   /// Kills the host if it still runs and frees everything the connection holds.
+  @override
   Future<void> close() async {
     _finish(RetroHostEnd.hostFailure, errorCode: RetroErrorCode.hostExited, kill: true);
     await _release();

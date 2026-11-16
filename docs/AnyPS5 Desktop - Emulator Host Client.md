@@ -7,8 +7,9 @@ control stream and shares each picture through shared memory. Both sides follow
 that repository's
 [`docs/protocol.md`](https://github.com/AnyTogether/anyps5-retro-host/blob/9052aff59c94c3ae3aa8ff63bef5df241acec713/docs/protocol.md),
 version 1, as it stands on its `main` at 9052aff. This page explains the
-launcher's side. It was written from the protocol alone, and has no UI yet:
-that is the next step.
+launcher's side. It was written from the protocol alone. The UI built on it,
+the game's picture, the controls, the in-game menu and the settings, is
+described in [The emulator host in the launcher's UI](<AnyPS5 Desktop - Emulator Host UI.md>).
 
 ## Files
 
@@ -63,6 +64,14 @@ caller adds variables on Windows, the native code builds the block for
   the drives' current directories (`=C:`), which `Platform.environment` leaves
   out and `CreateProcessW` does not add to a block it is given;
 - it sorts the entries by name without regard to case, as Windows requires.
+
+With `inheritEnvironment: false` the variables the caller gives are the host's
+whole environment, and nothing is inherited. The launcher does this on Linux,
+where it gives the host its own environment without what its AppImage set
+([Emulator host UI](<AnyPS5 Desktop - Emulator Host UI.md>), "The host's environment"). That
+environment cannot be empty: the native code gives the host the launcher's own
+environment when it is given no entries, so `start` refuses an empty one with
+an `ArgumentError` instead.
 
 **Windows.**
 
@@ -303,8 +312,10 @@ when `ANYPS5_RETRO_HOST_CHECKOUT` is set.
 
 ## Not yet
 
-- **No UI.** Picking the host's files, showing frames and the player's
-  controls are the next step.
+- **Debug builds only.** A PS1 game plays through the host behind a setting
+  ([Emulator host UI](<AnyPS5 Desktop - Emulator Host UI.md>), "In the launcher"), and only debug
+  builds find a host, through `ANYPS5_RETRO_HOST`. Release builds get the
+  signed host release later.
 - **No signature checks.** The release-time file checks from the protocol's
   "Finding and checking the host" section come with signed distribution.
   Until then, the client runs the command it is given.

@@ -574,7 +574,9 @@ extension LauncherProfiles on AppModel {
 
   /// The right click on Home: the Options menu; false when it is not Home's.
   bool homeRightClick() {
-    if (!preferences.onboarded || overlay != null || starting != null || pairing != null) return false;
+    if (!preferences.onboarded || overlay != null || starting != null || pairing != null || retroPlay != null) {
+      return false;
+    }
     openProfileMenu();
     return true;
   }

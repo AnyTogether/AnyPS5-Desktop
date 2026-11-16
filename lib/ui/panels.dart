@@ -183,6 +183,7 @@ class PanelView extends StatelessWidget {
       Layer.copyWarning,
       Layer.gameFiles,
       Layer.quickMenu,
+      Layer.retroMenu,
       Layer.homeMenu,
       Layer.launcherReport,
       Layer.profileMenu,
@@ -192,6 +193,7 @@ class PanelView extends StatelessWidget {
     // PS's menus: a heading that may be long (the game's name), and only as tall as their rows.
     final psMenu = const {
       Layer.quickMenu,
+      Layer.retroMenu,
       Layer.homeMenu,
       Layer.launcherReport,
       Layer.profileMenu,
@@ -199,7 +201,11 @@ class PanelView extends StatelessWidget {
     }.contains(model.overlay);
     // The quick menu is about the game playing: its icon by the heading (Close Game? is a
     // ConfirmCard, with the icon too).
-    final gameIcon = model.overlay == Layer.quickMenu ? model.running?.$1.icon : null;
+    final gameIcon = switch (model.overlay) {
+      Layer.quickMenu => model.running?.$1.icon,
+      Layer.retroMenu => model.retroPlay?.game.icon,
+      _ => null,
+    };
     // The copy warning explains itself before its four choices.
     // A join held back says both builds whole and what to do.
     final tall = model.overlay == Layer.copyWarning || model.overlay == Layer.joinBlocked;
@@ -235,15 +241,17 @@ class PanelView extends StatelessWidget {
               (psMenu
                   // The Options menu's rows say what each does: a line more each.
                   ? 168 +
-                        switch (model.overlay) {
-                              Layer.profileMenu => 74,
-                              // Send Report says what it sends: two lines more.
-                              Layer.launcherReport => 98,
-                              // The question's line is a sentence or two.
-                              Layer.cloudQuestion => 72,
-                              _ => 62,
-                            } *
-                            category.rows.length +
+                        (model.overlay == Layer.retroMenu
+                            ? _gameMenuRowsHeight(category.rows)
+                            : switch (model.overlay) {
+                                    Layer.profileMenu => 74,
+                                    // Send Report says what it sends: two lines more.
+                                    Layer.launcherReport => 98,
+                                    // The question's line is a sentence or two.
+                                    Layer.cloudQuestion => 72,
+                                    _ => 62,
+                                  } *
+                                  category.rows.length) +
                         // Now playing's card is taller than a row: its cover and three lines.
                         (category.rows.any((row) => row.kind is MediaRow) ? 40 : 0)
                   : compact
@@ -295,9 +303,15 @@ class PanelView extends StatelessWidget {
                                   color: model.accentChoice.color,
                                 ).copyWith(letterSpacing: 1.4 * scale),
                               ),
-                            if (model.overlay == Layer.quickMenu)
+                            if (model.overlay == Layer.quickMenu || model.overlay == Layer.retroMenu)
                               Text(
-                                T.upper(T.text(model.quickMenuPaused ? 'quickPaused' : 'quickRunning')),
+                                T.upper(
+                                  T.text(
+                                    model.quickMenuPaused || model.overlay == Layer.retroMenu
+                                        ? 'quickPaused'
+                                        : 'quickRunning',
+                                  ),
+                                ),
                                 style: AppText.display(
                                   12 * scale,
                                   weight: FontWeight.w700,
@@ -369,6 +383,7 @@ class PanelView extends StatelessWidget {
                         Layer.advanced,
                         Layer.friendOptions,
                         Layer.quickMenu,
+                        Layer.retroMenu,
                       }.contains(model.overlay),
                     ),
                   ],
@@ -410,6 +425,11 @@ class PanelView extends StatelessWidget {
     );
   }
 }
+
+/// How tall the rows of a PS1 game's menu are, with the gap under each: its pages mix actions,
+/// choices, a slider and a switch, some with a line under the title, so each counts its own.
+double _gameMenuRowsHeight(List<PanelRow> rows) =>
+    rows.fold(0, (height, row) => height + (row.detail != null ? 81 : (row.kind is ActionRow ? 58 : 65)));
 
 /// The sections' column: as large as the rows, scrolling with a scrollbar that shows whenever
 /// there are more than fit (Settings in a short window), the selected one kept in view.
@@ -602,6 +622,7 @@ class _RowView extends StatelessWidget {
   // Find Players, a friend's options), read by their rows' names and details, as on the Mac.
   static const _labelledMenus = {
     Layer.quickMenu,
+    Layer.retroMenu,
     Layer.homeMenu,
     Layer.launcherReport,
     Layer.profileMenu,
