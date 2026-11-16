@@ -2436,6 +2436,7 @@
   "retroHostOtherDetail": "A játék hiba miatt leállt.",
   "retroHostOutdatedDetail": "Ez az emulátor-gazdaprogram nem illik ehhez az indítóprogramhoz. Frissíteni kell.",
   "retroHostNotStartedDetail": "Az emulátor-gazdaprogramot nem sikerült elindítani.",
+  "retroHostCardUnreadable": "A játék memóriakártyája nem olvasható, ezért a mentései nem maradnak meg. A kártya fájlja változatlan marad.",
   "retroMenuVolume": "Hangerő",
   "retroMenuMute": "Némítás",
   "retroMenuDiscInsertedDetail": "A konzolban.",

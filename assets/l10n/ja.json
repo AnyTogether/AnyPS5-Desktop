@@ -2436,6 +2436,7 @@
   "retroHostOtherDetail": "エラーのためゲームが停止しました。",
   "retroHostOutdatedDetail": "このエミュレーター ホストはこのランチャーと合っていません。更新が必要です。",
   "retroHostNotStartedDetail": "エミュレーター ホストを起動できませんでした。",
+  "retroHostCardUnreadable": "このゲームのメモリーカードを読み込めなかったため、セーブは保存されません。カードのファイルはそのまま残ります。",
   "retroMenuVolume": "音量",
   "retroMenuMute": "ミュート",
   "retroMenuDiscInsertedDetail": "本体に入っています。",

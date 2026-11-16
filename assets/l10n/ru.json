@@ -2436,6 +2436,7 @@
   "retroHostOtherDetail": "Игра остановилась из-за ошибки.",
   "retroHostOutdatedDetail": "Этот хост эмуляции не соответствует этому лаунчеру. Его нужно обновить.",
   "retroHostNotStartedDetail": "Не удалось запустить хост эмуляции.",
+  "retroHostCardUnreadable": "Не удалось прочитать карту памяти этой игры, поэтому её сохранения не записываются. Файл карты остаётся без изменений.",
   "retroMenuVolume": "Громкость",
   "retroMenuMute": "Без звука",
   "retroMenuDiscInsertedDetail": "В консоли.",

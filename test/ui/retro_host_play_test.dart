@@ -261,7 +261,11 @@ void main() {
       [for (final row in model.panelCategories().single.rows) row.id],
       ['volume', 'mute', 'option-swanstation_CDROM_MuteCDAudio', 'option-swanstation_Audio_FastHook'],
     );
-    expect(launcher.play.menu.optionsIn(RetroOptionSection.graphics), hasLength(16), reason: 'kept for a Graphics page');
+    expect(
+      launcher.play.menu.optionsIn(RetroOptionSection.graphics),
+      hasLength(16),
+      reason: 'kept for a Graphics page',
+    );
     expect(launcher.row('option-swanstation_Audio_FastHook').title, 'Use Per-Frame Audio Batching');
     expect(launcher.row('option-swanstation_Audio_FastHook').detail, T.text('retroMenuOptionRestartOnlyDetail'));
     final volume = launcher.row('volume').kind as StepperRow;
@@ -600,6 +604,23 @@ void main() {
     await launcher.play.host.refresh();
     await pumpEventQueue();
     expect(model.retroPlay, isNull);
+  });
+
+  test('a memory card the host cannot read is said once, and the game plays on', () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model..setRetroHostPs1(true);
+    await launcher.start();
+    expect(model.toast, isNot(T.text('retroHostCardUnreadable')));
+    launcher.session.nextStatus = fakeStatus(cardUnreadable: true);
+    await launcher.play.host.refresh();
+    await pumpEventQueue();
+    expect(model.toast, T.text('retroHostCardUnreadable'));
+    expect(model.retroPlay, isNotNull);
+    expect(launcher.play.problem, isNull);
+    model.show('something else');
+    await launcher.play.host.refresh();
+    await pumpEventQueue();
+    expect(model.toast, 'something else', reason: 'once per game');
   });
 
   test('a host that speaks another protocol version says it needs updating', () async {

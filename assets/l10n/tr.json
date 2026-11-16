@@ -2436,6 +2436,7 @@
   "retroHostOtherDetail": "Oyun bir hata yüzünden durdu.",
   "retroHostOutdatedDetail": "Bu emülatör programı bu başlatıcıyla uyumlu değil. Güncellenmesi gerekiyor.",
   "retroHostNotStartedDetail": "Emülatör programı başlatılamadı.",
+  "retroHostCardUnreadable": "Bu oyunun hafıza kartı okunamadı, bu yüzden kayıtları tutulmuyor. Kart dosyasına dokunulmuyor.",
   "retroMenuVolume": "Ses düzeyi",
   "retroMenuMute": "Sessiz",
   "retroMenuDiscInsertedDetail": "Konsolda.",

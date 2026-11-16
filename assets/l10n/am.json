@@ -2420,6 +2420,7 @@
   "retroHostOtherDetail": "ጨዋታው በስህተት ምክንያት ቆሟል።",
   "retroHostOutdatedDetail": "ይህ የኢሙሌተር አስተናጋጅ ከዚህ ማስጀመሪያ ጋር አይዛመድም። መዘመን አለበት።",
   "retroHostNotStartedDetail": "የኢሙሌተር አስተናጋጁን ማስጀመር አልተቻለም።",
+  "retroHostCardUnreadable": "የዚህ ጨዋታ የማስታወሻ ካርድ ሊነበብ አልቻለም፣ ስለዚህ ማስቀመጫዎቹ አይቀመጡም። የካርዱ ፋይል እንዳለ ይቀራል።",
   "retroMenuVolume": "የድምፅ መጠን",
   "retroMenuMute": "ድምፅ አጥፋ",
   "retroMenuDiscInsertedDetail": "በኮንሶሉ ውስጥ።",

@@ -2436,6 +2436,7 @@
   "retroHostOtherDetail": "Permainan berhenti kerana ralat.",
   "retroHostOutdatedDetail": "Hos emulator ini tidak sepadan dengan pelancar ini. Ia perlu dikemas kini.",
   "retroHostNotStartedDetail": "Hos emulator tidak dapat dimulakan.",
+  "retroHostCardUnreadable": "Kad memori permainan ini tidak dapat dibaca, jadi simpanannya tidak disimpan. Fail kad dibiarkan seperti sedia ada.",
   "retroMenuVolume": "Kelantangan",
   "retroMenuMute": "Senyap",
   "retroMenuDiscInsertedDetail": "Dalam konsol.",

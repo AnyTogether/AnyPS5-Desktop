@@ -410,8 +410,14 @@ until it ends, not until its error screen is left. A chosen option is kept in
 in `Preferences.retroHostVolume` and `retroHostMuted`, so the next game starts
 with them.
 
-**Ending.** Close game stops the game (the host writes the memory card) and
-releases it, keeps the host for the next game (above), then the library comes
+**A memory card that cannot be read.** When a `status` says
+`cardUnreadable`, memory card 1's file is there but the host could not read
+it as a card, so it leaves the file as it is and this game's saves are
+written nowhere (protocol.md "status"). The launcher says so once per game in
+a toast (`retroHostCardUnreadable`), and the game plays on.
+
+**Ending.** Close game stops the game (the host writes the memory card,
+unless it could not read it, above) and releases it, keeps the host for the next game (above), then the library comes
 back. A game that
 ends without an error goes back to the library the same way. A game that ends
 with an error stays on its error screen ("Night Racer stopped") with the words
@@ -514,8 +520,8 @@ native memory as a real ring slot would be, so no host is started.
   on it, the kept host shut down when the player leaves the PS1 games, after
   the idle limit and when another game starts, a kept host that crashed and a
   host that crashed during a game (both replaced by a new host for the next
-  game), a host still holding a game after `release` (shut down), an error
-  screen, a clean end, an outdated host, and a start given up.
+  game), a host still holding a game after `release` (shut down), a memory
+  card the host cannot read (said once), an error screen, a clean end, an outdated host, and a start given up.
 - [`retro_host_play_golden_test.dart`](../test/ui/retro_host_play_golden_test.dart)
   draws the loading screen, the error screen, the game's picture, the menu's
   first page over it, its Console page, and Settings › Emulators with the

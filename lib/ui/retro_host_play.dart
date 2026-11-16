@@ -34,6 +34,10 @@ class RetroPlay {
   /// Its play time went to the family rules ([RetroHostPlaying._countRetroPlay]); once only.
   bool counted = false;
 
+  /// The player was told this game's memory card cannot be read, so its saves are not written
+  /// ([RetroStatus.cardUnreadable]); once per game.
+  bool cardWarned = false;
+
   /// The section of the menu shown, or null for the menu's first page.
   RetroOptionSection? menuSection;
 
@@ -241,11 +245,16 @@ extension RetroHostPlaying on AppModel {
     );
   }
 
-  /// The game moved on: a game that ended without an error, and was not closed by the player,
-  /// goes back to the library; one with an error stays on its error screen.
+  /// The game moved on: a memory card the host cannot read is said once; a game that ended
+  /// without an error, and was not closed by the player, goes back to the library; one with an
+  /// error stays on its error screen.
   void _retroChanged() {
     final play = retroPlay;
     if (play == null || _disposed) return;
+    if (!play.cardWarned && play.host.status?.cardUnreadable == true) {
+      play.cardWarned = true;
+      show(T.text('retroHostCardUnreadable'));
+    }
     if (play.host.phase == RetroHostGamePhase.ended && !play.closing) {
       if (!play.over) {
         play.endedAt = DateTime.now();

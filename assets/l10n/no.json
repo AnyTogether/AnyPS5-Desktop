@@ -2436,6 +2436,7 @@
   "retroHostOtherDetail": "Spillet stoppet på grunn av en feil.",
   "retroHostOutdatedDetail": "Denne emulatorverten passer ikke med dette startprogrammet. Den må oppdateres.",
   "retroHostNotStartedDetail": "Emulatorverten kunne ikke startes.",
+  "retroHostCardUnreadable": "Minnekortet til dette spillet kunne ikke leses, så lagringene blir ikke tatt vare på. Kortfilen blir ikke rørt.",
   "retroMenuVolume": "Lydstyrke",
   "retroMenuMute": "Demp",
   "retroMenuDiscInsertedDetail": "I konsollen.",

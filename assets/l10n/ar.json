@@ -2436,6 +2436,7 @@
   "retroHostOtherDetail": "توقفت اللعبة بسبب خطأ.",
   "retroHostOutdatedDetail": "مضيف المحاكاة هذا لا يتوافق مع هذا المشغّل. يجب تحديثه.",
   "retroHostNotStartedDetail": "تعذّر تشغيل مضيف المحاكاة.",
+  "retroHostCardUnreadable": "تعذّرت قراءة بطاقة الذاكرة لهذه اللعبة، لذلك لن تُحفظ تقدّماتها. يبقى ملف البطاقة كما هو.",
   "retroMenuVolume": "مستوى الصوت",
   "retroMenuMute": "كتم الصوت",
   "retroMenuDiscInsertedDetail": "داخل الجهاز.",

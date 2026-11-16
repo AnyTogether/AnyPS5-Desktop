@@ -2436,6 +2436,7 @@
   "retroHostOtherDetail": "오류로 인해 게임이 중지되었습니다.",
   "retroHostOutdatedDetail": "이 에뮬레이터 호스트가 이 런처와 맞지 않습니다. 업데이트가 필요합니다.",
   "retroHostNotStartedDetail": "에뮬레이터 호스트를 시작할 수 없습니다.",
+  "retroHostCardUnreadable": "이 게임의 메모리 카드를 읽을 수 없어 저장 내용이 보관되지 않습니다. 카드 파일은 그대로 둡니다.",
   "retroMenuVolume": "음량",
   "retroMenuMute": "음소거",
   "retroMenuDiscInsertedDetail": "본체에 들어 있습니다.",

@@ -2436,6 +2436,7 @@
   "retroHostOtherDetail": "El juego se detuvo por un error.",
   "retroHostOutdatedDetail": "Este host de emulación no coincide con este lanzador. Hay que actualizarlo.",
   "retroHostNotStartedDetail": "No se pudo iniciar el host de emulación.",
+  "retroHostCardUnreadable": "No se pudo leer la tarjeta de memoria de este juego, así que sus partidas no se guardan. El archivo de la tarjeta se deja como está.",
   "retroMenuVolume": "Volumen",
   "retroMenuMute": "Silenciar",
   "retroMenuDiscInsertedDetail": "En la consola.",

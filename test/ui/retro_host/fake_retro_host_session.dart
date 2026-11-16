@@ -160,8 +160,20 @@ class FakeRetroHostSession extends FakeFrameSource implements RetroHostSession {
   }
 }
 
-RetroStatus fakeStatus({bool ready = true, bool ended = false, double aspect = 4 / 3, String errorCode = ''}) =>
-    RetroStatus(ready: ready, ended: ended, error: '', errorCode: errorCode, aspect: aspect);
+RetroStatus fakeStatus({
+  bool ready = true,
+  bool ended = false,
+  double aspect = 4 / 3,
+  String errorCode = '',
+  bool cardUnreadable = false,
+}) => RetroStatus(
+  ready: ready,
+  ended: ended,
+  error: '',
+  errorCode: errorCode,
+  aspect: aspect,
+  cardUnreadable: cardUnreadable,
+);
 
 /// Controllers the test holds by hand.
 class FakePads {

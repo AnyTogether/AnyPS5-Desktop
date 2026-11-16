@@ -2436,6 +2436,7 @@
   "retroHostOtherDetail": "遊戲因發生錯誤而停止。",
   "retroHostOutdatedDetail": "此模擬器宿主程式與此啟動器不相符，需要更新。",
   "retroHostNotStartedDetail": "無法啟動模擬器宿主程式。",
+  "retroHostCardUnreadable": "無法讀取此遊戲的記憶卡，因此它的存檔不會被保存。記憶卡檔案保持原樣。",
   "retroMenuVolume": "音量",
   "retroMenuMute": "靜音",
   "retroMenuDiscInsertedDetail": "已放入主機。",

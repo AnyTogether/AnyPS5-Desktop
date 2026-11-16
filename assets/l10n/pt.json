@@ -2436,6 +2436,7 @@
   "retroHostOtherDetail": "O jogo parou por causa de um erro.",
   "retroHostOutdatedDetail": "Este host de emulação não corresponde a este inicializador. Ele precisa ser atualizado.",
   "retroHostNotStartedDetail": "Não foi possível iniciar o host de emulação.",
+  "retroHostCardUnreadable": "Não foi possível ler o cartão de memória deste jogo, por isso os seus saves não são guardados. O ficheiro do cartão fica como está.",
   "retroMenuVolume": "Volume",
   "retroMenuMute": "Sem som",
   "retroMenuDiscInsertedDetail": "No console.",

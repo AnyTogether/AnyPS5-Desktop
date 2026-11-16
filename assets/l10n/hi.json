@@ -2436,6 +2436,7 @@
   "retroHostOtherDetail": "गेम एक त्रुटि के कारण रुक गया।",
   "retroHostOutdatedDetail": "यह एमुलेटर होस्ट इस लॉन्चर से मेल नहीं खाता। इसे अपडेट करना होगा।",
   "retroHostNotStartedDetail": "एमुलेटर होस्ट शुरू नहीं हो सका।",
+  "retroHostCardUnreadable": "इस गेम का मेमोरी कार्ड पढ़ा नहीं जा सका, इसलिए इसकी सेव नहीं रखी जा रहीं। कार्ड की फ़ाइल जैसी है वैसी छोड़ दी गई है।",
   "retroMenuVolume": "वॉल्यूम",
   "retroMenuMute": "म्यूट",
   "retroMenuDiscInsertedDetail": "कंसोल में।",

@@ -2436,6 +2436,7 @@
   "retroHostOtherDetail": "Spillet stoppede på grund af en fejl.",
   "retroHostOutdatedDetail": "Denne emulatorvært passer ikke til denne launcher. Den skal opdateres.",
   "retroHostNotStartedDetail": "Emulatorværten kunne ikke startes.",
+  "retroHostCardUnreadable": "Dette spils hukommelseskort kunne ikke læses, så dets gemte spil bliver ikke gemt. Kortets fil bliver ikke rørt.",
   "retroMenuVolume": "Lydstyrke",
   "retroMenuMute": "Slå lyden fra",
   "retroMenuDiscInsertedDetail": "I konsollen.",
