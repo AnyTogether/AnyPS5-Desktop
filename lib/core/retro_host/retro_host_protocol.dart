@@ -195,6 +195,7 @@ class RetroStatus {
     this.progressLabel,
     this.progressPercent,
     this.options = const {},
+    this.cardUnreadable = false,
     this.discs,
   });
 
@@ -209,6 +210,7 @@ class RetroStatus {
       progressLabel = null,
       progressPercent = null,
       options = const {},
+      cardUnreadable = false,
       discs = null;
 
   final bool ready;
@@ -222,7 +224,15 @@ class RetroStatus {
   final String? progressLabel;
   final int? progressPercent;
   final Map<String, RetroOption> options;
+
+  /// Memory card 1's file is there but the host could not read it as a card, so it is left as it
+  /// is and this game's saves are not written anywhere. False from a status without the field.
+  final bool cardUnreadable;
+
   final RetroDiscs? discs;
+
+  /// The most discs `status.discs.labels` may list.
+  static const maxDiscs = 128;
 
   /// The status as protocol.md "status" writes it.
   Map<String, Object?> toJson() => {
@@ -234,6 +244,7 @@ class RetroStatus {
     'progressLabel': progressLabel,
     'progressPercent': progressPercent,
     'options': {for (final option in options.values) option.key: option.toJson()},
+    'cardUnreadable': cardUnreadable,
     'discs': ?discs?.toJson(),
   };
 
@@ -246,7 +257,8 @@ class RetroStatus {
       map.length == 4 && (map['errorCode'] == RetroErrorCode.hostExited || map['errorCode'] == RetroErrorCode.hostHung);
 
   /// Reads a `status` result, throwing [RetroProtocolError] for a field out of what protocol.md
-  /// allows. Unknown fields are ignored.
+  /// allows. Unknown fields are ignored. A host's `errorCode` of `hostExited` or `hostHung`, which
+  /// only the client may report, is read as `other` (protocol.md "status").
   static RetroStatus parse(Map<String, Object?> map) {
     final f = RetroFields(map, 'status');
     final options = <String, RetroOption>{};
@@ -272,6 +284,7 @@ class RetroStatus {
     if (f.has('discs')) {
       final d = f.object('discs');
       final labels = d.strings('labels');
+      if (labels.length > maxDiscs) throw const RetroProtocolError('status.discs.labels has more than 128 discs.');
       if (!d.has('inserted')) throw const RetroProtocolError('status.discs.inserted is missing.');
       final inserted = d.map['inserted'];
       if (inserted != null && (inserted is! int || inserted < 0 || inserted >= labels.length)) {
@@ -291,11 +304,14 @@ class RetroStatus {
     if (percent != null && (percent is! int || percent < 0 || percent > 100)) {
       throw const RetroProtocolError('status.progressPercent must be an integer from 0 to 100 or null.');
     }
+    final errorCode = f.string('errorCode');
     return RetroStatus(
       ready: f.boolean('ready'),
       ended: f.boolean('ended'),
       error: f.string('error'),
-      errorCode: f.string('errorCode'),
+      errorCode: errorCode == RetroErrorCode.hostExited || errorCode == RetroErrorCode.hostHung
+          ? RetroErrorCode.other
+          : errorCode,
       aspect: f.number('aspect', above: 0, atMost: 10),
       hardware: f.boolean('hardware'),
       resolutionError: f.string('resolutionError'),
@@ -303,6 +319,7 @@ class RetroStatus {
       progressLabel: f.stringOrNull('progressLabel'),
       progressPercent: percent as int?,
       options: options,
+      cardUnreadable: f.has('cardUnreadable') && f.boolean('cardUnreadable'),
       discs: discs,
     );
   }

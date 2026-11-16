@@ -1,10 +1,12 @@
 # The emulator host client
 
 PS1 games run in a separate program, the emulator host
-([anyps5-retro-host](https://github.com/B-Howell/anyps5-retro-host)), which
+([anyps5-retro-host](https://github.com/AnyTogether/anyps5-retro-host)), which
 runs SwanStation through libretro. It talks to the launcher over a private
 control stream and shares each picture through shared memory. Both sides follow
-that repository's `docs/protocol.md`, version 1. This page explains the
+that repository's
+[`docs/protocol.md`](https://github.com/AnyTogether/anyps5-retro-host/blob/9052aff59c94c3ae3aa8ff63bef5df241acec713/docs/protocol.md),
+version 1, as it stands on its `main` at 9052aff. This page explains the
 launcher's side. It was written from the protocol alone, and has no UI yet:
 that is the next step.
 
@@ -25,6 +27,23 @@ that is the next step.
 - calls and pings in order, with their time limits;
 - frames and rumble;
 - what to report when the host fails.
+
+## What a status holds
+
+`RetroStatus.parse` reads a `status` result by the protocol's "status" section
+and throws `RetroProtocolError` for a field outside it. Unknown fields are
+ignored.
+
+- **`cardUnreadable`.** True when memory card 1's file is there but the host
+  could not read it as a card, so this game's saves are not written anywhere.
+  A status without the field reads as false, as the protocol asks.
+- **`errorCode`.** Kept as the host sent it, so a code this launcher does not
+  know stays a failure with no known cause. The two codes only the client may
+  report, `hostExited` and `hostHung`, are read as `other` when a host sends
+  them, so they always mean the client's own report.
+- **`discs`.** At most 128 labels; more is a protocol error. `inserted` is null
+  while the tray is open, and also when the core inserted a disc past the
+  128th.
 
 ## Starting the host
 
@@ -274,7 +293,13 @@ ANYPS5_RETRO_HOST_CHECKOUT=/path/to/anyps5-retro-host flutter test test/core/ret
 
 CI runs the test on Linux (in the test shards) and on macOS (in the goldens
 job), against the host repository at the commit named in
-`.github/workflows/ci.yml`. It also passes on Windows.
+`.github/workflows/ci.yml`. It also passes on Windows. That commit is the host
+repository's `main` at 9052aff with its fake host added, until the fake host is
+merged there.
+
+[`test/core/retro_host/retro_status_test.dart`](../test/core/retro_host/retro_status_test.dart)
+covers how a `status` is read, and reads every status the fixture sessions send
+when `ANYPS5_RETRO_HOST_CHECKOUT` is set.
 
 ## Not yet
 

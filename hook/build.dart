@@ -37,7 +37,9 @@ void main(List<String> args) async {
       name: 'anyps5_retro_host',
       assetName: 'core/retro_host/retro_host_native.dart',
       sources: const ['native/retro_host/anyps5_retro_host.c'],
-      libraries: [if (os == OS.linux) ...['pthread', 'dl']],
+      libraries: [
+        if (os == OS.linux) ...['pthread', 'dl'],
+      ],
     ).run(input: input, output: output);
   });
 }

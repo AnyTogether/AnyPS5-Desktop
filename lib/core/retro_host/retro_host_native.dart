@@ -27,7 +27,7 @@ abstract final class RetroHostEvent {
   static const exited = 3;
 
   /// The exit code could not be read: on Linux, the Dart VM reaped the host before the client read
-  /// it (docs/RETRO_HOST_CLIENT.md).
+  /// it (docs/AnyPS5 Desktop - Emulator Host Client.md).
   static const exitUnknown = -9223372036854775808;
 }
 
