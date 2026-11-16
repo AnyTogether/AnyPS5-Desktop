@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:anyps5_desktop/core/retro_host/retro_host_client.dart' show RetroHostEnd;
 import 'package:anyps5_desktop/core/retro_host/retro_host_store.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
@@ -171,6 +172,27 @@ void main() {
       expect(launcher.session.closed, isTrue, reason: 'waited for before the files were replaced');
       expect(model.retroHostKeeper.holding, isFalse);
       expect(model.toast, T.format('retroHostReady', ['1.0.0']), reason: 'v1.0.1 carries the 1.0.0 files');
+    });
+
+    test('a download stopped while the kept host is still exiting is not put in place', () async {
+      github.releases.add(retroHostFixtureRelease(tag: 'v1.0.1'));
+      launcher = await Ps1Launcher.withRelease(retroHostApi: github.api);
+      final model = launcher.model..setRetroHostPs1(true);
+      model.select(model.games.indexOf(launcher.game));
+      await launcher.start();
+      await model.closeRetroGame();
+      launcher.checked.single!.release();
+      launcher.session.endsOnShutdown = false;
+      final installed = File(model.retroHostInstall!.host).lastModifiedSync();
+      final going = model.retroHostDownload.download();
+      await until(() => launcher.session.shutdownAsked, const Duration(seconds: 10));
+      model.retroHostDownload.cancel();
+      launcher.session.endedCompleter.complete(RetroHostEnd.clean);
+      await going;
+      expect(model.toast, isNot(T.format('retroHostReady', ['1.0.0'])));
+      expect(model.retroHostDownload.installing, isFalse);
+      expect(model.retroHostDownload.downloading, isFalse);
+      expect(File(model.retroHostInstall!.host).lastModifiedSync(), installed);
     });
 
     test('a download while a game is starting in the host refuses and leaves the kept host', () async {

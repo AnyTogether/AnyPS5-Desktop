@@ -114,6 +114,7 @@ class RetroHostDownloadModel {
       await app.stopKeptRetroHost();
       if (_hostInUse) throw ToolkitFailure(ToolkitFailureKind.badLayout, T.text('retroHostDownloadCloseGame'));
       if (_closed) return;
+      if (cancel.cancelled) throw ToolkitFailure(ToolkitFailureKind.cancelled, 'the download was stopped');
       final version = await store.putInPlace(download);
       broken = null;
       if (before == null) app.setRetroHostPs1(true);

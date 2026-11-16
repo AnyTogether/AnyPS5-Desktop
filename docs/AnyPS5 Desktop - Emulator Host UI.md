@@ -303,7 +303,8 @@ is not loaded has no menu to open.
 Emulators has a row for the PS1 emulator (`RetroHostDownloadModel`). Before
 anything is installed it says **Download the PS1 emulator**. Nothing is asked
 of GitHub until the player selects it. Then the row shows the download's
-progress, and selecting it again stops it. The host comes from the host
+progress, and selecting it again stops it, up to the moment the new host
+is put in place, even while the kept host is still exiting. The host comes from the host
 repository's signed releases and is checked on download, as
 [Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>) "Finding and checking the host"
 describes. Once it is installed the row says **PS1 emulator 1.0.0** (its
@@ -583,7 +584,8 @@ native memory as a real ring slot would be, so no host is started.
   shuts the kept host down and waits for it before the new host goes in, and
   is refused, leaving the kept host, while a game is starting; one the
   launcher closes during is not put in place. With no release the row
-  says none is published yet. Nothing downloads while a game plays, and a debug
+  says none is published yet. A download stopped while the kept host is
+  still exiting is not put in place. Nothing downloads while a game plays, and a debug
   build that runs `ANYPS5_RETRO_HOST` shows no download but says its host is
   unchecked, which the signed release's rows never say.
 - [`retro_keyboard_test.dart`](../test/core/retro_host/retro_keyboard_test.dart)
