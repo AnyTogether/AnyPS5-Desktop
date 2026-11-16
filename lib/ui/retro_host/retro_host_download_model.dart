@@ -36,6 +36,10 @@ class RetroHostDownloadModel {
   /// The new host is being put in place of the old: no host may start until it is.
   bool installing = false;
 
+  /// The checked files are being written over the old host's: past the point of stopping, so the
+  /// row no longer offers it ([cancel] does nothing).
+  bool placing = false;
+
   int _starts = 0;
 
   /// A start of a game in the host holds the installed host from its checks until its play is set
@@ -115,6 +119,8 @@ class RetroHostDownloadModel {
       if (_hostInUse) throw ToolkitFailure(ToolkitFailureKind.badLayout, T.text('retroHostDownloadCloseGame'));
       if (_closed) return;
       if (cancel.cancelled) throw ToolkitFailure(ToolkitFailureKind.cancelled, 'the download was stopped');
+      placing = true;
+      app.refresh();
       final version = await store.putInPlace(download);
       broken = null;
       if (before == null) app.setRetroHostPs1(true);
@@ -136,6 +142,7 @@ class RetroHostDownloadModel {
       }
     } finally {
       installing = false;
+      placing = false;
       _cancel = null;
       progress = null;
       app.refresh();
@@ -154,8 +161,11 @@ class RetroHostDownloadModel {
     }
   }
 
-  /// Stops the download; what came is kept, to carry on next time.
-  void cancel() => _cancel?.cancel();
+  /// Stops the download; what came is kept, to carry on next time. Once the new host is being put
+  /// in place it runs to the end.
+  void cancel() {
+    if (!placing) _cancel?.cancel();
+  }
 
   bool _closed = false;
 
@@ -181,16 +191,18 @@ class RetroHostDownloadModel {
         PanelRow(
           id: 'retro-host-download',
           title: T.format('retroHostDownloading', [((now?.fraction ?? 0) * 100).floor()]),
-          detail: T.format('retroHostProgress', [
-            switch (now?.phase) {
-              ToolkitPhase.download when (now?.total ?? 0) > 0 => T.format('engineProgress', [
-                byteText(now!.received),
-                byteText(now.total),
-              ]),
-              ToolkitPhase.unpack || ToolkitPhase.finish => T.text('retroHostChecking'),
-              _ => T.text('retroHostLooking'),
-            },
-          ]),
+          detail: placing
+              ? T.text('retroHostChecking')
+              : T.format('retroHostProgress', [
+                  switch (now?.phase) {
+                    ToolkitPhase.download when (now?.total ?? 0) > 0 => T.format('engineProgress', [
+                      byteText(now!.received),
+                      byteText(now.total),
+                    ]),
+                    ToolkitPhase.unpack || ToolkitPhase.finish => T.text('retroHostChecking'),
+                    _ => T.text('retroHostLooking'),
+                  },
+                ]),
           kind: ActionRow(cancel),
         ),
       ];

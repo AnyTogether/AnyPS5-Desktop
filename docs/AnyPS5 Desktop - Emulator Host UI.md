@@ -303,8 +303,10 @@ is not loaded has no menu to open.
 Emulators has a row for the PS1 emulator (`RetroHostDownloadModel`). Before
 anything is installed it says **Download the PS1 emulator**. Nothing is asked
 of GitHub until the player selects it. Then the row shows the download's
-progress, and selecting it again stops it, up to the moment the new host
-is put in place, even while the kept host is still exiting. The host comes from the host
+progress, and selecting it again stops it, even while the kept host is still
+exiting. Once the checked files are being written over the old host's
+(`RetroHostDownloadModel.placing`), the row says only that it is checking and
+no longer stops it, so a half-replaced host is never left behind. The host comes from the host
 repository's signed releases and is checked on download, as
 [Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>) "Finding and checking the host"
 describes. Once it is installed the row says **PS1 emulator 1.0.0** (its
@@ -319,7 +321,8 @@ start until the game's play is set). Before the new host is put in place, the ho
 shut down and waited for, so its held files are let go, and no game starts
 until the install is done. When the launcher goes, a download stops and one
 already fetched is not put in place (`RetroHostDownloadModel.close`), since
-the hosts shut down as it goes may not have exited yet. The first host installed turns the setting
+the hosts shut down as it goes may not have exited yet; one already being put
+in place finishes. The first host installed turns the setting
 below on, since the player asked for the emulator to play PS1 games with it.
 
 **The setting.** Settings › Emulators › **Run PS1 games in the separate
@@ -585,7 +588,8 @@ native memory as a real ring slot would be, so no host is started.
   is refused, leaving the kept host, while a game is starting; one the
   launcher closes during is not put in place. With no release the row
   says none is published yet. A download stopped while the kept host is
-  still exiting is not put in place. Nothing downloads while a game plays, and a debug
+  still exiting is not put in place, and once the new host is being put in
+  place the row no longer offers to stop it. Nothing downloads while a game plays, and a debug
   build that runs `ANYPS5_RETRO_HOST` shows no download but says its host is
   unchecked, which the signed release's rows never say.
 - [`retro_keyboard_test.dart`](../test/core/retro_host/retro_keyboard_test.dart)

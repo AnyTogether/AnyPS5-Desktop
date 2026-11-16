@@ -195,6 +195,29 @@ void main() {
       expect(File(model.retroHostInstall!.host).lastModifiedSync(), installed);
     });
 
+    test('once the new host is being put in place, the row no longer offers to stop it', () async {
+      github.releases.add(retroHostFixtureRelease(tag: 'v1.0.1'));
+      launcher = await Ps1Launcher.withRelease(retroHostApi: github.api);
+      final model = launcher.model;
+      final download = model.retroHostDownload;
+      String? detail;
+      void stopWhilePlacing() {
+        if (!download.placing || detail != null) return;
+        detail = download.rows(uncheckedHost: false).single.detail;
+        download.cancel();
+      }
+
+      model.addListener(stopWhilePlacing);
+      try {
+        await download.download();
+      } finally {
+        model.removeListener(stopWhilePlacing);
+      }
+      expect(detail, T.text('retroHostChecking'));
+      expect(model.toast, T.format('retroHostReady', ['1.0.0']));
+      expect(download.placing, isFalse);
+    });
+
     test('a download while a game is starting in the host refuses and leaves the kept host', () async {
       github.releases.add(retroHostFixtureRelease(tag: 'v1.0.1'));
       launcher = await Ps1Launcher.withRelease(retroHostApi: github.api);
