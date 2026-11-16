@@ -2432,5 +2432,19 @@
   "retroGraphicsChangeFailed": "Could not apply the graphics change",
   "retroEmbeddedStarting": "Wait for the embedded game to finish opening before closing AnyPS5.",
   "retroEmbeddedClosing": "The embedded game is still closing. Try again when it has finished saving.",
-  "retroEmbeddedStartupTimedOut": "The embedded game took too long to start."
+  "retroEmbeddedStartupTimedOut": "The embedded game took too long to start.",
+  "unlockPause": "Pause",
+  "unlockResume": "Resume",
+  "unlockCancelling": "Cancelling…",
+  "unlockPausedState": "Paused",
+  "keepGoing": "Keep going",
+  "cancelUnlockAskTitle": "Cancel the unlock of %@?",
+  "cancelUnlockAskDetail": "The work done so far is lost. Pause instead to stop now and go on later.",
+  "quitUnlocksTitle": "Quit while games are being unlocked?",
+  "quitRemovingTitle": "Quit while games are being removed?",
+  "quitGoBack": "Go back",
+  "quitCancelAndQuit": "Cancel and quit",
+  "quitAnyway": "Quit anyway",
+  "quitUnlocksDetail": "Cancel and quit throws the work away. To stop and go on later, go back and use Pause, and keep the launcher open.",
+  "quitRemovingNote": "Removing games can be neither paused nor cancelled."
 }

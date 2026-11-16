@@ -186,6 +186,10 @@ Future<void> main(List<String> arguments) async {
   health.runnerRemovesMarker = await window.removeAfterClose(health.markerPath);
   _exit = AppLifecycleListener(
     onExitRequested: () async {
+      // Every close of the window comes through here (the title bar, Alt+F4, the taskbar, and
+      // the launcher's own quit): a user's unlock under way, paused or waiting asks first. A
+      // close the launcher started after the answer (LauncherShutdown.quit) goes through.
+      if (!model.allowExit()) return AppExitResponse.cancel;
       if (!await model.prepareToQuit()) return AppExitResponse.cancel;
       closing();
       return AppExitResponse.exit;
@@ -205,11 +209,16 @@ Future<void> main(List<String> arguments) async {
     unawaited(
       StallWatch.start(health, started: DateTime.now()).then((started) {
         watch = started;
-        var beats = 0;
+        // The last seconds go along as each line comes (a line a second), as on the Mac: a
+        // stall's report then says what the launcher did up to its last second.
+        final feed = PingFeed();
         Timer.periodic(const Duration(milliseconds: 250), (_) {
-          // Every four seconds the last seconds go along, for the run's marker.
-          final full = ++beats % 16 == 0;
-          started.ping(lines: full ? List.of(model.recentLines) : null, error: full ? model.firstError : null);
+          final (:lines, :error) = feed.next(
+            added: model.recentLinesAdded,
+            lines: model.recentLines,
+            error: model.firstError,
+          );
+          started.ping(lines: lines, error: error);
         });
       }),
     );

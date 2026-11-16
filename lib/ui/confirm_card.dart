@@ -34,7 +34,7 @@ class ConfirmCard extends StatelessWidget {
     ];
     final destructive = rows.where(_destructive).firstOrNull;
     final detail = destructive?.detail;
-    final quitting = model.overlay == Layer.confirmQuit;
+    final quitting = model.overlay == Layer.confirmQuit || model.overlay == Layer.confirmQuitUnlocks;
     final deleting = model.overlay == Layer.confirmDeleteGame ? model.deletion.ask : null;
     final icon = model.overlay == Layer.closeGame ? model.running?.$1.icon : deleting?.game.icon;
     final profile = model.currentProfile;
