@@ -11,6 +11,23 @@ section is copied into the release.
 
 Nothing yet.
 
+## 0.1.24
+
+- **The previous game stays in view on the home screen.** The game before the selected one stays
+  at the left edge, a little dimmer than the others, instead of fading out, and the selected game's
+  name sits beside its tile with its state as a small icon, closer to the console's home screen.
+  Thanks to Lenny4250gh, who built this.
+- **Pause, resume and cancel an unlock.** While a game is being unlocked its button says Pause: the
+  relinker stops where it is and the next game in line starts, and Resume goes on from there (it
+  waits its turn when another unlock is running). The small ✕ beside it cancels the unlock and asks
+  first when work would be lost. Closing the launcher while games are being unlocked asks whether to
+  go back or cancel and quit, so no paused unlock is left behind. Thanks to Lenny4250gh, who built
+  this.
+- **A report of the launcher not responding says what it was doing up to its last second.** Its
+  last seconds used to stop up to four seconds before the stall began, and they now also say which
+  game was starting or playing (by its title ID), as on the Mac. A stall that happens while a game
+  starts, while it plays or after it closes can then be told apart (from Harris851's report).
+
 ## 0.1.23
 
 - **PS1, PS2 and PS3 games in an emulator you installed.** Settings › Game Library has a new switch,
