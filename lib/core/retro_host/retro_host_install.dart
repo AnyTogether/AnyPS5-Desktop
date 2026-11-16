@@ -4,18 +4,52 @@ import 'package:path/path.dart' as p;
 
 import '../game_process.dart';
 import '../host.dart';
+import 'retro_host_store.dart';
 
-/// The emulator host and the SwanStation library it loads for a PS1 game.
-///
-/// Only debug builds find one for now: protocol.md "Finding and checking the host" says "Debug
-/// builds of the launcher MAY run the host named by the environment variable `ANYPS5_RETRO_HOST`,
-/// and any core, without the checks. Release builds ignore that variable." The core is the
-/// SwanStation library beside that host, as a host release's zip holds the two. Release builds
-/// get the signed host release later.
+/// Which kind of launcher this was compiled as, for the PS1 host it may run: only a [debug] or
+/// [test] build runs the host `ANYPS5_RETRO_HOST` names, unchecked; a [release] never does
+/// (docs/AnyPS5 Desktop - Emulator Host Client.md "Debug and test builds").
+enum RetroHostBuild {
+  /// A published release, and any build compiled without the [testDefine]: only the signed host.
+  release,
+
+  /// A release-mode test build compiled with `--dart-define=ANYPS5_UNCHECKED_RETRO_HOST_BUILD=true`.
+  test,
+
+  /// A debug build (`kDebugMode`).
+  debug;
+
+  /// The `--dart-define` that compiles a test build. It is read when the launcher is compiled
+  /// ([testDefined]), never from the environment it runs in.
+  static const testDefine = 'ANYPS5_UNCHECKED_RETRO_HOST_BUILD';
+
+  /// Whether this launcher was compiled with [testDefine] set to `true`: a constant of the
+  /// compiled program, so no setting, file or environment variable can change it.
+  static const testDefined = bool.fromEnvironment(testDefine);
+
+  /// The build a [debug] launcher, or one compiled with [test], is.
+  static RetroHostBuild of({required bool debug, bool test = testDefined}) => debug
+      ? RetroHostBuild.debug
+      : test
+      ? RetroHostBuild.test
+      : RetroHostBuild.release;
+
+  /// Whether this build may run the host `ANYPS5_RETRO_HOST` names, without the checks.
+  bool get runsUnchecked => this != RetroHostBuild.release;
+}
+
+/// The emulator host and the SwanStation library it loads for a PS1 game: the signed release the
+/// launcher downloaded ([RetroHostStore.installed]), checked before each start, or in a debug or
+/// test build ([RetroHostBuild]) the host `ANYPS5_RETRO_HOST` names ([locate]), which is not.
+/// protocol.md "Finding and checking the host" says "Debug builds of the launcher MAY run the host
+/// named by the environment variable `ANYPS5_RETRO_HOST`, and any core, without the checks.
+/// Release builds ignore that variable." A test build is compiled in release mode but is not a
+/// release, and never published (docs/AnyPS5 Desktop - Emulator Host Client.md "Debug and test builds").
+/// The core is the SwanStation library beside the host, as a host release's zip holds the two.
 class RetroHostInstall {
-  const RetroHostInstall({required this.host, required this.core});
+  const RetroHostInstall({required this.host, required this.core, this.checked = false});
 
-  /// The environment variable that names the host in a debug build.
+  /// The environment variable that names the host in a debug or test build.
   static const variable = 'ANYPS5_RETRO_HOST';
 
   /// The host executable.
@@ -23,6 +57,11 @@ class RetroHostInstall {
 
   /// The SwanStation library, given to the host in `start`.
   final String core;
+
+  /// A signed release's host: its files are checked before each start and held until the host
+  /// has exited ([RetroHostStore.check], `RetroHostClient.start(checked: ...)`). False for the
+  /// host of a debug or test build.
+  final bool checked;
 
   /// SwanStation's file name on [system], as libretro builds name it.
   static String coreName(HostSystem system) =>
@@ -36,10 +75,14 @@ class RetroHostInstall {
   static Map<String, String>? environmentFor(HostSystem system, Map<String, String> launcher) =>
       system == HostSystem.linux ? GameProcess.withoutAppImage(launcher) : null;
 
-  /// The host [environment] names and the SwanStation library beside it, when this is a [debug]
-  /// build and both files are there; null otherwise.
-  static RetroHostInstall? locate(Map<String, String> environment, {required bool debug, required HostSystem system}) {
-    if (!debug) return null;
+  /// The host [environment] names and the SwanStation library beside it, when [build] runs an
+  /// unchecked host and both files are there; null otherwise, and always for a release.
+  static RetroHostInstall? locate(
+    Map<String, String> environment, {
+    required RetroHostBuild build,
+    required HostSystem system,
+  }) {
+    if (!build.runsUnchecked) return null;
     final named = environment[variable];
     if (named == null || named.isEmpty || !p.isAbsolute(named)) return null;
     final host = p.normalize(named);

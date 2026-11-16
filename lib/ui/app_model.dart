@@ -59,6 +59,7 @@ import '../core/relinker_flags.dart';
 import '../core/retro_host/retro_host_client.dart' show RetroHostClient, RetroHostEnd;
 import '../core/retro_host/retro_host_install.dart';
 import '../core/retro_host/retro_host_protocol.dart' show RetroErrorCode, RetroOption;
+import '../core/retro_host/retro_host_release.dart' show RetroHostChecked, RetroHostReleaseFailure;
 import '../core/retro_host/retro_host_session.dart' show RetroHostSession, RetroHostStartRequest;
 import '../core/retro_host/retro_keyboard.dart';
 import '../core/remote/adb_tunnel.dart';
@@ -108,6 +109,7 @@ import 'fonts_model.dart';
 import 'media_model.dart';
 import 'retro_host/retro_game_menu.dart';
 import 'retro_host/retro_host_controls.dart';
+import 'retro_host/retro_host_download_model.dart';
 import 'retro_host/retro_host_game.dart';
 import 'retro_host/retro_host_keeper.dart';
 import 'retro_host/retro_option_sections.dart';
@@ -1260,6 +1262,7 @@ class LauncherServices {
     this.armEngineReleases,
     this.ffmpegReleases,
     this.ffmpegRun,
+    this.retroHostReleases,
     this.pads,
     this.systemProbe,
     this.desktop,
@@ -1380,6 +1383,10 @@ class LauncherServices {
 
   /// Tests: runs the downloaded ffmpeg to see that it starts; Process.run by default.
   final ProcessRunner? ffmpegRun;
+
+  /// Where the PS1 emulator host comes from: the host repository's releases, signed; null in tests
+  /// that have no GitHub, so nothing is offered.
+  final GitHubReleases? retroHostReleases;
 
   /// Where controller input comes from (XInput and winmm on Windows, evdev on Linux); none when
   /// not given.
@@ -4500,14 +4507,16 @@ class AppModel extends ChangeNotifier {
     primaryAction(game);
   }
 
-  /// Starts the emulator host for a PS1 game (retro_host_play.dart); tests give a fake session. On
+  /// Starts the emulator host for a PS1 game (retro_host_play.dart), through the checked file for
+  /// a signed release's host ([RetroHostClient.start]'s `checked`); tests give a fake session. On
   /// Linux it gets the launcher's environment without what the launcher's AppImage set
   /// ([RetroHostInstall.environmentFor]), as a standalone emulator does.
   @visibleForTesting
-  late RetroHostOpener openRetroHost = (install, {required volume, required muted}) {
+  late RetroHostOpener openRetroHost = (install, {checked, required volume, required muted}) {
     final environment = RetroHostInstall.environmentFor(system, services.environment ?? Platform.environment);
     return RetroHostClient.start(
       command: [install.host],
+      checked: checked,
       environment: environment,
       inheritEnvironment: environment == null,
       volume: volume,
@@ -5575,6 +5584,9 @@ class AppModel extends ChangeNotifier {
 
   /// ffmpeg found on this computer, or the one downloaded for the launcher ([FfmpegModel]).
   late final FfmpegModel ffmpegTool = FfmpegModel(this);
+
+  /// The PS1 emulator host's download in Settings › Emulators, and its checks before each start.
+  late final RetroHostDownloadModel retroHostDownload = RetroHostDownloadModel(this);
 
   /// ffmpeg for the replay buffer and everything else that records or decodes.
   String? get replayFfmpeg => ffmpegTool.path;
@@ -8571,6 +8583,7 @@ class AppModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    retroHostDownload.close();
     _disposeRetroPlay();
     unawaited(retroHostKeeper.shutdown());
     profileFlow.listLeave?.cancel();

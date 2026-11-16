@@ -20,6 +20,12 @@ class RetroHostReleaseFailure implements Exception {
   String toString() => message;
 }
 
+/// A signed release that has no host for this system: nothing is wrong with it, it is just not
+/// for this launcher.
+class RetroHostNotReleased extends RetroHostReleaseFailure {
+  const RetroHostNotReleased(super.message);
+}
+
 /// One system a host release is built for: `<os>-<arch>` in its file names, and the names of the
 /// host and of SwanStation inside its zip (the host repository's tools/package_release.py).
 class RetroHostSystem {
@@ -77,6 +83,13 @@ class RetroHostVersion implements Comparable<RetroHostVersion> {
       : patch.compareTo(other.patch);
 
   @override
+  bool operator ==(Object other) =>
+      other is RetroHostVersion && other.major == major && other.minor == minor && other.patch == patch;
+
+  @override
+  int get hashCode => Object.hash(major, minor, patch);
+
+  @override
   String toString() => '$major.$minor.$patch';
 }
 
@@ -126,14 +139,20 @@ class RetroHostChecked {
   }
 }
 
-/// What to start for the emulator host: [command], and [checked] for a release host. [core] is the
-/// release's SwanStation, or null when a debug build runs ANYPS5_RETRO_HOST with any core.
-class RetroHostLaunch {
-  const RetroHostLaunch({required this.command, this.checked, this.core});
+/// A release whose SHA256SUMS is signed by a trusted key, and the names of this system's files in
+/// it: [zipName] and [filesName], with their digests in [sums].
+class RetroHostSignedRelease {
+  const RetroHostSignedRelease({
+    required this.version,
+    required this.zipName,
+    required this.filesName,
+    required this.sums,
+  });
 
-  final List<String> command;
-  final RetroHostChecked? checked;
-  final String? core;
+  final RetroHostVersion version;
+  final String zipName;
+  final String filesName;
+  final SignedSums sums;
 }
 
 /// Finding and checking the emulator host as anyps5-retro-host docs/protocol.md "Finding and
@@ -143,40 +162,6 @@ abstract final class RetroHostRelease {
   /// The oldest host this launcher runs, even signed, so an old host with a known fault cannot be
   /// put back.
   static const minimumVersion = RetroHostVersion(1, 0, 0);
-
-  /// The folder beside the launcher's executable that holds the host: the unpacked zip with
-  /// SHA256SUMS, SHA256SUMS.sig and the `.files` kept beside it.
-  static const folderName = 'retro-host';
-
-  /// Names a host for debug builds to run without any check.
-  static const debugVariable = 'ANYPS5_RETRO_HOST';
-
-  /// Whether this is a debug build: neither release (`dart.vm.product`) nor profile
-  /// (`dart.vm.profile`), as Flutter's kDebugMode.
-  static const debugBuild = !bool.fromEnvironment('dart.vm.product') && !bool.fromEnvironment('dart.vm.profile');
-
-  /// The folder of [folderName] beside this launcher's executable (GetModuleFileNameW or
-  /// /proc/self/exe, as Dart resolves it).
-  static Directory get folder => Directory(p.join(p.dirname(Platform.resolvedExecutable), folderName));
-
-  /// What to start: in a debug build the host ANYPS5_RETRO_HOST names, unchecked, when it is set;
-  /// otherwise the host in [folder], checked by [checkBeforeStart]. Release and profile builds
-  /// ignore the variable whatever [debug] says; [debug] false makes a debug build ignore it too.
-  static Future<RetroHostLaunch> locate({
-    Map<String, String>? environment,
-    bool? debug,
-    Directory? from,
-    List<ReleaseKey>? keys,
-    RetroHostSystem? system,
-    RetroHostVersion minimum = minimumVersion,
-  }) async {
-    final override = (environment ?? Platform.environment)[debugVariable];
-    if (debugBuild && (debug ?? true) && override != null && override.isNotEmpty) {
-      return RetroHostLaunch(command: [File(override).absolute.path]);
-    }
-    final checked = await checkBeforeStart(from ?? folder, keys: keys, system: system, minimum: minimum);
-    return RetroHostLaunch(command: [checked.executable], checked: checked, core: checked.core);
-  }
 
   /// The checks before each start: the signature, the `.files` against SHA256SUMS, and the host
   /// executable and SwanStation against the `.files`, each hashed from a [CheckedFile] that stays
@@ -247,8 +232,8 @@ abstract final class RetroHostRelease {
     final target = system ?? _currentSystem();
     final sumsBytes = _readSmall(p.join(download.path, ReleaseSigning.sumsName));
     final signatureBytes = _readSmall(p.join(download.path, ReleaseSigning.signatureName));
-    final sums = _verify(sumsBytes, signatureBytes, keys);
-    final release = _releaseOf(sums, target, minimum);
+    final release = signed(sumsBytes, signatureBytes, keys: keys, system: target, minimum: minimum);
+    final sums = release.sums;
     final listing = _readSmall(p.join(download.path, release.filesName));
     if (sha256.convert(listing).toString() != sums.digestFor(release.filesName)) {
       throw RetroHostReleaseFailure('${release.filesName} does not match the signed release');
@@ -285,13 +270,90 @@ abstract final class RetroHostRelease {
         final made = await Process.run('chmod', ['755', p.join(staging.path, target.executable)]);
         if (made.exitCode != 0) throw const RetroHostReleaseFailure('the host could not be made executable');
       }
-      if (into.existsSync()) into.deleteSync(recursive: true);
-      staging.renameSync(into.path);
+      _replace(into, staging);
     } on Object {
       if (staging.existsSync()) staging.deleteSync(recursive: true);
       rethrow;
     }
     return release.version;
+  }
+
+  /// Puts [staging] in the place of [into] whole or not at all: [into] is first moved aside to
+  /// `<into>.old`, which fails while a host started from it holds its files on Windows, so a host
+  /// in use is never left half deleted. The old folder is removed afterwards when it can be.
+  static void _replace(Directory into, Directory staging) {
+    final old = Directory('${into.path}.old');
+    if (old.existsSync()) {
+      try {
+        old.deleteSync(recursive: true);
+      } on FileSystemException {
+        throw const RetroHostReleaseFailure('an older host is still in use; close it and try again');
+      }
+    }
+    if (into.existsSync()) {
+      try {
+        into.renameSync(old.path);
+      } on FileSystemException {
+        throw const RetroHostReleaseFailure('the host is in use; close it and try again');
+      }
+    }
+    try {
+      staging.renameSync(into.path);
+    } on FileSystemException {
+      if (old.existsSync()) old.renameSync(into.path);
+      throw const RetroHostReleaseFailure('the new host could not be put in place');
+    }
+    try {
+      if (old.existsSync()) old.deleteSync(recursive: true);
+    } on FileSystemException {
+      // Removed by the next install.
+    }
+  }
+
+  /// The signature of a release and the names it gives this [system]'s files: [sums] (SHA256SUMS)
+  /// and [signature] (SHA256SUMS.sig) as downloaded. The first check on download, before anything
+  /// else of the release is fetched.
+  static RetroHostSignedRelease signed(
+    List<int> sums,
+    List<int> signature, {
+    List<ReleaseKey>? keys,
+    RetroHostSystem? system,
+    RetroHostVersion minimum = minimumVersion,
+  }) {
+    final signed = _verify(sums, signature, keys);
+    final release = _releaseOf(signed, system ?? _currentSystem(), minimum);
+    return RetroHostSignedRelease(
+      version: release.version,
+      zipName: release.zipName,
+      filesName: release.filesName,
+      sums: signed,
+    );
+  }
+
+  /// The version of the host in [folder] as its SHA256SUMS names it, read without any check, for
+  /// showing; null when the folder holds no host release for [system] (the sums list every
+  /// system's `.files`, but only this system's is kept beside the host). Before a start
+  /// [checkBeforeStart] checks it.
+  static RetroHostVersion? installedVersion(Directory folder, {RetroHostSystem? system}) {
+    final target = system ?? RetroHostSystem.current;
+    if (target == null) return null;
+    try {
+      final digests = ReleaseSigning.parseSums(File(p.join(folder.path, ReleaseSigning.sumsName)).readAsBytesSync());
+      for (final name in digests.keys) {
+        final match = _releaseName.firstMatch(name);
+        if (match != null &&
+            match.group(2) == target.name &&
+            match.group(3) == 'files' &&
+            File(p.join(folder.path, name)).existsSync()) {
+          return RetroHostVersion.tryParse(match.group(1)!);
+        }
+      }
+    } on FileSystemException {
+      return null;
+    } on SigningFailure {
+      return null;
+    }
+    return null;
   }
 
   /// A `.files` list: `<64 hex digits>  <name>` a line, as shasum writes it, with `/` between
@@ -335,7 +397,7 @@ abstract final class RetroHostRelease {
       final match = _releaseName.firstMatch(name);
       if (match != null && match.group(2) == system.name && match.group(3) == 'files') listed.add(name);
     }
-    if (listed.isEmpty) throw RetroHostReleaseFailure('the release has no host for ${system.name}');
+    if (listed.isEmpty) throw RetroHostNotReleased('the release has no host for ${system.name}');
     if (listed.length > 1) throw RetroHostReleaseFailure('the release lists more than one host for ${system.name}');
     final filesName = listed.single;
     final versionText = _releaseName.firstMatch(filesName)!.group(1)!;

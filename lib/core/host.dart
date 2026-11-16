@@ -103,6 +103,10 @@ class AppPaths {
   String get gameFonts => p.join(p.dirname(toolkits), 'Fonts', 'Games');
   String get backupsFolder => p.join(config, 'Backups');
 
+  /// The emulator host the launcher downloaded ([RetroHostStore]), beside its toolkits (local, not
+  /// roaming, on Windows).
+  String get retroHost => p.join(p.dirname(toolkits), 'RetroHost');
+
   /// The emulator host's PS1 BIOS folder (the core's system directory) and memory cards, where
   /// protocol.md's `start` example keeps them.
   String get retroSystem => p.join(config, 'retro', 'system');

@@ -25,6 +25,9 @@ class RetroHostKeeper {
   /// Whether a host is kept now.
   bool get holding => _session != null;
 
+  /// Whether the host kept now was started from [program], so [take] would give it.
+  bool keeps({required String program}) => _session != null && _program == program;
+
   /// Keeps [session], the host started from [program], for the next game; a host kept before is
   /// shut down.
   void keep(RetroHostSession session, {required String program}) {

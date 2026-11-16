@@ -530,7 +530,7 @@ void main() {
   test('a host that cannot be started says so and leaves the library as it was', () async {
     launcher = Ps1Launcher();
     final model = launcher.model..setRetroHostPs1(true);
-    model.openRetroHost = (install, {required volume, required muted}) =>
+    model.openRetroHost = (install, {checked, required volume, required muted}) =>
         throw const ProcessException('anyps5-retro-host', [], 'not executable');
     await model.play(launcher.game);
     expect(model.retroPlay, isNull);

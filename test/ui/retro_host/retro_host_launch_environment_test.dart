@@ -29,7 +29,7 @@ void main() {
     };
     final fixture = makeFixture(withToolkit: false, environment: launcher);
     try {
-      final install = RetroHostInstall.locate(launcher, debug: true, system: HostSystem.linux)!;
+      final install = RetroHostInstall.locate(launcher, build: RetroHostBuild.debug, system: HostSystem.linux)!;
       final session = fixture.model.openRetroHost(install, volume: 1, muted: false);
       session.ready.ignore();
       expect(await session.ended.timeout(const Duration(seconds: 20)), RetroHostEnd.hostFailure);

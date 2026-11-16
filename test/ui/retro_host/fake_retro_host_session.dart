@@ -146,10 +146,13 @@ class FakeRetroHostSession extends FakeFrameSource implements RetroHostSession {
   /// A `rumble` message from the host.
   void sendRumble(int port, int strong, int weak) => _rumble.add(RetroRumble(port, strong, weak));
 
+  /// Whether [shutdown] ends the host at once; when false, the test completes [endedCompleter].
+  bool endsOnShutdown = true;
+
   @override
   void shutdown() {
     shutdownAsked = true;
-    if (!endedCompleter.isCompleted) endedCompleter.complete(RetroHostEnd.clean);
+    if (endsOnShutdown && !endedCompleter.isCompleted) endedCompleter.complete(RetroHostEnd.clean);
   }
 
   @override

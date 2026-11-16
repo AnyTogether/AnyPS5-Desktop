@@ -27,6 +27,7 @@ import 'core/opened_files.dart';
 import 'core/launcher_health.dart';
 import 'core/libmpv.dart';
 import 'core/release_signing.dart';
+import 'core/retro_host/retro_host_store.dart';
 import 'core/steam/steam_launch.dart';
 import 'core/toolkit_download.dart';
 import 'ui/app_model.dart';
@@ -164,6 +165,7 @@ Future<void> main(List<String> arguments) async {
         signingKeys: ReleaseSigning.trustedKeys,
       ),
       ffmpegReleases: GitHubReleases(repository: FfmpegBuild.repository, signingKeys: ReleaseSigning.trustedKeys),
+      retroHostReleases: GitHubReleases(repository: RetroHostStore.repository, signingKeys: ReleaseSigning.trustedKeys),
       // SDL2 (beside the launcher on Windows, the system's on Linux), else XInput and winmm or evdev.
       pads: () => PadReader.open(arguments: arguments),
       systemProbe: () => HostProbe(HostSystem.current),
