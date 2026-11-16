@@ -321,8 +321,13 @@ start until the game's play is set). Before the new host is put in place, the ho
 shut down and waited for, so its held files are let go, and no game starts
 until the install is done. When the launcher goes, a download stops and one
 already fetched is not put in place (`RetroHostDownloadModel.close`), since
-the hosts shut down as it goes may not have exited yet; one already being put
-in place finishes. The first host installed turns the setting
+the hosts shut down as it goes may not have exited yet. The launcher does not
+wait for one already being put in place, and quitting can cut it short. That
+leaves no half-replaced host: `RetroHostRelease.install` writes the new files
+into `RetroHost/host.new` and only then swaps the folders with two renames in
+one synchronous step, so the old host stays whole until then. The next start
+checks the installed host anyway, and a missing host is offered for download
+again. The first host installed turns the setting
 below on, since the player asked for the emulator to play PS1 games with it.
 
 **The setting.** Settings › Emulators › **Run PS1 games in the separate
