@@ -159,20 +159,51 @@ class _HomeViewState extends State<HomeView> with SingleTickerProviderStateMixin
   /// everything is built with a finished animation, so the widgets stay the same.
   AnimationController? _intro;
 
+  /// The curtain is over the home screen until the animation ends.
+  bool _curtain = false;
+
+  /// Decided: played or skipped for this run's first look at the home screen.
+  bool _introDecided = false;
+
   Animation<double> get _introAnimation => _intro ?? const AlwaysStoppedAnimation(1.0);
 
-  @override
-  void initState() {
-    super.initState();
-    // Not with a game starting or running (a Steam shortcut goes straight into it).
-    if (StartupIntro.shouldPlay() && widget.model.starting == null && widget.model.running == null) {
-      StartupIntro.played = true;
-      _intro = AnimationController(vsync: this, duration: StartupIntro.duration)..forward();
-    }
+  /// At the first build with nothing over the home screen (the launch profile picker is over it
+  /// before the first frame, and the profile's own settings come with the pick): the intro plays,
+  /// or is skipped for the run. Not with reduced motion (the profile's or the system's), nor
+  /// with a game starting or running (a Steam shortcut goes straight into it).
+  void _decideIntro(BuildContext context) {
+    final model = widget.model;
+    if (_introDecided || model.overlay != null || !StartupIntro.pending) return;
+    _introDecided = true;
+    StartupIntro.played = true;
+    if (Motion.reduced || MediaQuery.disableAnimationsOf(context)) return;
+    if (model.starting != null || model.running != null) return;
+    final intro = AnimationController(vsync: this, duration: StartupIntro.duration);
+    _intro = intro;
+    _curtain = true;
+    intro.addStatusListener((status) {
+      if (status != AnimationStatus.completed) return;
+      model.onInput = null;
+      if (mounted) setState(() => _curtain = false);
+    });
+    // A key, a button or a click finishes it at once.
+    model.onInput = _finishIntro;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _intro == intro) unawaited(intro.forward());
+    });
+  }
+
+  void _finishIntro() {
+    final intro = _intro;
+    if (intro == null || intro.isCompleted) return;
+    intro.value = 1;
+    widget.model.onInput = null;
+    if (mounted) setState(() => _curtain = false);
   }
 
   @override
   void dispose() {
+    if (widget.model.onInput == _finishIntro) widget.model.onInput = null;
     _intro?.dispose();
     super.dispose();
   }
@@ -183,32 +214,37 @@ class _HomeViewState extends State<HomeView> with SingleTickerProviderStateMixin
     final now = widget.now;
     final scale = LayoutScale.of(context);
     final game = model.homePreviewGame;
+    _decideIntro(context);
     // Glass's panes on the home screen never overlap: they share one blur of the background.
-    return BackdropGroup(
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          _body(context, model, now, scale, game),
-          if (_intro != null) IntroCurtain(animation: _intro!, deep: model.palette.deep),
-          if (model.profileListOpen) ...[
-            // A click anywhere else closes the list, and still does what it was for.
-            Positioned.fill(
-              child: Listener(behavior: HitTestBehavior.translucent, onPointerDown: (_) => model.closeProfileList()),
-            ),
-            Positioned(
-              left: 0,
-              top: 0,
-              child: CompositedTransformFollower(
-                link: _profileLink,
-                showWhenUnlinked: false,
-                targetAnchor: Alignment.bottomCenter,
-                followerAnchor: Alignment.topCenter,
-                offset: Offset(0, 12 * scale),
-                child: ProfileSwitcherList(model: model),
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => _finishIntro(),
+      child: BackdropGroup(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _body(context, model, now, scale, game),
+            if (_curtain) IntroCurtain(animation: _intro!, deep: model.palette.deep) else const SizedBox.shrink(),
+            if (model.profileListOpen) ...[
+              // A click anywhere else closes the list, and still does what it was for.
+              Positioned.fill(
+                child: Listener(behavior: HitTestBehavior.translucent, onPointerDown: (_) => model.closeProfileList()),
               ),
-            ),
+              Positioned(
+                left: 0,
+                top: 0,
+                child: CompositedTransformFollower(
+                  link: _profileLink,
+                  showWhenUnlinked: false,
+                  targetAnchor: Alignment.bottomCenter,
+                  followerAnchor: Alignment.topCenter,
+                  offset: Offset(0, 12 * scale),
+                  child: ProfileSwitcherList(model: model),
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

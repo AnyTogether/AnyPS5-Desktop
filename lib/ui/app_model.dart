@@ -4846,8 +4846,12 @@ class AppModel extends ChangeNotifier {
     _changed();
   }
 
+  /// Something to do at the next key, button or click, once (the start animation finishing).
+  VoidCallback? onInput;
+
   /// Home screen, library and panels: what a command does where the user is.
   void handle(Command command) {
+    onInput?.call();
     // Mirrored screens (Arabic, Urdu): → moves to what is drawn on the right, as on the Mac.
     // Watching a share play the controller is the game's, so it stays as it is there.
     if (T.language.isRightToLeft && overlay != Layer.shareWatch) command = command.mirrored;

@@ -8,8 +8,11 @@ import 'theme.dart';
 /// The start animation, as on the console: a dark screen with a spotlight and four dots, the
 /// tiles popping in one after the other, then the top bar and the selected game's details.
 ///
-/// It plays once per run, on the home screen's first build. [enabled] is off until `main` turns
-/// it on, so previews and tests (which build the home screen directly) never wait for it.
+/// It plays once per run, the first time the home screen shows with nothing over it (not under
+/// the launch profile picker, which is over it before the first frame). [enabled] is off until
+/// `main` turns it on, so previews and tests (which build the home screen directly) never wait
+/// for it. Reduced motion (the profile's setting and the system's) and a game starting or
+/// running at that moment skip it for the run.
 abstract final class StartupIntro {
   static bool enabled = false;
   static bool played = false;
@@ -28,12 +31,14 @@ abstract final class StartupIntro {
     return (from, from + 0.22);
   }
 
-  static bool shouldPlay() => enabled && !played && !Motion.reduced;
+  /// The intro is still to be decided: on, and not played or skipped yet.
+  static bool get pending => enabled && !played;
 }
 
 /// A part of the home screen coming in: it fades, slides and grows into place between [span]'s
 /// two moments of [animation]. The same widgets are built before, during and after, so nothing
-/// below it is rebuilt from scratch when the animation ends.
+/// below it is rebuilt from scratch when the animation ends. The transitions animate on the
+/// render objects with no rebuild per frame.
 class IntroReveal extends StatelessWidget {
   const IntroReveal({
     super.key,
@@ -54,21 +59,15 @@ class IntroReveal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final curve = Interval(span.$1, span.$2, curve: Motion.settle);
-    return AnimatedBuilder(
-      animation: animation,
-      child: child,
-      builder: (context, child) {
-        final t = curve.transform(animation.value);
-        return Opacity(
-          opacity: t,
-          child: FractionalTranslation(
-            translation: Offset(slide.dx * (1 - t), slide.dy * (1 - t)),
-            child: Transform.scale(scale: scaleFrom + (1 - scaleFrom) * t, child: child),
-          ),
-        );
-      },
-    );
+    final eased = animation.drive(CurveTween(curve: Interval(span.$1, span.$2, curve: Motion.settle)));
+    var result = child;
+    if (scaleFrom != 1) {
+      result = ScaleTransition(scale: eased.drive(Tween(begin: scaleFrom, end: 1.0)), child: result);
+    }
+    if (slide != Offset.zero) {
+      result = SlideTransition(position: eased.drive(Tween(begin: slide, end: Offset.zero)), child: result);
+    }
+    return FadeTransition(opacity: eased, child: result);
   }
 }
 
