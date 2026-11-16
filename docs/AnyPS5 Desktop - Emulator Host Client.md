@@ -291,11 +291,20 @@ the host repository. Python 3 must be on `PATH`:
 ANYPS5_RETRO_HOST_CHECKOUT=/path/to/anyps5-retro-host flutter test test/core/retro_host
 ```
 
-CI runs the test on Linux (in the test shards) and on macOS (in the goldens
-job), against the host repository at the commit named in
-`.github/workflows/ci.yml`. It also passes on Windows. That commit is the host
-repository's `main` at 9052aff with its fake host added, until the fake host is
-merged there.
+CI runs `test/core/retro_host` against the host repository at the commit
+named in `.github/workflows/ci.yml`:
+
+- on `ubuntu-latest` in the test shards, where glibc has `pidfd_spawn`;
+- on Ubuntu 22.04 in the Linux build job, where glibc 2.35 has none, so the
+  host is started with `posix_spawn` and its pidfd opened after and checked
+  through `/proc/<pid>/fd/3`, the path Debian 12 takes too;
+- on macOS in the goldens job, with `posix_spawn`;
+- on Windows in the Windows build job, with the handle list, the job object
+  and the ring's `DuplicateHandle`, `MapViewOfFile` and `VirtualQuery` checks.
+  The sessions that are only for Linux and macOS skip themselves there.
+
+That commit is the host repository's `main` at 9052aff with its fake host
+added, until the fake host is merged there.
 
 [`test/core/retro_host/retro_status_test.dart`](../test/core/retro_host/retro_status_test.dart)
 covers how a `status` is read, and reads every status the fixture sessions send

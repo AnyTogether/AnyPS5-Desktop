@@ -230,6 +230,22 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+      # The emulator host client on the oldest distro: glibc 2.35 has no pidfd_spawn, so the host is
+      # started with posix_spawn and its pidfd opened after, checked through /proc/<pid>/fd/3
+      # (docs/AnyPS5 Desktop - Emulator Host Client.md "Starting the host"), as on Debian 12.
+      - name: Fetch the emulator host's fixtures and fake host
+        shell: bash
+        run: |
+          git init -q "$RUNNER_TEMP/retro-host"
+          git -C "$RUNNER_TEMP/retro-host" fetch -q --depth 1 "$RETRO_HOST_REPOSITORY" "$RETRO_HOST_COMMIT"
+          git -C "$RUNNER_TEMP/retro-host" checkout -q FETCH_HEAD
+          echo "ANYPS5_RETRO_HOST_CHECKOUT=$RUNNER_TEMP/retro-host" >> "$GITHUB_ENV"
+      - name: Run the emulator host client's tests
+        run: |
+          ldd --version | head -n 1
+          flutter test test/core/retro_host
+        env:
+          ANYPS5_SKIP_GOLDENS: 1
       - name: Name the build after the nightly
         if: ${{ inputs.version }}
         shell: bash
@@ -345,6 +361,20 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+      # The emulator host client's Windows start: the handle list, the job object, and the
+      # DuplicateHandle, MapViewOfFile and VirtualQuery checks of a ring. The few sessions that are
+      # only for Linux and macOS skip themselves.
+      - name: Fetch the emulator host's fixtures and fake host
+        shell: bash
+        run: |
+          git init -q "$RUNNER_TEMP/retro-host"
+          git -C "$RUNNER_TEMP/retro-host" fetch -q --depth 1 "$RETRO_HOST_REPOSITORY" "$RETRO_HOST_COMMIT"
+          git -C "$RUNNER_TEMP/retro-host" checkout -q FETCH_HEAD
+          echo "ANYPS5_RETRO_HOST_CHECKOUT=$RUNNER_TEMP/retro-host" >> "$GITHUB_ENV"
+      - name: Run the emulator host client's tests
+        run: flutter test test/core/retro_host
+        env:
+          ANYPS5_SKIP_GOLDENS: 1
       - name: Name the build after the nightly
         if: ${{ inputs.version }}
         shell: bash
