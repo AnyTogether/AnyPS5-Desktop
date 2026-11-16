@@ -376,6 +376,17 @@ jobs:
             if (-not (Test-Path (Join-Path $release $licence))) { Write-Error "no $licence in $release"; exit 1 }
           }
           Get-ChildItem $release -Filter *.dll | Sort-Object Length -Descending | Select-Object -First 8 Name, @{n = "MiB"; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize
+      # The Visual C++ debug runtime is only on PCs with Visual Studio and may not be shipped. The
+      # check is first run on the ANGLE archive media_kit unpacks, whose zlib.dll and libc++.dll are
+      # debug builds, so a check that finds nothing there fails too.
+      - name: Check nothing in the release needs the Visual C++ debug runtime
+        shell: pwsh
+        run: |
+          $check = "packaging\windows\check-debug-runtime.ps1"
+          $found = $false
+          try { & $check -Path build\windows\x64\ANGLE *> $null } catch { $found = "$_" -match "debug runtime use" }
+          if (-not $found) { Write-Error "the check found no debug runtime in build\windows\x64\ANGLE"; exit 1 }
+          & $check -Path build\windows\x64\runner\Release
       - name: Package the installer (Inno Setup 6)
         if: github.event_name != 'pull_request'
         shell: pwsh
@@ -386,18 +397,22 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\installer\AnyPS5-Desktop-windows-x64.zip
       # The installer's contents can only be seen by installing it (7-Zip and innoextract do not read
-      # this Inno Setup): silently, into a temporary folder on the runner.
+      # this Inno Setup): silently, into a temporary folder on the runner. The folder first holds the
+      # zlib.dll an older release installed, which the installer must delete.
       - name: Install the package into a folder and check what it put there
         if: github.event_name != 'pull_request'
         shell: pwsh
         run: |
           $setup = Get-Item build\installer\AnyPS5-Desktop-Setup-*.exe
           $target = Join-Path $env:RUNNER_TEMP "anyps5-install"
+          New-Item -ItemType Directory -Force $target | Out-Null
+          Copy-Item build\windows\x64\ANGLE\zlib.dll $target
           $run = Start-Process -FilePath $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$target" -Wait -PassThru
           if ($run.ExitCode) { Write-Error "the installer ended with $($run.ExitCode)"; exit 1 }
           foreach ($file in "anyps5_desktop.exe", "SDL2.dll", "SDL2-LICENSE.txt", "libmpv-2.dll", "libmpv-LICENSE.txt", "ANGLE-LICENSE.txt") {
             if (-not (Test-Path (Join-Path $target $file))) { Write-Error "no $file installed"; exit 1 }
           }
+          if (Test-Path (Join-Path $target "zlib.dll")) { Write-Error "the installer left an older release's zlib.dll"; exit 1 }
           Get-ChildItem $target -Filter *LICENSE* | Select-Object Name, Length | Format-Table -AutoSize
       - uses: actions/upload-artifact@v7
         if: github.event_name != 'pull_request'
