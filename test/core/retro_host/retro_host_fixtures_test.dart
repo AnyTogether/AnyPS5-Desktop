@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:anyps5_desktop/core/retro_host/checked_file.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_client.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_protocol.dart';
+import 'package:anyps5_desktop/core/retro_host/retro_host_release.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
@@ -484,10 +486,6 @@ void main() {
                 as Map<String, Object?>)['steps']!
             as List<Object?>;
     final steps = fixture.cast<Map<String, Object?>>();
-    Map<String, Object?> withId(Map<String, Object?> step, int id) => {
-      ...step,
-      'message': {...step['message']! as Map<String, Object?>, 'id': id},
-    };
     await _playOwn(
       checkout,
       python,
@@ -495,18 +493,135 @@ void main() {
       'hostFailure',
       [
         _call('status', null, null, id: 2)[0],
-        withId(steps[4], 3),
-        withId(steps[8], 4),
+        _withId(steps[4], 3),
+        _withId(steps[8], 4),
         _call('status', null, null, id: 2)[1],
-        withId(steps[5], 3),
-        withId(steps[9], 4),
+        _withId(steps[5], 3),
+        _withId(steps[9], 4),
         ...steps.sublist(10),
       ],
       check: (session) =>
           expect(session.client.failureReason, contains('after stop'), reason: 'killed by the stop limit'),
     );
   }, timeout: const Timeout(Duration(seconds: 90)));
+  test("a checked host's files stay held for the host's whole life, through a second game", () {
+    final seen = <int, bool>{};
+    return _playOwn(
+      checkout,
+      python,
+      'A checked host: a game gets ready and ends, is released, a second game starts, then shutdown.',
+      'clean',
+      [
+        ..._startCall(checkout),
+        ..._status(checkout, 3, ended: false),
+        ..._status(checkout, 4, ended: true),
+        ..._call('release', null, null, id: 5),
+        ..._call('status', null, null, id: 6),
+        for (final step in _startCall(checkout)) _withId(step, 7),
+        ..._status(checkout, 8, ended: false),
+        {
+          'from': 'launcher',
+          'message': {'type': 'shutdown'},
+        },
+        {'hostExits': 0},
+      ],
+      checkedFor: _checkedCore,
+      afterReply: (session, id) {
+        final checked = session.checked!;
+        seen[id] = checked.held;
+        if (Platform.isWindows) _expectLocked(checked.core, 'after the reply to call $id');
+      },
+      check: (session) {
+        expect(seen, {for (var id = 1; id <= 8; id++) id: true}, reason: 'held after every reply');
+        expect(session.checked!.held, isFalse, reason: 'let go once the host has exited');
+        final core = session.checked!.core;
+        File(core).renameSync('$core.swapped');
+        File('$core.swapped').renameSync(core);
+      },
+    );
+  }, timeout: const Timeout(Duration(seconds: 90)));
+  test('a checked host that exits unasked keeps its files held until it has exited', () {
+    final seen = <int, bool>{};
+    return _playOwn(
+      checkout,
+      python,
+      'A checked host whose game got ready exits with code 3.',
+      'hostFailure',
+      [
+        ..._startCall(checkout),
+        ..._status(checkout, 3, ended: false),
+        {'hostExits': 3},
+      ],
+      checkedFor: _checkedCore,
+      afterReply: (session, id) => seen[id] = session.checked!.held,
+      check: (session) {
+        expect(seen, {1: true, 2: true, 3: true}, reason: 'held after every reply');
+        expect(session.checked!.held, isFalse, reason: 'let go once the host has exited');
+      },
+    );
+  }, timeout: const Timeout(Duration(seconds: 90)));
+  test(
+    'a checked host killed for a protocol error lets its files go once it has exited',
+    () => _playOwn(
+      checkout,
+      python,
+      'A checked host whose game got ready answers pause with true, and is killed.',
+      'protocolError',
+      [
+        ..._startCall(checkout),
+        ..._status(checkout, 3, ended: false),
+        {
+          'from': 'launcher',
+          'message': {'type': 'call', 'id': 4, 'method': 'pause', 'args': true},
+          'anyValueFor': ['id'],
+        },
+        {
+          'from': 'host',
+          'message': {'type': 'reply', 'id': 4, 'result': true},
+          'anyValueFor': ['id'],
+          'invalid': 'pause returns null',
+        },
+      ],
+      checkedFor: _checkedCore,
+      afterReply: (session, id) => expect(session.checked!.held, isTrue, reason: 'held after the reply to $id'),
+      check: (session) => expect(session.checked!.held, isFalse, reason: 'let go once the host has exited'),
+    ),
+    timeout: const Timeout(Duration(seconds: 90)),
+  );
 }
+
+/// A check of the session's core alone, as if [program], the fake host's interpreter, were the
+/// checked host executable.
+RetroHostChecked _checkedCore(String program, Map<String, String> paths) => RetroHostChecked(
+  version: const RetroHostVersion(1, 0, 0),
+  executable: program,
+  core: paths['core']!,
+  files: [CheckedFile.open(paths['core']!)],
+);
+
+/// On Windows a held checked file cannot be written, replaced by a rename onto it, renamed or
+/// deleted: the way a later game's core load could otherwise be given another library.
+void _expectLocked(String path, String when) {
+  final other = File('$path.other')..writeAsStringSync('another core\n');
+  try {
+    expect(
+      () => File(path).openSync(mode: FileMode.append).closeSync(),
+      throwsA(isA<FileSystemException>()),
+      reason: 'written $when',
+    );
+    expect(() => other.renameSync(path), throwsA(isA<FileSystemException>()), reason: 'replaced $when');
+    expect(() => File(path).renameSync('$path.moved'), throwsA(isA<FileSystemException>()), reason: 'renamed $when');
+    expect(() => File(path).deleteSync(), throwsA(isA<FileSystemException>()), reason: 'deleted $when');
+  } finally {
+    if (other.existsSync()) other.deleteSync();
+  }
+}
+
+/// [step] as the session's call [id].
+Map<String, Object?> _withId(Map<String, Object?> step, int id) => {
+  ...step,
+  'message': {...step['message']! as Map<String, Object?>, 'id': id},
+};
 
 final _failedGame = isA<RetroStatus>()
     .having((s) => s.ended, 'ended', isTrue)
@@ -578,6 +693,8 @@ Future<void> _playOwn(
   List<Map<String, Object?>> steps, {
   Future<void> Function(RetroHostClient client)? afterReady,
   void Function(_Session session)? check,
+  RetroHostChecked Function(String program, Map<String, String> paths)? checkedFor,
+  void Function(_Session session, int id)? afterReply,
 }) async {
   final directory = Directory.systemTemp.createTempSync('retro-host-own-');
   try {
@@ -588,7 +705,16 @@ Future<void> _playOwn(
       'steps': [..._greeting, ...steps],
     };
     final file = File(p.join(directory.path, 'own.json'))..writeAsStringSync(jsonEncode(session));
-    await _Session(checkout, python, file, session, afterReady: afterReady, check: check).play();
+    await _Session(
+      checkout,
+      python,
+      file,
+      session,
+      afterReady: afterReady,
+      check: check,
+      checkedFor: checkedFor,
+      afterReply: afterReply,
+    ).play();
   } finally {
     directory.deleteSync(recursive: true);
   }
@@ -664,13 +790,30 @@ bool _runsHere(String? os) => switch (os) {
 };
 
 class _Session {
-  _Session(this.checkout, this.python, this.file, this.session, {this.afterReady, this.check});
+  _Session(
+    this.checkout,
+    this.python,
+    this.file,
+    this.session, {
+    this.afterReady,
+    this.check,
+    this.checkedFor,
+    this.afterReply,
+  });
 
   /// Runs once the first `volume` call is answered, before the session's next call.
   final Future<void> Function(RetroHostClient client)? afterReady;
 
   /// Runs once the host has exited, before the outcome is checked.
   final void Function(_Session session)? check;
+
+  /// Makes the check the fake host is started with, from the program the command names and the
+  /// session's paths, as if the fake host were a checked release.
+  final RetroHostChecked Function(String program, Map<String, String> paths)? checkedFor;
+
+  /// Runs once the client has taken the host's reply to the session's call [id].
+  final void Function(_Session session, int id)? afterReply;
+  RetroHostChecked? checked;
   final rumbles = <RetroRumble>[];
 
   final String checkout;
@@ -692,7 +835,9 @@ class _Session {
       final pathsFile = File(p.join(work.path, 'paths.json'))..writeAsStringSync(jsonEncode(paths));
       final report = File(p.join(work.path, 'report.json'));
       resume = File(p.join(work.path, 'resume'))..writeAsStringSync('-1');
+      checked = checkedFor?.call(python, paths);
       client = RetroHostClient.start(
+        checked: checked,
         command: [
           python,
           '-I',
@@ -728,6 +873,7 @@ class _Session {
       } on Object {
         // The client was never started.
       }
+      checked?.release();
       work.deleteSync(recursive: true);
     }
   }
@@ -810,6 +956,7 @@ class _Session {
           case 'reply':
             final pending = calls.removeAt(0);
             await _checkReply(pending, message, step['anyValueFor'] as List<Object?>?);
+            afterReply?.call(this, message['id']! as int);
           case 'frame':
             frameSteps++;
             await _until(() => frames.length >= frameSteps, 'frame $frameSteps');

@@ -279,8 +279,9 @@ static void close_handle(HANDLE* handle) {
   *handle = NULL;
 }
 
-ANYPS5_EXPORT void* anyps5_rh_start(const char* const* argv, int32_t argc, const char* const* env, int32_t envc,
-                                    int64_t token, anyps5_rh_callback callback, char* error, int32_t error_size) {
+ANYPS5_EXPORT void* anyps5_rh_start(const char* path, const char* const* argv, int32_t argc, const char* const* env,
+                                    int32_t envc, int64_t token, anyps5_rh_callback callback, char* error,
+                                    int32_t error_size) {
   if (argc < 1) {
     set_error(error, error_size, "No host program was given.");
     return NULL;
@@ -308,7 +309,7 @@ ANYPS5_EXPORT void* anyps5_rh_start(const char* const* argv, int32_t argc, const
   }
   size_t used = 0;
   size_t room = 0;
-  program = widen(argv[0]);
+  program = widen(path ? path : argv[0]);
   if (!program) {
     set_error(error, error_size, "The host program's path is not valid UTF-8.");
     goto fail;
@@ -537,6 +538,49 @@ ANYPS5_EXPORT uint32_t anyps5_rh_load(void* address) {
 
 ANYPS5_EXPORT void anyps5_rh_store(void* address, uint32_t value) {
   InterlockedExchange((volatile LONG*)address, (LONG)value);
+}
+
+// A release file opened for its check (protocol.md "Finding and checking the
+// host"): read access, shared for reading only, so nothing can write, replace
+// or delete it while the launcher holds it. The handle is not inheritable.
+ANYPS5_EXPORT int64_t anyps5_rh_open_checked(const char* path, char* error, int32_t error_size) {
+  wchar_t* name = widen(path);
+  if (!name) {
+    set_error(error, error_size, "The path is not valid UTF-8.");
+    return -1;
+  }
+  HANDLE file = CreateFileW(name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+  DWORD failure = GetLastError();
+  free(name);
+  if (file == INVALID_HANDLE_VALUE) {
+    char text[96];
+    snprintf(text, sizeof text, "The file could not be opened (Windows error %lu).", (unsigned long)failure);
+    set_error(error, error_size, text);
+    return -1;
+  }
+  if (GetFileType(file) != FILE_TYPE_DISK) {
+    CloseHandle(file);
+    set_error(error, error_size, "It is not a file.");
+    return -1;
+  }
+  return (int64_t)(intptr_t)file;
+}
+
+// Reads up to `size` bytes at `offset`; gives the count, 0 at the end, or -1.
+ANYPS5_EXPORT int32_t anyps5_rh_read_checked(int64_t file, int64_t offset, uint8_t* out, int32_t size) {
+  OVERLAPPED at;
+  ZeroMemory(&at, sizeof at);
+  at.Offset = (DWORD)((uint64_t)offset & 0xFFFFFFFFu);
+  at.OffsetHigh = (DWORD)((uint64_t)offset >> 32);
+  DWORD got = 0;
+  if (!ReadFile((HANDLE)(intptr_t)file, out, (DWORD)size, &got, &at)) {
+    return GetLastError() == ERROR_HANDLE_EOF ? 0 : -1;
+  }
+  return (int32_t)got;
+}
+
+ANYPS5_EXPORT void anyps5_rh_close_checked(int64_t file) {
+  if (file != -1) CloseHandle((HANDLE)(intptr_t)file);
 }
 
 #else
@@ -885,7 +929,8 @@ static int open_pidfd(pid_t pid, unsigned long socket_inode, int* lost) {
 }
 #endif
 
-static int spawn_now(char* const* argv, char* const* envp, int host_end, pid_t* pid, int* pidfd, int* lost) {
+static int spawn_now(const char* path, char* const* argv, char* const* envp, int host_end, pid_t* pid, int* pidfd,
+                     int* lost) {
   posix_spawn_file_actions_t actions;
   posix_spawnattr_t attributes;
   posix_spawn_file_actions_init(&actions);
@@ -914,7 +959,7 @@ static int spawn_now(char* const* argv, char* const* envp, int host_end, pid_t* 
   pidfd_getpid_t pidfd_getpid_call = (pidfd_getpid_t)dlsym(RTLD_DEFAULT, "pidfd_getpid");
   failure = ENOSYS;
   if (pidfd_spawn_call && pidfd_getpid_call) {
-    failure = pidfd_spawn_call(pidfd, argv[0], &actions, &attributes, argv, envp);
+    failure = pidfd_spawn_call(pidfd, path, &actions, &attributes, argv, envp);
     if (!failure) {
       fcntl(*pidfd, F_SETFD, FD_CLOEXEC);
       *pid = pidfd_getpid_call(*pidfd);
@@ -930,7 +975,7 @@ static int spawn_now(char* const* argv, char* const* envp, int host_end, pid_t* 
     }
   }
   if (failure == ENOSYS || failure == EINVAL) {
-    failure = posix_spawn(pid, argv[0], &actions, &attributes, argv, envp);
+    failure = posix_spawn(pid, path, &actions, &attributes, argv, envp);
     if (!failure) {
       struct stat socket_info;
       unsigned long inode = fstat(host_end, &socket_info) == 0 ? (unsigned long)socket_info.st_ino : 0;
@@ -938,7 +983,7 @@ static int spawn_now(char* const* argv, char* const* envp, int host_end, pid_t* 
     }
   }
 #else
-  failure = posix_spawn(pid, argv[0], &actions, &attributes, argv, envp);
+  failure = posix_spawn(pid, path, &actions, &attributes, argv, envp);
 #endif
   posix_spawn_file_actions_destroy(&actions);
   posix_spawnattr_destroy(&attributes);
@@ -952,6 +997,7 @@ static int spawn_now(char* const* argv, char* const* envp, int host_end, pid_t* 
 // started it exits (protocol.md "Starting the host"). One job at a time; only
 // the spawner thread clears the slot, once the job is done.
 typedef struct Spawn {
+  const char* path;
   char* const* argv;
   char* const* envp;
   int host_end;
@@ -975,7 +1021,7 @@ static void* spawner_main(void* argument) {
     while (!g_spawn_job) pthread_cond_wait(&g_spawn_wake, &g_spawn_lock);
     Spawn* job = g_spawn_job;
     pthread_mutex_unlock(&g_spawn_lock);
-    job->failure = spawn_now(job->argv, job->envp, job->host_end, &job->pid, &job->pidfd, &job->lost);
+    job->failure = spawn_now(job->path, job->argv, job->envp, job->host_end, &job->pid, &job->pidfd, &job->lost);
     pthread_mutex_lock(&g_spawn_lock);
     job->done = 1;
     g_spawn_job = NULL;
@@ -993,7 +1039,8 @@ static void start_spawner(void) {
   pthread_attr_destroy(&attributes);
 }
 
-static pid_t spawn_host(char* const* argv, char* const* envp, int host_end, int* failure, int* pidfd, int* lost) {
+static pid_t spawn_host(const char* path, char* const* argv, char* const* envp, int host_end, int* failure, int* pidfd,
+                        int* lost) {
   pthread_once(&g_spawner_once, start_spawner);
   if (!g_spawner_ready) {
     *failure = EAGAIN;
@@ -1001,6 +1048,7 @@ static pid_t spawn_host(char* const* argv, char* const* envp, int host_end, int*
   }
   Spawn job;
   memset(&job, 0, sizeof job);
+  job.path = path;
   job.argv = argv;
   job.envp = envp;
   job.host_end = host_end;
@@ -1018,9 +1066,10 @@ static pid_t spawn_host(char* const* argv, char* const* envp, int host_end, int*
 
 #else
 
-static pid_t spawn_host(char* const* argv, char* const* envp, int host_end, int* failure, int* pidfd, int* lost) {
+static pid_t spawn_host(const char* path, char* const* argv, char* const* envp, int host_end, int* failure, int* pidfd,
+                        int* lost) {
   pid_t pid = -1;
-  *failure = spawn_now(argv, envp, host_end, &pid, pidfd, lost);
+  *failure = spawn_now(path, argv, envp, host_end, &pid, pidfd, lost);
   return *failure ? -1 : pid;
 }
 
@@ -1040,8 +1089,9 @@ static void signal_host(pid_t pid, int pidfd, int lost) {
   if (!lost) kill(pid, SIGKILL);
 }
 
-ANYPS5_EXPORT void* anyps5_rh_start(const char* const* argv, int32_t argc, const char* const* env, int32_t envc,
-                                    int64_t token, anyps5_rh_callback callback, char* error, int32_t error_size) {
+ANYPS5_EXPORT void* anyps5_rh_start(const char* path, const char* const* argv, int32_t argc, const char* const* env,
+                                    int32_t envc, int64_t token, anyps5_rh_callback callback, char* error,
+                                    int32_t error_size) {
   if (argc < 1) {
     set_error(error, error_size, "No host program was given.");
     return NULL;
@@ -1094,7 +1144,7 @@ ANYPS5_EXPORT void* anyps5_rh_start(const char* const* argv, int32_t argc, const
   int failure = 0;
   int pidfd = -1;
   int lost = 0;
-  pid_t pid = spawn_host((char* const*)arguments, envp, ends[1], &failure, &pidfd, &lost);
+  pid_t pid = spawn_host(path ? path : argv[0], (char* const*)arguments, envp, ends[1], &failure, &pidfd, &lost);
   free(arguments);
   free(environment);
   close(ends[1]);
@@ -1271,6 +1321,51 @@ ANYPS5_EXPORT uint32_t anyps5_rh_load(void* address) {
 
 ANYPS5_EXPORT void anyps5_rh_store(void* address, uint32_t value) {
   __atomic_store_n((uint32_t*)address, value, __ATOMIC_SEQ_CST);
+}
+
+// A release file opened for its check (protocol.md "Finding and checking the
+// host"): close-on-exec, at a number above 3, so the dup2 to descriptor 3 at
+// the host's start cannot replace it and it never reaches the host. On Linux
+// the host is started through it, as /proc/self/fd/<n>. O_NONBLOCK keeps a
+// FIFO put in a file's place from blocking the open; it is then refused as
+// not a regular file, and reads of a regular file are not changed by it.
+ANYPS5_EXPORT int64_t anyps5_rh_open_checked(const char* path, char* error, int32_t error_size) {
+  int fd = open(path, O_RDONLY | O_CLOEXEC | O_NONBLOCK);
+  if (fd < 0) {
+    char text[128];
+    snprintf(text, sizeof text, "The file could not be opened: %s.", strerror(errno));
+    set_error(error, error_size, text);
+    return -1;
+  }
+  if (fd <= 3) {
+    int high = fcntl(fd, F_DUPFD_CLOEXEC, 4);
+    close(fd);
+    if (high < 0) {
+      set_error(error, error_size, "The file's descriptor could not be moved.");
+      return -1;
+    }
+    fd = high;
+  }
+  struct stat info;
+  if (fstat(fd, &info) != 0 || !S_ISREG(info.st_mode)) {
+    close(fd);
+    set_error(error, error_size, "It is not a file.");
+    return -1;
+  }
+  return fd;
+}
+
+// Reads up to `size` bytes at `offset`; gives the count, 0 at the end, or -1.
+ANYPS5_EXPORT int32_t anyps5_rh_read_checked(int64_t file, int64_t offset, uint8_t* out, int32_t size) {
+  ssize_t got;
+  do {
+    got = pread((int)file, out, (size_t)size, (off_t)offset);
+  } while (got < 0 && errno == EINTR);
+  return got < 0 ? -1 : (int32_t)got;
+}
+
+ANYPS5_EXPORT void anyps5_rh_close_checked(int64_t file) {
+  if (file >= 0) close((int)file);
 }
 
 #endif

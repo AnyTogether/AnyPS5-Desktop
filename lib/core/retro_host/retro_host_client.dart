@@ -11,6 +11,7 @@ import 'package:ffi/ffi.dart';
 import 'frame_ring.dart';
 import 'retro_host_native.dart';
 import 'retro_host_protocol.dart';
+import 'retro_host_release.dart';
 import 'retro_host_session.dart';
 import 'strict_json.dart';
 
@@ -147,21 +148,52 @@ class RetroHostClient implements RetroHostSession {
   PinnedFrame? _frame;
   FrameRing? _frameRing;
 
+  /// The checked files, held until the host has exited: the host loads the core again for every
+  /// game it starts, so each load must find the file that was checked (protocol.md "Finding and
+  /// checking the host").
+  RetroHostChecked? _checked;
+
+  /// The SwanStation of the checked release: the only core `start` may name for a checked host.
+  String? _releaseCore;
+
+  void _releaseChecked() {
+    final checked = _checked;
+    _checked = null;
+    checked?.release();
+  }
+
   /// Starts the host: [command] is the executable's absolute path and any arguments before the
   /// protocol's own; [environment] adds to the launcher's environment for the host, or, with
   /// [inheritEnvironment] false, is the host's whole environment. A whole environment cannot be
   /// empty, since native/retro_host gives the launcher's own for none. [volume] and [muted] are
   /// sent as the first call after `welcome`.
+  ///
+  /// [checked] is a host whose files were checked (retro_host_release.dart): it is started through
+  /// the checked file, and its files stay held until the host has exited, so every game's core load
+  /// finds the checked SwanStation; [exited] completes only after they are let go. A start that
+  /// fails lets them go at once (protocol.md "Finding and checking the host").
   static RetroHostClient start({
     required List<String> command,
+    RetroHostChecked? checked,
     Map<String, String>? environment,
     bool inheritEnvironment = true,
     double volume = 1,
     bool muted = false,
     List<String> pixelFormats = const [RetroPixelFormat.rgba8, RetroPixelFormat.bgra8],
   }) {
-    if (command.isEmpty) throw ArgumentError.value(command, 'command', 'names no program');
+    if (checked != null && !checked.claim()) {
+      throw ArgumentError.value(checked, 'checked', 'was released or used by another start; check again');
+    }
+    if (command.isEmpty) {
+      checked?.release();
+      throw ArgumentError.value(command, 'command', 'names no program');
+    }
+    if (checked != null && command.first != checked.executable) {
+      checked.release();
+      throw ArgumentError.value(command.first, 'command', 'is not the checked host ${checked.executable}');
+    }
     if (!inheritEnvironment && (environment == null || environment.isEmpty)) {
+      checked?.release();
       throw ArgumentError.value(environment, 'environment', "is empty, so the host would get the launcher's own");
     }
     final env = !inheritEnvironment
@@ -175,8 +207,12 @@ class RetroHostClient implements RetroHostSession {
     final error = calloc<Uint8>(512).cast<Utf8>();
     final argv = _strings(command);
     final envp = _strings(env);
+    final program = checked?.program?.toNativeUtf8() ?? nullptr;
+    client._checked = checked;
+    client._releaseCore = checked?.core;
     try {
       client._connection = retroHostStart(
+        program,
         argv.$1,
         command.length,
         envp.$1,
@@ -188,11 +224,13 @@ class RetroHostClient implements RetroHostSession {
       );
       if (client._connection == nullptr) {
         client._callback.close();
+        client._releaseChecked();
         throw ProcessException(command.first, command.skip(1).toList(), error.toDartString());
       }
     } finally {
       argv.$2();
       envp.$2();
+      if (program != nullptr) calloc.free(program);
       calloc.free(error);
     }
     client.pid = retroHostPid(client._connection);
@@ -235,7 +273,8 @@ class RetroHostClient implements RetroHostSession {
   /// The host's exit code, once it has exited.
   int? get exitCode => _exitCode;
 
-  /// Completes with the host's exit code when its process has ended.
+  /// Completes with the host's exit code when its process has ended, once a checked host's files
+  /// have been let go.
   Future<int> get exited => _exited.future;
 
   String get hostVersion => _hostVersion;
@@ -287,6 +326,15 @@ class RetroHostClient implements RetroHostSession {
   }
 
   Future<Object?> _send(String method, Object? args) {
+    final core = _releaseCore;
+    if (method == 'start' && core != null && (args is! Map || args['core'] != core)) {
+      return Future.error(
+        RetroCallError(
+          RetroCallError.argument,
+          'A release host only runs the SwanStation it was released with ($core).',
+        ),
+      );
+    }
     if (_ended.isCompleted) return Future.value(_afterFailure(method));
     if (!_greeted) throw StateError('No call may be sent before welcome.');
     if (method != 'volume' && !_capabilities.contains(retroCapabilityPs1)) {
@@ -443,6 +491,7 @@ class RetroHostClient implements RetroHostSession {
       case RetroHostEvent.exited:
         _exitCode = extra;
         _unsupportedKill?.cancel();
+        _releaseChecked();
         if (!_exited.isCompleted) _exited.complete(extra);
         if (_unsupportedSeen) {
           _finish(RetroHostEnd.unsupported);
@@ -822,6 +871,7 @@ class RetroHostClient implements RetroHostSession {
     final address = _connection.address;
     final code = await Isolate.run(() => retroHostClose(Pointer<Void>.fromAddress(address)));
     _connection = nullptr;
+    _releaseChecked();
     if (!_exited.isCompleted) {
       _exitCode = code;
       _exited.complete(code);

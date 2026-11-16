@@ -41,6 +41,7 @@ typedef RetroHostCallbackNative = Void Function(
 
 @Native<
   Pointer<Void> Function(
+    Pointer<Utf8>,
     Pointer<Pointer<Utf8>>,
     Int32,
     Pointer<Pointer<Utf8>>,
@@ -51,7 +52,10 @@ typedef RetroHostCallbackNative = Void Function(
     Int32,
   )
 >(symbol: 'anyps5_rh_start')
+/// Starts the host from [path], or from `argv[0]` when [path] is null; `argv[0]` is the host's own
+/// first argument either way.
 external Pointer<Void> retroHostStart(
+  Pointer<Utf8> path,
   Pointer<Pointer<Utf8>> argv,
   int argc,
   Pointer<Pointer<Utf8>> env,
@@ -109,3 +113,17 @@ external int retroHostLoad(Pointer<Void> address);
 /// A sequentially consistent store of [value] at [address].
 @Native<Void Function(Pointer<Void>, Uint32)>(symbol: 'anyps5_rh_store', isLeaf: true)
 external void retroHostStore(Pointer<Void> address, int value);
+
+/// Opens a release file for its check (protocol.md "Finding and checking the host"): on Windows a
+/// handle shared for reading only, elsewhere a close-on-exec descriptor above 3. Gives -1 and
+/// [error] when it cannot.
+@Native<Int64 Function(Pointer<Utf8>, Pointer<Utf8>, Int32)>(symbol: 'anyps5_rh_open_checked')
+external int retroHostOpenChecked(Pointer<Utf8> path, Pointer<Utf8> error, int errorSize);
+
+/// Reads up to [size] bytes at [offset] of a file from [retroHostOpenChecked]: the count, 0 at its
+/// end, or -1.
+@Native<Int32 Function(Int64, Int64, Pointer<Uint8>, Int32)>(symbol: 'anyps5_rh_read_checked')
+external int retroHostReadChecked(int file, int offset, Pointer<Uint8> out, int size);
+
+@Native<Void Function(Int64)>(symbol: 'anyps5_rh_close_checked')
+external void retroHostCloseChecked(int file);
