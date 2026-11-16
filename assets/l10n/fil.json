@@ -2436,7 +2436,7 @@
   "retroHostOtherDetail": "Huminto ang laro dahil sa isang error.",
   "retroHostOutdatedDetail": "Hindi tugma ang emulator host na ito sa launcher na ito. Kailangan itong i-update.",
   "retroHostNotStartedDetail": "Hindi masimulan ang emulator host.",
-  "retroHostCardUnreadable": "Hindi mabasa ang memory card ng larong ito, kaya hindi nase-save ang mga save nito. Hindi ginagalaw ang file ng card.",
+  "retroHostCardUnreadable": "Hindi mabasa ang memory card ng larong ito, kaya hindi naiimbak ang progreso nito. Hindi ginagalaw ang file ng card.",
   "retroMenuVolume": "Volume",
   "retroMenuMute": "I-mute",
   "retroMenuDiscInsertedDetail": "Nasa console.",

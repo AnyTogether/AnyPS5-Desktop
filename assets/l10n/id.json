@@ -2436,7 +2436,7 @@
   "retroHostOtherDetail": "Game berhenti karena terjadi kesalahan.",
   "retroHostOutdatedDetail": "Host emulator ini tidak cocok dengan peluncur ini. Host perlu diperbarui.",
   "retroHostNotStartedDetail": "Host emulator tidak dapat dimulai.",
-  "retroHostCardUnreadable": "Kartu memori game ini tidak dapat dibaca, jadi simpanannya tidak disimpan. File kartu dibiarkan apa adanya.",
+  "retroHostCardUnreadable": "Kartu memori game ini tidak dapat dibaca, jadi progresnya tidak disimpan. File kartu dibiarkan apa adanya.",
   "retroMenuVolume": "Volume",
   "retroMenuMute": "Bisukan",
   "retroMenuDiscInsertedDetail": "Di dalam konsol.",
