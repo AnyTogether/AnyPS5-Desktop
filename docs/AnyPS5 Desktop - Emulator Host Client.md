@@ -338,8 +338,8 @@ named in `.github/workflows/ci.yml`:
   and the ring's `DuplicateHandle`, `MapViewOfFile` and `VirtualQuery` checks.
   The sessions that are only for Linux and macOS skip themselves there.
 
-That commit is the host repository's `main` at 9052aff with its fake host
-added, until the fake host is merged there.
+That commit is the host repository's `main` with its fake host merged
+(AnyTogether/anyps5-retro-host#10).
 
 [`test/core/retro_host/retro_status_test.dart`](../test/core/retro_host/retro_status_test.dart)
 covers how a `status` is read, and reads every status the fixture sessions send
