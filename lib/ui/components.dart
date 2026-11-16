@@ -90,9 +90,11 @@ class Glass extends StatelessWidget {
   }
 }
 
-/// The white ring and glow a focused element wears. The glow is drawn around the ring only, so
-/// the element itself keeps its colors.
-class FocusRing extends StatelessWidget {
+/// The ring and glow a focused element wears, in the console's style: a thin, slightly translucent
+/// ring with a soft halo that breathes slowly, and a brighter glint that travels around the edge.
+/// The glow is drawn around the ring only, so the element itself keeps its colors. The animation
+/// only runs while the element is focused (and not with reduced motion).
+class FocusRing extends StatefulWidget {
   const FocusRing({super.key, required this.focused, required this.radius, required this.child, this.width = 3});
 
   final bool focused;
@@ -101,26 +103,78 @@ class FocusRing extends StatelessWidget {
   final Widget child;
 
   @override
+  State<FocusRing> createState() => _FocusRingState();
+}
+
+class _FocusRingState extends State<FocusRing> with SingleTickerProviderStateMixin {
+  /// One full turn of the glint around the edge; the halo breathes twice per turn.
+  static const _period = Duration(milliseconds: 4800);
+
+  late final AnimationController _loop = AnimationController(vsync: this, duration: _period);
+
+  bool _glass = false;
+
+  // Inherited widgets cannot be read in initState; this runs right after it, and on a look change.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _glass = LookScope.isGlass(context);
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(FocusRing oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focused != widget.focused) _sync();
+  }
+
+  void _sync() {
+    if (widget.focused && !Motion.reduced && !_glass) {
+      if (!_loop.isAnimating) _loop.repeat();
+    } else {
+      _loop.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _loop.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final glass = LookScope.isGlass(context);
+    final glass = _glass;
+    final width = widget.width;
+    final reach = width * 1.6;
+    // The halo needs room to spread past the ring.
+    final ring = glass
+        ? CustomPaint(painter: _IceRingPainter(radius: widget.radius + reach, width: width))
+        : RepaintBoundary(
+            child: CustomPaint(
+              painter: _RingPainter(radius: widget.radius + reach, width: width, phase: _loop),
+            ),
+          );
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        child,
+        widget.child,
         PositionedDirectional(
-          start: -width * 1.6,
-          top: -width * 1.6,
-          end: -width * 1.6,
-          bottom: -width * 1.6,
+          start: -reach,
+          top: -reach,
+          end: -reach,
+          bottom: -reach,
           child: IgnorePointer(
             child: AnimatedOpacity(
-              opacity: focused ? 1 : 0,
+              opacity: widget.focused ? 1 : 0,
               duration: Motion.focus,
               curve: Motion.settle,
-              child: CustomPaint(
-                painter: glass
-                    ? _IceRingPainter(radius: radius + width * 1.6, width: width)
-                    : _RingPainter(radius: radius + width * 1.6, width: width),
+              // A small settle as the ring lands, as on the console: it closes in from slightly outside.
+              child: AnimatedScale(
+                scale: widget.focused ? 1 : 1.04,
+                duration: Motion.focus * 1.5,
+                curve: Motion.settle,
+                child: ring,
               ),
             ),
           ),
@@ -131,29 +185,78 @@ class FocusRing extends StatelessWidget {
 }
 
 class _RingPainter extends CustomPainter {
-  _RingPainter({required this.radius, required this.width});
+  _RingPainter({required this.radius, required this.width, required Animation<double> phase})
+    : _phase = phase,
+      super(repaint: phase);
+
   final double radius;
   final double width;
+  final Animation<double> _phase;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final ring = RRect.fromRectAndRadius((Offset.zero & size).deflate(width / 2), Radius.circular(radius));
-    canvas
-      ..drawRRect(
-        ring,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = width * 2.5
-          ..color = Colors.white.withValues(alpha: 0.35)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.outer, 9),
-      )
-      ..drawRRect(
-        ring,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = width
-          ..color = Colors.white.withValues(alpha: 0.95),
-      );
+    final t = _phase.value; // 0..1, one turn of the glint
+    final rect = Offset.zero & size;
+    final ringWidth = width * 0.8;
+    final ring = RRect.fromRectAndRadius(rect.deflate(width / 2), Radius.circular(radius));
+
+    // Breathing: the halo swells and fades twice per turn, never fully off.
+    final breath = 0.5 - 0.5 * math.cos(t * 2 * math.pi * 2);
+    final haloAlpha = 0.16 + 0.16 * breath;
+    final haloBlur = 9 + 5 * breath;
+
+    // 1. Wide soft halo, outside the ring only.
+    canvas.drawRRect(
+      ring,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = width * 3
+        ..color = Colors.white.withValues(alpha: haloAlpha)
+        ..maskFilter = MaskFilter.blur(BlurStyle.outer, haloBlur),
+    );
+
+    // 2. The ring: translucent white, with a brighter glint travelling around it.
+    const base = 0.62;
+    final glint = SweepGradient(
+      startAngle: 0,
+      endAngle: 2 * math.pi,
+      transform: GradientRotation(t * 2 * math.pi),
+      colors: [
+        Colors.white.withValues(alpha: base),
+        Colors.white.withValues(alpha: base),
+        Colors.white,
+        Colors.white.withValues(alpha: base),
+        Colors.white.withValues(alpha: base),
+      ],
+      stops: const [0.0, 0.62, 0.8, 0.98, 1.0],
+    ).createShader(rect);
+    canvas.drawRRect(
+      ring,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = ringWidth
+        ..shader = glint,
+    );
+
+    // 3. The glint also lights the halo a little where it passes (a second, tighter pass).
+    canvas.drawRRect(
+      ring,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = ringWidth * 2
+        ..shader = SweepGradient(
+          transform: GradientRotation(t * 2 * math.pi),
+          colors: [
+            Colors.white.withValues(alpha: 0),
+            Colors.white.withValues(alpha: 0),
+            Colors.white.withValues(alpha: 0.38),
+            Colors.white.withValues(alpha: 0),
+            Colors.white.withValues(alpha: 0),
+          ],
+          stops: const [0.0, 0.62, 0.8, 0.98, 1.0],
+        ).createShader(rect)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.outer, 6),
+    );
   }
 
   @override
