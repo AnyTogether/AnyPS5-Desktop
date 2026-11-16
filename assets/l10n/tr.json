@@ -2552,5 +2552,19 @@
   "retroPs3SCHChina": "SCH (Çin)",
   "retroPs3CrossWestern": "Çarpı (Batı)",
   "retroPs3CircleJapanese": "Daire (Japonya)",
-  "retroPs3Preparing": "PS3 oyun verileri hazırlanıyor…"
+  "retroPs3Preparing": "PS3 oyun verileri hazırlanıyor…",
+  "unlockPause": "Duraklat",
+  "unlockResume": "Devam et",
+  "unlockCancelling": "İptal ediliyor…",
+  "unlockPausedState": "Duraklatıldı",
+  "keepGoing": "Sürdür",
+  "cancelUnlockAskTitle": "%@ için kilit açma iptal edilsin mi?",
+  "cancelUnlockAskDetail": "Şimdiye kadar yapılan iş kaybolur. Bunun yerine duraklatıp daha sonra devam edebilirsin.",
+  "quitUnlocksTitle": "Oyunların kilidi açılırken çıkılsın mı?",
+  "quitRemovingTitle": "Oyunlar kaldırılırken çıkılsın mı?",
+  "quitGoBack": "Geri dön",
+  "quitCancelAndQuit": "İptal et ve çık",
+  "quitAnyway": "Yine de çık",
+  "quitUnlocksDetail": "İptal et ve çık, yapılan işi siler. Durdurup sonra devam etmek için geri dön, Duraklat'ı kullan ve başlatıcıyı açık tut.",
+  "quitRemovingNote": "Oyunları kaldırma duraklatılamaz ve iptal edilemez."
 }

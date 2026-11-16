@@ -88,11 +88,17 @@ class _LauncherShellState extends State<LauncherShell> {
   /// stall says of its last seconds.
   late final FrameLog _recent = FrameLog(widget.model.addRecentLine, describe: _onScreen);
 
+  /// The look, the layer, the game starting or playing (by title ID, as the Mac's line says), the
+  /// window and the memory: a stall's report tells from it whether it began while a game was
+  /// starting, while it played or back on the home screen.
   String _onScreen() {
     final model = widget.model;
+    final starting = model.starting?.titleId;
+    final playing = model.running?.$1.titleId;
     return 'look ${model.look.name}${model.solidGlass ? ' solid' : ''}'
         '${model.glassWindow.seeThrough ? ' see-through' : ''} layer ${model.overlay?.name ?? 'home'}'
-        '${model.running != null ? ' game running' : ''} ${model.active ? 'in front' : 'behind'}'
+        '${starting != null ? ' starting $starting' : ''}${playing != null ? ' playing $playing' : ''}'
+        ' ${model.active ? 'in front' : 'behind'}'
         '${model.windowFullscreen ? ' full screen' : ''} ${ProcessInfo.currentRss >> 20} MB';
   }
 
@@ -534,6 +540,8 @@ class _LauncherShellState extends State<LauncherShell> {
                                                 // A plain yes or no: Quit AnyPS5?, Close the game?,
                                                 // Delete the game?
                                                 Layer.confirmQuit ||
+                                                Layer.confirmCancelUnlock ||
+                                                Layer.confirmQuitUnlocks ||
                                                 Layer.closeGame ||
                                                 Layer.confirmDeleteGame => ConfirmCard(model: model),
                                                 Layer.challenge => WithBackPill(
@@ -563,7 +571,7 @@ class _LauncherShellState extends State<LauncherShell> {
                                             accent: model.accentChoice.color,
                                             onMinimize: model.minimizeLauncher,
                                             onWindowed: () => unawaited(model.setLauncherFullscreen(false)),
-                                            onQuit: model.quitLauncher,
+                                            onQuit: model.requestQuit,
                                           ),
                                       ],
                                     ),

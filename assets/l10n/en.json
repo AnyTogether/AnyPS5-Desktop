@@ -2552,5 +2552,19 @@
   "retroPs3SCHChina": "SCH (China)",
   "retroPs3CrossWestern": "Cross (Western)",
   "retroPs3CircleJapanese": "Circle (Japanese)",
-  "retroPs3Preparing": "Preparing PS3 game data…"
+  "retroPs3Preparing": "Preparing PS3 game data…",
+  "unlockPause": "Pause",
+  "unlockResume": "Resume",
+  "unlockCancelling": "Cancelling…",
+  "unlockPausedState": "Paused",
+  "keepGoing": "Keep going",
+  "cancelUnlockAskTitle": "Cancel the unlock of %@?",
+  "cancelUnlockAskDetail": "The work done so far is lost. Pause instead to stop now and go on later.",
+  "quitUnlocksTitle": "Quit while games are being unlocked?",
+  "quitRemovingTitle": "Quit while games are being removed?",
+  "quitGoBack": "Go back",
+  "quitCancelAndQuit": "Cancel and quit",
+  "quitAnyway": "Quit anyway",
+  "quitUnlocksDetail": "Cancel and quit throws the work away. To stop and go on later, go back and use Pause, and keep the launcher open.",
+  "quitRemovingNote": "Removing games can be neither paused nor cancelled."
 }

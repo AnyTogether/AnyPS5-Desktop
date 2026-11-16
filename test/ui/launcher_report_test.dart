@@ -5,6 +5,7 @@ import 'package:anyps5_desktop/ui/theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/fake_process.dart';
 import '../support/ui_support.dart';
 
 /// The launcher's own crash or long stall, offered at the next start: Send Report opens the
@@ -108,5 +109,29 @@ void main() {
     expect(find.textContaining('the whole of it is on the clipboard'), findsOneWidget);
     // The toast's own time.
     await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('the line a second says which game is starting or playing, for a stall\'s last seconds', (tester) async {
+    final fixture = makeFixture();
+    addTearDown(fixture.dispose);
+    final model = fixture.model;
+    final game = model.games.firstWhere((game) => game.titleId == 'PPSA01001');
+    // The frames line of the last second (window and media lines come between them too).
+    String lastSecond() => model.recentLines.lastWhere((line) => line.contains(' frames '));
+    await pumpLauncher(tester, model);
+    final added = model.recentLinesAdded;
+    model.starting = game;
+    await tester.pump(const Duration(seconds: 1));
+    expect(model.recentLinesAdded, greaterThan(added), reason: 'a line each second');
+    expect(lastSecond(), contains(' starting PPSA01001 '));
+    model
+      ..starting = null
+      ..running = (game, runningFor(FakeGameProcess()));
+    await tester.pump(const Duration(seconds: 1));
+    expect(lastSecond(), contains(' playing PPSA01001 '));
+    expect(lastSecond(), isNot(contains('starting')));
+    model.running = null;
+    await tester.pump(const Duration(seconds: 1));
+    expect(lastSecond(), isNot(contains('PPSA01001')), reason: 'back on the home screen');
   });
 }

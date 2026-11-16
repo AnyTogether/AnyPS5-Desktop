@@ -29,6 +29,14 @@ class GameAction {
     NeedsEmulator() => GameAction(T.text('retroChooseEmulator'), Icons.settings_rounded),
     Locked() || Unreadable() => GameAction(T.text('unlock'), Icons.lock_open_rounded),
     Failed() => GameAction(T.text('retry'), Icons.refresh_rounded),
+    Installing(cancelling: true) => GameAction(
+      T.text('unlockCancelling'),
+      Icons.close_rounded,
+      tone: ActionTone.busy,
+      indeterminate: true,
+    ),
+    // Paused by hand: the button goes on from there.
+    Installing(paused: true, preparing: false) => GameAction(T.text('unlockResume'), Icons.play_arrow_rounded),
     Installing(preparing: true) => GameAction(T.text('playWhenReady'), Icons.play_arrow_rounded),
     // Updating (or unlocking to play): the button says so and carries the progress; the press
     // does not give it up (Game Settings › Cancel Update does).
@@ -53,7 +61,9 @@ class GameAction {
       Icons.hourglass_top_rounded,
       tone: ActionTone.busy,
     ),
-    Installing() || Queued() => GameAction(T.text('cancel'), Icons.close_rounded),
+    // An unlock under way stops without being lost: Pause (the small Cancel button is beside it).
+    Installing() => GameAction(T.text('unlockPause'), Icons.pause_rounded),
+    Queued() => GameAction(T.text('cancel'), Icons.close_rounded),
     WaitingForEngine(forThisGame: true) => GameAction(
       T.text('actionUpdatingEngine'),
       Icons.construction_rounded,
