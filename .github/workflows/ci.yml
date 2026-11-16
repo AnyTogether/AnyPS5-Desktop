@@ -37,6 +37,10 @@ concurrency:
 
 env:
   FLUTTER_VERSION: 3.47.1
+  # The emulator host's fixture sessions and fake host, which test/core/retro_host plays against
+  # the launcher's client (anyps5-retro-host docs/protocol.md "Fixtures").
+  RETRO_HOST_REPOSITORY: https://github.com/B-Howell/anyps5-retro-host.git
+  RETRO_HOST_COMMIT: d91fd36c2597a36edd4d04799e193c836ae18849
   # libpulse-dev: flutter_webrtc's Linux loopback capture (share play's Opus track) builds only
   # with it; the bundle then needs libpulse0, which PulseAudio and PipeWire systems have.
   LINUX_PACKAGES: clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libsdl2-2.0-0 libpulse-dev file
@@ -128,6 +132,12 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+      - name: Fetch the emulator host's fixtures and fake host
+        run: |
+          git init -q "$RUNNER_TEMP/retro-host"
+          git -C "$RUNNER_TEMP/retro-host" fetch -q --depth 1 "$RETRO_HOST_REPOSITORY" "$RETRO_HOST_COMMIT"
+          git -C "$RUNNER_TEMP/retro-host" checkout -q FETCH_HEAD
+          echo "ANYPS5_RETRO_HOST_CHECKOUT=$RUNNER_TEMP/retro-host" >> "$GITHUB_ENV"
       - run: flutter pub get
       # The goldens are made on macOS and compared in the goldens job (test/flutter_test_config.dart).
       - run: flutter test --total-shards 2 --shard-index ${{ matrix.shard }}
@@ -156,6 +166,17 @@ jobs:
       - name: Run the test files that compare goldens, and the library watcher's
         if: ${{ !inputs.update_goldens }}
         run: flutter test $(grep -rl matchesGoldenFile test | sort) test/core/library_watch_test.dart
+      - if: ${{ !inputs.update_goldens }}
+        name: Fetch the emulator host's fixtures and fake host
+        run: |
+          git init -q "$RUNNER_TEMP/retro-host"
+          git -C "$RUNNER_TEMP/retro-host" fetch -q --depth 1 "$RETRO_HOST_REPOSITORY" "$RETRO_HOST_COMMIT"
+          git -C "$RUNNER_TEMP/retro-host" checkout -q FETCH_HEAD
+          echo "ANYPS5_RETRO_HOST_CHECKOUT=$RUNNER_TEMP/retro-host" >> "$GITHUB_ENV"
+      # The emulator host's client starts the host with posix_spawn on macOS, unlike Linux.
+      - name: Run the emulator host client's conformance test
+        if: ${{ !inputs.update_goldens }}
+        run: flutter test test/core/retro_host
       - name: Remake the golden files
         if: ${{ inputs.update_goldens }}
         run: flutter test --update-goldens $(grep -rl matchesGoldenFile test | sort)

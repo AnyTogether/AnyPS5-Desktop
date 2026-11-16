@@ -2,6 +2,8 @@
 // Windows, the system's C compiler on Linux (and on the Mac for `flutter test`). Dart finds it by
 // its asset id (lib/core/audio/atrac9.dart). native/capture is the game's sound for Remote Play,
 // broadcasting and clips (WASAPI loopback on Windows; elsewhere it says there is none).
+// native/retro_host is the launcher's side of the emulator host's control stream and frame ring
+// (lib/core/retro_host/).
 import 'dart:io';
 
 import 'package:code_assets/code_assets.dart';
@@ -30,6 +32,12 @@ void main(List<String> args) async {
       assetName: 'core/capture/game_sound_native.dart',
       sources: const ['native/capture/anyps5_sound.c'],
       libraries: [if (os == OS.windows) 'ole32'],
+    ).run(input: input, output: output);
+    await CBuilder.library(
+      name: 'anyps5_retro_host',
+      assetName: 'core/retro_host/retro_host_native.dart',
+      sources: const ['native/retro_host/anyps5_retro_host.c'],
+      libraries: [if (os == OS.linux) ...['pthread', 'dl']],
     ).run(input: input, output: output);
   });
 }
