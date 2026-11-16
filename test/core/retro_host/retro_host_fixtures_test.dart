@@ -478,6 +478,44 @@ void main() {
     ),
     timeout: const Timeout(Duration(seconds: 90)),
   );
+  test(
+    'start after a host failure throws RetroHostGone and keeps the failed game reported',
+    () => _playOwn(
+      checkout,
+      python,
+      'a game runs, then the host exits unasked.',
+      'hostFailure',
+      [
+        ..._startCall(checkout),
+        {'hostExits': 1},
+      ],
+      check: (session) => expectLater(() async {
+        await expectLater(session.client.startGame({}), throwsA(isA<RetroHostGone>()));
+        await expectLater(session.client.call('start', {}), throwsA(isA<RetroHostGone>()));
+        return session.client.status();
+      }(), completion(_failedGame)),
+    ),
+    timeout: const Timeout(Duration(seconds: 90)),
+  );
+  test(
+    'a start still waiting when the host fails throws RetroHostGone',
+    () => _playOwn(
+      checkout,
+      python,
+      'a game runs, a second start is sent, then the host exits unasked before answering it.',
+      'hostFailure',
+      [
+        ..._startCall(checkout),
+        _secondStart(checkout, 3),
+        {'hostExits': 1},
+      ],
+      check: (session) => expectLater(() async {
+        await expectLater(session.calls.last, throwsA(isA<RetroHostGone>()));
+        return session.client.status();
+      }(), completion(_failedGame)),
+    ),
+    timeout: const Timeout(Duration(seconds: 90)),
+  );
   test('a status answered before stop does not lift the stop time limit', () async {
     final fixture =
         (jsonDecode(File(p.join(checkout, 'fixtures', 'v1', 'sessions', 'stop-deadline.json')).readAsStringSync())
@@ -790,7 +828,9 @@ class _Session {
               stopping = null;
               calls.add(stopped.then((status) => status?.toJson()));
             } else {
-              calls.add(client.call(method, _fill(message['args'])));
+              final pending = client.call(method, _fill(message['args']));
+              unawaited(pending.then((_) {}, onError: (_) {}));
+              calls.add(pending);
             }
           case 'input':
             client.input(

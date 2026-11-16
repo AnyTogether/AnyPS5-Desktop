@@ -78,7 +78,7 @@ class _Pending {
   final int id;
   final String method;
   final Object? args;
-  final DateTime deadline;
+  final Duration deadline;
   final completer = Completer<Object?>();
 }
 
@@ -86,7 +86,8 @@ class _Pending {
 /// hello/welcome exchange, calls and their replies in order, pings, time limits, the frame ring,
 /// and what to report when the host fails. It reads and writes the stream only through the native
 /// threads in native/retro_host, never on this isolate, so the UI thread never waits on the host
-/// (protocol.md "Timeouts").
+/// (protocol.md "Timeouts"). The time limits are measured on a [Stopwatch], which follows a monotonic
+/// clock, so a step of the wall clock cannot set one off.
 class RetroHostClient {
   RetroHostClient._(this._volume, this._muted, this._offeredFormats);
 
@@ -115,13 +116,15 @@ class RetroHostClient {
   final _frames = StreamController<RetroFrameEvent>.broadcast(sync: true);
   final _rumble = StreamController<RetroRumble>.broadcast();
   final _calls = Queue<_Pending>();
-  final _pings = Queue<(int, DateTime)>();
+  final _pings = Queue<(int, Duration)>();
+  final _clock = Stopwatch()..start();
+  final _drained = Completer<void>();
 
-  late DateTime _welcomeDeadline;
-  DateTime? _nextPing;
-  DateTime? _stopDeadline;
+  late Duration _welcomeDeadline;
+  Duration? _nextPing;
+  Duration? _stopDeadline;
   int _stopId = 0;
-  DateTime? _shutdownDeadline;
+  Duration? _shutdownDeadline;
   int _nextCallId = 1;
   int _nextPingId = 1;
   bool _greeted = false;
@@ -149,6 +152,10 @@ class RetroHostClient {
   /// Starts the host: [command] is the executable's absolute path and any arguments before the
   /// protocol's own; [environment] adds to the launcher's environment for the host. [volume] and
   /// [muted] are sent as the first call after `welcome`.
+  ///
+  /// It starts the process on the calling isolate and returns once the process exists, so on Windows
+  /// it takes as long as `CreateProcessW`, which can be slow while antivirus scans a new executable.
+  /// The connection's threads, and everything after, never block this isolate.
   static RetroHostClient start({
     required List<String> command,
     Map<String, String>? environment,
@@ -178,7 +185,7 @@ class RetroHostClient {
         512,
       );
       if (client._connection == nullptr) {
-        client._callback.close();
+        unawaited(client._drained.future.then((_) => client._callback.close()));
         throw ProcessException(command.first, command.skip(1).toList(), error.toDartString());
       }
     } finally {
@@ -187,7 +194,7 @@ class RetroHostClient {
       calloc.free(error);
     }
     client.pid = retroHostPid(client._connection);
-    client._welcomeDeadline = DateTime.now().add(welcomeLimit);
+    client._welcomeDeadline = client._now + welcomeLimit;
     client._timer = Timer.periodic(_tick, (_) => client._checkTime());
     client._sendObject({
       'type': 'hello',
@@ -197,6 +204,8 @@ class RetroHostClient {
     });
     return client;
   }
+
+  Duration get _now => _clock.elapsed;
 
   static (Pointer<Pointer<Utf8>>, void Function()) _strings(List<String> values) {
     final array = calloc<Pointer<Utf8>>(values.length + 1);
@@ -271,7 +280,7 @@ class RetroHostClient {
   }
 
   Future<Object?> _send(String method, Object? args) {
-    if (_ended.isCompleted) return Future.value(_afterFailure(method));
+    if (_ended.isCompleted) return Future.sync(() => _afterFailure(method));
     if (!_greeted) throw StateError('No call may be sent before welcome.');
     if (method != 'volume' && !_capabilities.contains(retroCapabilityPs1)) {
       throw StateError('The host does not list the ps1 capability.');
@@ -286,7 +295,7 @@ class RetroHostClient {
     } on Object catch (error) {
       return Future.error(RetroCallError(RetroCallError.argument, 'The call cannot be sent: $error'));
     }
-    final pending = _Pending(_nextCallId++, method, args, DateTime.now().add(replyLimit));
+    final pending = _Pending(_nextCallId++, method, args, _now + replyLimit);
     final before = _expectedRumble();
     _calls.add(pending);
     if (method == 'start' || method == 'release') {
@@ -298,7 +307,8 @@ class RetroHostClient {
     return pending.completer.future;
   }
 
-  /// `start`: loads a game and gives its epoch.
+  /// `start`: loads a game and gives its epoch. Once the connection has ended it throws
+  /// [RetroHostGone], also while a failed game is still reported: the next game needs a new host.
   Future<int> startGame(Map<String, Object?> args) async => ((await call('start', args))! as Map)['epoch'] as int;
 
   /// `status`: null with no game loaded, and the short report of protocol.md "Host failure" after
@@ -322,7 +332,7 @@ class RetroHostClient {
     if (!_ended.isCompleted) {
       if (!_greeted) throw StateError('No call may be sent before welcome.');
       if (_stopDeadline == null) {
-        _stopDeadline = DateTime.now().add(stopLimit);
+        _stopDeadline = _now + stopLimit;
         _stopId = _nextCallId;
       }
     }
@@ -365,7 +375,7 @@ class RetroHostClient {
       return;
     }
     _shutdownSent = true;
-    _shutdownDeadline = DateTime.now().add(shutdownLimit);
+    _shutdownDeadline = _now + shutdownLimit;
     _sendObject({'type': 'shutdown'});
   }
 
@@ -375,9 +385,13 @@ class RetroHostClient {
     await _release();
   }
 
+  /// What a call gives once the connection has ended: protocol.md "Host failure" for a game that was
+  /// loaded, and [RetroHostGone] for `start`, which that section does not list, and for any call with
+  /// no game loaded.
   Object? _afterFailure(String method) {
     final failed = _failedStatus;
-    if (failed == null) throw RetroHostGone(_ended.isCompleted ? _endValue! : RetroHostEnd.hostFailure);
+    final gone = RetroHostGone(_endValue ?? RetroHostEnd.hostFailure);
+    if (failed == null) throw gone;
     switch (method) {
       case 'status':
         return failed.toFailureJson();
@@ -387,19 +401,28 @@ class RetroHostClient {
         return null;
       case 'connectedPorts' || 'changeDisc' || 'option':
         return false;
-      default:
+      case 'pause' || 'stop' || 'volume':
         return null;
+      default:
+        throw gone;
     }
   }
 
   RetroHostEnd? _endValue;
 
+  /// Events still on their way after the connection was freed, or after a start that failed, are
+  /// only cleaned up: a message's body is freed and its descriptor closed.
   void _onEvent(int token, int kind, Pointer<Uint8> data, int length, int extra) {
+    if (kind == RetroHostEvent.closed) {
+      _drained.complete();
+      return;
+    }
+    if (kind != RetroHostEvent.message && _connection == nullptr) return;
     switch (kind) {
       case RetroHostEvent.message:
         final body = Uint8List.fromList(data.asTypedList(length));
         retroHostFree(data.cast());
-        if (_closing || _ended.isCompleted) {
+        if (_closing || _ended.isCompleted || _connection == nullptr) {
           retroHostCloseDescriptor(extra);
           return;
         }
@@ -491,7 +514,7 @@ class RetroHostClient {
     if (hostPid != pid) throw RetroProtocolError('welcome.pid is $hostPid, not the host\'s process id $pid.');
     _greeted = true;
     _pixelFormat = format;
-    _nextPing = DateTime.now().add(pingEvery);
+    _nextPing = _now + pingEvery;
     call('volume', {'level': _volume, 'muted': _muted}).then(
       (_) {
         if (!_ready.isCompleted) _ready.complete();
@@ -721,7 +744,7 @@ class RetroHostClient {
 
   void _checkTime() {
     if (_ended.isCompleted || _connection == nullptr) return;
-    final now = DateTime.now();
+    final now = _now;
     final writeAge = retroHostWriteAgeMs(_connection);
     if (writeAge < 0) {
       _finish(RetroHostEnd.hostFailure, errorCode: RetroErrorCode.hostExited, kill: true);
@@ -729,14 +752,14 @@ class RetroHostClient {
     }
     final missed = switch (now) {
       _ when writeAge > writeLimit.inMilliseconds => 'A write to the host took longer than ${writeLimit.inSeconds} s.',
-      _ when !_greeted && !_unsupportedSeen && now.isAfter(_welcomeDeadline) =>
+      _ when !_greeted && !_unsupportedSeen && now > _welcomeDeadline =>
         'No welcome within ${welcomeLimit.inSeconds} s.',
-      _ when _calls.isNotEmpty && now.isAfter(_calls.first.deadline) =>
+      _ when _calls.isNotEmpty && now > _calls.first.deadline =>
         'No reply to ${_calls.first.method} within ${replyLimit.inSeconds} s.',
-      _ when _pings.isNotEmpty && now.isAfter(_pings.first.$2) => 'No pong within ${replyLimit.inSeconds} s.',
-      _ when _stopDeadline != null && now.isAfter(_stopDeadline!) =>
+      _ when _pings.isNotEmpty && now > _pings.first.$2 => 'No pong within ${replyLimit.inSeconds} s.',
+      _ when _stopDeadline != null && now > _stopDeadline! =>
         'The game had not ended ${stopLimit.inSeconds} s after stop.',
-      _ when _shutdownDeadline != null && now.isAfter(_shutdownDeadline!) =>
+      _ when _shutdownDeadline != null && now > _shutdownDeadline! =>
         'The host had not exited ${shutdownLimit.inSeconds} s after shutdown.',
       _ => null,
     };
@@ -745,11 +768,11 @@ class RetroHostClient {
       return;
     }
     final next = _nextPing;
-    if (next != null && !_shutdownSent && now.isAfter(next)) {
+    if (next != null && !_shutdownSent && now > next) {
       if (_nextPingId > RetroFields.maxId) return;
       final id = _nextPingId++;
-      _pings.add((id, now.add(replyLimit)));
-      _nextPing = now.add(pingEvery);
+      _pings.add((id, now + replyLimit));
+      _nextPing = now + pingEvery;
       _sendObject({'type': 'ping', 'id': id});
     }
   }
@@ -791,7 +814,9 @@ class RetroHostClient {
 
   Future<void>? _releasing;
 
-  /// Frees the connection once; every caller waits for the same release to finish.
+  /// Frees the connection once; every caller waits for the same release to finish. The callback is
+  /// closed only after the native side's last event, [RetroHostEvent.closed], has been handled, so
+  /// every message still queued for this isolate is freed, with its descriptor, rather than dropped.
   Future<void> _release() => _releasing ??= _releaseNow();
 
   Future<void> _releaseNow() async {
@@ -804,6 +829,7 @@ class RetroHostClient {
       _exitCode = code;
       _exited.complete(code);
     }
+    await _drained.future;
     _callback.close();
     _previousRing?.unmap();
     _ring?.unmap();
