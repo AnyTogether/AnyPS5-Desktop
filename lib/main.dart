@@ -42,6 +42,7 @@ import 'ui/profile_picture.dart';
 import 'ui/sealed_photo.dart';
 import 'ui/voice_note_player.dart';
 import 'ui/sharing_model.dart';
+import 'ui/startup_intro.dart';
 import 'ui/strings.dart';
 import 'ui/together_model.dart' show launcherVersion;
 import 'ui/theme.dart';
@@ -242,6 +243,9 @@ Future<void> main(List<String> arguments) async {
   unawaited(model.saveSync.refreshInfo());
   unawaited(model.engine.startupCheck());
   unawaited(model.updates.startupCheck());
+  // The home screen's start animation plays in the real launcher only: previews and tests
+  // build the home screen without it.
+  StartupIntro.enabled = true;
   // The home tiles' focus ring moves (tests leave it still).
   FocusRing.enabled = true;
   runApp(AnyPS5App(model: model));
