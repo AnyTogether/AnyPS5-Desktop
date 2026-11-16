@@ -147,11 +147,40 @@ Linux and macOS the writer and the exit watcher wait on one condition variable
 waiter: waking only one could wake the watcher and leave the message unsent.
 
 `close()` waits, inside `Isolate.run`, for the host and the threads; when the
-client gave up on the host itself, `close()` waits for that same release. Nothing on
-the UI isolate ever waits on the host, as the protocol's "Timeouts" section
-requires.
+client gave up on the host itself, `close()` waits for that same release. Once
+the host is started, nothing on the UI isolate ever waits on it, as the
+protocol's "Timeouts" section requires; the start itself is the one exception
+(below).
+
+**The last event.** Every close, and every start that fails, ends with a
+`closed` event, which the native side sends once every thread that reports
+events has finished. The client closes its callback only after handling it.
+Messages still queued for the isolate at that point (the exit is not always
+the last: the reader can still be passing on the stream when the 2 second
+limit above lets the exit through) are then freed, with any ring descriptor
+that came with them, instead of being dropped with the callback. A start that
+fails on Windows after the host's threads began tears them down the way
+`close()` does, so its `closed` event still comes.
+
+**Starting is not off the UI isolate.** `RetroHostClient.start` makes the
+process on the calling isolate and returns once it exists, with its pid, so
+`hello` goes out at once. On Windows that is as long as `CreateProcessW` takes,
+which can be slow while antivirus scans a new executable; on Linux it is the
+wait for the start thread. Moving it to another isolate would make `start`
+asynchronous for every caller, so it stays here; the UI should start the host
+where a short pause does not show.
+
+**Descriptors.** The reader looks at every control message of a read. If one
+is not `SCM_RIGHTS`, the control data was cut short, or a descriptor came
+where the protocol allows none, the message is a framing error and every
+descriptor that came with it is closed, also those in later items, as the
+protocol's "Framing" section asks of the receiver.
 
 ## Time limits and failures
+
+The limits are measured on a `Stopwatch`, which follows a monotonic clock, so
+a change of the wall clock, such as a correction after waking from sleep,
+cannot set one off.
 
 | Limit | Time | When it is missed |
 | --- | --- | --- |
@@ -182,7 +211,10 @@ loaded:
 - `connectedPorts`, `changeDisc` and `option` give false.
 
 This lasts until `release`. A call still waiting when the connection ends is
-answered the same way, and never left waiting.
+answered the same way, and never left waiting. `start` is not on the
+protocol's list: once the connection has ended it throws `RetroHostGone`, also
+while a failed game is still reported, since the next game needs a new host.
+Every other call throws `RetroHostGone` when no game was loaded.
 
 ## Frames
 
@@ -265,7 +297,9 @@ is the launcher's conformance test.
   frame shown, that a refused call keeps the calls in order, that a pause with
   no game does not silence the next game's rumble, and that the motors are
   zeroed when a rumble listener closes the client, when `connectedPorts(1)`
-  takes away port 2, and on a clean shutdown.
+  takes away port 2, and on a clean shutdown. Two check that `start` after a
+  host failure, and a `start` still waiting when the host fails, throw
+  `RetroHostGone` while the failed game stays reported.
 
 [`test/core/retro_host/retro_host_real_test.dart`](../test/core/retro_host/retro_host_real_test.dart)
 runs the client against the real host and the real SwanStation core, as the
@@ -286,7 +320,8 @@ host repository's `tests/real_core.py` does:
 [`test/core/retro_host/retro_host_environment_test.dart`](../test/core/retro_host/retro_host_environment_test.dart)
 covers how the host's environment is put together, and
 [`test/core/retro_host/retro_host_close_test.dart`](../test/core/retro_host/retro_host_close_test.dart)
-checks that a focus change after `close()` is ignored.
+checks that a start that fails throws `ProcessException` and that a focus
+change after `close()` is ignored.
 
 [`test/core/retro_host/strict_json_test.dart`](../test/core/retro_host/strict_json_test.dart)
 covers the JSON rules, and
@@ -300,11 +335,20 @@ the host repository. Python 3 must be on `PATH`:
 ANYPS5_RETRO_HOST_CHECKOUT=/path/to/anyps5-retro-host flutter test test/core/retro_host
 ```
 
-CI runs the test on Linux (in the test shards) and on macOS (in the goldens
-job), against the host repository at the commit named in
-`.github/workflows/ci.yml`. It also passes on Windows. That commit is the host
-repository's `main` at 9052aff with its fake host added, until the fake host is
-merged there.
+CI runs `test/core/retro_host` against the host repository at the commit
+named in `.github/workflows/ci.yml`:
+
+- on `ubuntu-latest` in the test shards, where glibc has `pidfd_spawn`;
+- on Ubuntu 22.04 in the Linux build job, where glibc 2.35 has none, so the
+  host is started with `posix_spawn` and its pidfd opened after and checked
+  through `/proc/<pid>/fd/3`, the path Debian 12 takes too;
+- on macOS in the goldens job, with `posix_spawn`;
+- on Windows in the Windows build job, with the handle list, the job object
+  and the ring's `DuplicateHandle`, `MapViewOfFile` and `VirtualQuery` checks.
+  The sessions that are only for Linux and macOS skip themselves there.
+
+That commit is the host repository's `main` with its fake host merged
+(AnyTogether/anyps5-retro-host#10).
 
 [`test/core/retro_host/retro_status_test.dart`](../test/core/retro_host/retro_status_test.dart)
 covers how a `status` is read, and reads every status the fixture sessions send

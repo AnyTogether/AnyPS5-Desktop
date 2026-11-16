@@ -27,6 +27,7 @@
 #define EVENT_END 1
 #define EVENT_FRAMING 2
 #define EVENT_EXITED 3
+#define EVENT_CLOSED 4
 
 // The `extra` of EVENT_EXITED when the exit code could not be read: another
 // part of the launcher reaped the host first (Linux without pidfd only).
@@ -279,8 +280,15 @@ static void close_handle(HANDLE* handle) {
   *handle = NULL;
 }
 
-ANYPS5_EXPORT void* anyps5_rh_start(const char* const* argv, int32_t argc, const char* const* env, int32_t envc,
-                                    int64_t token, anyps5_rh_callback callback, char* error, int32_t error_size) {
+// Cancels the thread's synchronous I/O until it has finished: a cancel only
+// reaches a call already in progress, so one made just before the thread's next
+// ReadFile or WriteFile would be missed.
+static void stop_thread(HANDLE thread) {
+  while (WaitForSingleObject(thread, 20) == WAIT_TIMEOUT) CancelSynchronousIo(thread);
+}
+
+static void* start_connection(const char* const* argv, int32_t argc, const char* const* env, int32_t envc,
+                              int64_t token, anyps5_rh_callback callback, char* error, int32_t error_size) {
   if (argc < 1) {
     set_error(error, error_size, "No host program was given.");
     return NULL;
@@ -413,16 +421,19 @@ fail:
   free(block);
   close_handle(&host_read);
   close_handle(&host_write);
-  if (started) TerminateProcess(c->process, 1);
-  close_handle(&c->write_pipe);
-  close_handle(&c->read_pipe);
+  if (started) {
+    TerminateProcess(c->process, 1);
+    WaitForSingleObject(c->process, INFINITE);
+  }
   EnterCriticalSection(&c->lock);
   c->closing = 1;
   WakeAllConditionVariable(&c->wake);
   LeaveCriticalSection(&c->lock);
-  if (c->writer) WaitForSingleObject(c->writer, INFINITE);
-  if (c->reader) WaitForSingleObject(c->reader, INFINITE);
+  if (c->writer) stop_thread(c->writer);
+  if (c->reader) stop_thread(c->reader);
   if (c->waiter) WaitForSingleObject(c->waiter, INFINITE);
+  close_handle(&c->write_pipe);
+  close_handle(&c->read_pipe);
   close_handle(&c->writer);
   close_handle(&c->reader);
   close_handle(&c->waiter);
@@ -445,16 +456,9 @@ ANYPS5_EXPORT int64_t anyps5_rh_write_age_ms(void* handle) {
   return (int64_t)(GetTickCount64() - (ULONGLONG)started);
 }
 
-// Cancels the thread's synchronous I/O until it has finished: a cancel only
-// reaches a call already in progress, so one made just before the thread's next
-// ReadFile or WriteFile would be missed.
-static void stop_thread(HANDLE thread) {
-  while (WaitForSingleObject(thread, 20) == WAIT_TIMEOUT) CancelSynchronousIo(thread);
-}
-
 // Gives the host's exit code as EVENT_EXITED does, since that event may still be
-// on its way to Dart when the callback is closed.
-ANYPS5_EXPORT int64_t anyps5_rh_close(void* handle) {
+// on its way to Dart when close returns.
+static int64_t close_connection(void* handle) {
   Connection* c = (Connection*)handle;
   TerminateJobObject(c->job, 1);
   TerminateProcess(c->process, 1);
@@ -600,7 +604,9 @@ static void close_received(int* descriptors, int count) {
 // Reads `size` bytes of one part of a message (its length, or its body).
 // Descriptors may only come with the first byte of a length (protocol.md
 // "Framing"); `first` says this read holds it. Returns 1, 0 at end of stream,
-// or -1 for a framing error.
+// or -1 for a framing error. Every control message is looked at, and on an
+// error every descriptor that came with the message is closed: those of this
+// read in every SCM_RIGHTS item, and the one an earlier read of it kept.
 static int read_part(Connection* c, uint8_t* out, size_t size, int first, int* descriptors, int* count) {
   size_t done = 0;
   while (done < size) {
@@ -628,24 +634,28 @@ static int read_part(Connection* c, uint8_t* out, size_t size, int first, int* d
     }
     int received[4];
     int held = 0;
+    int broken = (message.msg_flags & MSG_CTRUNC) != 0;
     for (struct cmsghdr* item = CMSG_FIRSTHDR(&message); item; item = CMSG_NXTHDR(&message, item)) {
-      if (item->cmsg_level == SOL_SOCKET && item->cmsg_type == SCM_RIGHTS) {
-        int n = (int)((item->cmsg_len - CMSG_LEN(0)) / sizeof(int));
-        for (int i = 0; i < n && held < 4; ++i) {
-          memcpy(&received[held], CMSG_DATA(item) + i * sizeof(int), sizeof(int));
+      if (item->cmsg_level != SOL_SOCKET || item->cmsg_type != SCM_RIGHTS) {
+        broken = 1;
+        continue;
+      }
+      int n = (int)((item->cmsg_len - CMSG_LEN(0)) / sizeof(int));
+      for (int i = 0; i < n; ++i) {
+        int descriptor;
+        memcpy(&descriptor, CMSG_DATA(item) + i * sizeof(int), sizeof(int));
+        if (held < 4) {
 #if !defined(MSG_CMSG_CLOEXEC)
-          fcntl(received[held], F_SETFD, FD_CLOEXEC);
+          fcntl(descriptor, F_SETFD, FD_CLOEXEC);
 #endif
-          ++held;
+          received[held++] = descriptor;
+        } else {
+          close(descriptor);
+          broken = 1;
         }
-      } else {
-        close_received(received, held);
-        close_received(descriptors, *count);
-        *count = 0;
-        return -1;
       }
     }
-    if (message.msg_flags & MSG_CTRUNC) {
+    if (broken) {
       close_received(received, held);
       close_received(descriptors, *count);
       *count = 0;
@@ -1040,8 +1050,8 @@ static void signal_host(pid_t pid, int pidfd, int lost) {
   if (!lost) kill(pid, SIGKILL);
 }
 
-ANYPS5_EXPORT void* anyps5_rh_start(const char* const* argv, int32_t argc, const char* const* env, int32_t envc,
-                                    int64_t token, anyps5_rh_callback callback, char* error, int32_t error_size) {
+static void* start_connection(const char* const* argv, int32_t argc, const char* const* env, int32_t envc,
+                              int64_t token, anyps5_rh_callback callback, char* error, int32_t error_size) {
   if (argc < 1) {
     set_error(error, error_size, "No host program was given.");
     return NULL;
@@ -1165,8 +1175,8 @@ ANYPS5_EXPORT int64_t anyps5_rh_write_age_ms(void* handle) {
 }
 
 // Gives the host's exit code as EVENT_EXITED does, since that event may still be
-// on its way to Dart when the callback is closed.
-ANYPS5_EXPORT int64_t anyps5_rh_close(void* handle) {
+// on its way to Dart when close returns.
+static int64_t close_connection(void* handle) {
   Connection* c = (Connection*)handle;
   anyps5_rh_kill(c);
   shutdown(c->socket, SHUT_RDWR);
@@ -1280,3 +1290,23 @@ ANYPS5_EXPORT int32_t anyps5_rh_send(void* handle, const uint8_t* data, int32_t 
 }
 
 ANYPS5_EXPORT void anyps5_rh_free(void* data) { free(data); }
+
+// Every start that fails and every close end with EVENT_CLOSED, sent once the
+// threads that report events have finished, so it is the connection's last
+// event: Dart closes its callback only then, and so still frees every message
+// and descriptor that was on its way.
+ANYPS5_EXPORT void* anyps5_rh_start(const char* const* argv, int32_t argc, const char* const* env, int32_t envc,
+                                    int64_t token, anyps5_rh_callback callback, char* error, int32_t error_size) {
+  void* c = start_connection(argv, argc, env, envc, token, callback, error, error_size);
+  if (!c && callback) callback(token, EVENT_CLOSED, NULL, 0, -1);
+  return c;
+}
+
+ANYPS5_EXPORT int64_t anyps5_rh_close(void* handle) {
+  Connection* c = (Connection*)handle;
+  const anyps5_rh_callback callback = c->callback;
+  const int64_t token = c->token;
+  const int64_t code = close_connection(handle);
+  callback(token, EVENT_CLOSED, NULL, 0, code);
+  return code;
+}

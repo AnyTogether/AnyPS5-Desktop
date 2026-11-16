@@ -478,6 +478,44 @@ void main() {
     ),
     timeout: const Timeout(Duration(seconds: 90)),
   );
+  test(
+    'start after a host failure throws RetroHostGone and keeps the failed game reported',
+    () => _playOwn(
+      checkout,
+      python,
+      'a game runs, then the host exits unasked.',
+      'hostFailure',
+      [
+        ..._startCall(checkout),
+        {'hostExits': 1},
+      ],
+      check: (session) => expectLater(() async {
+        await expectLater(session.client.startGame({}), throwsA(isA<RetroHostGone>()));
+        await expectLater(session.client.call('start', {}), throwsA(isA<RetroHostGone>()));
+        return session.client.status();
+      }(), completion(_failedGame)),
+    ),
+    timeout: const Timeout(Duration(seconds: 90)),
+  );
+  test(
+    'a start still waiting when the host fails throws RetroHostGone',
+    () => _playOwn(
+      checkout,
+      python,
+      'a game runs, a second start is sent, then the host exits unasked before answering it.',
+      'hostFailure',
+      [
+        ..._startCall(checkout),
+        _secondStart(checkout, 3),
+        {'hostExits': 1},
+      ],
+      check: (session) => expectLater(() async {
+        await expectLater(session.calls.last, throwsA(isA<RetroHostGone>()));
+        return session.client.status();
+      }(), completion(_failedGame)),
+    ),
+    timeout: const Timeout(Duration(seconds: 90)),
+  );
   test('a status answered before stop does not lift the stop time limit', () async {
     final fixture =
         (jsonDecode(File(p.join(checkout, 'fixtures', 'v1', 'sessions', 'stop-deadline.json')).readAsStringSync())
@@ -577,7 +615,7 @@ Future<void> _playOwn(
   String outcome,
   List<Map<String, Object?>> steps, {
   Future<void> Function(RetroHostClient client)? afterReady,
-  void Function(_Session session)? check,
+  FutureOr<void> Function(_Session session)? check,
 }) async {
   final directory = Directory.systemTemp.createTempSync('retro-host-own-');
   try {
@@ -670,7 +708,7 @@ class _Session {
   final Future<void> Function(RetroHostClient client)? afterReady;
 
   /// Runs once the host has exited, before the outcome is checked.
-  final void Function(_Session session)? check;
+  final FutureOr<void> Function(_Session session)? check;
   final rumbles = <RetroRumble>[];
 
   final String checkout;
@@ -713,7 +751,7 @@ class _Session {
       await _steps(report);
       final end = await client.ended.timeout(const Duration(seconds: 40));
       await client.exited.timeout(const Duration(seconds: 20));
-      check?.call(this);
+      await check?.call(this);
       expect(end.name, session['outcome'], reason: 'outcome (${client.failureReason ?? 'no reason'})');
       // Nothing else in this test reaps children, so the host's exit code must be known: on Linux
       // that shows the client kept the host's pidfd (docs/AnyPS5 Desktop - Emulator Host Client.md).
@@ -790,7 +828,9 @@ class _Session {
               stopping = null;
               calls.add(stopped.then((status) => status?.toJson()));
             } else {
-              calls.add(client.call(method, _fill(message['args'])));
+              final pending = client.call(method, _fill(message['args']));
+              unawaited(pending.then((_) {}, onError: (_) {}));
+              calls.add(pending);
             }
           case 'input':
             client.input(

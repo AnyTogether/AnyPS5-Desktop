@@ -26,6 +26,11 @@ abstract final class RetroHostEvent {
   /// else still holds the host's end of the stream: then it comes 2 seconds after the exit.
   static const exited = 3;
 
+  /// The connection's last event, after every thread that reports events has finished: sent by
+  /// [retroHostClose] and by a [retroHostStart] that fails. Until it comes, events may still be on
+  /// their way, so the callback must stay open to free their messages and descriptors.
+  static const closed = 4;
+
   /// The exit code could not be read: on Linux, the Dart VM reaped the host before the client read
   /// it (docs/AnyPS5 Desktop - Emulator Host Client.md).
   static const exitUnknown = -9223372036854775808;
@@ -39,6 +44,10 @@ typedef RetroHostCallbackNative = Void Function(
   Int64 extra,
 );
 
+/// Starts the host and its stream's threads, or gives null with the reason in [error]. It runs on
+/// the calling thread and returns once the process exists: on Windows after `CreateProcessW`, which
+/// can be slow while antivirus scans a new executable; on Linux after the start thread has run
+/// `posix_spawn`.
 @Native<
   Pointer<Void> Function(
     Pointer<Pointer<Utf8>>,
@@ -77,8 +86,8 @@ external int retroHostWriteAgeMs(Pointer<Void> connection);
 external void retroHostKill(Pointer<Void> connection);
 
 /// Kills the host if it still runs, waits for it and for the stream's threads, and frees the
-/// connection; gives the exit code as [RetroHostEvent.exited] does. It blocks, so callers run it
-/// off the UI isolate.
+/// connection; gives the exit code as [RetroHostEvent.exited] does, and sends
+/// [RetroHostEvent.closed] last. It blocks, so callers run it off the UI isolate.
 @Native<Int64 Function(Pointer<Void>)>(symbol: 'anyps5_rh_close')
 external int retroHostClose(Pointer<Void> connection);
 

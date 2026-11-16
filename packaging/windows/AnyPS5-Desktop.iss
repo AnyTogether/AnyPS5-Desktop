@@ -68,6 +68,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [InstallDelete]
 ; Files of an older version that the new one no longer ships.
 Type: filesandordirs; Name: "{app}\data"
+; media_kit's debug zlib.dll, which releases before this one shipped (windows/CMakeLists.txt).
+Type: files; Name: "{app}\zlib.dll"
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

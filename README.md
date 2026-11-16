@@ -482,6 +482,13 @@ use those once changed in the game.
   packaging if the bundle has a libmpv or links one, and CI starts the launcher from the .deb on
   clean Ubuntu 22.04 and 24.04 with apt's libmpv and again without it
   (`packaging/linux/check-libmpv.sh`).
+- No Windows binary may need the Visual C++ debug runtime (`MSVCP140D.dll`, `VCRUNTIME140D.dll`,
+  `ucrtbased.dll`): only Visual Studio installs it and it may not be shipped.
+  media_kit_libs_windows_video 1.0.11 (also its main branch in November 2026) bundles the
+  `zlib.dll` of its ANGLE archive, a debug build that nothing imports or loads, so
+  `windows/CMakeLists.txt` leaves it out. `packaging/windows/check-debug-runtime.ps1` reads the
+  imports of every .exe and .dll in the release folder and fails on a debug runtime;
+  `build-installer.ps1` and CI run it. The installer deletes the copy an older release left.
 
 - Nightly builds: `.github/workflows/nightly.yml` builds main once a day when the launcher
   changed and publishes an unsigned pre-release, `v<next>-nightly.<YYYYMMDD>.<n>`. The launcher's

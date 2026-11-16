@@ -81,6 +81,16 @@ install(FILES "${FLUTTER_ICU_DATA_FILE}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}
 install(FILES "${FLUTTER_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   COMPONENT Runtime)
 
+# media_kit_libs_windows_video lists the zlib.dll of its ANGLE.7z among the libraries it bundles.
+# That zlib.dll is a debug build (it imports VCRUNTIME140D.dll and ucrtbased.dll, which only Visual
+# Studio installs and which may not be shipped), and nothing imports or loads it: libEGL.dll and
+# libGLESv2.dll do not import it and libmpv-2.dll has zlib built in. It stays out of the bundle, and
+# a copy from an earlier build is removed (packaging/windows/check-debug-runtime.ps1 checks the bundle).
+list(REMOVE_ITEM PLUGIN_BUNDLED_LIBRARIES "${CMAKE_BINARY_DIR}/ANGLE/zlib.dll")
+install(CODE "
+  file(REMOVE \"${INSTALL_BUNDLE_LIB_DIR}/zlib.dll\")
+  " COMPONENT Runtime)
+
 if(PLUGIN_BUNDLED_LIBRARIES)
   install(FILES "${PLUGIN_BUNDLED_LIBRARIES}"
     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
