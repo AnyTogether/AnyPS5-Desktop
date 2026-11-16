@@ -85,6 +85,9 @@ void main() {
     expect(retroOptionSection('other_core_option'), RetroOptionSection.advanced);
     expect(retroOptionShown('swanstation_Console_Enable8MBRAM'), isFalse);
     expect(retroOptionShown('swanstation_Console_Region'), isTrue);
+    expect(retroOptionSent('swanstation_Console_Region'), isTrue);
+    expect(retroOptionSent('swanstation_Console_Enable8MBRAM'), isFalse);
+    expect(retroOptionSent('swanstation_GPU_ResolutionScale'), isFalse, reason: 'no Graphics page yet');
   });
 
   test('SwanStation\'s own (Restart) leaves the title, since the menu says it under each such option', () {

@@ -235,7 +235,7 @@ extension RetroHostPlaying on AppModel {
         saves: p.normalize(paths.retroSaves),
         options: {
           for (final MapEntry(:key, :value) in preferences.retroHostOptions.entries)
-            if (retroOptionShown(key)) key: value,
+            if (retroOptionSent(key)) key: value,
         },
       ),
     );

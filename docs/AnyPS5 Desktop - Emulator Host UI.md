@@ -283,7 +283,9 @@ replacements (the host gives SwanStation no texture folder), the development
 console's 8 MB of RAM (no game sold uses it), the CPU recompiler's three
 debugging switches, and the light gun crosshair (the host plugs in only
 DualShocks). A value kept for one of them from before is not sent in `start`,
-so nobody is left with a setting they can no longer change.
+so nobody is left with a setting they can no longer change. For the same
+reason a value kept for a graphics option is not sent either until the
+Graphics page exists (`retroOptionSent`).
 
 `open()` pauses the game (`pause` with `true`, the same as the player's own
 pause) and sets the controls' `suspended`, so presses in the menu never reach
@@ -374,8 +376,9 @@ The stick modifier tilts the keyboard's sticks by the game's stick modifier
 scale. Mouse buttons and the wheel are not read. The keys are read from
 Flutter's `HardwareKeyboard.physicalKeysPressed` at each poll. While the game's
 screen is in front, the launcher's own keys do nothing: only the in-game
-shortcuts of Settings › Shortcuts (PS, the quick menu, a screenshot, a clip)
-and full screen act. A PS1 game's Game Settings has a **Controls** row for its
+shortcuts of Settings › Shortcuts and full screen act. PS opens the game's
+menu; the screenshot and clip shortcuts do nothing for a game in the host
+yet, since they follow a game the launcher started as its own process. A PS1 game's Game Settings has a **Controls** row for its
 keys.
 
 **The game's screen.** `RetroPlayView` draws the game over the whole window,

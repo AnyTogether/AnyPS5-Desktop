@@ -65,7 +65,10 @@ void main() {
       ..setRetroHostPs1(true)
       ..preferences.retroHostVolume = 40
       ..preferences.retroHostMuted = true
-      ..preferences.retroHostOptions['swanstation_GPU_ResolutionScale'] = '2';
+      ..preferences.retroHostOptions.addAll({
+        'swanstation_CDROM_ReadSpeedup': '2',
+        'swanstation_GPU_ResolutionScale': '2',
+      });
     expect(model.stateOf(launcher.game), isA<Installed>(), reason: 'no DuckStation needed');
     expect(launcher.emulatorSettings().rows.map((row) => row.id), contains('retro-host-bios'));
     model.closeOverlay();
@@ -87,8 +90,8 @@ void main() {
       'disc': p.normalize(launcher.disc),
       'system': p.normalize(model.paths.retroSystem),
       'saves': p.normalize(model.paths.retroSaves),
-      'options': {'swanstation_GPU_ResolutionScale': '2'},
-    });
+      'options': {'swanstation_CDROM_ReadSpeedup': '2'},
+    }, reason: 'a graphics option has no page yet, so it is kept back');
     expect(Directory(model.paths.retroSystem).existsSync(), isTrue);
     expect(model.preferences.lastPlayed[launcher.game.id], isNotNull);
 

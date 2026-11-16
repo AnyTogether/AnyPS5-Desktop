@@ -55,6 +55,14 @@ RetroOptionSection? retroOptionSection(String key) {
 /// Whether the option at [key] is shown somewhere, so a value kept for it is sent to the host.
 bool retroOptionShown(String key) => retroOptionSection(key) != null;
 
+/// Whether a value kept for [key] goes to a game's `start`: one the in-game menu shows. A graphics
+/// option is kept back too, since the launcher has no page yet where the player could see or
+/// change it.
+bool retroOptionSent(String key) {
+  final section = retroOptionSection(key);
+  return section != null && section != RetroOptionSection.graphics;
+}
+
 /// An option's title without SwanStation's own " (Restart)": the menu says that under every option
 /// that takes effect only when the game starts again, not only under those SwanStation named so.
 String retroOptionTitle(String title) {
