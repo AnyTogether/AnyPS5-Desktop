@@ -280,6 +280,13 @@ static void close_handle(HANDLE* handle) {
   *handle = NULL;
 }
 
+// Cancels the thread's synchronous I/O until it has finished: a cancel only
+// reaches a call already in progress, so one made just before the thread's next
+// ReadFile or WriteFile would be missed.
+static void stop_thread(HANDLE thread) {
+  while (WaitForSingleObject(thread, 20) == WAIT_TIMEOUT) CancelSynchronousIo(thread);
+}
+
 static void* start_connection(const char* const* argv, int32_t argc, const char* const* env, int32_t envc,
                               int64_t token, anyps5_rh_callback callback, char* error, int32_t error_size) {
   if (argc < 1) {
@@ -414,16 +421,19 @@ fail:
   free(block);
   close_handle(&host_read);
   close_handle(&host_write);
-  if (started) TerminateProcess(c->process, 1);
-  close_handle(&c->write_pipe);
-  close_handle(&c->read_pipe);
+  if (started) {
+    TerminateProcess(c->process, 1);
+    WaitForSingleObject(c->process, INFINITE);
+  }
   EnterCriticalSection(&c->lock);
   c->closing = 1;
   WakeAllConditionVariable(&c->wake);
   LeaveCriticalSection(&c->lock);
-  if (c->writer) WaitForSingleObject(c->writer, INFINITE);
-  if (c->reader) WaitForSingleObject(c->reader, INFINITE);
+  if (c->writer) stop_thread(c->writer);
+  if (c->reader) stop_thread(c->reader);
   if (c->waiter) WaitForSingleObject(c->waiter, INFINITE);
+  close_handle(&c->write_pipe);
+  close_handle(&c->read_pipe);
   close_handle(&c->writer);
   close_handle(&c->reader);
   close_handle(&c->waiter);
@@ -444,13 +454,6 @@ ANYPS5_EXPORT int64_t anyps5_rh_write_age_ms(void* handle) {
   if (started < 0) return -1;
   if (started == 0) return 0;
   return (int64_t)(GetTickCount64() - (ULONGLONG)started);
-}
-
-// Cancels the thread's synchronous I/O until it has finished: a cancel only
-// reaches a call already in progress, so one made just before the thread's next
-// ReadFile or WriteFile would be missed.
-static void stop_thread(HANDLE thread) {
-  while (WaitForSingleObject(thread, 20) == WAIT_TIMEOUT) CancelSynchronousIo(thread);
 }
 
 // Gives the host's exit code as EVENT_EXITED does, since that event may still be

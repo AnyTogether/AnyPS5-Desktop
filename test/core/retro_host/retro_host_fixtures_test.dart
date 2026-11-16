@@ -615,7 +615,7 @@ Future<void> _playOwn(
   String outcome,
   List<Map<String, Object?>> steps, {
   Future<void> Function(RetroHostClient client)? afterReady,
-  void Function(_Session session)? check,
+  FutureOr<void> Function(_Session session)? check,
 }) async {
   final directory = Directory.systemTemp.createTempSync('retro-host-own-');
   try {
@@ -708,7 +708,7 @@ class _Session {
   final Future<void> Function(RetroHostClient client)? afterReady;
 
   /// Runs once the host has exited, before the outcome is checked.
-  final void Function(_Session session)? check;
+  final FutureOr<void> Function(_Session session)? check;
   final rumbles = <RetroRumble>[];
 
   final String checkout;
@@ -751,7 +751,7 @@ class _Session {
       await _steps(report);
       final end = await client.ended.timeout(const Duration(seconds: 40));
       await client.exited.timeout(const Duration(seconds: 20));
-      check?.call(this);
+      await check?.call(this);
       expect(end.name, session['outcome'], reason: 'outcome (${client.failureReason ?? 'no reason'})');
       // Nothing else in this test reaps children, so the host's exit code must be known: on Linux
       // that shows the client kept the host's pidfd (docs/AnyPS5 Desktop - Emulator Host Client.md).

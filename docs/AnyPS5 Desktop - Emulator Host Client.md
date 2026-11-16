@@ -138,9 +138,10 @@ Linux and macOS the writer and the exit watcher wait on one condition variable
 waiter: waking only one could wake the watcher and leave the message unsent.
 
 `close()` waits, inside `Isolate.run`, for the host and the threads; when the
-client gave up on the host itself, `close()` waits for that same release. Nothing on
-the UI isolate ever waits on the host, as the protocol's "Timeouts" section
-requires.
+client gave up on the host itself, `close()` waits for that same release. Once
+the host is started, nothing on the UI isolate ever waits on it, as the
+protocol's "Timeouts" section requires; the start itself is the one exception
+(below).
 
 **The last event.** Every close, and every start that fails, ends with a
 `closed` event, which the native side sends once every thread that reports
@@ -148,7 +149,9 @@ events has finished. The client closes its callback only after handling it.
 Messages still queued for the isolate at that point (the exit is not always
 the last: the reader can still be passing on the stream when the 2 second
 limit above lets the exit through) are then freed, with any ring descriptor
-that came with them, instead of being dropped with the callback.
+that came with them, instead of being dropped with the callback. A start that
+fails on Windows after the host's threads began tears them down the way
+`close()` does, so its `closed` event still comes.
 
 **Starting is not off the UI isolate.** `RetroHostClient.start` makes the
 process on the calling isolate and returns once it exists, with its pid, so
