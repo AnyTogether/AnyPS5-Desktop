@@ -1,1 +1,0 @@
-- **A report of the launcher not responding says what it was doing up to its last second.** Its last seconds used to stop up to four seconds before the stall began, and they now also say which game was starting or playing (by its title ID), as on the Mac. A stall that happens while a game starts, while it plays or after it closes can then be told apart.
