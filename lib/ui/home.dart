@@ -21,6 +21,7 @@ import 'padlock.dart';
 import 'panels.dart' show StatusDot;
 import 'profiles_view.dart' show ProfileSwitcherList, ProfileTile;
 import 'retro_folder_tile.dart';
+import 'startup_intro.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'together_model.dart';
@@ -150,9 +151,31 @@ class HomeView extends StatefulWidget {
   State<HomeView> createState() => _HomeViewState();
 }
 
-class _HomeViewState extends State<HomeView> {
+class _HomeViewState extends State<HomeView> with SingleTickerProviderStateMixin {
   /// Ties the profile list to the picture in the top bar it drops from.
   final LayerLink _profileLink = LayerLink();
+
+  /// The start animation (StartupIntro), once per run; null when it does not play. Afterwards
+  /// everything is built with a finished animation, so the widgets stay the same.
+  AnimationController? _intro;
+
+  Animation<double> get _introAnimation => _intro ?? const AlwaysStoppedAnimation(1.0);
+
+  @override
+  void initState() {
+    super.initState();
+    // Not with a game starting or running (a Steam shortcut goes straight into it).
+    if (StartupIntro.shouldPlay() && widget.model.starting == null && widget.model.running == null) {
+      StartupIntro.played = true;
+      _intro = AnimationController(vsync: this, duration: StartupIntro.duration)..forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _intro?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -166,6 +189,7 @@ class _HomeViewState extends State<HomeView> {
         fit: StackFit.expand,
         children: [
           _body(context, model, now, scale, game),
+          if (_intro != null) IntroCurtain(animation: _intro!, deep: model.palette.deep),
           if (model.profileListOpen) ...[
             // A click anywhere else closes the list, and still does what it was for.
             Positioned.fill(
@@ -195,41 +219,60 @@ class _HomeViewState extends State<HomeView> {
       children: [
         Padding(
           padding: EdgeInsets.fromLTRB(64 * scale, 34 * scale, 64 * scale, 0),
-          child: TopBar(model: model, now: now, profileLink: _profileLink),
+          child: IntroReveal(
+            animation: _introAnimation,
+            span: StartupIntro.topBar,
+            slide: const Offset(0, -0.4),
+            child: TopBar(model: model, now: now, profileLink: _profileLink),
+          ),
         ),
         if (model.games.isEmpty)
           Expanded(child: EmptyLibrary(model: model))
         else ...[
           SizedBox(height: 34 * scale),
-          TileRow(model: model),
+          TileRow(model: model, intro: _introAnimation),
           if (model.homeFolderPlatform != null) ...[
             SizedBox(height: 24 * scale),
-            TileRow(key: const ValueKey('retro-folder-games'), model: model, folderContents: true),
+            TileRow(
+              key: const ValueKey('retro-folder-games'),
+              model: model,
+              folderContents: true,
+              intro: _introAnimation,
+            ),
           ],
           const Spacer(),
           if (game != null)
-            AnimatedSwitcher(
-              layoutBuilder: uniqueSwitcherLayout(),
-              duration: Motion.layout,
-              switchInCurve: Motion.settle,
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween(begin: const Offset(0, 0.04), end: Offset.zero).animate(animation),
-                  child: child,
+            IntroReveal(
+              animation: _introAnimation,
+              span: StartupIntro.hero,
+              slide: const Offset(0, 0.06),
+              child: AnimatedSwitcher(
+                layoutBuilder: uniqueSwitcherLayout(),
+                duration: Motion.layout,
+                switchInCurve: Motion.settle,
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween(begin: const Offset(0, 0.04), end: Offset.zero).animate(animation),
+                    child: child,
+                  ),
                 ),
-              ),
-              child: Padding(
-                key: ValueKey(game.id),
-                padding: EdgeInsets.symmetric(horizontal: 72 * scale),
-                child: HeroInfo(model: model, game: game),
+                child: Padding(
+                  key: ValueKey(game.id),
+                  padding: EdgeInsets.symmetric(horizontal: 72 * scale),
+                  child: HeroInfo(model: model, game: game),
+                ),
               ),
             ),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 64 * scale, vertical: 28 * scale),
             child: Align(
               alignment: AlignmentDirectional.centerEnd,
-              child: Legible(softness: 14, child: HintBar(options: model.selectedHomeFolder == null)),
+              child: IntroReveal(
+                animation: _introAnimation,
+                span: StartupIntro.hints,
+                child: Legible(softness: 14, child: HintBar(options: model.selectedHomeFolder == null)),
+              ),
             ),
           ),
         ],
@@ -744,10 +787,18 @@ class PhoneIndicator extends StatelessWidget {
 /// console. The tiles are top-aligned and the next ones follow right after the selected one; the
 /// previous game stays visible on the left, cut by the edge.
 class TileRow extends StatelessWidget {
-  const TileRow({super.key, required this.model, this.folderContents = false});
+  const TileRow({
+    super.key,
+    required this.model,
+    this.folderContents = false,
+    this.intro = const AlwaysStoppedAnimation(1.0),
+  });
 
   final AppModel model;
   final bool folderContents;
+
+  /// The start animation (StartupIntro): each tile pops in on its turn.
+  final Animation<double> intro;
 
   @override
   Widget build(BuildContext context) {
@@ -798,42 +849,48 @@ class TileRow extends StatelessWidget {
                     top: 0,
                     width: size,
                     height: size,
-                    child: AnimatedOpacity(
-                      duration: Motion.layout,
-                      opacity: offset < 0 ? (offset == -1 ? tilePeekOpacity : 0) : 1,
-                      // A click selects at once (a GestureDetector with a double tap would wait to
-                      // see whether a second click comes); a second click plays.
-                      child: Pressable(
-                        key: ValueKey('tile-press-$id'),
-                        onHover: console != null && !selected && offset >= 0
-                            ? () {
-                                if (!model.panning && model.overlay == null) {
-                                  model.selectHomeTile(index, folderContents: folderContents);
+                    child: IntroReveal(
+                      animation: intro,
+                      span: StartupIntro.tile(index),
+                      slide: const Offset(0, 0.12),
+                      scaleFrom: 0.82,
+                      child: AnimatedOpacity(
+                        duration: Motion.layout,
+                        opacity: offset < 0 ? (offset == -1 ? tilePeekOpacity : 0) : 1,
+                        // A click selects at once (a GestureDetector with a double tap would wait to
+                        // see whether a second click comes); a second click plays.
+                        child: Pressable(
+                          key: ValueKey('tile-press-$id'),
+                          onHover: console != null && !selected && offset >= 0
+                              ? () {
+                                  if (!model.panning && model.overlay == null) {
+                                    model.selectHomeTile(index, folderContents: folderContents);
+                                  }
                                 }
-                              }
-                            : null,
-                        onTap: () {
-                          model.selectHomeTile(index, folderContents: folderContents);
-                          if (console != null) model.openSelectedHomeFolder();
-                        },
-                        onDoubleTap: console == null
-                            ? () {
-                                model.selectHomeTile(index, folderContents: folderContents);
-                                model.primaryAction(game);
-                              }
-                            : null,
-                        builder: (context, _) {
-                          final focused = selected && rowFocused && model.focus.isTiles && model.overlay == null;
-                          if (console != null) {
-                            return RetroFolderTile(
-                              console: console,
-                              size: size,
-                              focused: focused,
-                              accent: model.accentChoice.color,
-                            );
-                          }
-                          return GameTile(model: model, game: game, size: size, focused: focused);
-                        },
+                              : null,
+                          onTap: () {
+                            model.selectHomeTile(index, folderContents: folderContents);
+                            if (console != null) model.openSelectedHomeFolder();
+                          },
+                          onDoubleTap: console == null
+                              ? () {
+                                  model.selectHomeTile(index, folderContents: folderContents);
+                                  model.primaryAction(game);
+                                }
+                              : null,
+                          builder: (context, _) {
+                            final focused = selected && rowFocused && model.focus.isTiles && model.overlay == null;
+                            if (console != null) {
+                              return RetroFolderTile(
+                                console: console,
+                                size: size,
+                                focused: focused,
+                                accent: model.accentChoice.color,
+                              );
+                            }
+                            return GameTile(model: model, game: game, size: size, focused: focused);
+                          },
+                        ),
                       ),
                     ),
                   ),
