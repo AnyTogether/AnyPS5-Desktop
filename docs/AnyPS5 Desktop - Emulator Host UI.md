@@ -168,8 +168,12 @@ one kept from the last game, or a fake in the tests.
   The window's focus is given back to the host (`inputFocus` true), as a new
   host starts with it, since the next game tells it its own.
 
-Nothing here waits on the host on the UI thread. Every wait is a `Future`,
-and the client's time limits make sure each one ends.
+After the host process exists, nothing here waits on the host on the UI
+thread: every wait is a `Future`, and the client's time limits make sure each
+one ends. Starting the process is the exception. `RetroHostClient.start` runs
+on the UI isolate and returns once the process exists, so on Windows it takes
+as long as `CreateProcessW`, which can be slow while antivirus scans a new
+host executable.
 
 ## Controllers: `RetroHostControls`
 
