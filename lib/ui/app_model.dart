@@ -2741,6 +2741,17 @@ class AppModel extends ChangeNotifier {
       glassFallback ||
       (backdrop.kind.seeThrough && preferences.glassTransparency == 0);
 
+  /// The home tiles' focus ring may move: only when nothing else needs the computer, as with the
+  /// background (no game starting or running, the launcher in front, no layer open) and not with
+  /// reduced motion or the low-power dimming.
+  bool get homeRingMoves =>
+      running == null &&
+      starting == null &&
+      overlay == null &&
+      !resting &&
+      !preferences.reducedMotion &&
+      !powerWatch.dimmed;
+
   WindowBackdrop get backdrop => services.backdrop ?? const NoBackdrop();
 
   /// Glass's window: see-through to the desktop where the system can, under its tint.
