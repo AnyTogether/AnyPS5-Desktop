@@ -110,6 +110,10 @@ class _FocusRingState extends State<FocusRing> with SingleTickerProviderStateMix
   /// One full turn of the glint around the edge; the halo breathes twice per turn.
   static const _period = Duration(milliseconds: 4800);
 
+  /// flutter test never runs the loop: an animation that repeats forever keeps a frame scheduled,
+  /// so pumpAndSettle would wait for it until it times out. The ring is drawn still there.
+  static final bool _underTest = Platform.environment.containsKey('FLUTTER_TEST');
+
   late final AnimationController _loop = AnimationController(vsync: this, duration: _period);
 
   bool _glass = false;
@@ -129,7 +133,7 @@ class _FocusRingState extends State<FocusRing> with SingleTickerProviderStateMix
   }
 
   void _sync() {
-    if (widget.focused && !Motion.reduced && !_glass) {
+    if (widget.focused && !Motion.reduced && !_glass && !_underTest) {
       if (!_loop.isAnimating) _loop.repeat();
     } else {
       _loop.stop();
