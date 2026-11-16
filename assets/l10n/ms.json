@@ -2419,6 +2419,8 @@
   "quitRemovingNote": "Pembuangan permainan tidak boleh dijeda atau dibatalkan.",
   "retroHostPs1": "Jalankan permainan PS1 dalam hos berasingan",
   "retroHostPs1Detail": "Permainan PS1 dimainkan dalam tetingkap ini melalui hos emulator AnyPS5 dan bukannya DuckStation.",
+  "retroHostUnchecked": "Emulator PS1 tidak disemak (binaan ujian)",
+  "retroHostUncheckedDetail": "Binaan ini untuk ujian: ia menjalankan emulator PS1 yang dinamakan oleh ANYPS5_RETRO_HOST tanpa menyemak tandatangan atau failnya. Keluaran biasa hanya menjalankan emulator yang ditandatangani.",
   "retroHostDownload": "Muat turun emulator PS1",
   "retroHostDownloadDetail": "Hos emulator AnyPS5 dengan SwanStation, untuk bermain permainan PS1 dalam tetingkap ini. Failnya ditandatangani dan disemak sebelum setiap permainan. Tiada apa-apa dimuat turun sehingga anda memilih ini.",
   "retroHostInstalled": "Emulator PS1 %@",

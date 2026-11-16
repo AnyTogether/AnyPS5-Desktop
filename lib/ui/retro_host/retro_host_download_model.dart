@@ -181,9 +181,10 @@ class RetroHostDownloadModel {
 
   /// Settings › Emulators' row for the download: one press to download the host, then how it
   /// goes; once installed, its version, and a press looks for a newer one. Nothing where no host
-  /// can be downloaded, or the debug host `ANYPS5_RETRO_HOST` names is used.
-  List<PanelRow> rows({required bool debugHost}) {
-    if (!offered || debugHost) return const [];
+  /// can be downloaded, or the unchecked host `ANYPS5_RETRO_HOST` names is used (a debug or test
+  /// build, `RetroHostBuild`).
+  List<PanelRow> rows({required bool uncheckedHost}) {
+    if (!offered || uncheckedHost) return const [];
     if (downloading) {
       final now = progress;
       return [

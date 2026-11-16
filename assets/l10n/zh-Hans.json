@@ -2419,6 +2419,8 @@
   "quitRemovingNote": "移除游戏无法暂停，也无法取消。",
   "retroHostPs1": "在独立宿主程序中运行 PS1 游戏",
   "retroHostPs1Detail": "PS1 游戏通过 AnyPS5 模拟器宿主程序在此窗口中运行，而不是使用 DuckStation。",
+  "retroHostUnchecked": "未经检查的 PS1 模拟器（测试版本）",
+  "retroHostUncheckedDetail": "此版本仅供测试：它运行 ANYPS5_RETRO_HOST 指定的 PS1 模拟器，不检查其签名或文件。正式版本只运行已签名的模拟器。",
   "retroHostDownload": "下载 PS1 模拟器",
   "retroHostDownloadDetail": "带有 SwanStation 的 AnyPS5 模拟器宿主程序，用于在此窗口中玩 PS1 游戏。其文件经过签名，并在每次游戏前检查。在你选择此项之前不会下载任何内容。",
   "retroHostInstalled": "PS1 模拟器 %@",

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:anyps5_desktop/core/host.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_client.dart';
+import 'package:anyps5_desktop/core/retro_host/retro_host_build.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_install.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -29,7 +30,7 @@ void main() {
     };
     final fixture = makeFixture(withToolkit: false, environment: launcher);
     try {
-      final install = RetroHostInstall.locate(launcher, debug: true, system: HostSystem.linux)!;
+      final install = RetroHostInstall.locate(launcher, build: RetroHostBuild.debug, system: HostSystem.linux)!;
       final session = fixture.model.openRetroHost(install, volume: 1, muted: false);
       session.ready.ignore();
       expect(await session.ended.timeout(const Duration(seconds: 20)), RetroHostEnd.hostFailure);

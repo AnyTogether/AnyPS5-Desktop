@@ -252,6 +252,12 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: bash packaging/set-version.sh "$VERSION"
       - run: flutter build linux --release
+      # A test build may run an unchecked PS1 host and is never published (docs/AnyPS5 Desktop -
+      # Emulator Host Client.md "Debug and test builds"). The check reads the defines Flutter compiled
+      # this build with and looks for a test build's mark in the AOT snapshot it made, so it fails
+      # however the test build's define was given. Nightlies are this workflow's builds.
+      - name: Check the build is no test build
+        run: dart run tool/check_release_build.dart linux build/linux/x64/release/bundle
       # The system's libmpv, never a carried one: no libmpv in the bundle, nothing in it links one,
       # and the clip player's plugin links libanyps5_mpv.so (packaging/linux/no-libmpv.sh).
       - name: Check the bundle carries no libmpv
@@ -397,6 +403,12 @@ jobs:
           key: ${{ steps.archives.outputs.key }}
           path: ${{ env.WINDOWS_ARCHIVES }}
       - run: flutter build windows --release
+      # A test build may run an unchecked PS1 host and is never published (docs/AnyPS5 Desktop -
+      # Emulator Host Client.md "Debug and test builds"). The check reads the defines Flutter compiled
+      # this build with and looks for a test build's mark in the AOT snapshot it made, so it fails
+      # however the test build's define was given. Nightlies are this workflow's builds.
+      - name: Check the build is no test build
+        run: dart run tool/check_release_build.dart windows build/windows/x64/runner/Release
       # A failed download stops the build before this step; this keeps the rule that the cache
       # only holds archives that all arrived, since one without them would stay until the versions change.
       - name: See whether every archive arrived

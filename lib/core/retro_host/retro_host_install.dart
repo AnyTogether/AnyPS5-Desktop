@@ -4,18 +4,21 @@ import 'package:path/path.dart' as p;
 
 import '../game_process.dart';
 import '../host.dart';
+import 'retro_host_build.dart';
 import 'retro_host_store.dart';
 
 /// The emulator host and the SwanStation library it loads for a PS1 game: the signed release the
-/// launcher downloaded ([RetroHostStore.installed]), checked before each start, or in a debug build
-/// the host `ANYPS5_RETRO_HOST` names ([locate]), which is not. protocol.md "Finding and checking
-/// the host" says "Debug builds of the launcher MAY run the host named by the environment variable
-/// `ANYPS5_RETRO_HOST`, and any core, without the checks. Release builds ignore that variable."
+/// launcher downloaded ([RetroHostStore.installed]), checked before each start, or in a debug or
+/// test build ([RetroHostBuild]) the host `ANYPS5_RETRO_HOST` names ([locate]), which is not.
+/// protocol.md "Finding and checking the host" says "Debug builds of the launcher MAY run the host
+/// named by the environment variable `ANYPS5_RETRO_HOST`, and any core, without the checks.
+/// Release builds ignore that variable." A test build is compiled in release mode but is not a
+/// release, and never published (docs/AnyPS5 Desktop - Emulator Host Client.md "Debug and test builds").
 /// The core is the SwanStation library beside the host, as a host release's zip holds the two.
 class RetroHostInstall {
   const RetroHostInstall({required this.host, required this.core, this.checked = false});
 
-  /// The environment variable that names the host in a debug build.
+  /// The environment variable that names the host in a debug or test build.
   static const variable = 'ANYPS5_RETRO_HOST';
 
   /// The host executable.
@@ -26,7 +29,7 @@ class RetroHostInstall {
 
   /// A signed release's host: its files are checked before each start and held until the host
   /// has exited ([RetroHostStore.check], `RetroHostClient.start(checked: ...)`). False for the
-  /// debug host.
+  /// host of a debug or test build.
   final bool checked;
 
   /// SwanStation's file name on [system], as libretro builds name it.
@@ -41,10 +44,14 @@ class RetroHostInstall {
   static Map<String, String>? environmentFor(HostSystem system, Map<String, String> launcher) =>
       system == HostSystem.linux ? GameProcess.withoutAppImage(launcher) : null;
 
-  /// The host [environment] names and the SwanStation library beside it, when this is a [debug]
-  /// build and both files are there; null otherwise.
-  static RetroHostInstall? locate(Map<String, String> environment, {required bool debug, required HostSystem system}) {
-    if (!debug) return null;
+  /// The host [environment] names and the SwanStation library beside it, when [build] runs an
+  /// unchecked host and both files are there; null otherwise, and always for a release.
+  static RetroHostInstall? locate(
+    Map<String, String> environment, {
+    required RetroHostBuild build,
+    required HostSystem system,
+  }) {
+    if (!build.runsUnchecked) return null;
     final named = environment[variable];
     if (named == null || named.isEmpty || !p.isAbsolute(named)) return null;
     final host = p.normalize(named);

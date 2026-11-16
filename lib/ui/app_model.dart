@@ -57,6 +57,7 @@ import '../core/power.dart';
 import '../core/prepare_queue.dart';
 import '../core/relinker_flags.dart';
 import '../core/retro_host/retro_host_client.dart' show RetroHostClient, RetroHostEnd;
+import '../core/retro_host/retro_host_build.dart';
 import '../core/retro_host/retro_host_install.dart';
 import '../core/retro_host/retro_host_protocol.dart' show RetroErrorCode, RetroOption;
 import '../core/retro_host/retro_host_release.dart' show RetroHostChecked, RetroHostReleaseFailure;
