@@ -95,10 +95,17 @@ void main() {
 
   testWidgets('it stops while a game starts', (tester) async {
     await home(tester);
+    expect(tester.binding.hasScheduledFrame, isTrue);
     model.starting = orbit();
     model.refresh();
     await frames(tester);
-    expect(tester.binding.hasScheduledFrame, isFalse);
+    // The starting card has an animation of its own, so a frame stays scheduled; the ring is
+    // already still when turning every ring off changes nothing.
+    final withSwitch = tester.binding.transientCallbackCount;
+    FocusRing.enabled = false;
+    model.refresh();
+    await frames(tester);
+    expect(tester.binding.transientCallbackCount, withSwitch);
     model.starting = null;
   });
 
