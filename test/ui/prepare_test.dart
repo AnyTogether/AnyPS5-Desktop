@@ -218,7 +218,9 @@ void main() {
       expect(model.stateOf(comet), isA<Installing>());
       model.select(model.games.indexOf(comet));
       model.open(Layer.gameSettings);
+      // An unlock the game starts after has no Pause: Cancel unlock is the first row and gives it up at once.
       final cancel = model.panelCategories().single.rows.first;
+      expect(cancel.id, 'cancelJob');
       expect(cancel.title, T.text('cancelUnlock'));
       (cancel.kind as ActionRow).run();
       await until(() => model.stateOf(comet) is Locked);

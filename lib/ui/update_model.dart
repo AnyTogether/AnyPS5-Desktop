@@ -269,7 +269,7 @@ class LauncherUpdateModel {
             LauncherUpdates.swapAppImage(file, appImage);
             await (app.services.startDetached ?? _startDetached)(appImage, const []);
           }
-          (app.services.quit ?? exit)(0);
+          app.exitWithoutAsking(0);
         } on Object catch (failure) {
           app.vibrate(HapticCue.error);
           app.show(T.format('desktopUpdateApplyFailed', ['$failure']));
