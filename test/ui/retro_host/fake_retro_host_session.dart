@@ -26,6 +26,11 @@ class FakeSlot {
     }
   }
 
+  /// Its mapping; [unmap] ends it, as [FrameRing.unmap] does.
+  final mapping = RingMapping();
+
+  void unmap() => mapping.end();
+
   PinnedFrame pin({int epoch = 1, String format = RetroPixelFormat.rgba8}) => PinnedFrame(
     slot: 0,
     width: width,
@@ -34,6 +39,7 @@ class FakeSlot {
     visible: true,
     pixels: pixels,
     pixelFormat: format,
+    mapping: mapping,
   );
 
   void free() => calloc.free(pixels);

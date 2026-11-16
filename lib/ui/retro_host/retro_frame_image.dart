@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ffi';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -13,13 +12,18 @@ import '../../core/retro_host/retro_host_protocol.dart';
 class RetroFramePixels {
   const RetroFramePixels(this.bytes, this.width, this.height, this.format);
 
-  /// Copies [frame]'s `height` rows of `width` × 4 bytes out of the ring.
-  factory RetroFramePixels.copy(PinnedFrame frame) => RetroFramePixels(
-    Uint8List.fromList(frame.pixels.asTypedList(frame.width * frame.height * 4)),
-    frame.width,
-    frame.height,
-    frame.pixelFormat == RetroPixelFormat.bgra8 ? ui.PixelFormat.bgra8888 : ui.PixelFormat.rgba8888,
-  );
+  /// Copies [frame]'s `height` rows of `width` × 4 bytes out of the ring; null once its ring has
+  /// been unmapped, so nothing reads memory that is gone. Only the copy reaches the raster thread.
+  static RetroFramePixels? copy(PinnedFrame frame) {
+    final bytes = frame.copyPixels();
+    if (bytes == null) return null;
+    return RetroFramePixels(
+      bytes,
+      frame.width,
+      frame.height,
+      frame.pixelFormat == RetroPixelFormat.bgra8 ? ui.PixelFormat.bgra8888 : ui.PixelFormat.rgba8888,
+    );
+  }
 
   final Uint8List bytes;
   final int width;
@@ -65,7 +69,9 @@ class RetroFrameImage extends ChangeNotifier implements ValueListenable<ui.Image
   void _onFrame(RetroFrameEvent event) {
     final frame = event.frame;
     if (!event.drawn || frame == null || _disposed || !accepting) return;
-    _next = RetroFramePixels.copy(frame);
+    final pixels = RetroFramePixels.copy(frame);
+    if (pixels == null) return;
+    _next = pixels;
     if (!_uploading) unawaited(_upload());
   }
 

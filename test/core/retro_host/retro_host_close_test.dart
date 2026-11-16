@@ -11,6 +11,10 @@ List<String> _exitsAtOnce() => Platform.isWindows
     : ['/bin/sh', '-c', 'exit 0'];
 
 void main() {
+  test('a start that fails throws ProcessException', () {
+    final missing = p.join(Directory.systemTemp.path, 'anyps5-no-such-host', Platform.isWindows ? 'host.exe' : 'host');
+    expect(() => RetroHostClient.start(command: [missing]), throwsA(isA<ProcessException>()));
+  });
   test('a focus change after close is ignored', () async {
     final client = RetroHostClient.start(command: _exitsAtOnce());
     unawaited(client.ready.then((_) {}, onError: (_) {}));
