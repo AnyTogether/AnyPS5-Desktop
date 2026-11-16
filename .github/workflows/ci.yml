@@ -376,6 +376,17 @@ jobs:
             if (-not (Test-Path (Join-Path $release $licence))) { Write-Error "no $licence in $release"; exit 1 }
           }
           Get-ChildItem $release -Filter *.dll | Sort-Object Length -Descending | Select-Object -First 8 Name, @{n = "MiB"; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize
+      # The Visual C++ debug runtime is only on PCs with Visual Studio and may not be shipped. The
+      # check is first run on the ANGLE archive media_kit unpacks, whose zlib.dll and libc++.dll are
+      # debug builds, so a check that finds nothing there fails too.
+      - name: Check nothing in the release needs the Visual C++ debug runtime
+        shell: pwsh
+        run: |
+          $check = "packaging\windows\check-debug-runtime.ps1"
+          $found = $false
+          try { & $check -Path build\windows\x64\ANGLE *> $null } catch { $found = "$_" -match "debug runtime use" }
+          if (-not $found) { Write-Error "the check found no debug runtime in build\windows\x64\ANGLE"; exit 1 }
+          & $check -Path build\windows\x64\runner\Release
       - name: Package the installer (Inno Setup 6)
         if: github.event_name != 'pull_request'
         shell: pwsh
