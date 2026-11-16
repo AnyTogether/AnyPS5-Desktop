@@ -75,6 +75,18 @@ void main() {
     expect(await _rgba(picture.value!), [50, 60, 70, 255, 50, 60, 70, 255]);
   });
 
+  test('a frame whose ring was unmapped is never read or shown, and the picture before it stays', () async {
+    source.send(slot(1, 1, [4, 5, 6, 255]).pin());
+    await _shown(picture, 1);
+    final gone = slot(1, 1, [7, 7, 7, 255]);
+    final kept = gone.pin();
+    gone.unmap();
+    source.send(kept);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(picture.shown, 1);
+    expect(await _rgba(picture.value!), [4, 5, 6, 255]);
+  });
+
   test('while one image is being made, only the newest frame that came meanwhile is made next', () async {
     source.send(slot(1, 1, [1, 0, 0, 255]).pin());
     source.send(slot(1, 1, [2, 0, 0, 255]).pin());

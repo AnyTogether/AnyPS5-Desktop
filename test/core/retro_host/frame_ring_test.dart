@@ -40,12 +40,16 @@ void main() {
   setUp(() => memory = _Memory());
   tearDown(() => calloc.free(memory.base));
 
+  final unmaps = <(Pointer<Void>, int)>[];
+  tearDown(unmaps.clear);
+
   FrameRing ring({int Function(Pointer<Void>)? load}) => FrameRing.check(
     base: memory.base.cast(),
     bytes: _Memory.bytes,
     pixelFormat: RetroPixelFormat.rgba8,
     load: load ?? (address) => address.cast<Uint32>().value,
     store: (address, value) => address.cast<Uint32>().value = value,
+    unmap: (base, bytes) => unmaps.add((base, bytes)),
   );
 
   test('pins the newest frame and says the earlier pin was given up', () {
@@ -80,5 +84,20 @@ void main() {
     memory.slot(0, width: 4, height: 4);
     memory.latest = 0;
     expect(() => ring().pin(), throwsA(isA<RetroProtocolError>()));
+  });
+
+  test('a frame pinned before its ring was unmapped gives no pixels, and the ring is unmapped once', () {
+    memory.slot(0, width: 2, height: 1);
+    (memory.base + 4096).asTypedList(8).setAll(0, [1, 2, 3, 4, 5, 6, 7, 8]);
+    memory.latest = 0;
+    final frames = ring();
+    final pinned = frames.pin()!;
+    expect(pinned.copyPixels(), [1, 2, 3, 4, 5, 6, 7, 8]);
+    frames
+      ..unmap()
+      ..unmap();
+    expect(pinned.mapping.mapped, isFalse);
+    expect(pinned.copyPixels(), isNull);
+    expect(unmaps, [(memory.base.cast<Void>(), _Memory.bytes)]);
   });
 }

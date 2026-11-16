@@ -232,7 +232,11 @@ Every other call throws `RetroHostGone` when no game was loaded.
   pinning a newer frame of this game (the host may then write the old slot);
   in the last two cases `frame` becomes null. Read `frame` again after
   each message. A frame that was not drawn can be read only until the next
-  message.
+  message. `close()` and a third ring unmap a ring while a `PinnedFrame` from
+  it may still be held, so each frame shares its ring's `RingMapping`:
+  `FrameRing.unmap` ends it, and `PinnedFrame.copyPixels()` then gives null
+  instead of reading memory that is gone. Read pixels only through
+  `copyPixels()`.
 
 ## Which game is loaded
 
@@ -326,7 +330,8 @@ change after `close()` is ignored.
 [`test/core/retro_host/strict_json_test.dart`](../test/core/retro_host/strict_json_test.dart)
 covers the JSON rules, and
 [`test/core/retro_host/frame_ring_test.dart`](../test/core/retro_host/frame_ring_test.dart)
-covers pinning, including three tries that all miss.
+covers pinning, including three tries that all miss, and that a frame pinned
+before its ring was unmapped gives no pixels.
 
 To run the fixture test, point `ANYPS5_RETRO_HOST_CHECKOUT` at a checkout of
 the host repository. Python 3 must be on `PATH`:

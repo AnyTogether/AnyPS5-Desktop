@@ -1,7 +1,17 @@
 import 'dart:ffi';
+import 'dart:typed_data';
 
 import 'retro_host_native.dart';
 import 'retro_host_protocol.dart';
+
+/// Whether a ring's memory is still mapped. [FrameRing.unmap] ends it, and every frame pinned in
+/// that ring shares it, so a frame kept past the unmap can tell its [PinnedFrame.pixels] are gone.
+class RingMapping {
+  bool get mapped => _mapped;
+  bool _mapped = true;
+
+  void end() => _mapped = false;
+}
 
 /// One frame the launcher has pinned in a [FrameRing]: the host does not write this slot until the
 /// launcher's next read. Every field is the launcher's own checked copy (protocol.md "Frame ring").
@@ -14,6 +24,7 @@ class PinnedFrame {
     required this.visible,
     required this.pixels,
     required this.pixelFormat,
+    required this.mapping,
   });
 
   final int slot;
@@ -24,17 +35,25 @@ class PinnedFrame {
   /// Whether the frame has any pixel that is not black.
   final bool visible;
 
-  /// `height` rows of `width` × 4 bytes, top row first, no padding.
+  /// `height` rows of `width` × 4 bytes, top row first, no padding. It points into the ring, so it
+  /// may be read only while [mapping] is mapped; [copyPixels] checks that.
   final Pointer<Uint8> pixels;
 
   /// [RetroPixelFormat.rgba8] or [RetroPixelFormat.bgra8].
   final String pixelFormat;
+
+  /// The mapping of the ring the frame is in.
+  final RingMapping mapping;
+
+  /// A copy of the pixels, or null once the ring has been unmapped, when [pixels] points at memory
+  /// that is gone.
+  Uint8List? copyPixels() => mapping.mapped ? Uint8List.fromList(pixels.asTypedList(width * height * 4)) : null;
 }
 
 /// The shared memory a `ring` message announces, mapped and checked as protocol.md "Checks the
 /// launcher makes" says. The header's geometry is read once, here; later reads use only the copies.
 class FrameRing {
-  FrameRing._(this._base, this.bytes, this.slotBytes, this.pixelFormat, this._load, this._store);
+  FrameRing._(this._base, this.bytes, this.slotBytes, this.pixelFormat, this._load, this._store, this._unmap);
 
   Pointer<Void> _at(int offset) => (_base.cast<Uint8>() + offset).cast();
 
@@ -50,7 +69,8 @@ class FrameRing {
   final String pixelFormat;
   final int Function(Pointer<Void>) _load;
   final void Function(Pointer<Void>, int) _store;
-  bool _unmapped = false;
+  final void Function(Pointer<Void>, int) _unmap;
+  final _mapping = RingMapping();
 
   /// Whether the last [pin] stored a slot in `reading`, which gives up the pin held before it,
   /// whether or not it pinned a new frame.
@@ -67,6 +87,7 @@ class FrameRing {
     FrameRing? current,
     int Function(Pointer<Void>) load = retroHostLoad,
     void Function(Pointer<Void>, int) store = retroHostStore,
+    void Function(Pointer<Void>, int) unmap = retroHostUnmapRing,
   }) {
     final header = base.cast<Uint32>();
     if (header[0] != _magic) throw const RetroProtocolError('The ring\'s magic is wrong.');
@@ -90,7 +111,7 @@ class FrameRing {
         throw const RetroProtocolError('A new ring is not at least twice as large as the last.');
       }
     }
-    return FrameRing._(base, bytes, slotBytes, pixelFormat, load, store);
+    return FrameRing._(base, bytes, slotBytes, pixelFormat, load, store, unmap);
   }
 
   /// Pins the newest frame: null when there is none, or when `latest` kept moving for three tries.
@@ -133,12 +154,14 @@ class FrameRing {
       visible: visible != 0,
       pixels: _at(_headerBytes + slot * slotBytes).cast<Uint8>(),
       pixelFormat: pixelFormat,
+      mapping: _mapping,
     );
   }
 
+  /// Unmaps the ring; every frame pinned in it can no longer be read.
   void unmap() {
-    if (_unmapped) return;
-    _unmapped = true;
-    retroHostUnmapRing(_base, bytes);
+    if (!_mapping.mapped) return;
+    _mapping.end();
+    _unmap(_base, bytes);
   }
 }

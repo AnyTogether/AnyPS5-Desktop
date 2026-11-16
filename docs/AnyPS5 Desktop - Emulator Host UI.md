@@ -44,7 +44,10 @@ pins the newest frame and adds an event to `frames`
    another frame replaces it", and a frame that was not drawn "can be read only
    until the next message". So the copy is made while the event is handled,
    before any other message can arrive. After that, nothing the host writes can
-   change the picture.
+   change the picture. The copy goes through `PinnedFrame.copyPixels()`, which
+   gives null once the frame's ring has been unmapped (by `close()` or a third
+   ring); such a frame is dropped and the picture before it stays. Only the
+   Dart copy reaches the raster thread, so it never reads the shared memory.
 2. **It makes an image from the copy.** `decodeImageFromPixels` uploads it,
    with `PixelFormat.rgba8888` or `PixelFormat.bgra8888` to match the frame's
    format. Both formats come out as the same colours.
@@ -437,6 +440,7 @@ native memory as a real ring slot would be, so no host is started.
   - frames not marked drawn are skipped;
   - the copy is taken when the event arrives, so later writes to the slot do
     not show;
+  - a frame whose ring was unmapped is never read or shown;
   - while an upload runs, only the newest frame is uploaded next;
   - `clear()` drops a frame still being uploaded.
 - [`retro_host_game_test.dart`](../test/ui/retro_host/retro_host_game_test.dart)
