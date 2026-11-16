@@ -99,6 +99,8 @@ void main() {
     expect(curtain, findsOneWidget);
     expect(StartupIntro.played, isTrue);
 
+    // The animation's clock starts at its first frame, so the first pump only starts it.
+    await tester.pump(StartupIntro.duration);
     await tester.pump(StartupIntro.duration);
     await tester.pump();
     expect(curtain, findsNothing);
