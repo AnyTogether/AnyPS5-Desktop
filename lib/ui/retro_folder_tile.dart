@@ -10,6 +10,7 @@ class RetroFolderTile extends StatelessWidget {
     required this.size,
     required this.focused,
     required this.accent,
+    this.animated = false,
   });
 
   final RetroPlatform console;
@@ -17,12 +18,16 @@ class RetroFolderTile extends StatelessWidget {
   final bool focused;
   final Color accent;
 
+  /// The ring moves while focused (see [FocusRing.animated]).
+  final bool animated;
+
   @override
   Widget build(BuildContext context) {
     final radius = size * 0.12;
     return FocusRing(
       focused: focused,
       radius: radius,
+      animated: animated,
       child: Glass(
         radius: radius,
         child: Stack(

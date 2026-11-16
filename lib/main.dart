@@ -31,6 +31,7 @@ import 'core/steam/steam_launch.dart';
 import 'core/toolkit_download.dart';
 import 'ui/app_model.dart';
 import 'ui/clip_player.dart';
+import 'ui/components.dart' show FocusRing;
 import 'ui/countries.dart';
 import 'ui/crash_model.dart';
 import 'ui/launcher.dart';
@@ -241,6 +242,8 @@ Future<void> main(List<String> arguments) async {
   unawaited(model.saveSync.refreshInfo());
   unawaited(model.engine.startupCheck());
   unawaited(model.updates.startupCheck());
+  // The home tiles' focus ring moves (tests leave it still).
+  FocusRing.enabled = true;
   runApp(AnyPS5App(model: model));
   // .anyps5theme files open with this launcher (the zip, the AppImage and the archive install
   // nothing that would say so); not for a development build.

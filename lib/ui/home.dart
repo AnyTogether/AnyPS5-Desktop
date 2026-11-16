@@ -830,6 +830,7 @@ class TileRow extends StatelessWidget {
                               size: size,
                               focused: focused,
                               accent: model.accentChoice.color,
+                              animated: model.homeRingMoves,
                             );
                           }
                           return GameTile(model: model, game: game, size: size, focused: focused);
@@ -973,6 +974,7 @@ class GameTile extends StatelessWidget {
     return FocusRing(
       focused: focused,
       radius: radius,
+      animated: model.homeRingMoves,
       child: AnimatedContainer(
         duration: Motion.focus,
         decoration: BoxDecoration(
