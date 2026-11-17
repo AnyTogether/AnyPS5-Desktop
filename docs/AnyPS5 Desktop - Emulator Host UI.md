@@ -364,9 +364,10 @@ Release builds ignore that variable." (A test build is a release-mode build
 compiled to allow it, never published:
 [Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>) "Debug and test builds".) That
 unchecked host comes first, and while it is used no download row is shown;
-instead **Unchecked PS1 emulator (test build)** says that this build runs it
+instead **Unchecked emulator (test build)** says that this build runs it
 without checking its signature or files, and that normal releases only run the
-signed emulator. A Settings row alone is not enough, since a screenshot of
+signed emulator. Its words name no console, since the same host plays PS1
+games and, with LRPS2 beside it, PS2 games. A Settings row alone is not enough, since a screenshot of
 the game would not show it, so a game on that host is also marked where it
 plays ("The unchecked-host mark" below). The core is the SwanStation library beside the host
 (`swanstation_libretro.dll` on Windows,
@@ -601,14 +602,14 @@ where the game plays, and the review of host #14 made it a condition of test
 builds: a test build running an unchecked host shows it on the game's screen,
 every time, so a tester's screenshot of the game can never pass for a
 release. A PS2 game on that host, on its unchecked LRPS2, is marked the same
-way (`RetroPlay.unchecked` is the host's, whichever core it plays); the mark's
-words still name the PS1 emulator, as the Settings row's do.
+way (`RetroPlay.unchecked` is the host's, whichever core it plays), so the
+mark's words, like the Settings row's, name no console.
 
 - **What it is.** `RetroUncheckedMark`
   ([`retro_unchecked_mark.dart`](../lib/ui/retro_host/retro_unchecked_mark.dart))
   is a small dark label in the window's bottom corner (start side, so on the
   left in left-to-right languages), with a flask icon in the warning colour
-  and the same words as the Settings row, **Unchecked PS1 emulator (test
+  and the same words as the Settings row, **Unchecked emulator (test
   build)**. It is drawn in the launcher's stack above the game and above every
   layer over it (the game's menu, Settings); only the starting card, call
   and pairing cards, toasts and window buttons are drawn above it. It lets the
@@ -866,7 +867,12 @@ open, a PS2 disc's `start`, a PS1 disc on the same host, a host without `ps2`,
 the real LRPS2's `bios` and its folder, a running PS2 game's menu, and the
 signed release with LRPS2
 ([`test/fixtures/retro_host_release_ps2`](../test/fixtures/retro_host_release_ps2/SHA256SUMS))
-and without it. It replays the statuses in
+and without it. It also downloads both from a fake GitHub, one after the other,
+and checks that a PS2 cue sheet (`Ps1Launcher.addPs2CueSheet` in
+[`test/support/ps1_launcher.dart`](../test/support/ps1_launcher.dart)) is
+listed once the host gains LRPS2 and hidden again once a newer host without it
+is put in place, with the setting kept on throughout: the rescan of
+`RetroHostDownloadModel._lookAgain`. It replays the statuses in
 [`test/support/ps2_host_recording.dart`](../test/support/ps2_host_recording.dart)
 (described in [Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>) "PS2 games").
 [`retro_host_play_golden_test.dart`](../test/ui/retro_host_play_golden_test.dart)
