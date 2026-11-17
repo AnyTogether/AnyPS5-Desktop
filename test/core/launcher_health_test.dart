@@ -250,19 +250,30 @@ void main() {
     watch.ping(lines: ['frames 60 build 2.1/3.0/4.2 raster 3.0/4.1/6.0 | look cosmic layer home in front']);
     // The interface's isolate is stuck from here: no more pings.
     final problem = File(health.problemFile);
-    for (var waited = 0; waited < 80 && !problem.existsSync(); waited++) {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+    // The watchdog writes from its own isolate, on its own time, and a write truncates the file
+    // before it fills it: wait for a whole report that says what is awaited, not a fixed time.
+    Future<LauncherProblem?> written(bool Function(LauncherProblem) awaited) async {
+      for (var waited = 0; waited < 80; waited++) {
+        try {
+          final found = LauncherProblem.fromJson(jsonDecode(problem.readAsStringSync()) as Map<String, dynamic>);
+          if (awaited(found)) return found;
+        } on Object {
+          // Not there yet, or being written.
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+      return null;
     }
-    final json = jsonDecode(problem.readAsStringSync()) as Map<String, dynamic>;
-    final stall = LauncherProblem.fromJson(json);
-    expect(stall.kind, LauncherProblemKind.hang);
+
+    final stall = await written((_) => true);
+    expect(stall, isNotNull, reason: 'the stall was written');
+    expect(stall!.kind, LauncherProblemKind.hang);
     expect(stall.recovered, isFalse);
     expect(stall.lines.single, contains('layer home'));
     watch.ping();
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    final ended = LauncherProblem.fromJson(jsonDecode(problem.readAsStringSync()) as Map<String, dynamic>);
-    expect(ended.recovered, isTrue);
-    expect(ended.stalledFor!.inSeconds, greaterThanOrEqualTo(5));
+    final ended = await written((found) => found.recovered);
+    expect(ended, isNotNull, reason: 'the stall that ended was written');
+    expect(ended!.stalledFor!.inSeconds, greaterThanOrEqualTo(5));
     watch.closing();
   }, timeout: const Timeout(Duration(seconds: 20)));
 
