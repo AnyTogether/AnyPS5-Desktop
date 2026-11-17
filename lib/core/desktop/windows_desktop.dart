@@ -648,6 +648,7 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
     required Future<void> until,
     Duration fade = coverFade,
     Duration windowTimeout = coverWindowWait,
+    Future<void>? exited,
     void Function()? onCovered,
   }) async {
     if (_card != 0) return false;
