@@ -2419,6 +2419,8 @@
   "quitRemovingNote": "Hindi maaaring i-pause o kanselahin ang pag-alis ng mga laro.",
   "retroHostPs1": "Patakbuhin ang mga larong PS1 sa hiwalay na host",
   "retroHostPs1Detail": "Nilalaro ang mga larong PS1 sa window na ito sa pamamagitan ng emulator host ng AnyPS5 sa halip na DuckStation.",
+  "retroHostUnchecked": "Hindi nasuring PS1 emulator (test build)",
+  "retroHostUncheckedDetail": "Pang-test ang build na ito: pinapatakbo nito ang PS1 emulator na itinuturo ng ANYPS5_RETRO_HOST nang hindi sinusuri ang pirma o mga file nito. Ang karaniwang release ay nagpapatakbo lang ng pinirmahang emulator.",
   "retroHostDownload": "I-download ang PS1 emulator",
   "retroHostDownloadDetail": "Ang emulator host ng AnyPS5 kasama ang SwanStation, para malaro ang mga larong PS1 sa window na ito. Naka-sign ang mga file nito at sinusuri bago ang bawat laro. Walang ida-download hangga't hindi mo ito pinipili.",
   "retroHostInstalled": "PS1 emulator %@",

@@ -2419,6 +2419,8 @@
   "quitRemovingNote": "Odebírání her nelze pozastavit ani zrušit.",
   "retroHostPs1": "Spouštět hry pro PS1 v samostatném hostiteli",
   "retroHostPs1Detail": "Hry pro PS1 se hrají v tomto okně přes hostitele emulátoru AnyPS5 místo DuckStation.",
+  "retroHostUnchecked": "Neověřený emulátor PS1 (testovací sestavení)",
+  "retroHostUncheckedDetail": "Toto sestavení je určeno k testování: spouští emulátor PS1, který určuje ANYPS5_RETRO_HOST, bez kontroly jeho podpisu a souborů. Běžná vydání spouštějí jen podepsaný emulátor.",
   "retroHostDownload": "Stáhnout emulátor PS1",
   "retroHostDownloadDetail": "Hostitel emulátoru AnyPS5 se SwanStation pro hraní her PS1 v tomto okně. Jeho soubory jsou podepsané a kontrolují se před každou hrou. Nic se nestáhne, dokud tuto možnost nevyberete.",
   "retroHostInstalled": "Emulátor PS1 %@",

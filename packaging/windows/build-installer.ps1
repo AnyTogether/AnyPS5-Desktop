@@ -16,6 +16,9 @@ $release = Join-Path $root "build\windows\x64\runner\Release"
 if (-not (Test-Path (Join-Path $release "anyps5_desktop.exe"))) { throw "no release build in $release" }
 if (-not (Test-Path (Join-Path $release "SDL2.dll"))) { throw "no SDL2.dll in ${release}: the package would ship without SDL2 controller support" }
 & (Join-Path $PSScriptRoot "check-debug-runtime.ps1") -Path $release
+# Never a test build, which may run an unchecked PS1 host (tool/check_release_build.dart).
+dart run tool/check_release_build.dart windows $release
+if ($LASTEXITCODE) { throw "$release is a test build or cannot be checked ($LASTEXITCODE)" }
 
 $iscc = @(
   "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",

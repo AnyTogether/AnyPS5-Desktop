@@ -11,6 +11,7 @@ class RetroPlay {
     required this.started,
     required this.program,
     required this.core,
+    required this.unchecked,
   });
 
   final Game game;
@@ -21,6 +22,10 @@ class RetroPlay {
 
   /// The SwanStation library the game was started with.
   final String core;
+
+  /// The host was started without the checks a signed release's gets (a debug or test build's
+  /// `ANYPS5_RETRO_HOST`): the game is marked as such while it runs (`RetroUncheckedMark`).
+  final bool unchecked;
   final RetroHostControls controls;
   final RetroGameMenu menu;
   final DateTime started;
@@ -129,11 +134,24 @@ const retroMenuSections = {
 /// window through the emulator host, with the launcher's controllers and keyboard, and the game's
 /// menu on PS.
 extension RetroHostPlaying on AppModel {
-  /// The host this build runs: in a debug build the one `ANYPS5_RETRO_HOST` names, unchecked;
-  /// otherwise the signed host downloaded in Settings › Emulators, checked before each start.
-  /// Null when neither is there. Neither is looked for here ([retroHostDebug],
-  /// [RetroHostDownloadModel.installed]).
-  RetroHostInstall? get retroHostInstall => retroHostDebug ?? retroHostDownload.installed;
+  /// The host this build runs: in a debug or test build ([RetroHostBuild]) the one
+  /// `ANYPS5_RETRO_HOST` names, unchecked; otherwise the signed host downloaded in Settings ›
+  /// Emulators, checked before each start. Null when neither is there. Neither is looked for here
+  /// ([retroHostUnchecked], [RetroHostDownloadModel.installed]).
+  RetroHostInstall? get retroHostInstall => retroHostUnchecked ?? retroHostDownload.installed;
+
+  /// What this launcher was compiled as: a debug build, a test build, or a release, as
+  /// `RetroHostBuild.of(debug: kDebugMode)` says. A constant of the compiled program.
+  static const retroHostBuild = kDebugMode
+      ? RetroHostBuild.debug
+      : RetroHostBuild.testDefined
+      ? RetroHostBuild.test
+      : RetroHostBuild.release;
+
+  /// Whether this launcher looks for, runs and marks (`RetroUncheckedMark`) an unchecked host: a
+  /// debug or test build. A constant, so a release is compiled without the lookup
+  /// ([AppModel.retroHostUnchecked]) and without the mark, as without the host.
+  static const runsUnchecked = retroHostBuild != RetroHostBuild.release;
 
   /// Whether [platform]'s discs play in the emulator host: PS1, with the setting on and a host
   /// found. Otherwise they go to the emulator chosen in Settings › Emulators, as before.
@@ -157,13 +175,20 @@ extension RetroHostPlaying on AppModel {
     _changed();
   }
 
-  /// Settings › Emulators' rows for the host: its download, and where a host is found, the
-  /// setting and the BIOS folder.
+  /// Settings › Emulators' rows for the host: its download, or the notice that this build runs an
+  /// unchecked host, and where a host is found, the setting and the BIOS folder.
   List<PanelRow> _retroHostSettingsRows() {
-    final download = retroHostDownload.rows(debugHost: retroHostDebug != null);
+    final unchecked = retroHostUnchecked != null;
+    final download = retroHostDownload.rows(uncheckedHost: unchecked);
     if (retroHostInstall == null) return download;
     return [
       ...download,
+      if (unchecked)
+        PanelRow(
+          id: 'retro-host-unchecked',
+          title: T.text('retroHostUnchecked'),
+          kind: InfoRow(T.text('retroHostUncheckedDetail')),
+        ),
       PanelRow(
         id: 'retro-host-ps1',
         title: T.text('retroHostPs1'),
@@ -287,6 +312,7 @@ extension RetroHostPlaying on AppModel {
       started: DateTime.now(),
       program: install.host,
       core: install.core,
+      unchecked: !install.checked,
     );
     retroPlay = play;
     host.addListener(_retroChanged);

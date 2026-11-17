@@ -252,6 +252,12 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: bash packaging/set-version.sh "$VERSION"
       - run: flutter build linux --release
+      # A test build may run an unchecked PS1 host and is never published (docs/AnyPS5 Desktop -
+      # Emulator Host Client.md "Debug and test builds"). The check reads the defines Flutter compiled
+      # this build with and looks for a test build's mark in the AOT snapshot it made, so it fails
+      # however the test build's define was given. Nightlies are this workflow's builds.
+      - name: Check the build is no test build
+        run: dart run tool/check_release_build.dart linux build/linux/x64/release/bundle
       # The system's libmpv, never a carried one: no libmpv in the bundle, nothing in it links one,
       # and the clip player's plugin links libanyps5_mpv.so (packaging/linux/no-libmpv.sh).
       - name: Check the bundle carries no libmpv
@@ -331,6 +337,11 @@ jobs:
           bash packaging/linux/runpaths.sh check build/package-contents/AnyPS5-Desktop build/package-contents/squashfs-root
           bash packaging/linux/no-libmpv.sh build/package-contents/AnyPS5-Desktop
           bash packaging/linux/no-libmpv.sh build/package-contents/squashfs-root/usr/lib/anyps5-desktop
+      # The check packaging/sign-release.sh runs before it signs a release, on the packages as they
+      # are published: each one's AOT snapshot is read out of it and holds no test build's mark.
+      - name: Check the packages as the release signing does
+        if: github.event_name != 'pull_request'
+        run: dart run tool/check_release_build.dart files build/packages/*.deb build/packages/*.AppImage build/packages/*.tar.gz
       - uses: actions/upload-artifact@v7
         if: github.event_name != 'pull_request'
         with:
@@ -397,6 +408,12 @@ jobs:
           key: ${{ steps.archives.outputs.key }}
           path: ${{ env.WINDOWS_ARCHIVES }}
       - run: flutter build windows --release
+      # A test build may run an unchecked PS1 host and is never published (docs/AnyPS5 Desktop -
+      # Emulator Host Client.md "Debug and test builds"). The check reads the defines Flutter compiled
+      # this build with and looks for a test build's mark in the AOT snapshot it made, so it fails
+      # however the test build's define was given. Nightlies are this workflow's builds.
+      - name: Check the build is no test build
+        run: dart run tool/check_release_build.dart windows build/windows/x64/runner/Release
       # A failed download stops the build before this step; this keeps the rule that the cache
       # only holds archives that all arrived, since one without them would stay until the versions change.
       - name: See whether every archive arrived
@@ -466,6 +483,15 @@ jobs:
           }
           if (Test-Path (Join-Path $target "zlib.dll")) { Write-Error "the installer left an older release's zlib.dll"; exit 1 }
           Get-ChildItem $target -Filter *LICENSE* | Select-Object Name, Length | Format-Table -AutoSize
+      # The check packaging/sign-release.sh runs before it signs a release: the zip's AOT snapshot
+      # holds no test build's mark, and the installer installs that snapshot and no mark.
+      - name: Check the installer and the zip as the release signing does
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          $setup = Get-Item build\installer\AnyPS5-Desktop-Setup-*.exe
+          dart run tool/check_release_build.dart files $setup.FullName build\installer\AnyPS5-Desktop-windows-x64.zip
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v7
         if: github.event_name != 'pull_request'
         with:

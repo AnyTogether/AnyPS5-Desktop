@@ -57,6 +57,7 @@ import '../core/power.dart';
 import '../core/prepare_queue.dart';
 import '../core/relinker_flags.dart';
 import '../core/retro_host/retro_host_client.dart' show RetroHostClient, RetroHostEnd;
+import '../core/retro_host/retro_host_build.dart';
 import '../core/retro_host/retro_host_install.dart';
 import '../core/retro_host/retro_host_protocol.dart' show RetroErrorCode, RetroOption, RetroStatus;
 import '../core/retro_host/retro_host_release.dart' show RetroHostChecked, RetroHostReleaseFailure;
@@ -2759,13 +2760,16 @@ class AppModel extends ChangeNotifier {
   @visibleForTesting
   final retroHostKeeper = RetroHostKeeper();
 
-  /// The host `ANYPS5_RETRO_HOST` names, run unchecked, where a debug build is given one: looked
-  /// for once, as the environment that names it does not change while the launcher runs.
-  late final RetroHostInstall? retroHostDebug = RetroHostInstall.locate(
-    services.environment ?? Platform.environment,
-    debug: kDebugMode,
-    system: HostSystem.current,
-  );
+  /// The host `ANYPS5_RETRO_HOST` names, run unchecked, where a debug or test build is given one
+  /// ([RetroHostBuild]): looked for once, as the environment that names it does not change while
+  /// the launcher runs. A release is compiled without the lookup ([RetroHostPlaying.runsUnchecked]).
+  late final RetroHostInstall? retroHostUnchecked = RetroHostPlaying.runsUnchecked
+      ? RetroHostInstall.locate(
+          services.environment ?? Platform.environment,
+          build: RetroHostPlaying.retroHostBuild,
+          system: HostSystem.current,
+        )
+      : null;
 
   /// How often a PS1 game in the host is asked its `status`; tests ask by hand.
   @visibleForTesting

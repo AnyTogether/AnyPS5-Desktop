@@ -9,7 +9,8 @@
 # nightly.
 #
 # The build is ci.yml's, called with the commit and the version: analyze, tests, goldens and both
-# builds with their packages, and nothing is published unless all of them passed.
+# builds with their packages, and nothing is published unless all of them passed. Both builds fail
+# on a launcher test build (tool/check_release_build.dart), so a nightly is never one.
 #
 # CI has no signing key, so the pre-release comes out unsigned, and the launcher does not offer it
 # until tools/release/sign_nightly.sh -R AnyTogether/AnyPS5-Desktop <tag> (AnyPS5-ARM) has added

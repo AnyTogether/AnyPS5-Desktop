@@ -2419,6 +2419,8 @@
   "quitRemovingNote": "A játékok eltávolítása nem szüneteltethető, és nem is szakítható meg.",
   "retroHostPs1": "PS1-játékok futtatása a külön gazdaprogramban",
   "retroHostPs1Detail": "A PS1-játékok ebben az ablakban futnak az AnyPS5 emulátor-gazdaprogramján keresztül a DuckStation helyett.",
+  "retroHostUnchecked": "Ellenőrizetlen PS1-emulátor (tesztverzió)",
+  "retroHostUncheckedDetail": "Ez a verzió tesztelésre szolgál: az ANYPS5_RETRO_HOST által megadott PS1-emulátort futtatja az aláírás és a fájlok ellenőrzése nélkül. A normál kiadások csak az aláírt emulátort futtatják.",
   "retroHostDownload": "PS1-emulátor letöltése",
   "retroHostDownloadDetail": "Az AnyPS5 emulátor-gazdaprogramja a SwanStationnel, hogy PS1-játékokat játszhass ebben az ablakban. A fájljai alá vannak írva, és minden játék előtt ellenőrzi őket. Semmi sem töltődik le, amíg ezt ki nem választod.",
   "retroHostInstalled": "PS1-emulátor %@",

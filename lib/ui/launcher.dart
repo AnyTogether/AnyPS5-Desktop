@@ -36,6 +36,7 @@ import 'onboarding.dart';
 import 'panels.dart';
 import 'profiles_view.dart';
 import 'retro_host/retro_play_view.dart';
+import 'retro_host/retro_unchecked_mark.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'together_model.dart';
@@ -549,6 +550,10 @@ class _LauncherShellState extends State<LauncherShell> {
                                             ),
                                           ),
                                         ),
+                                        // A PS1 game on an unchecked host, in a debug or test
+                                        // build: marked over every layer, compiled out of a release.
+                                        if (RetroHostPlaying.runsUnchecked && (model.retroPlay?.unchecked ?? false))
+                                          const RetroUncheckedMark(),
                                         if (model.starting != null) _StartingCard(model: model),
                                         if (model.together.ringing != null && model.pairing == null)
                                           RingingCard(model: model),

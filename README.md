@@ -490,6 +490,14 @@ use those once changed in the game.
   `windows/CMakeLists.txt` leaves it out. `packaging/windows/check-debug-runtime.ps1` reads the
   imports of every .exe and .dll in the release folder and fails on a debug runtime;
   `build-installer.ps1` and CI run it. The installer deletes the copy an older release left.
+- No package or nightly may be a test build (`--dart-define` of the PS1 emulator host's test
+  build, which may run an unchecked host; docs/AnyPS5 Desktop - Emulator Host Client.md "Debug
+  and test builds"). `tool/check_release_build.dart` runs after `flutter build` in CI,
+  `build-installer.ps1` and the Linux packaging, and fails if Flutter compiled the build with
+  that define or its AOT snapshot holds a test build's mark. `packaging/sign-release.sh` signs a
+  Stable release only after the same check has read the snapshot out of every file it is given
+  (the zip, the .tar.gz, the .deb, the AppImage, and everything the installer installs) and
+  refuses any other file; CI runs that check on the packages it builds.
 
 - Nightly builds: `.github/workflows/nightly.yml` builds main once a day when the launcher
   changed and publishes an unsigned pre-release, `v<next>-nightly.<YYYYMMDD>.<n>`. The launcher's

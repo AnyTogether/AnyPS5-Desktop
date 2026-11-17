@@ -9,6 +9,8 @@ mkdir -p "$OUT"
 build_bundle() {
   if [ "${SKIP_BUILD:-0}" != 1 ]; then (cd "$ROOT" && flutter build linux --release); fi
   [ -x "$BUNDLE/anyps5_desktop" ] || { echo "no release bundle in $BUNDLE" >&2; exit 1; }
+  # Never a test build, which may run an unchecked PS1 host (tool/check_release_build.dart).
+  (cd "$ROOT" && dart run tool/check_release_build.dart linux "$BUNDLE")
   # No build folder in any library's RUNPATH: only $ORIGIN-relative folders inside the bundle.
   bash "$HERE/runpaths.sh" fix "$BUNDLE"
   bash "$HERE/no-libmpv.sh" "$BUNDLE"
