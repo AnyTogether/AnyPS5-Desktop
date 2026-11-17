@@ -47,6 +47,7 @@ import '../core/game_deletion.dart' show Trash;
 import '../core/game_library.dart';
 import '../core/game_log.dart';
 import '../core/game_process.dart';
+import '../core/child_processes.dart';
 import '../core/game_presets.dart';
 import '../core/game_settings.dart';
 import '../core/launch_resolution.dart';
@@ -5627,6 +5628,35 @@ class AppModel extends ChangeNotifier {
     unawaited(nowPlaying.close());
     (services.quit ?? exit)(0);
   }
+
+  /// The launcher is closing: the game playing is asked to close as its window would (as Close
+  /// Game does: taskkill without /F on Windows, SIGTERM on Linux) and has [stopGrace] to save,
+  /// then it is ended. Stop's TerminateProcess would leave it no time. The replay buffer, Remote
+  /// Play and a broadcast end next, and ChildProcesses ends what is left (the relinker, an
+  /// engine build, a program of a program).
+  Future<void> endChildProcesses() async {
+    try {
+      final playing = running;
+      if (playing != null) {
+        final run = playing.$2;
+        _stopped = true;
+        _stopTimer?.cancel();
+        _stopTimer = null;
+        await run.close();
+        await run.exitCode.timeout(stopGrace, onTimeout: () {
+          run.kill();
+          return -1;
+        });
+      }
+      media.dispose();
+      await _stopReplay().timeout(const Duration(seconds: 3), onTimeout: () {});
+    } on Object {
+      // What is left goes below.
+    }
+    ChildProcesses.killAll();
+  }
+
+
 
   // Captures: Share, the replay buffer, screenshots.
 
