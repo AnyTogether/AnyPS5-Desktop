@@ -35,7 +35,7 @@ enum Upscaler { bilinear, fsr1 }
 /// the ones a game starts with when nothing was chosen: full screen (it was windowed at 75% before
 /// the launcher made full screen the default).
 class DisplayDefaults {
-  const DisplayDefaults({this.fullscreen = true, this.windowSize = 75, this.vsync = true, this.startAnimation = true});
+  const DisplayDefaults({this.fullscreen = false, this.windowSize = 75, this.vsync = true, this.startAnimation = true});
 
   /// What a launcher that saved its preferences before full screen became the default has: the
   /// games it started opened in a window, so they still do until Default Display is changed.
