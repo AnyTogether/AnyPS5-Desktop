@@ -244,7 +244,8 @@ where the maintainers sign.
   finds the host that `ANYPS5_RETRO_HOST` names, with the SwanStation library
   beside it, only in a debug build or a test build (`RetroHostBuild`, below).
   That host is started without any check, and Settings › Emulators says so
-  ("Unchecked PS1 emulator (test build)"). A release, and a profile build,
+  ("Unchecked PS1 emulator (test build)"), as does a mark in the corner of
+  the game's screen while a game plays on it. A release, and a profile build,
   ignore the variable and only run the downloaded release's host
   (`RetroHostStore.installed`, a `RetroHostInstall` with `checked` set), and
   only with that release's SwanStation.
@@ -348,6 +349,17 @@ shipped program:
 A runtime switch (a setting, a command-line flag, a variable read by a
 release) was rejected: anyone, or any program, able to set it for a normal
 user's launcher could make that launcher run an unchecked program.
+
+**How a tester's screenshot is told apart.** While a game plays on the
+unchecked host, a debug or test build marks the game's screen with a small
+corner label, "Unchecked PS1 emulator (test build)", on every screen of the
+game and over every layer above it, so a screenshot of a test build can never
+pass for a release. The review of host #14 made this a condition of test
+builds; the Settings row alone is not enough. The mark is drawn only under the
+compile-time constant `kDebugMode || RetroHostBuild.testDefined`
+(`RetroHostPlaying.marksUnchecked`), so a release does not have it at all
+([Emulator host UI](<AnyPS5 Desktop - Emulator Host UI.md>) "The unchecked-host
+mark").
 
 **What a test build is not.** It is never published. It still checks a
 downloaded host as a release does; it only also runs the named one, which

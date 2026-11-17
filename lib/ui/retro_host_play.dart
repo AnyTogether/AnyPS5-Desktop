@@ -11,6 +11,7 @@ class RetroPlay {
     required this.started,
     required this.program,
     required this.core,
+    required this.unchecked,
   });
 
   final Game game;
@@ -21,6 +22,10 @@ class RetroPlay {
 
   /// The SwanStation library the game was started with.
   final String core;
+
+  /// The host was started without the checks a signed release's gets (a debug or test build's
+  /// `ANYPS5_RETRO_HOST`): the game is marked as such while it runs (`RetroUncheckedMark`).
+  final bool unchecked;
   final RetroHostControls controls;
   final RetroGameMenu menu;
   final DateTime started;
@@ -137,6 +142,10 @@ extension RetroHostPlaying on AppModel {
 
   /// What this launcher was compiled as: a debug build, a test build, or a release.
   static final retroHostBuild = RetroHostBuild.of(debug: kDebugMode);
+
+  /// Whether this launcher marks a game on an unchecked host (`RetroUncheckedMark`): a debug or
+  /// test build. A constant, so a release is compiled without the mark, as without the host.
+  static const marksUnchecked = kDebugMode || RetroHostBuild.testDefined;
 
   /// Whether [platform]'s discs play in the emulator host: PS1, with the setting on and a host
   /// found. Otherwise they go to the emulator chosen in Settings › Emulators, as before.
@@ -297,6 +306,7 @@ extension RetroHostPlaying on AppModel {
       started: DateTime.now(),
       program: install.host,
       core: install.core,
+      unchecked: !install.checked,
     );
     retroPlay = play;
     host.addListener(_retroChanged);

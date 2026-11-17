@@ -4,6 +4,7 @@ import 'package:anyps5_desktop/core/retro_host/retro_host_protocol.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/launcher.dart';
 import 'package:anyps5_desktop/ui/retro_host/retro_play_view.dart';
+import 'package:anyps5_desktop/ui/retro_host/retro_unchecked_mark.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,7 +14,7 @@ import '../support/ui_support.dart';
 import 'retro_host/fake_retro_host_session.dart';
 
 /// A PS1 game in the emulator host as it looks: loading, stopped on an error, its menu over the
-/// game, and Settings › Emulators with the host's rows.
+/// game, the mark of a game on an unchecked host, and Settings › Emulators with the host's rows.
 void main() {
   late Ps1Launcher launcher;
   final shell = find.byType(LauncherShell);
@@ -48,8 +49,10 @@ void main() {
     return slot;
   }
 
-  Future<void> playing(WidgetTester tester, {RetroStatus? status, bool frame = true}) async {
-    launcher = Ps1Launcher();
+  /// A game playing on the signed release's host, as a release has it, or with [unchecked] on
+  /// the host `ANYPS5_RETRO_HOST` names, as a debug or test build has it.
+  Future<void> playing(WidgetTester tester, {RetroStatus? status, bool frame = true, bool unchecked = false}) async {
+    launcher = unchecked ? Ps1Launcher() : (await tester.runAsync(Ps1Launcher.withRelease))!;
     launcher.model.setRetroHostPs1(true);
     await tester.runAsync(() => launcher.start(status: status));
     await pumpLauncher(tester, launcher.model);
@@ -94,6 +97,14 @@ void main() {
     expect(find.byType(RetroPlayView), findsOneWidget);
     expect(launcher.play.host.picture.value, isNotNull);
     await expectLater(shell, matchesGoldenFile('goldens/retro_host_playing_en.png'));
+  });
+
+  testWidgets("playing on an unchecked host: the test build's mark in the corner", (tester) async {
+    await playing(tester, unchecked: true);
+    expect(launcher.play.unchecked, isTrue);
+    expect(find.byType(RetroUncheckedMark), findsOneWidget);
+    expect(find.text(T.text('retroHostUnchecked')), findsOneWidget);
+    await expectLater(shell, matchesGoldenFile('goldens/retro_host_playing_unchecked_en.png'));
   });
 
   testWidgets('the menu over the paused game: discs, its sections, Close Game', (tester) async {

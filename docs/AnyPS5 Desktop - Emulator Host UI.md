@@ -28,6 +28,7 @@ the launcher plays a PS1 disc from its emulator library through all of them
 | [`lib/core/retro_host/retro_keyboard.dart`](../lib/core/retro_host/retro_keyboard.dart) | `RetroKeyboard`: the keyboard as a PS1 controller, with the keys of a game's Controls. |
 | [`lib/ui/retro_host_play.dart`](../lib/ui/retro_host_play.dart) | `RetroPlay` and the `RetroHostPlaying` part of `AppModel`: the setting, starting a disc in the host, the commands while it plays, the menu's panel rows, closing. |
 | [`lib/ui/retro_host/retro_play_view.dart`](../lib/ui/retro_host/retro_play_view.dart) | `RetroPlayView`: the game over the whole window, with `RetroGameNotice` for the loading and error screens. |
+| [`lib/ui/retro_host/retro_unchecked_mark.dart`](../lib/ui/retro_host/retro_unchecked_mark.dart) | `RetroUncheckedMark`: the small corner label over a game on an unchecked host, only in debug and test builds. |
 
 Each piece does one job and can be used alone. A settings preview can use
 `RetroFrameView` with any picture, and a menu can follow `RetroHostGame` without
@@ -357,7 +358,9 @@ compiled to allow it, never published:
 unchecked host comes first, and while it is used no download row is shown;
 instead **Unchecked PS1 emulator (test build)** says that this build runs it
 without checking its signature or files, and that normal releases only run the
-signed emulator. The core is the SwanStation library beside the host
+signed emulator. A Settings row alone is not enough, since a screenshot of
+the game would not show it, so a game on that host is also marked where it
+plays ("The unchecked-host mark" below). The core is the SwanStation library beside the host
 (`swanstation_libretro.dll` on Windows,
 `swanstation_libretro.so` on Linux), as a host release's zip holds the two.
 Neither is looked for on every read: every PS1 tile and row uses the same
@@ -535,6 +538,39 @@ also offers the PS1 BIOS folder there (O or Triangle,
 protocol version shows that it needs updating, and a host that never greeted
 the launcher shows that it could not be started.
 
+## The unchecked-host mark
+
+The host's protocol.md asks a launcher that runs an unchecked host to say so
+where the game plays, and the review of host #14 made it a condition of test
+builds: a test build running an unchecked host shows it on the game's screen,
+every time, so a tester's screenshot of the game can never pass for a
+release.
+
+- **What it is.** `RetroUncheckedMark`
+  ([`retro_unchecked_mark.dart`](../lib/ui/retro_host/retro_unchecked_mark.dart))
+  is a small dark label in the window's bottom corner (start side, so on the
+  left in left-to-right languages), with a flask icon in the warning colour
+  and the same words as the Settings row, **Unchecked PS1 emulator (test
+  build)**. It is drawn in the launcher's stack above the game and above every
+  layer over it (the game's menu, Settings); only the starting card, call
+  and pairing cards, toasts and window buttons are drawn above it. It lets the
+  pointer through. So it shows on the
+  loading screen, the playing picture, the paused game under its menu, any
+  layer opened over the game, and the error screen, for as long as the game
+  is `AppModel.retroPlay`. It is small and in a corner, as test and beta
+  builds of other programs mark their output, so it does not hide the game.
+- **When.** `RetroPlay.unchecked` is set when the game starts, from the
+  install it starts (`!RetroHostInstall.checked`): the host `ANYPS5_RETRO_HOST`
+  names. A debug or test build that plays a downloaded signed host shows no
+  mark, since that host was checked.
+- **Not in a release.** The launcher draws it only under
+  `RetroHostPlaying.marksUnchecked`, a constant: `kDebugMode ||
+  RetroHostBuild.testDefined`. Both are fixed when the launcher is compiled
+  ([Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>) "Debug
+  and test builds"), so in a release the condition is `false` and the
+  compiler leaves the mark out, as it leaves out the unchecked host itself.
+  No setting, file or environment variable can turn it on or off.
+
 ## Tests
 
 The tests in `test/ui/retro_host` use a fake session and fake frames, kept in
@@ -647,9 +683,18 @@ native memory as a real ring slot would be, so no host is started.
 - [`retro_host_play_golden_test.dart`](../test/ui/retro_host_play_golden_test.dart)
   draws the loading screen, the error screen (no BIOS, with its folder hint),
   the game's picture, the menu's
-  first page over it, its Console page, and Settings › Emulators with the
+  first page over it, its Console page, the game on an unchecked host with
+  its mark in the corner, and Settings › Emulators with the
   host's rows: the debug host's with its unchecked notice, the download offered
   before a host is installed, and the downloaded release installed and turned on.
+  The game's own goldens play on the signed release's host, as a release has
+  it, so they show no mark.
+- [`retro_host_unchecked_mark_test.dart`](../test/ui/retro_host_unchecked_mark_test.dart)
+  follows a game on the host `ANYPS5_RETRO_HOST` names through every screen
+  (loading, playing, its menu, Settings over it, stopped on an error) and
+  finds the mark on each, finds it on none for a game on the signed release,
+  and checks that `RetroHostPlaying.marksUnchecked` is the compile-time
+  `kDebugMode || RetroHostBuild.testDefined`.
 - [`retro_host_release_play_test.dart`](../test/ui/retro_host_release_play_test.dart)
   plays a PS1 disc the release way, with the recorded signed release of
   `test/fixtures/retro_host_release` and no `ANYPS5_RETRO_HOST`. The host is
