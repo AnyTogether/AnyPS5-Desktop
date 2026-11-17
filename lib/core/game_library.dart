@@ -163,17 +163,25 @@ abstract final class GameLibrary {
   static final retroCache = RetroScanCache();
 
   /// Finds every game folder under [root], down to three levels, sorted by name. With
-  /// [includeRetro], the PS1, PS2 and PS3 discs in them too.
-  static List<Game> scan(String root, {bool includeRetro = false, RetroScanCache? cache}) =>
-      survey(root, includeRetro: includeRetro, cache: cache).games;
+  /// [includeRetro], the PS1, PS2 and PS3 discs in them too, and with [hostPs2] the PS2 discs only
+  /// the emulator host plays as well.
+  static List<Game> scan(String root, {bool includeRetro = false, bool hostPs2 = false, RetroScanCache? cache}) =>
+      survey(root, includeRetro: includeRetro, hostPs2: hostPs2, cache: cache).games;
 
   /// The games under [root] and the dumps not whole yet. Cheap: a listing per level and each
   /// game's param.json. With [includeRetro], also the discs: what was read from a disc file is
-  /// kept in [cache] (the shared [retroCache] by default) until the file changes.
-  static LibrarySurvey survey(String root, {bool includeRetro = false, RetroScanCache? cache}) {
+  /// kept in [cache] (the shared [retroCache] by default) until the file changes. With [hostPs2]
+  /// (the emulator host plays PS2 discs now), PS2 cue sheets too, which PCSX2 does not boot.
+  static LibrarySurvey survey(String root, {bool includeRetro = false, bool hostPs2 = false, RetroScanCache? cache}) {
     final found = <Game>[];
     final incomplete = <String>[];
-    _visit(root, 0, found, incomplete, includeRetro ? (root: root, cache: cache ?? retroCache) : null);
+    _visit(
+      root,
+      0,
+      found,
+      incomplete,
+      includeRetro ? (root: root, cache: cache ?? retroCache, hostPs2: hostPs2) : null,
+    );
     // A game's update and add-ons are not games of their own, nor dumps still being copied.
     final claimed = GameAddons.claimed(found.map((game) => (update: game.update, addons: game.addons)));
     if (claimed.isNotEmpty) {
@@ -189,9 +197,14 @@ abstract final class GameLibrary {
   /// comes first; two dumps of one title in the same folder both show, as they do in one folder.
   /// A folder that is not there is skipped and counted as null.
   ///
-  /// With [includeRetro], the discs too; what [cache] holds of files no longer in any folder is
-  /// let go.
-  static LibrarySurvey surveyAll(List<String> roots, {bool includeRetro = false, RetroScanCache? cache}) {
+  /// With [includeRetro], the discs too, and with [hostPs2] the PS2 discs only the emulator host
+  /// plays ([survey]); what [cache] holds of files no longer in any folder is let go.
+  static LibrarySurvey surveyAll(
+    List<String> roots, {
+    bool includeRetro = false,
+    bool hostPs2 = false,
+    RetroScanCache? cache,
+  }) {
     final retro = cache ?? retroCache;
     if (includeRetro) retro.begin();
     final games = <Game>[];
@@ -204,7 +217,7 @@ abstract final class GameLibrary {
         folders[root] = null;
         continue;
       }
-      final here = survey(root, includeRetro: includeRetro, cache: retro);
+      final here = survey(root, includeRetro: includeRetro, hostPs2: hostPs2, cache: retro);
       folders[root] = here.games.length;
       final earlier = {...titles};
       for (final game in here.games) {
@@ -259,11 +272,18 @@ abstract final class GameLibrary {
   static bool _sameNames(Map<String, String> a, Map<String, String> b) =>
       a.length == b.length && a.entries.every((entry) => b[entry.key] == entry.value);
 
-  static bool _sameFiles(List<String>? a, List<String>? b) =>
-      a == null || b == null ? a == b : a.length == b.length && [for (var i = 0; i < a.length; i++) a[i] == b[i]].every((same) => same);
+  static bool _sameFiles(List<String>? a, List<String>? b) => a == null || b == null
+      ? a == b
+      : a.length == b.length && [for (var i = 0; i < a.length; i++) a[i] == b[i]].every((same) => same);
 
   static void _visit(String folder, int depth, List<Game> found, List<String> incomplete, _RetroScan? retro) {
-    final game = inspect(folder, includeRetro: retro != null, root: retro?.root, cache: retro?.cache);
+    final game = inspect(
+      folder,
+      includeRetro: retro != null,
+      hostPs2: retro?.hostPs2 ?? false,
+      root: retro?.root,
+      cache: retro?.cache,
+    );
     if (game != null) {
       found.add(game);
       return;
@@ -294,14 +314,16 @@ abstract final class GameLibrary {
     }
   }
 
-  /// The discs among [files], all in [folder]: cue sheets whose tracks are all there (PS2 discs
-  /// under a folder named for PS2 alone, PS1 discs anywhere else), PBP files, PS2 ISOs, CHDs under
-  /// a folder named for one console, CSO and ZSO images (compressed ISOs, which PSP games use too)
-  /// under a folder named for PS2 alone, and the playlists that gather a PS1 game's discs (the discs
-  /// they list are not games of their own then). These are the PS2 disc files the emulator host
-  /// takes (anyps5-retro-host docs/protocol.md "start"), but `.elf`, a program rather than a disc,
-  /// which only a game's own `retro.json` names. What is read from each file comes from
-  /// [_RetroScan.cache] while the file is unchanged.
+  /// The discs among [files], all in [folder]: cue sheets whose tracks are all there (PS1 discs
+  /// outside a folder named for PS2, and with [_RetroScan.hostPs2] PS2 discs under a folder named
+  /// for PS2 alone), PBP files, PS2 ISOs, CHDs under a folder named for one console, CSO and ZSO
+  /// images (compressed ISOs, which PSP games use too) under a folder named for PS2 alone, and the
+  /// playlists that gather a PS1 game's discs (the discs they list are not games of their own then).
+  /// These are the PS2 disc files the emulator host takes (anyps5-retro-host docs/protocol.md
+  /// "start"), but `.elf`, a program rather than a disc, which only a game's own `retro.json` names.
+  /// PCSX2 boots all of them from its command line but the cue sheet (its `IsDiscFileName` has no
+  /// `.cue`), so a PS2 cue sheet is listed only while the host plays PS2 discs. What is read from
+  /// each file comes from [_RetroScan.cache] while the file is unchanged.
   static List<Game> _scanRetroFiles(String folder, Iterable<File> files, _RetroScan retro) {
     final cache = retro.cache;
     final discs = <String, RetroPlatform>{};
@@ -314,7 +336,7 @@ abstract final class GameLibrary {
         switch (p.extension(file.path).toLowerCase()) {
           case '.m3u':
             playlists.add(file);
-          case '.cue' when !(ps1Folder && ps2Folder):
+          case '.cue' when !ps2Folder || (!ps1Folder && retro.hostPs2):
             final local = cache.read(file, () => _cueFiles(file))?.map((name) => _localDiscFile(folder, name)).toList();
             if (local != null && local.isNotEmpty && local.every((path) => path != null)) {
               discs[file.path] = ps2Folder ? RetroPlatform.ps2 : RetroPlatform.ps1;
@@ -472,12 +494,21 @@ abstract final class GameLibrary {
   }
 
   /// The game in [folder], or null when it is not a dump. With [includeRetro], a folder with a
-  /// retro.json or an extracted PS3 disc too, identified inside the games folder [root].
-  static Game? inspect(String folder, {bool includeRetro = false, String? root, RetroScanCache? cache}) {
+  /// retro.json or an extracted PS3 disc too, identified inside the games folder [root]; with
+  /// [hostPs2], a retro.json may name a PS2 cue sheet ([_inspectRetro]).
+  static Game? inspect(
+    String folder, {
+    bool includeRetro = false,
+    bool hostPs2 = false,
+    String? root,
+    RetroScanCache? cache,
+  }) {
     final system = p.join(folder, 'sce_sys');
     final eboot = p.join(folder, 'eboot.bin');
     if (!File(eboot).existsSync()) {
-      return includeRetro ? _inspectRetro(folder, root) ?? _inspectPs3(folder, root, cache ?? retroCache) : null;
+      return includeRetro
+          ? _inspectRetro(folder, root, hostPs2: hostPs2) ?? _inspectPs3(folder, root, cache ?? retroCache)
+          : null;
     }
     final Map<String, dynamic> parameters;
     try {
@@ -570,8 +601,8 @@ abstract final class GameLibrary {
   }
 
   /// A PS1 or PS2 game folder its retro.json describes: the console, name, title ID and disc, and
-  /// the art and music beside it.
-  static Game? _inspectRetro(String folder, String? root) {
+  /// the art and music beside it. A PS2 cue sheet only with [hostPs2], as PCSX2 does not boot one.
+  static Game? _inspectRetro(String folder, String? root, {required bool hostPs2}) {
     try {
       final manifest = File(p.join(folder, 'retro.json'));
       if (!manifest.existsSync()) return null;
@@ -599,7 +630,7 @@ abstract final class GameLibrary {
 
       final disc = localFile('disc', switch (platform) {
         RetroPlatform.ps1 => {'.cue', '.chd', '.m3u', '.pbp'},
-        RetroPlatform.ps2 => {'.iso', '.chd', '.cso', '.zso', '.cue', '.elf'},
+        RetroPlatform.ps2 => {'.iso', '.chd', '.cso', '.zso', '.elf', if (hostPs2) '.cue'},
         RetroPlatform.ps3 => {'.sfb'},
       });
       if (disc == null) return null;
@@ -661,8 +692,9 @@ abstract final class GameLibrary {
   }
 }
 
-/// Where a scan looks for discs: the games folder it started in, and what it keeps of the files.
-typedef _RetroScan = ({String root, RetroScanCache cache});
+/// Where a scan looks for discs: the games folder it started in, what it keeps of the files, and
+/// whether the PS2 discs only the emulator host plays are listed.
+typedef _RetroScan = ({String root, RetroScanCache cache, bool hostPs2});
 
 /// What a scan read from the disc files (a cue sheet's tracks, whether an ISO boots a PS2, a
 /// playlist's entries, a PS3 disc's PARAM.SFO), by path, kept while the file's size and

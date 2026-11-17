@@ -36,15 +36,31 @@ void main() {
     await pumpEventQueue();
   }
 
-  test('a host with no LRPS2 beside it says PS2 games are not available in it, whatever the setting', () {
+  test('a host with no LRPS2 beside it shows no PS2 rows and plays no PS2 disc, whatever the setting', () {
     launcher = Ps1Launcher(ps2: false);
     final model = launcher.model..setRetroHostPs2(true);
     expect(model.retroHostInstall!.ps2Core, isNull);
-    final ps2 = row('retro-host-ps2')!;
-    expect(ps2.title, T.text('retroHostPs2'));
-    expect((ps2.kind as InfoRow).text, T.text('retroHostPs2NotAvailable'));
-    expect(row('retro-host-ps2-bios'), isNull);
+    final ids = launcher.emulatorSettings().rows.map((row) => row.id).toList();
+    expect(ids, contains('retro-host-ps1'));
+    expect(ids.where((id) => id.startsWith('retro-host-ps2')), isEmpty);
     expect(model.playsInHost(RetroPlatform.ps2), isFalse);
+  });
+
+  test('a PS2 cue sheet, which PCSX2 does not boot, is in the library only while PS2 discs play in the host', () {
+    launcher = Ps1Launcher(ps2: true);
+    final model = launcher.model;
+    final folder = Directory(p.join(model.root!, 'PS2', 'Cue Racer'))..createSync(recursive: true);
+    File(p.join(folder.path, 'Cue Racer.bin')).createSync();
+    File(p.join(folder.path, 'Cue Racer.cue'))
+        .writeAsStringSync('FILE "Cue Racer.bin" BINARY\n  TRACK 01 MODE2/2352\n');
+    bool listed() => model.games.any((game) => game.name == 'Cue Racer');
+    model.rescan();
+    expect(listed(), isFalse, reason: 'it would start in PCSX2');
+    model.setRetroHostPs2(true);
+    expect(listed(), isTrue);
+    expect(model.games.singleWhere((game) => game.name == 'Cue Racer').retro!.platform, RetroPlatform.ps2);
+    model.setRetroHostPs2(false);
+    expect(listed(), isFalse);
   });
 
   test('with LRPS2 beside the host: off until turned on, then the PS2 BIOS folder, opened where LRPS2 looks', () {
@@ -162,11 +178,12 @@ void main() {
   );
 
   group('the signed release', () {
-    test('one without LRPS2 says PS2 is not available, and is checked for SwanStation alone', () async {
+    test('one without LRPS2 shows no PS2 rows, and is checked for SwanStation alone', () async {
       launcher = await Ps1Launcher.withRelease(ps2: false);
       final model = launcher.model..setRetroHostPs2(true);
       expect(model.retroHostInstall!.ps2Core, isNull);
-      expect((row('retro-host-ps2')!.kind as InfoRow).text, T.text('retroHostPs2NotAvailable'));
+      expect(row('retro-host-ps2'), isNull);
+      expect(row('retro-host-ps2-bios'), isNull);
       final checked = await model.retroHostDownload.store.check();
       addTearDown(checked.release);
       expect(checked.ps2Core, isNull);

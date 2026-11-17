@@ -68,11 +68,18 @@ void main() {
       isEmpty,
       reason: 'the host fixes those itself',
     );
-    for (final key in options.keys) {
+    expect(options, contains('pcsx2_upscale_multiplier'));
+    for (final key in options.keys.where((key) => key != 'pcsx2_upscale_multiplier')) {
       expect(retroOptionSection(key), RetroOptionSection.advanced, reason: key);
       expect(retroOptionSent(key, ps2: true), isTrue, reason: key);
       expect(retroOptionSent(key), isFalse, reason: '$key is no PS1 option');
     }
+    expect(retroOptionSection('pcsx2_upscale_multiplier'), RetroOptionSection.graphics);
+    expect(
+      retroOptionSent('pcsx2_upscale_multiplier', ps2: true),
+      isFalse,
+      reason: "held back like SwanStation's graphics: the host's resolution limits do not cover it yet",
+    );
     expect(retroOptionSent('swanstation_Console_Region', ps2: true), isFalse);
     expect(retroOptionSent('swanstation_Console_Region'), isTrue);
   });

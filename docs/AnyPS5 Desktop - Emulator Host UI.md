@@ -286,7 +286,7 @@ finds its place:
 
 | Section | SwanStation options |
 | --- | --- |
-| Graphics (not in the menu, see "Not yet") | `GPU_*` and `Display_*` |
+| Graphics (not in the menu, see "Not yet") | `GPU_*` and `Display_*`; LRPS2's `pcsx2_upscale_multiplier` |
 | Audio | `Audio_*` and Mute CD Audio (`CDROM_MuteCDAudio`) |
 | Controller | `Controller*` (`Controller_`, `Controller1_`, `Controller2_`, `ControllerPorts_`) |
 | Console | `Console_*`, `BIOS_*`, CD-ROM Region Check, Read Speedup and Seek Speedup, CPU Overclocking |
@@ -399,10 +399,14 @@ made the same way (`_retroHostPs2SettingsRows`):
   picked file checked as LRPS2's `IsBIOS` does and copied in; that is left
   out to keep the PS2 rows the PS1 rows' shape, and can follow if the
   maintainers want it.
-- Where the host has no LRPS2 (a release that does not ship it yet), one row,
-  **Run PS2 games in the separate host**, says the host has no PS2 emulator
-  yet, so PS2 games play in PCSX2. The setting does nothing then, even saved
-  as on.
+- Where the host has no LRPS2 (every signed release until the host ships it),
+  there are no PS2 rows at all, so Settings › Emulators is the PS1 one, and PS2
+  discs start in PCSX2. The setting does nothing then, even saved as on.
+- Turning the setting on or off scans the library again, and so does a
+  download that adds or drops LRPS2: a PS2 cue sheet is listed only while PS2
+  discs play in the host, since PCSX2 does not boot one
+  ([Standalone emulator library](<AnyPS5 Desktop - Standalone Emulator Library.md>)
+  "Discovery").
 
 A PS2 disc starts on the same host as a PS1 disc, with `console` `ps2`, LRPS2
 as `core`, `saves` `AppPaths.retroPs2Saves` (`retro/saves/ps2`), and only the
@@ -416,7 +420,12 @@ LRPS2's `bios` (no BIOS it takes in `pcsx2/bios`) shows **No PS2 BIOS was
 found** with the PS2 BIOS folder offered on the options key
 (`retroBiosFolderOf`), as the PS1 error screen offers the PS1 folder. The
 in-game menu is the PS1 one: LRPS2's options are all under Advanced
-(`retroOptionSection`), with their own titles, and `pcsx2_bios`, the BIOS file
+(`retroOptionSection`), with their own titles, but its resolution scale
+(`pcsx2_upscale_multiplier`), which is a graphics option, left out of the menu
+and not sent, as SwanStation's are, until the host's resolution limits cover
+LRPS2 (host `docs/ps2.md` "Drawing" knows only SwanStation's). A host test ran
+one PS2 game at 2x at full speed on a fast graphics card, which says nothing
+about a slower one. `pcsx2_bios`, the BIOS file
 LRPS2 starts with when the folder holds more than one, says it takes effect at
 the next start. The kept host stays for the next game while the game selected
 plays in the host, PS1 or PS2. Online play stays PS1-only and is not touched.

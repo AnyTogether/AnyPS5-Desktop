@@ -2441,7 +2441,6 @@
   "retroHostBiosFolderDetail": "Onde fica o arquivo da BIOS do PS1. Selecione para abrir a pasta.",
   "retroHostPs2": "Rodar jogos de PS2 no host separado",
   "retroHostPs2Detail": "Os jogos de PS2 rodam nesta janela pelo host de emulação do AnyPS5 em vez do PCSX2.",
-  "retroHostPs2NotAvailable": "Este host de emulação ainda não tem um emulador de PS2, então os jogos de PS2 rodam no PCSX2.",
   "retroHostPs2BiosFolder": "Pasta da BIOS do PS2",
   "retroHostPs2BiosFolderDetail": "Onde fica o arquivo da BIOS do PS2. Selecione para abrir a pasta.",
   "retroHostPs2BiosDetail": "Nenhuma BIOS do PS2 foi encontrada. Coloque um arquivo de BIOS na pasta da BIOS do PS2 (Configurações › Emuladores) e inicie o jogo novamente.",

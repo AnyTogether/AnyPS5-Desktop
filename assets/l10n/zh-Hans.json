@@ -2441,7 +2441,6 @@
   "retroHostBiosFolderDetail": "存放 PS1 BIOS 文件的位置。选择即可打开该文件夹。",
   "retroHostPs2": "在独立宿主程序中运行 PS2 游戏",
   "retroHostPs2Detail": "PS2 游戏通过 AnyPS5 模拟器宿主程序在此窗口中运行，而不是使用 PCSX2。",
-  "retroHostPs2NotAvailable": "此模拟器宿主程序还没有 PS2 模拟器，因此 PS2 游戏会在 PCSX2 中运行。",
   "retroHostPs2BiosFolder": "PS2 BIOS 文件夹",
   "retroHostPs2BiosFolderDetail": "存放 PS2 BIOS 文件的位置。选择即可打开该文件夹。",
   "retroHostPs2BiosDetail": "未找到 PS2 BIOS。请将 BIOS 文件放入 PS2 BIOS 文件夹（设置 › 模拟器），然后重新启动游戏。",

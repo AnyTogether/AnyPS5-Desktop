@@ -2441,7 +2441,6 @@
   "retroHostBiosFolderDetail": "Ide kerül a PS1 BIOS-fájl. Válaszd ki a mappa megnyitásához.",
   "retroHostPs2": "PS2-játékok futtatása a külön gazdaprogramban",
   "retroHostPs2Detail": "A PS2-játékok ebben az ablakban futnak az AnyPS5 emulátor-gazdaprogramján keresztül a PCSX2 helyett.",
-  "retroHostPs2NotAvailable": "Ennek az emulátor-gazdaprogramnak még nincs PS2-emulátora, ezért a PS2-játékok a PCSX2-ben futnak.",
   "retroHostPs2BiosFolder": "PS2 BIOS mappa",
   "retroHostPs2BiosFolderDetail": "Ide kerül a PS2 BIOS-fájl. Válaszd ki a mappa megnyitásához.",
   "retroHostPs2BiosDetail": "Nem található PS2 BIOS. Tegyél egy BIOS-fájlt a PS2 BIOS mappába (Beállítások › Emulátorok), és indítsd újra a játékot.",

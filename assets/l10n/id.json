@@ -2441,7 +2441,6 @@
   "retroHostBiosFolderDetail": "Tempat file BIOS PS1 disimpan. Pilih untuk membuka folder.",
   "retroHostPs2": "Jalankan game PS2 di host terpisah",
   "retroHostPs2Detail": "Game PS2 dimainkan di jendela ini melalui host emulator AnyPS5, bukan PCSX2.",
-  "retroHostPs2NotAvailable": "Host emulator ini belum memiliki emulator PS2, jadi game PS2 dimainkan di PCSX2.",
   "retroHostPs2BiosFolder": "Folder BIOS PS2",
   "retroHostPs2BiosFolderDetail": "Tempat file BIOS PS2 disimpan. Pilih untuk membuka folder.",
   "retroHostPs2BiosDetail": "BIOS PS2 tidak ditemukan. Letakkan file BIOS di folder BIOS PS2 (Pengaturan › Emulator) lalu mulai game lagi.",

@@ -201,16 +201,18 @@ extension RetroHostPlaying on AppModel {
     _changed();
   }
 
+  /// Turns PS2 discs in the host on or off; the library is scanned again, as it lists PS2 cue
+  /// sheets only while the host plays PS2 discs ([GameLibrary.survey]).
   void setRetroHostPs2(bool enabled) {
     if (preferences.retroHostPs2 == enabled) return;
     preferences.retroHostPs2 = enabled;
     savePreferences();
-    _changed();
+    rescan();
   }
 
   /// Settings › Emulators' rows for the host: its download, or the notice that this build runs an
   /// unchecked host, and where a host is found, the setting and the BIOS folder; then the same two
-  /// for PS2 where that host has LRPS2 beside it, or a row saying it has none.
+  /// for PS2 where that host has LRPS2 beside it.
   List<PanelRow> _retroHostSettingsRows() {
     final unchecked = retroHostUnchecked != null;
     final download = retroHostDownload.rows(uncheckedHost: unchecked);
@@ -243,17 +245,9 @@ extension RetroHostPlaying on AppModel {
 
   /// The PS2 rows of Settings › Emulators under the PS1 ones: where [install] has LRPS2 beside it,
   /// the setting and, once it is on, the folder LRPS2 looks for the PS2 BIOS in; where it has none
-  /// (a host release that does not ship LRPS2), one row saying so.
+  /// (a host release that does not ship LRPS2), no rows, so its Settings stay as they are for PS1.
   List<PanelRow> _retroHostPs2SettingsRows(RetroHostInstall install) {
-    if (install.ps2Core == null) {
-      return [
-        PanelRow(
-          id: 'retro-host-ps2',
-          title: T.text('retroHostPs2'),
-          kind: InfoRow(T.text('retroHostPs2NotAvailable')),
-        ),
-      ];
-    }
+    if (install.ps2Core == null) return const [];
     return [
       PanelRow(
         id: 'retro-host-ps2',
@@ -422,7 +416,8 @@ extension RetroHostPlaying on AppModel {
     try {
       return await retroHostDownload.store.check();
     } on RetroHostReleaseFailure catch (failure) {
-      _padLog?.call('emulator host: ${install.host} failed its check: ${failure.message}');
+      final file = failure.file == null ? '' : ' (${failure.file} failed)';
+      _padLog?.call('emulator host: ${install.host} failed its check$file: ${failure.message}');
       retroHostDownload.failedCheck(failure.message);
       if (!_disposed) show(T.text('retroHostCheckFailed'));
       rethrow;

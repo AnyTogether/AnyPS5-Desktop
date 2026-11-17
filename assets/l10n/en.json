@@ -2441,7 +2441,6 @@
   "retroHostBiosFolderDetail": "Where the PS1 BIOS file goes. Select to open the folder.",
   "retroHostPs2": "Run PS2 games in the separate host",
   "retroHostPs2Detail": "PS2 games play in this window through the AnyPS5 emulator host instead of PCSX2.",
-  "retroHostPs2NotAvailable": "This emulator host has no PS2 emulator yet, so PS2 games play in PCSX2 instead.",
   "retroHostPs2BiosFolder": "PS2 BIOS folder",
   "retroHostPs2BiosFolderDetail": "Where the PS2 BIOS file goes. Select to open the folder.",
   "retroHostPs2BiosDetail": "No PS2 BIOS was found. Put a BIOS file in the PS2 BIOS folder (Settings › Emulators) and start the game again.",

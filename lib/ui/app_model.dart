@@ -3146,7 +3146,11 @@ class AppModel extends ChangeNotifier {
       _connected.clear();
       _scannedFolders = key;
     }
-    final survey = GameLibrary.surveyAll(folders, includeRetro: preferences.retroLibrary);
+    final survey = GameLibrary.surveyAll(
+      folders,
+      includeRetro: preferences.retroLibrary,
+      hostPs2: playsInHost(RetroPlatform.ps2),
+    );
     folderCounts = survey.folders;
     _gameRoots = survey.roots;
     _takeScan(survey.games, quiet: _newlyConnected());
@@ -3172,7 +3176,11 @@ class AppModel extends ChangeNotifier {
   List<String> _watchedScan(String folder) {
     final folders = preferences.gamesFolders;
     if (_disposed || !folders.contains(folder)) return const [];
-    final survey = GameLibrary.surveyAll(folders, includeRetro: preferences.retroLibrary);
+    final survey = GameLibrary.surveyAll(
+      folders,
+      includeRetro: preferences.retroLibrary,
+      hostPs2: playsInHost(RetroPlatform.ps2),
+    );
     final key = folders.join('\n');
     final counted = !mapEquals(folderCounts, survey.folders);
     folderCounts = survey.folders;

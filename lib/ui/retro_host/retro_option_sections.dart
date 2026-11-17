@@ -1,8 +1,10 @@
 /// Where a SwanStation option is shown. The host lists every option SwanStation lets the player
 /// change now (about fifty for a PS1 game, in SwanStation's order); the launcher groups them.
 enum RetroOptionSection {
-  /// The picture: SwanStation's `GPU`, `Display` and `TextureReplacements` options. The in-game
-  /// menu does not show them: they are left for a Graphics page of their own.
+  /// The picture: SwanStation's `GPU`, `Display` and `TextureReplacements` options, and LRPS2's
+  /// resolution scale (`pcsx2_upscale_multiplier`), which the host's resolution limits do not
+  /// cover yet (anyps5-retro-host docs/ps2.md "Drawing"). The in-game menu does not show them:
+  /// they are left for a Graphics page of their own.
   graphics,
 
   /// The sound: SwanStation's `Audio` options and Mute CD Audio. The menu adds the host's volume.
@@ -36,9 +38,11 @@ enum RetroOptionSection {
 /// - the light gun crosshair (`Controller_ShowCrosshair`): the host plugs in only DualShocks.
 ///
 /// Keys are `swanstation_<Group>_<Name>`; a key of another form is [RetroOptionSection.advanced], as
-/// every LRPS2 option of a PS2 game is (`pcsx2_...`), its BIOS (`pcsx2_bios`) included.
+/// every LRPS2 option of a PS2 game is (`pcsx2_...`), its BIOS (`pcsx2_bios`) included, but its
+/// resolution scale, which is [RetroOptionSection.graphics].
 RetroOptionSection? retroOptionSection(String key) {
   const prefix = 'swanstation_';
+  if (key == 'pcsx2_upscale_multiplier') return RetroOptionSection.graphics;
   if (!key.startsWith(prefix)) return RetroOptionSection.advanced;
   final name = key.substring(prefix.length);
   if (_hidden.contains(name) || name.startsWith('TextureReplacements_')) return null;

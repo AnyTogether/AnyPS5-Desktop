@@ -2441,7 +2441,6 @@
   "retroHostBiosFolderDetail": "PS1 BIOS dosyasının konduğu yer. Klasörü açmak için seç.",
   "retroHostPs2": "PS2 oyunlarını ayrı emülatör programında çalıştır",
   "retroHostPs2Detail": "PS2 oyunları PCSX2 yerine AnyPS5 emülatör programıyla bu pencerede oynanır.",
-  "retroHostPs2NotAvailable": "Bu emülatör programında henüz PS2 emülatörü yok, bu yüzden PS2 oyunları PCSX2’de oynanır.",
   "retroHostPs2BiosFolder": "PS2 BIOS klasörü",
   "retroHostPs2BiosFolderDetail": "PS2 BIOS dosyasının konduğu yer. Klasörü açmak için seç.",
   "retroHostPs2BiosDetail": "PS2 BIOS'u bulunamadı. PS2 BIOS klasörüne (Ayarlar › Emülatörler) bir BIOS dosyası koy ve oyunu yeniden başlat.",

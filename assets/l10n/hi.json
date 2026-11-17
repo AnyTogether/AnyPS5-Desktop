@@ -2441,7 +2441,6 @@
   "retroHostBiosFolderDetail": "जहां PS1 BIOS फ़ाइल रखी जाती है। फ़ोल्डर खोलने के लिए चुनें।",
   "retroHostPs2": "PS2 गेम अलग होस्ट में चलाएं",
   "retroHostPs2Detail": "PS2 गेम PCSX2 के बजाय AnyPS5 एमुलेटर होस्ट के ज़रिए इसी विंडो में खेले जाते हैं।",
-  "retroHostPs2NotAvailable": "इस एमुलेटर होस्ट में अभी PS2 एमुलेटर नहीं है, इसलिए PS2 गेम PCSX2 में खेले जाते हैं।",
   "retroHostPs2BiosFolder": "PS2 BIOS फ़ोल्डर",
   "retroHostPs2BiosFolderDetail": "जहां PS2 BIOS फ़ाइल रखी जाती है। फ़ोल्डर खोलने के लिए चुनें।",
   "retroHostPs2BiosDetail": "कोई PS2 BIOS नहीं मिला। PS2 BIOS फ़ोल्डर (सेटिंग्स › एमुलेटर) में एक BIOS फ़ाइल रखें और गेम फिर से शुरू करें।",

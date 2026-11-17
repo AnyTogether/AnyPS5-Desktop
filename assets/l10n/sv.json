@@ -2441,7 +2441,6 @@
   "retroHostBiosFolderDetail": "Där PS1-BIOS-filen ska ligga. Välj för att öppna mappen.",
   "retroHostPs2": "Kör PS2-spel i den separata värden",
   "retroHostPs2Detail": "PS2-spel spelas i det här fönstret via AnyPS5:s emulatorvärd i stället för PCSX2.",
-  "retroHostPs2NotAvailable": "Den här emulatorvärden har ingen PS2-emulator än, så PS2-spel spelas i PCSX2 i stället.",
   "retroHostPs2BiosFolder": "Mapp för PS2-BIOS",
   "retroHostPs2BiosFolderDetail": "Där PS2-BIOS-filen ska ligga. Välj för att öppna mappen.",
   "retroHostPs2BiosDetail": "Inget PS2-BIOS hittades. Lägg en BIOS-fil i mappen för PS2-BIOS (Inställningar › Emulatorer) och starta spelet igen.",

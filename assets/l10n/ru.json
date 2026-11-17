@@ -2441,7 +2441,6 @@
   "retroHostBiosFolderDetail": "Сюда кладётся файл BIOS PS1. Выберите, чтобы открыть папку.",
   "retroHostPs2": "Запускать игры PS2 в отдельном хосте",
   "retroHostPs2Detail": "Игры PS2 идут в этом окне через хост эмуляции AnyPS5, а не через PCSX2.",
-  "retroHostPs2NotAvailable": "В этом хосте эмуляции пока нет эмулятора PS2, поэтому игры PS2 запускаются в PCSX2.",
   "retroHostPs2BiosFolder": "Папка BIOS PS2",
   "retroHostPs2BiosFolderDetail": "Сюда кладётся файл BIOS PS2. Выберите, чтобы открыть папку.",
   "retroHostPs2BiosDetail": "BIOS PS2 не найден. Положите файл BIOS в папку BIOS PS2 («Настройки» › «Эмуляторы») и запустите игру снова.",

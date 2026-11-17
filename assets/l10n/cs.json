@@ -2441,7 +2441,6 @@
   "retroHostBiosFolderDetail": "Sem patří soubor BIOS PS1. Výběrem otevřete složku.",
   "retroHostPs2": "Spouštět hry pro PS2 v samostatném hostiteli",
   "retroHostPs2Detail": "Hry pro PS2 se hrají v tomto okně přes hostitele emulátoru AnyPS5 místo PCSX2.",
-  "retroHostPs2NotAvailable": "Tento hostitel emulátoru zatím nemá emulátor PS2, takže se hry pro PS2 hrají v PCSX2.",
   "retroHostPs2BiosFolder": "Složka BIOS PS2",
   "retroHostPs2BiosFolderDetail": "Sem patří soubor BIOS PS2. Výběrem otevřete složku.",
   "retroHostPs2BiosDetail": "Nebyl nalezen žádný BIOS PS2. Vložte soubor BIOS do složky BIOS PS2 (Nastavení › Emulátory) a spusťte hru znovu.",

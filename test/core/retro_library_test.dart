@@ -134,7 +134,7 @@ void main() {
     expect(cache.length, 0, reason: 'a file gone from the library is let go');
   });
 
-  test('PS2 discs under a PS2 folder: cue sheets, CSO and ZSO images by their header, and a retro.json ELF', () {
+  test('PS2 discs under a PS2 folder: cue sheets while the host plays PS2, CSO and ZSO by their header, an ELF', () {
     final root = temporaryFolder('ps2-disc-types');
     addTearDown(() => root.deleteSync(recursive: true));
     final ps2 = Directory(p.join(root.path, 'PS2'))..createSync();
@@ -153,10 +153,21 @@ void main() {
     File(p.join(homebrew.path, 'retro.json'))
         .writeAsStringSync(jsonEncode({'platform': 'ps2', 'titleId': 'HOMEBREW1', 'name': 'Demo', 'disc': 'demo.elf'}));
 
-    final games = GameLibrary.scan(root.path, includeRetro: true);
-    final platforms = {for (final game in games) game.name: (game.retro!.platform, p.extension(game.retro!.path))};
-    expect(platforms, {
+    final cueHomebrew = Directory(p.join(root.path, 'CueHomebrew'))..createSync();
+    File(p.join(cueHomebrew.path, 'Arcade.bin')).createSync();
+    File(p.join(cueHomebrew.path, 'Arcade.cue'))
+        .writeAsStringSync('FILE "Arcade.bin" BINARY\n  TRACK 01 MODE2/2352\n');
+    File(p.join(cueHomebrew.path, 'retro.json')).writeAsStringSync(
+      jsonEncode({'platform': 'ps2', 'titleId': 'HOMEBREW2', 'name': 'Arcade', 'disc': 'Arcade.cue'}),
+    );
+
+    Map<String, (RetroPlatform, String)> listed(List<Game> games) => {
+      for (final game in games) game.name: (game.retro!.platform, p.extension(game.retro!.path)),
+    };
+    final games = GameLibrary.scan(root.path, includeRetro: true, hostPs2: true);
+    expect(listed(games), {
       'Racer': (RetroPlatform.ps2, '.cue'),
+      'Arcade': (RetroPlatform.ps2, '.cue'),
       'Puzzle': (RetroPlatform.ps2, '.cso'),
       'Quest': (RetroPlatform.ps2, '.zso'),
       'Other': (RetroPlatform.ps1, '.cue'),
@@ -164,5 +175,12 @@ void main() {
     }, reason: 'a CSO outside a PS2 folder may be a PSP game, and a loose ELF is no disc');
     final racer = games.singleWhere((game) => game.name == 'Racer');
     expect(racer.files!.map(p.basename), ['Racer.cue', 'Racer.bin']);
+
+    expect(listed(GameLibrary.scan(root.path, includeRetro: true)), {
+      'Puzzle': (RetroPlatform.ps2, '.cso'),
+      'Quest': (RetroPlatform.ps2, '.zso'),
+      'Other': (RetroPlatform.ps1, '.cue'),
+      'Demo': (RetroPlatform.ps2, '.elf'),
+    }, reason: 'PCSX2 boots no cue sheet, so a PS2 one waits for the host to play PS2 discs');
   });
 }

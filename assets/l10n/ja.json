@@ -2441,7 +2441,6 @@
   "retroHostBiosFolderDetail": "PS1 の BIOS ファイルを置く場所です。選択するとフォルダーが開きます。",
   "retroHostPs2": "PS2 のゲームを別のホストで実行",
   "retroHostPs2Detail": "PS2 のゲームを PCSX2 ではなく AnyPS5 エミュレーター ホストを使ってこのウィンドウでプレイします。",
-  "retroHostPs2NotAvailable": "このエミュレーター ホストにはまだ PS2 のエミュレーターがないため、PS2 のゲームは PCSX2 でプレイします。",
   "retroHostPs2BiosFolder": "PS2 BIOS フォルダー",
   "retroHostPs2BiosFolderDetail": "PS2 の BIOS ファイルを置く場所です。選択するとフォルダーが開きます。",
   "retroHostPs2BiosDetail": "PS2 の BIOS が見つかりません。PS2 BIOS フォルダー ([設定] › [エミュレーター]) に BIOS ファイルを置いて、ゲームをもう一度起動してください。",

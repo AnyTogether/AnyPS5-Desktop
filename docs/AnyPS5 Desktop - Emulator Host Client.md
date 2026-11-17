@@ -309,18 +309,25 @@ The protocol lines this follows:
 What the launcher does with them:
 
 - **Which core.** `RetroHostInstall.ps2Core` is LRPS2, `pcsx2_libretro.dll`,
-  `.so` or `.dylib` (`RetroHostSystem.ps2Core`, the names the host's
-  `package_release.py` gives it on its `ps2-release` branch), beside the host.
-  `RetroHostStore.installed` names it when the release's folder holds it, and
-  `RetroHostInstall.locate` when it is beside an unchecked host. A release
-  that does not ship LRPS2 has none, and PS2 is then not available.
+  `.so` or `.dylib` (`RetroHostSystem.ps2Core`), beside the host. The names
+  must stay the ones the host's `tools/package_release.py` packs (its
+  `SYSTEMS`, on the `ps2-release` branch at 8571e68 the same three): a release
+  whose LRPS2 is named otherwise is taken for one without LRPS2.
+  `RetroHostStore.installed` names it when the installed release's `.files`
+  lists it (`RetroHostRelease.installedHasPs2Core`), as `checkBeforeStart`
+  decides it, so a stray `pcsx2_libretro` file in the host folder is neither
+  offered nor checked; `RetroHostInstall.locate` names it when it is beside an
+  unchecked host. A release that does not ship LRPS2 has none, and PS2 is then
+  not available: Settings › Emulators shows no PS2 rows.
 - **Checked like SwanStation.** `checkBeforeStart` checks LRPS2 against the
   `.files` whenever the `.files` lists it, for a PS1 game too: one host plays
   the next game on the cores it was checked with, PS1 or PS2, so both are
   held for its whole life on Windows (and checked again by path on Linux
   before a kept host's next game). A changed LRPS2 fails the check for every
   game. A release whose `.files` lists no LRPS2 is checked for SwanStation
-  alone, and its `RetroHostChecked.ps2Core` is null.
+  alone, and its `RetroHostChecked.ps2Core` is null. A failure names the file
+  that failed (`RetroHostReleaseFailure.file`), and the launcher's log line
+  says it, so a broken LRPS2 that stops a PS1 game is named as the cause.
 - **`start`.** `RetroHostStartRequest.console` is `ps2` for a PS2 game and
   left out for a PS1 one, the host's default, so a PS1 start is the same on
   every host. The client throws `StateError` before it sends a `start` that

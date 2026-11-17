@@ -2441,7 +2441,6 @@
   "retroHostBiosFolderDetail": "Dito inilalagay ang PS1 BIOS file. Piliin para buksan ang folder.",
   "retroHostPs2": "Patakbuhin ang mga larong PS2 sa hiwalay na host",
   "retroHostPs2Detail": "Nilalaro ang mga larong PS2 sa window na ito sa pamamagitan ng emulator host ng AnyPS5 sa halip na PCSX2.",
-  "retroHostPs2NotAvailable": "Wala pang PS2 emulator ang emulator host na ito, kaya sa PCSX2 nilalaro ang mga larong PS2.",
   "retroHostPs2BiosFolder": "Folder ng PS2 BIOS",
   "retroHostPs2BiosFolderDetail": "Dito inilalagay ang PS2 BIOS file. Piliin para buksan ang folder.",
   "retroHostPs2BiosDetail": "Walang nahanap na PS2 BIOS. Maglagay ng BIOS file sa folder ng PS2 BIOS (Mga Setting › Mga emulator) at simulan muli ang laro.",

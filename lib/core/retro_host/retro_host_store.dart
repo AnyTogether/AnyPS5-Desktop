@@ -45,7 +45,8 @@ class RetroHostStore {
   /// The host to start, when its files are there; it is checked before each start ([check]). A
   /// host left in `host.old` by a launcher stopped in the middle of putting a new one in place is
   /// put back first ([RetroHostRelease.restore]). Its [RetroHostInstall.ps2Core] is the release's
-  /// LRPS2 when the release shipped one (a host with `ps2`), and null otherwise.
+  /// LRPS2 when the release's `.files` lists one (a host with `ps2`), as [check] decides it, and
+  /// null otherwise, even with a stray `pcsx2_libretro` file in the folder.
   RetroHostInstall? installed() {
     final target = system;
     if (target == null) return null;
@@ -58,7 +59,7 @@ class RetroHostStore {
     return RetroHostInstall(
       host: host,
       core: core,
-      ps2Core: File(ps2Core).existsSync() ? ps2Core : null,
+      ps2Core: RetroHostRelease.installedHasPs2Core(folder, system: target) ? ps2Core : null,
       checked: true,
     );
   }

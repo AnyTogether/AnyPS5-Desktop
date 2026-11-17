@@ -2441,7 +2441,6 @@
   "retroHostBiosFolderDetail": "Locul unde se pune fișierul BIOS PS1. Selectează pentru a deschide dosarul.",
   "retroHostPs2": "Rulează jocurile PS2 în gazda separată",
   "retroHostPs2Detail": "Jocurile PS2 rulează în această fereastră prin gazda de emulare AnyPS5 în loc de PCSX2.",
-  "retroHostPs2NotAvailable": "Această gazdă de emulare nu are încă un emulator PS2, așa că jocurile PS2 rulează în PCSX2.",
   "retroHostPs2BiosFolder": "Dosarul BIOS PS2",
   "retroHostPs2BiosFolderDetail": "Locul unde se pune fișierul BIOS PS2. Selectează pentru a deschide dosarul.",
   "retroHostPs2BiosDetail": "Nu s-a găsit niciun BIOS PS2. Pune un fișier BIOS în dosarul BIOS PS2 (Setări › Emulatoare) și pornește din nou jocul.",

@@ -2441,7 +2441,6 @@
   "retroHostBiosFolderDetail": "المكان الذي يوضع فيه ملف BIOS لجهاز PS1. اختره لفتح المجلد.",
   "retroHostPs2": "تشغيل ألعاب PS2 في المضيف المنفصل",
   "retroHostPs2Detail": "تُلعب ألعاب PS2 في هذه النافذة عبر مضيف المحاكاة في AnyPS5 بدلًا من PCSX2.",
-  "retroHostPs2NotAvailable": "لا يتضمن مضيف المحاكاة هذا محاكي PS2 بعد، لذا تُلعب ألعاب PS2 في PCSX2 بدلًا منه.",
   "retroHostPs2BiosFolder": "مجلد BIOS لجهاز PS2",
   "retroHostPs2BiosFolderDetail": "المكان الذي يوضع فيه ملف BIOS لجهاز PS2. اختره لفتح المجلد.",
   "retroHostPs2BiosDetail": "لم يُعثر على BIOS لجهاز PS2. ضع ملف BIOS في مجلد BIOS لجهاز PS2 (الإعدادات › المحاكيات) ثم شغّل اللعبة مرة أخرى.",
