@@ -98,7 +98,7 @@ void main() {
     final again = File(p.join(temp.path, 'home', '.local', 'state', 'AnyPS5', 'logs', 'PPSA07007.log'))
         .readAsStringSync();
     expect(RegExp(r'^--- \S+ \S+ trace$', multiLine: true).hasMatch(again), isTrue);
-    expect(again, contains('ANYPS5_FULLSCREEN=1'));
+    expect(again, contains('ANYPS5_FULLSCREEN=0'));
     // Settings › Default Display reaches a game started here too.
     final preferences = File(AppPaths.forSystem(HostSystem.linux, environment: environment).preferencesFile)
       ..createSync(recursive: true)

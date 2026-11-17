@@ -44,9 +44,9 @@ void main() {
 
   testWidgets('← on a choice goes to the option before, even on a row of two; → to the next', (tester) async {
     await openGameSettings(tester);
-    expect(settings().fullscreen, isTrue);
+    expect(settings().fullscreen, isFalse);
     await press(tester, LogicalKeyboardKey.arrowLeft);
-    expect(settings().fullscreen, isTrue, reason: 'already at the first option: ← stays');
+    expect(settings().fullscreen, isFalse, reason: 'already at the first option: ← stays');
     expect(settings().ownFullscreen, isNull, reason: 'at the first option, Default');
     await press(tester, LogicalKeyboardKey.arrowRight);
     expect(settings().ownFullscreen, isFalse, reason: 'Window');

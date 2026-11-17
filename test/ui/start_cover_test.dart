@@ -9,7 +9,7 @@ import 'package:path/path.dart' as p;
 import '../support/ui_support.dart';
 import 'desktop_features_test.dart' show FakeDesktop, FakePads;
 
-/// Start animation (Default Display and Game Settings, full screen only), and how long a game's cover stays.
+/// Start animation (Default Display and Game Settings), and how long a game's cover stays.
 void main() {
   group('the setting', () {
     test('on by default, and the key is written only when it is off', () {
@@ -22,15 +22,21 @@ void main() {
       expect(off.isBuiltIn, isFalse);
     });
 
-    test('a game follows the default unless it chose; only full screen fades', () {
+    test('a game follows the default unless it chose; only full screen fades over the game', () {
       const settings = GameSettings();
       expect(settings.ownStartAnimation, isNull);
-      expect(settings.fadesCover, isTrue, reason: 'full screen and on by default');
-      expect(settings.copyWith(fullscreen: false).fadesCover, isFalse, reason: 'a window has no fade');
-      expect(settings.copyWith(startAnimation: false).fadesCover, isFalse);
+      // Built-in display default is windowed: cover can show, but no layered fade over the game.
+      expect(settings.fullscreen, isFalse);
+      expect(settings.fadesCover, isFalse, reason: 'windowed: no layered fade');
+      expect(settings.copyWith(fullscreen: true).fadesCover, isTrue, reason: 'full screen and on by default');
+      expect(settings.copyWith(fullscreen: true, startAnimation: false).fadesCover, isFalse);
       final following = settings.withDefaults(const DisplayDefaults(startAnimation: false));
       expect(following.startAnimation, isFalse);
-      expect(following.copyWith(startAnimation: true).fadesCover, isTrue, reason: 'its own choice wins');
+      expect(
+        following.copyWith(fullscreen: true, startAnimation: true).fadesCover,
+        isTrue,
+        reason: 'its own choice wins',
+      );
       expect(settings.toJson().containsKey('startAnimation'), isFalse);
       final own = GameSettings.fromJson({'startAnimation': false});
       expect(own.ownStartAnimation, isFalse);
@@ -39,22 +45,28 @@ void main() {
       expect(own.followingDisplayDefaults().followsDisplayDefaults, isTrue);
     });
 
-    test('is a row of Default Display, only while the default is full screen', () {
+    test('is a row of Default Display for windowed and full screen', () {
       final fixture = makeFixture();
       addTearDown(fixture.dispose);
       final model = fixture.model;
       model.open(Layer.settings);
-      List<String> ids() => model.panelCategories().firstWhere((c) => c.id == 'displayDefaults').rows.map((r) => r.id).toList();
+      List<String> ids() =>
+          model.panelCategories().firstWhere((c) => c.id == 'displayDefaults').rows.map((r) => r.id).toList();
       expect(ids(), contains('defaultStartAnimation'));
-      final row = model.panelCategories().firstWhere((c) => c.id == 'displayDefaults').rows.firstWhere((r) => r.id == 'defaultStartAnimation');
+      final row = model
+          .panelCategories()
+          .firstWhere((c) => c.id == 'displayDefaults')
+          .rows
+          .firstWhere((r) => r.id == 'defaultStartAnimation');
       expect((row.kind as ToggleRow).value, isTrue);
       (row.kind as ToggleRow).set(false);
       expect(model.preferences.displayDefaults.startAnimation, isFalse);
-      model.preferences.displayDefaults = model.preferences.displayDefaults.copyWith(fullscreen: false);
-      expect(ids(), isNot(contains('defaultStartAnimation')));
+      // Still shown when the default is full screen.
+      model.preferences.displayDefaults = model.preferences.displayDefaults.copyWith(fullscreen: true);
+      expect(ids(), contains('defaultStartAnimation'));
     });
 
-    test('is a row of a game\'s Display, only while it starts in full screen', () {
+    test('is a row of a game\'s Display for windowed and full screen', () {
       final fixture = makeFixture();
       addTearDown(fixture.dispose);
       final model = fixture.model;
@@ -63,12 +75,13 @@ void main() {
       model.open(Layer.gameSettings);
       List<String> ids() => model.panelCategories().single.rows.map((r) => r.id).toList();
       expect(ids(), contains('startAnimation'));
-      final choice = model.panelCategories().single.rows.firstWhere((r) => r.id == 'startAnimation').kind as ChoiceRow;
+      final choice =
+          model.panelCategories().single.rows.firstWhere((r) => r.id == 'startAnimation').kind as ChoiceRow;
       expect(choice.selected, 0, reason: 'Default');
       choice.set(2);
       expect(model.currentSettings(orbit).ownStartAnimation, isFalse);
-      model.saveSettings(orbit, model.currentSettings(orbit).copyWith(fullscreen: false));
-      expect(ids(), isNot(contains('startAnimation')), reason: 'a window has no fade');
+      model.saveSettings(orbit, model.currentSettings(orbit).copyWith(fullscreen: true));
+      expect(ids(), contains('startAnimation'));
     });
   });
 
@@ -77,6 +90,7 @@ void main() {
     late FakePads pads;
     late Fixture fixture;
     late AppModel model;
+    late Future<void> playing;
 
     setUp(() {
       pads = FakePads();
@@ -92,35 +106,36 @@ void main() {
 
     Future<void> until(bool Function() condition, {int tries = 500}) async {
       for (var index = 0; index < tries && !condition(); index++) {
-        await Future<void>.delayed(const Duration(milliseconds: 20));
+        await Future<void>.delayed(const Duration(milliseconds: 10));
       }
       expect(condition(), isTrue);
     }
 
-    late Future<void> playing;
-
-    Future<void> playOrbit() async {
+    Future<void> playOrbit({bool fullscreen = true}) async {
+      model.preferences.displayDefaults = DisplayDefaults(fullscreen: fullscreen);
       final orbit = model.games.firstWhere((game) => game.titleId == 'PPSA01001');
       final installed = Installer.installedFolder(orbit, model.root!);
-      File(p.join(installed, 'app.elf')).writeAsStringSync('#!/bin/sh\nsleep 5\n');
-      if (!Platform.isWindows) Process.runSync('chmod', ['755', p.join(installed, 'app.elf')]);
+      File(p.join(installed, 'app.elf')).writeAsStringSync('#!/bin/sh\nsleep 30\n');
+      Process.runSync('chmod', ['755', p.join(installed, 'app.elf')]);
       model.select(model.games.indexOf(orbit));
       playing = model.play(orbit);
-      await until(() => model.running != null);
     }
 
-    test('stays up after the process started, separate from `starting`; gone once it has settled', () async {
-      await playOrbit();
-      expect(model.starting, isNull, reason: '`starting` still means only the process being started');
-      await until(() => desktop.coverEvents.isNotEmpty);
+
+    test('stays up after the process started, separate from starting; gone once it has settled', () async {
+      await playOrbit(fullscreen: true);
+      await until(() => model.coverGame != null);
+      await until(() => model.starting == null && model.running != null);
+      expect(model.coverGame, isNotNull, reason: 'cover kept after starting cleared');
       await until(() => model.coverGame == null);
       model.stopGame();
       await playing;
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
 
     test('a desktop with a picture over the game takes the cover\'s place at once', () async {
-      desktop.coverWorks = true;
-      await playOrbit();
+      await playOrbit(fullscreen: true);
+      await until(() => model.coverGame != null);
+      await until(() => desktop.coverEvents.contains('covered'));
       await until(() => desktop.coverEvents.contains('gone'));
       expect(desktop.coverEvents.take(2), ['asked', 'covered']);
       expect(model.coverGame, isNull);
@@ -130,6 +145,7 @@ void main() {
 
     test('a game that exits before it opens a window takes the cover with it at once', () async {
       desktop.windowNeverOpens = true;
+      model.preferences.displayDefaults = const DisplayDefaults(fullscreen: true);
       final orbit = model.games.firstWhere((game) => game.titleId == 'PPSA01001');
       final installed = Installer.installedFolder(orbit, model.root!);
       File(p.join(installed, 'app.elf')).writeAsStringSync('#!/bin/sh\nsleep 1\nexit 1\n');
@@ -144,7 +160,7 @@ void main() {
 
     test('a menu opened over the cover shows: the cover goes', () async {
       desktop.windowNeverOpens = true;
-      await playOrbit();
+      await playOrbit(fullscreen: true);
       await until(() => model.coverGame != null);
       model.open(Layer.quickMenu);
       expect(model.coverGame, isNull);
@@ -153,19 +169,18 @@ void main() {
       await playing;
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
 
-    test('in a window: no fade, so no cover is kept and the desktop is not asked for one', () async {
-      model.preferences.displayDefaults = const DisplayDefaults(fullscreen: false);
-      await playOrbit();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      expect(model.coverGame, isNull);
-      expect(desktop.coverEvents, isEmpty);
+    test('in a window: cover stays on the home screen, desktop is not asked for a layered fade', () async {
+      await playOrbit(fullscreen: false);
+      await until(() => model.coverGame != null);
+      expect(desktop.coverEvents, isEmpty, reason: 'no layered fade in a window');
       model.stopGame();
+      await until(() => model.coverGame == null);
       await playing;
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
 
     test('off: no cover is kept and the desktop is not asked for one', () async {
       model.preferences.displayDefaults = const DisplayDefaults(startAnimation: false);
-      await playOrbit();
+      await playOrbit(fullscreen: true);
       await Future<void>.delayed(const Duration(milliseconds: 100));
       expect(model.coverGame, isNull);
       expect(desktop.coverEvents, isEmpty);

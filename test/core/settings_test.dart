@@ -165,7 +165,7 @@ StickModifier = KEY:F24
   group('game settings', () {
     test('the default environment', () {
       expect(const GameSettings().environment(launcherLanguage: 19), {
-        'ANYPS5_FULLSCREEN': '1',
+        'ANYPS5_FULLSCREEN': '0',
         'ANYPS5_WINDOW_SIZE': '75',
         'ANYPS5_PRESENT_MODE': 'fifo',
         'ANYPS5_LANGUAGE': '19',
@@ -329,9 +329,9 @@ StickModifier = KEY:F24
   });
 
   group('display defaults', () {
-    test('the built-in defaults: full screen, a window of 75% when windowed, vertical sync on', () {
+    test('the built-in defaults: windowed, a window of 75%, vertical sync on', () {
       const defaults = DisplayDefaults();
-      expect(defaults.fullscreen, isTrue);
+      expect(defaults.fullscreen, isFalse);
       expect(defaults.windowSize, 75);
       expect(defaults.vsync, isTrue);
       expect(
@@ -448,7 +448,7 @@ StickModifier = KEY:F24
       expect(read('{"settingsVersion":${GameSettings.version},"fullscreen":true}').ownFullscreen, isTrue);
       final none = read('{"settingsVersion":${GameSettings.version}}');
       expect(none.ownFullscreen, isNull);
-      expect(none.fullscreen, isTrue, reason: 'no choice: the new default');
+      expect(none.fullscreen, isFalse, reason: 'no choice: windowed default');
       // Before the format: a missing key follows the default, true and false are kept.
       expect(read('{"overlay":"off"}').ownFullscreen, isNull);
       expect(read('{"fullscreen":true,"windowSize":75}').ownFullscreen, isTrue);
