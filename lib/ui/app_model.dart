@@ -4572,11 +4572,12 @@ class AppModel extends ChangeNotifier {
     coverHandedOver = false;
     _changed();
     try {
-      // Let the cover paint at least once before Windows snapshots it for the layered fade.
-      // Without this the early snapshot in fadeCover can still be empty and the hand-over
-      // falls back to the late path (desktop / taskbar flash).
-      await Future<void>.delayed(Duration.zero);
       final reduced = Motion.reduced || ui.PlatformDispatcher.instance.accessibilityFeatures.disableAnimations;
+      // Wait for the cover entrance (fade + slight zoom) to finish so the early snapshot on
+      // Windows is the settled picture, matching what the user sees. Reduced motion is short.
+      // This also keeps the Flutter cover up during the first part of the game start, so the
+      // hand-over to the layered window does not feel like an abrupt cut to the game window.
+      await Future<void>.delayed(reduced ? const Duration(milliseconds: 80) : const Duration(milliseconds: 480));
       // Full screen: layered fade over the game when possible. Windowed (or Linux): keep the
       // Flutter cover on the home screen until settled, then drop it — never over the game.
       var shown = false;

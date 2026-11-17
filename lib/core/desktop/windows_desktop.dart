@@ -793,15 +793,16 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
           shown = true;
           _w.showWindow(window, 4 /* SW_SHOWNOACTIVATE */);
           _w.setWindowPos(window, _topmost, 0, 0, 0, 0, _noMove | _noSize | _noActivate | _showWindow);
-          // Tell the Flutter side the moment the layered window is on screen, so its own cover
-          // can drop with no gap (and no flash of the taskbar / desktop underneath).
-          if (!told) {
-            told = true;
-            onShown?.call();
-          }
         }
         _pumpCard(message);
         await Future<void>.delayed(const Duration(milliseconds: 16));
+        // Drop the Flutter cover only after the layered window has had one full frame on
+        // screen. Calling onShown in the same tick as ShowWindow could leave a frame where
+        // neither cover is visible (taskbar flash) or the game window jumps into view.
+        if (shown && !told) {
+          told = true;
+          onShown?.call();
+        }
       }
       return true;
     } finally {
