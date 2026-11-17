@@ -72,6 +72,7 @@ final class _Win32 {
     );
     getDC = user.lookupFunction<_H Function(_H), int Function(int)>('GetDC');
     releaseDC = user.lookupFunction<Int32 Function(_H, _H), int Function(int, int)>('ReleaseDC');
+    getSystemMetrics = user.lookupFunction<Int32 Function(Int32), int Function(int)>('GetSystemMetrics');
     printWindow = user.lookupFunction<Int32 Function(_H, _H, Uint32), int Function(int, int, int)>('PrintWindow');
     registerClassEx = user.lookupFunction<Uint16 Function(Pointer<Uint8>), int Function(Pointer<Uint8>)>(
       'RegisterClassExW',
@@ -168,6 +169,7 @@ final class _Win32 {
   late final int Function(int, int) monitorFromWindow;
   late final int Function(int, Pointer<Uint32>) getMonitorInfo;
   late final int Function(int) getDC;
+  late final int Function(int) getSystemMetrics;
   late final int Function(int, int) releaseDC;
   late final int Function(int, int, int) printWindow;
   late final int Function(Pointer<Uint8>) registerClassEx;
@@ -655,7 +657,16 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
     var processEnded = false;
     unawaited(exited?.then<void>((_) => processEnded = true, onError: (Object _) => processEnded = true));
     try {
-      // A quick poll: the game's window must not be on screen long before the picture is.
+      // Snapshot while the process starts (not after the window shows): the toImage / crop /
+      // BGRA work must not leave a gap in which the game window or the taskbar flashes.
+      // Size from the primary monitor; refined to the game's monitor once its window exists.
+      final primary = _primaryScreen();
+      if (primary == null) return false;
+      final prepWidth = primary[2] - primary[0];
+      final prepHeight = primary[3] - primary[1];
+      if (prepWidth <= 0 || prepHeight <= 0) return false;
+      final prepared = cover(prepWidth, prepHeight);
+
       final window = await _waitForWindow(
         pid,
         timeout: windowTimeout,
@@ -669,9 +680,15 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
       final width = screen[2] - screen[0];
       final height = screen[3] - screen[1];
       if (width <= 0 || height <= 0) return false;
-      final image = await cover(width, height);
+
+      // Prefer the image already in flight; re-snap only if the game's monitor differs.
+      RgbaImage? image = await prepared;
+      if (image == null || image.width != width || image.height != height) {
+        image = await cover(width, height);
+      }
       if (image == null || image.width != width || image.height != height) return false;
       if (_card != 0 || windowOf(pid) != window) return false;
+
       var released = false;
       unawaited(until.then<void>((_) {}, onError: (Object _) {}).whenComplete(() => released = true));
       Duration? releaseAt;
@@ -702,6 +719,19 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
     } on Object {
       // Whatever went wrong, the game starts as it did without the picture.
       return false;
+    }
+  }
+
+  /// The primary monitor as left, top, right, bottom. Null if the metrics are unavailable.
+  List<int>? _primaryScreen() {
+    try {
+      // SM_CXSCREEN / SM_CYSCREEN — primary monitor only (matches most game windows).
+      final cx = _w.getSystemMetrics(0);
+      final cy = _w.getSystemMetrics(1);
+      if (cx <= 0 || cy <= 0) return null;
+      return [0, 0, cx, cy];
+    } on Object {
+      return null;
     }
   }
 
