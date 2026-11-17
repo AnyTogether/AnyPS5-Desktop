@@ -79,6 +79,8 @@ void main() {
     expect(model.preferences.displayDefaults.fullscreen, isFalse);
     pads.press(PadButton.south);
     expect(hasRow('defaultWindowSize'), isTrue, reason: 'windowed has a size');
+    // Rows: display, start animation, window size, vsync.
+    pads.press(PadButton.dpadDown);
     pads.press(PadButton.dpadDown);
     pads.press(PadButton.dpadDown);
     expect(model.panelCategories()[model.panelCategory].rows[model.panelRow].id, 'defaultVsync');

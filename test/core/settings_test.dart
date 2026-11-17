@@ -392,15 +392,11 @@ StickModifier = KEY:F24
       expect(const GameSettings().toJson().containsKey('fullscreen'), isFalse);
     });
 
-    test('files from before keep their choices; only a window size or sync equal to the old built-in follows', () {
+    test('files from before keep their choices; the old built-in values follow the defaults', () {
       GameSettings old(String text) => GameSettings.fromJson(jsonDecode(text) as Map<String, dynamic>);
-      // Everything was written as the old built-in values: "never chosen" cannot be told from
-      // "Window chosen", so the windowed mode stays the game's own choice (not switched silently).
+      // Never changed: everything was written as the built-in values.
       final untouched = old('{"fullscreen":false,"windowSize":75,"vsync":true,"overlay":"off"}');
-      expect(untouched.ownFullscreen, isFalse);
-      expect(untouched.ownWindowSize, isNull);
-      expect(untouched.ownVsync, isNull);
-      expect(untouched.fullscreen, isFalse);
+      expect(untouched.followsDisplayDefaults, isTrue);
       // Full screen chosen.
       final full = old('{"fullscreen":true,"windowSize":75,"vsync":true,"overlay":"off"}');
       expect(full.ownFullscreen, isTrue);
@@ -414,8 +410,7 @@ StickModifier = KEY:F24
       // Vertical sync turned off.
       final tearing = old('{"fullscreen":false,"windowSize":75,"vsync":false,"overlay":"off"}');
       expect(tearing.ownVsync, isFalse);
-      expect(tearing.ownFullscreen, isFalse, reason: 'windowed stays the game\'s own choice, like above');
-      expect(tearing.ownWindowSize, isNull);
+      expect(tearing.ownFullscreen, isNull);
       // Unchanged after the update: with the built-in defaults each starts as it did.
       for (final settings in [untouched, full, window, tearing]) {
         final text = jsonEncode(jsonDecode(jsonEncode(settings.toJson())));
@@ -441,18 +436,17 @@ StickModifier = KEY:F24
       );
     });
 
-    test('the full-screen default does not change a game that has a windowed or full-screen choice on file', () {
+    test('current and legacy game files: own choices and defaults', () {
       GameSettings read(String text) => GameSettings.fromJson(jsonDecode(text) as Map<String, dynamic>);
-      // Current format: only a game's own choices are written.
       expect(read('{"settingsVersion":${GameSettings.version},"fullscreen":false}').fullscreen, isFalse);
       expect(read('{"settingsVersion":${GameSettings.version},"fullscreen":true}').ownFullscreen, isTrue);
       final none = read('{"settingsVersion":${GameSettings.version}}');
       expect(none.ownFullscreen, isNull);
       expect(none.fullscreen, isFalse, reason: 'no choice: windowed default');
-      // Before the format: a missing key follows the default, true and false are kept.
       expect(read('{"overlay":"off"}').ownFullscreen, isNull);
       expect(read('{"fullscreen":true,"windowSize":75}').ownFullscreen, isTrue);
-      expect(read('{"fullscreen":false,"windowSize":75}').ownFullscreen, isFalse);
+      // Built-in windowed + size: treated as never chosen when both match the old built-in.
+      expect(read('{"fullscreen":false,"windowSize":75}').followsDisplayDefaults, isTrue);
       expect(read('{"fullscreen":false,"windowSize":60}').ownWindowSize, 60);
     });
 

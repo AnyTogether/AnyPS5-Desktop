@@ -111,30 +111,43 @@ void main() {
       expect(condition(), isTrue);
     }
 
-    Future<void> playOrbit({bool fullscreen = true}) async {
-      model.preferences.displayDefaults = DisplayDefaults(fullscreen: fullscreen);
+    Future<void> startOrbit({
+      required bool fullscreen,
+      bool startAnimation = true,
+      bool coverWorks = false,
+      bool windowNeverOpens = false,
+      String script = '#!/bin/sh\nsleep 30\n',
+    }) async {
+      desktop.coverWorks = coverWorks;
+      desktop.windowNeverOpens = windowNeverOpens;
+      model.preferences.displayDefaults = DisplayDefaults(
+        fullscreen: fullscreen,
+        startAnimation: startAnimation,
+      );
       final orbit = model.games.firstWhere((game) => game.titleId == 'PPSA01001');
       final installed = Installer.installedFolder(orbit, model.root!);
-      File(p.join(installed, 'app.elf')).writeAsStringSync('#!/bin/sh\nsleep 30\n');
+      File(p.join(installed, 'app.elf')).writeAsStringSync(script);
       Process.runSync('chmod', ['755', p.join(installed, 'app.elf')]);
       model.select(model.games.indexOf(orbit));
       playing = model.play(orbit);
     }
 
-
     test('stays up after the process started, separate from starting; gone once it has settled', () async {
-      await playOrbit(fullscreen: true);
+      // Full screen without a layered desktop: fadeCover is asked and returns false; the cover
+      // stays on the home screen until applyDisplay completes, then drops.
+      desktop.displayDelay = const Duration(milliseconds: 500);
+      await startOrbit(fullscreen: true);
       await until(() => model.coverGame != null);
       await until(() => model.starting == null && model.running != null);
       expect(model.coverGame, isNotNull, reason: 'cover kept after starting cleared');
+      expect(desktop.coverEvents, contains('asked'));
       await until(() => model.coverGame == null);
       model.stopGame();
       await playing;
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
 
     test('a desktop with a picture over the game takes the cover\'s place at once', () async {
-      await playOrbit(fullscreen: true);
-      await until(() => model.coverGame != null);
+      await startOrbit(fullscreen: true, coverWorks: true);
       await until(() => desktop.coverEvents.contains('covered'));
       await until(() => desktop.coverEvents.contains('gone'));
       expect(desktop.coverEvents.take(2), ['asked', 'covered']);
@@ -144,14 +157,11 @@ void main() {
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
 
     test('a game that exits before it opens a window takes the cover with it at once', () async {
-      desktop.windowNeverOpens = true;
-      model.preferences.displayDefaults = const DisplayDefaults(fullscreen: true);
-      final orbit = model.games.firstWhere((game) => game.titleId == 'PPSA01001');
-      final installed = Installer.installedFolder(orbit, model.root!);
-      File(p.join(installed, 'app.elf')).writeAsStringSync('#!/bin/sh\nsleep 1\nexit 1\n');
-      Process.runSync('chmod', ['755', p.join(installed, 'app.elf')]);
-      model.select(model.games.indexOf(orbit));
-      playing = model.play(orbit);
+      await startOrbit(
+        fullscreen: true,
+        windowNeverOpens: true,
+        script: '#!/bin/sh\nsleep 1\nexit 1\n',
+      );
       await until(() => model.coverGame != null);
       await until(() => model.coverGame == null);
       expect(desktop.coverEvents, contains('no window'), reason: 'the wait for the window stopped with the process');
@@ -159,8 +169,7 @@ void main() {
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
 
     test('a menu opened over the cover shows: the cover goes', () async {
-      desktop.windowNeverOpens = true;
-      await playOrbit(fullscreen: true);
+      await startOrbit(fullscreen: true, windowNeverOpens: true);
       await until(() => model.coverGame != null);
       model.open(Layer.quickMenu);
       expect(model.coverGame, isNull);
@@ -170,18 +179,19 @@ void main() {
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
 
     test('in a window: cover stays on the home screen, desktop is not asked for a layered fade', () async {
-      await playOrbit(fullscreen: false);
+      desktop.displayDelay = const Duration(milliseconds: 500);
+      await startOrbit(fullscreen: false);
       await until(() => model.coverGame != null);
       expect(desktop.coverEvents, isEmpty, reason: 'no layered fade in a window');
+      // Cover stays until the display step finishes (or the game exits).
       model.stopGame();
       await until(() => model.coverGame == null);
       await playing;
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
 
     test('off: no cover is kept and the desktop is not asked for one', () async {
-      model.preferences.displayDefaults = const DisplayDefaults(startAnimation: false);
-      await playOrbit(fullscreen: true);
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await startOrbit(fullscreen: true, startAnimation: false);
+      await Future<void>.delayed(const Duration(milliseconds: 150));
       expect(model.coverGame, isNull);
       expect(desktop.coverEvents, isEmpty);
       model.stopGame();
@@ -189,3 +199,4 @@ void main() {
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
   });
 }
+

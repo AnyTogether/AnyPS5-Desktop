@@ -65,9 +65,13 @@ class FakeDesktop implements DesktopWindows {
   @override
   bool? launcherFocused() => focused;
 
+  /// How long [applyDisplay] waits before completing (so cover tests can observe the home cover).
+  Duration displayDelay = Duration.zero;
+
   @override
   Future<bool> applyDisplay(int pid, {required bool fullscreen, required int windowSize}) async {
     calls.add('display ${fullscreen ? 'fullscreen' : '$windowSize%'}');
+    if (displayDelay > Duration.zero) await Future<void>.delayed(displayDelay);
     return true;
   }
 
