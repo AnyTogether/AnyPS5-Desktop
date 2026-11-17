@@ -173,6 +173,17 @@ void main() {
     (await host.check()).release();
   });
 
+  test('a host that cannot be written on the unpacking isolate fails as a write, leaving the old host', () async {
+    github.releases.add(retroHostFixtureRelease());
+    final host = store();
+    await host.putInPlace(await host.fetch(await newest()));
+    File('${host.folder.path}.new').writeAsStringSync('in the way\n');
+    final error = await failure(host.putInPlace(await host.fetch(await newest())));
+    expect(error.kind, ToolkitFailureKind.badLayout);
+    expect(error.message, startsWith('the host could not be written'));
+    (await host.check()).release();
+  });
+
   test('a stopped download keeps what came, and the next try carries on', () async {
     github.releases.add(retroHostFixtureRelease());
     final zip = 'anyps5-retro-host-1.0.0-windows-x64.zip';
