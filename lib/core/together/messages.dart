@@ -527,8 +527,13 @@ class Messages with Notifier {
     ];
     conversations = ordered(await _openLast(fetched));
     _unlisted.removeAll(conversations.map((c) => c.id));
-    loaded = true;
-    await _countUnread();
+    try {
+      await _countUnread();
+    } finally {
+      // Loaded once the count is in too: until then the badge said 0 over a list with unread ones.
+      loaded = true;
+      notifyListeners();
+    }
     final shown = open;
     if (shown != null && shown.unread > 0) await _read(shown);
   }
