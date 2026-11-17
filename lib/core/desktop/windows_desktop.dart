@@ -655,28 +655,7 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
     var processEnded = false;
     unawaited(exited?.then<void>((_) => processEnded = true, onError: (Object _) => processEnded = true));
     try {
-      // Snapshot the cover as soon as we can (launcher monitor) so the layered window is ready
-      // the moment the game window appears. Waiting for the window first left a gap of a few
-      // hundred ms in which the desktop / taskbar / game window flashed (the flicker reported
-      // when the cover hands over for the fade).
-      final launcher = _launcher;
-      final earlyScreens = launcher != 0 ? _screenOf(launcher) : null;
-      RgbaImage? prepared;
-      List<int>? preparedScreen;
-      if (earlyScreens != null) {
-        final (_, screen) = earlyScreens;
-        final w = screen[2] - screen[0];
-        final h = screen[3] - screen[1];
-        if (w > 0 && h > 0) {
-          prepared = await cover(w, h);
-          if (prepared != null && prepared.width == w && prepared.height == h) {
-            preparedScreen = screen;
-          } else {
-            prepared = null;
-          }
-        }
-      }
-
+      // A quick poll: the game's window must not be on screen long before the picture is.
       final window = await _waitForWindow(
         pid,
         timeout: windowTimeout,
@@ -690,21 +669,9 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
       final width = screen[2] - screen[0];
       final height = screen[3] - screen[1];
       if (width <= 0 || height <= 0) return false;
-
-      RgbaImage? image = prepared;
-      if (image == null ||
-          preparedScreen == null ||
-          preparedScreen[0] != screen[0] ||
-          preparedScreen[1] != screen[1] ||
-          preparedScreen[2] != screen[2] ||
-          preparedScreen[3] != screen[3]) {
-        // Different monitor (or no early snapshot): take one now. Still much shorter than the
-        // old path because the cover has already been painted for a while.
-        image = await cover(width, height);
-      }
+      final image = await cover(width, height);
       if (image == null || image.width != width || image.height != height) return false;
       if (_card != 0 || windowOf(pid) != window) return false;
-
       var released = false;
       unawaited(until.then<void>((_) {}, onError: (Object _) {}).whenComplete(() => released = true));
       Duration? releaseAt;
@@ -796,9 +763,6 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
         }
         _pumpCard(message);
         await Future<void>.delayed(const Duration(milliseconds: 16));
-        // Drop the Flutter cover only after the layered window has had one full frame on
-        // screen. Calling onShown in the same tick as ShowWindow could leave a frame where
-        // neither cover is visible (taskbar flash) or the game window jumps into view.
         if (shown && !told) {
           told = true;
           onShown?.call();
