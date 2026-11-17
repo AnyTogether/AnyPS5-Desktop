@@ -286,7 +286,7 @@ where the maintainers sign.
   neither checked nor marked broken while the unchecked one is used. A release, and a profile build,
   ignore the variable and only run the downloaded release's host
   (`RetroHostStore.installed`, a `RetroHostInstall` with `checked` set), and
-  only with that release's SwanStation.
+  only with that release's cores (SwanStation, and LRPS2 when it ships one).
 
 ## PS2 games
 
