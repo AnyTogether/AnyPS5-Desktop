@@ -180,12 +180,18 @@ void main() {
 
     test('in a window: cover stays on the home screen, desktop is not asked for a layered fade', () async {
       desktop.displayDelay = const Duration(milliseconds: 500);
+      final started = DateTime.now();
       await startOrbit(fullscreen: false);
       await until(() => model.coverGame != null);
       expect(desktop.coverEvents, isEmpty, reason: 'no layered fade in a window');
-      // Cover stays until the display step finishes (or the game exits).
-      model.stopGame();
+      // Cover stays until the display step finishes (displayDelay), not only when the game exits.
       await until(() => model.coverGame == null);
+      expect(
+        DateTime.now().difference(started),
+        greaterThanOrEqualTo(const Duration(milliseconds: 400)),
+        reason: 'cover waited for the display step, not an instant drop',
+      );
+      model.stopGame();
       await playing;
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
 

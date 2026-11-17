@@ -1423,7 +1423,7 @@
   "launcherVolumeDetail": "Semua yang dimainkan oleh pelancar: bunyi dan muziknya. 0% bermaksud senyap; permainan mengekalkan kelantangan sendiri.",
   "start": "Mula",
   "startAnimation": "Animasi permulaan",
-  "startAnimationDetail": "Semasa permainan dimuatkan, kulit kekal. Skrin penuh: pudar di atas permainan; tetingkap: di skrin utama. Mati: tiada kulit.",
+  "startAnimationDetail": "Semasa permainan dimuatkan, kulit kekal. Skrin penuh pudar di atas permainan, tetingkap di skrin utama. Mati: tiada kulit.",
   "startFailed": "Permainan tidak dapat dimulakan",
   "starting": "Sedang dimulakan…",
   "status": "Status",

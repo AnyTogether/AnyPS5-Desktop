@@ -360,19 +360,3 @@ abstract final class KeyCodes {
   }
 }
 
-/// Whether a window is already full screen: its rectangle is the monitor's and it has no frame
-/// (its client area is as big as the window). [window] and [screen] are left, top, right, bottom.
-/// The launcher presses F11 for upstream's engine only when this is false: it toggles, so
-/// pressing it in a window that is already full screen would leave it.
-bool windowIsFullscreen({
-  required List<int> window,
-  required List<int> screen,
-  required int clientWidth,
-  required int clientHeight,
-}) {
-  if (window.length != 4 || screen.length != 4) return false;
-  for (var index = 0; index < 4; index++) {
-    if (window[index] != screen[index]) return false;
-  }
-  return clientWidth == window[2] - window[0] && clientHeight == window[3] - window[1];
-}

@@ -299,8 +299,7 @@ void main() {
       await Future<void>.delayed(GuideSwitch.defaultDebounce);
       pads.press(PadButton.guide);
       expect(desktop.calls.where((call) => call == 'raise' || call == 'focus'), ['raise', 'focus']);
-      expect(desktop.calls.first, isNot('display fullscreen'), reason: 'upstream\'s engine: windowed is the default, the launcher sizes the window');
-      expect(desktop.calls.first, startsWith('display '));
+      expect(desktop.calls.first, 'display 75%', reason: 'upstream\'s engine: windowed is the default, the launcher sizes the window');
       model.stopGame();
       await playing;
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);

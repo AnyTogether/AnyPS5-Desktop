@@ -142,7 +142,7 @@ void main() {
       final log = File(paths.logFile('PPSA07007')).readAsStringSync();
       expect(log, contains('relinked game --aps5-report=off two words'));
       expect(log, contains('ANYPS5_MINE=a b'));
-      expect(log, contains('ANYPS5_FULLSCREEN=1'), reason: "the launcher's own value");
+      expect(log, contains('ANYPS5_FULLSCREEN=0'), reason: "the launcher's own value");
       expect(
         log,
         contains(

@@ -1423,7 +1423,7 @@
   "launcherVolumeDetail": "Tudo o que o inicializador toca: seus sons e sua música. 0% é silêncio; os jogos mantêm o próprio volume.",
   "start": "Iniciar",
   "startAnimation": "Animação de início",
-  "startAnimationDetail": "Enquanto um jogo carrega, a capa permanece. Em ecrã inteiro desvanece-se sobre o jogo; em janela, no ecrã inicial. Desligado: sem capa.",
+  "startAnimationDetail": "Enquanto um jogo carrega, a capa permanece. Em ecrã inteiro desvanece-se sobre o jogo, em janela no ecrã inicial. Desligado: sem capa.",
   "startFailed": "Não foi possível iniciar o jogo",
   "starting": "Iniciando…",
   "status": "Status",

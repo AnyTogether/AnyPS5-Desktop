@@ -7062,11 +7062,11 @@ class AppModel extends ChangeNotifier {
         }),
       ),
       PanelRow(
-          id: 'defaultStartAnimation',
-          title: T.text('startAnimation'),
-          detail: T.text('startAnimationDetail'),
-          kind: ToggleRow(defaults.startAnimation, (value) => change(defaults.copyWith(startAnimation: value))),
-        ),
+        id: 'defaultStartAnimation',
+        title: T.text('startAnimation'),
+        detail: T.text('startAnimationDetail'),
+        kind: ToggleRow(defaults.startAnimation, (value) => change(defaults.copyWith(startAnimation: value))),
+      ),
       if (!defaults.fullscreen)
         PanelRow(
           id: 'defaultWindowSize',
@@ -7501,19 +7501,19 @@ class AppModel extends ChangeNotifier {
       // Cover while the game opens: in full screen it can fade over the game; in a window it
       // stays on the home screen until the display step finishes.
       PanelRow(
-          id: 'startAnimation',
-          title: T.text('startAnimation'),
-          detail: T.text('startAnimationDetail'),
-          kind: ChoiceRow(
-            [byDefault(T.text(defaults.startAnimation ? 'on' : 'off')), T.text('on'), T.text('off')],
-            switch (settings.ownStartAnimation) {
-              null => 0,
-              true => 1,
-              false => 2,
-            },
-            (index) => change(settings.copyWith(startAnimation: index == 0 ? null : index == 1)),
-          ),
+        id: 'startAnimation',
+        title: T.text('startAnimation'),
+        detail: T.text('startAnimationDetail'),
+        kind: ChoiceRow(
+          [byDefault(T.text(defaults.startAnimation ? 'on' : 'off')), T.text('on'), T.text('off')],
+          switch (settings.ownStartAnimation) {
+            null => 0,
+            true => 1,
+            false => 2,
+          },
+          (index) => change(settings.copyWith(startAnimation: index == 0 ? null : index == 1)),
         ),
+      ),
       if (supportsResolution)
         // The relinker applies it: an unlock running now goes on with the one it started with.
         held(

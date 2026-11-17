@@ -68,9 +68,6 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('overlay-previous')));
     await settle(tester);
     expect(settings().overlay, OverlayCorner.topLeft, reason: 'the left arrow goes back');
-    // The size row only exists in a window: full screen is the default now.
-    model.saveSettings(orbit(), settings().copyWith(fullscreen: false));
-    await settle(tester);
     await tester.tap(find.byKey(const ValueKey('windowSize-previous')));
     await settle(tester);
     expect(settings().windowSize, 70);
