@@ -171,7 +171,7 @@ Future<RetroHostChecked> _checkedRelease(
   File(p.join(download.path, 'SHA256SUMS')).writeAsBytesSync(sums);
   File(p.join(download.path, 'SHA256SUMS.sig')).writeAsStringSync('${key.signatureLine(sums)}\n');
   final installed = Directory(p.join(work.path, 'retro-host'));
-  await RetroHostRelease.install(download, installed, keys: [key.key]);
+  await RetroHostRelease.install(download, installed, tag: 'v1.0.0', keys: [key.key]);
   return RetroHostRelease.checkBeforeStart(installed, keys: [key.key]);
 }
 

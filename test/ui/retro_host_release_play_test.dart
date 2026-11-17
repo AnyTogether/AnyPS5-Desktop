@@ -174,7 +174,7 @@ void main() {
       expect(launcher.session.shutdownAsked, isTrue);
       expect(launcher.session.closed, isTrue, reason: 'waited for before the files were replaced');
       expect(model.retroHostKeeper.holding, isFalse);
-      expect(model.toast, T.format('retroHostReady', ['1.0.0']), reason: 'v1.0.1 carries the 1.0.0 files');
+      expect(model.toast, T.format('retroHostReady', ['1.0.1']));
     });
 
     test('a download stopped while the kept host is still exiting is not put in place', () async {
@@ -192,7 +192,7 @@ void main() {
       model.retroHostDownload.cancel();
       launcher.session.endedCompleter.complete(RetroHostEnd.clean);
       await going;
-      expect(model.toast, isNot(T.format('retroHostReady', ['1.0.0'])));
+      expect(model.toast, isNot(T.format('retroHostReady', ['1.0.1'])));
       expect(model.retroHostDownload.installing, isFalse);
       expect(model.retroHostDownload.downloading, isFalse);
       expect(File(model.retroHostInstall!.host).lastModifiedSync(), installed);
@@ -214,7 +214,7 @@ void main() {
       launcher.session.endedCompleter.complete(RetroHostEnd.clean);
       await quitting;
       await going;
-      expect(model.toast, isNot(T.format('retroHostReady', ['1.0.0'])));
+      expect(model.toast, isNot(T.format('retroHostReady', ['1.0.1'])));
       expect(model.retroHostDownload.placing, isFalse);
       expect(File(model.retroHostInstall!.host).lastModifiedSync(), installed);
     });
@@ -238,7 +238,7 @@ void main() {
         model.removeListener(stopWhilePlacing);
       }
       expect(detail, T.text('retroHostChecking'));
-      expect(model.toast, T.format('retroHostReady', ['1.0.0']));
+      expect(model.toast, T.format('retroHostReady', ['1.0.1']));
       expect(download.placing, isFalse);
     });
 
@@ -269,12 +269,27 @@ void main() {
       final going = download.download();
       download.close();
       await going;
-      expect(model.toast, isNot(T.format('retroHostReady', ['1.0.0'])));
+      expect(model.toast, isNot(T.format('retroHostReady', ['1.0.1'])));
       expect(download.installing, isFalse);
       expect(File(model.retroHostInstall!.host).lastModifiedSync(), installed);
       final asked = github.requests.length;
       await download.download();
       expect(github.requests, hasLength(asked), reason: 'a closed launcher downloads nothing');
+    });
+
+    test('an older host published again under a higher tag is not taken for an update', () async {
+      github.releases.add(retroHostFixtureRelease(tag: 'v1.2.0', signedAs: '1.0.0'));
+      launcher = await Ps1Launcher.withRelease(retroHostApi: github.api);
+      final model = launcher.model;
+      final installed = File(model.retroHostInstall!.host).lastModifiedSync();
+      await model.retroHostDownload.download();
+      expect(
+        model.toast,
+        T.format('retroHostDownloadFailed', ['v1.2.0: the release tagged v1.2.0 is signed as host 1.0.0']),
+      );
+      expect(row('retro-host-download')!.title, T.format('retroHostInstalled', ['1.0.0']));
+      expect(File(model.retroHostInstall!.host).lastModifiedSync(), installed);
+      expect(github.downloads.map((path) => path.split('/').last).toSet(), {'SHA256SUMS', 'SHA256SUMS.sig'});
     });
 
     test('with no signed release yet, the row says so', () async {

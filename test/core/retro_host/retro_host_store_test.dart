@@ -134,6 +134,34 @@ void main() {
     expect(error.message, contains('no host for linux-arm64'));
   });
 
+  test('an older signed release published again under a higher tag is refused before its zip is fetched', () async {
+    github.releases.add(retroHostFixtureRelease(tag: 'v1.2.0', signedAs: '1.0.0'));
+    final release = await newest();
+    expect(release?.tag, 'v1.2.0', reason: 'picked by its tag, as any newer release');
+    final error = await failure(store().fetch(release));
+    expect(error.kind, ToolkitFailureKind.signature);
+    expect(error.message, 'v1.2.0: the release tagged v1.2.0 is signed as host 1.0.0');
+    expect(github.downloads.map((path) => path.split('/').last).toSet(), {'SHA256SUMS', 'SHA256SUMS.sig'});
+    expect(Directory(p.join(temp.path, 'RetroHost', '.downloads', 'v1.2.0')).existsSync(), isFalse);
+    expect(store().installed(), isNull);
+  });
+
+  test('a newer release is signed as its own tag, and installs as that version', () async {
+    github.releases.add(retroHostFixtureRelease(tag: 'v1.2.0'));
+    final host = store();
+    final download = await host.fetch(await newest());
+    expect(download.tag, 'v1.2.0');
+    expect(
+      (await failure(host.putInPlace((folder: download.folder, tag: 'v1.3.0')))).message,
+      'the release tagged v1.3.0 is signed as host 1.2.0',
+      reason: 'the tag is held to the signed version on install too',
+    );
+    expect(host.installed(), isNull);
+    expect(await host.putInPlace(download), const RetroHostVersion(1, 2, 0));
+    expect(host.version, const RetroHostVersion(1, 2, 0));
+    (await host.check()).release();
+  });
+
   test('a stopped download keeps what came, and the next try carries on', () async {
     github.releases.add(retroHostFixtureRelease());
     final zip = 'anyps5-retro-host-1.0.0-windows-x64.zip';

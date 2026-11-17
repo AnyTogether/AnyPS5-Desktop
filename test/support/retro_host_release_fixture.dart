@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:anyps5_desktop/core/release_signing.dart';
@@ -25,19 +26,46 @@ TestReleaseKey retroHostFixtureKey() => TestReleaseKey.fromPem(
 );
 
 /// The release's files by name, as published: those SHA256SUMS lists, SHA256SUMS and its signature.
-Map<String, List<int>> retroHostFixtureFiles() {
+/// With another [version], the same files named for that version and signed again by the fixture
+/// key, as the host repository would publish a newer release of them.
+Map<String, List<int>> retroHostFixtureFiles({String version = retroHostFixtureVersion}) {
   final sums = File(p.join(retroHostFixture, ReleaseSigning.sumsName)).readAsBytesSync();
-  return {
+  final files = {
     for (final name in ReleaseSigning.parseSums(sums).keys)
       name: File(p.join(retroHostFixture, name)).readAsBytesSync(),
-    ReleaseSigning.sumsName: sums,
-    ReleaseSigning.signatureName: File(p.join(retroHostFixture, ReleaseSigning.signatureName)).readAsBytesSync(),
+  };
+  if (version == retroHostFixtureVersion) {
+    return {
+      ...files,
+      ReleaseSigning.sumsName: sums,
+      ReleaseSigning.signatureName: File(p.join(retroHostFixture, ReleaseSigning.signatureName)).readAsBytesSync(),
+    };
+  }
+  final renamed = {
+    for (final MapEntry(key: name, value: bytes) in files.entries)
+      name.replaceFirst('anyps5-retro-host-$retroHostFixtureVersion-', 'anyps5-retro-host-$version-'): bytes,
+  };
+  final resigned = sumsOf(renamed);
+  return {
+    ...renamed,
+    ReleaseSigning.sumsName: resigned,
+    ReleaseSigning.signatureName: utf8.encode('${retroHostFixtureKey().signatureLine(resigned)}\n'),
   };
 }
 
-/// The release on a fake GitHub, tagged as the host repository tags it.
-FakeRelease retroHostFixtureRelease({String tag = 'v1.0.0'}) => FakeRelease(tag, retroHostFixtureFiles());
+/// The version the recorded release was packed as.
+const retroHostFixtureVersion = '1.0.0';
+
+/// The release on a fake GitHub under [tag], as the host repository tags it: its files signed as
+/// the tag's version, or as [signedAs] for a release published under a tag it was not signed for.
+FakeRelease retroHostFixtureRelease({String tag = 'v$retroHostFixtureVersion', String? signedAs}) =>
+    FakeRelease(tag, retroHostFixtureFiles(version: signedAs ?? tag.substring(1)));
 
 /// The release unpacked into [into] as a download leaves it, for [system] (this one by default).
-Future<void> installRetroHostFixture(Directory into, {RetroHostSystem? system}) =>
-    RetroHostRelease.install(Directory(retroHostFixture), into, keys: retroHostFixtureKeys(), system: system);
+Future<void> installRetroHostFixture(Directory into, {RetroHostSystem? system}) => RetroHostRelease.install(
+  Directory(retroHostFixture),
+  into,
+  tag: 'v$retroHostFixtureVersion',
+  keys: retroHostFixtureKeys(),
+  system: system,
+);

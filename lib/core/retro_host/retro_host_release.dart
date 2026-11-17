@@ -163,9 +163,21 @@ abstract final class RetroHostRelease {
   /// put back.
   static const minimumVersion = RetroHostVersion(1, 0, 0);
 
-  /// The checks before each start: the signature, the `.files` against SHA256SUMS, and the host
-  /// executable and SwanStation against the `.files`, each hashed from a [CheckedFile] that stays
-  /// held in the result.
+  /// The file beside an installed host that keeps the tag it was published under, so the check
+  /// before each start holds the signed version to it too. Its name starts with a dot, which no
+  /// file of a release may ([parseFileList]).
+  static const tagName = '.release-tag';
+
+  /// Refuses a release whose signed [version] is not the one its [tag] gives: the launcher picks a
+  /// release by its tag, so an older signed host published again under a higher tag would
+  /// otherwise be taken for an update.
+  static void checkTag(String tag, RetroHostVersion version) {
+    if (tag != 'v$version') throw RetroHostReleaseFailure('the release tagged $tag is signed as host $version');
+  }
+
+  /// The checks before each start: the signature, the tag kept on install against the signed
+  /// version, the `.files` against SHA256SUMS, and the host executable and SwanStation against the
+  /// `.files`, each hashed from a [CheckedFile] that stays held in the result.
   static Future<RetroHostChecked> checkBeforeStart(
     Directory folder, {
     List<ReleaseKey>? keys,
@@ -179,6 +191,7 @@ abstract final class RetroHostRelease {
       keys,
     );
     final release = _releaseOf(sums, target, minimum);
+    checkTag(_readTag(folder), release.version);
     final listing = _readSmall(p.join(folder.path, release.filesName));
     if (sha256.convert(listing).toString() != sums.digestFor(release.filesName)) {
       throw RetroHostReleaseFailure('${release.filesName} does not match the signed release');
@@ -218,13 +231,15 @@ abstract final class RetroHostRelease {
     );
   }
 
-  /// The checks on download, then the unpacking: the signature, the zip and the `.files` against
-  /// SHA256SUMS, and every file of the zip against the `.files`. [download] holds the files as
-  /// published; [into] is replaced by the unpacked zip with SHA256SUMS, SHA256SUMS.sig and the
-  /// `.files` beside it. Gives the version installed.
+  /// The checks on download, then the unpacking: the signature, the signed version against [tag],
+  /// the zip and the `.files` against SHA256SUMS, and every file of the zip against the `.files`.
+  /// [download] holds the files as published under [tag]; [into] is replaced by the unpacked zip
+  /// with SHA256SUMS, SHA256SUMS.sig, the `.files` and the tag ([tagName]) beside it. Gives the
+  /// version installed.
   static Future<RetroHostVersion> install(
     Directory download,
     Directory into, {
+    required String tag,
     List<ReleaseKey>? keys,
     RetroHostSystem? system,
     RetroHostVersion minimum = minimumVersion,
@@ -232,7 +247,7 @@ abstract final class RetroHostRelease {
     final target = system ?? _currentSystem();
     final sumsBytes = _readSmall(p.join(download.path, ReleaseSigning.sumsName));
     final signatureBytes = _readSmall(p.join(download.path, ReleaseSigning.signatureName));
-    final release = signed(sumsBytes, signatureBytes, keys: keys, system: target, minimum: minimum);
+    final release = signed(sumsBytes, signatureBytes, tag: tag, keys: keys, system: target, minimum: minimum);
     final sums = release.sums;
     final listing = _readSmall(p.join(download.path, release.filesName));
     if (sha256.convert(listing).toString() != sums.digestFor(release.filesName)) {
@@ -266,6 +281,7 @@ abstract final class RetroHostRelease {
       File(p.join(staging.path, ReleaseSigning.sumsName)).writeAsBytesSync(sumsBytes, flush: true);
       File(p.join(staging.path, ReleaseSigning.signatureName)).writeAsBytesSync(signatureBytes, flush: true);
       File(p.join(staging.path, release.filesName)).writeAsBytesSync(listing, flush: true);
+      File(p.join(staging.path, tagName)).writeAsStringSync(tag, flush: true);
       if (!Platform.isWindows) {
         final made = await Process.run('chmod', ['755', p.join(staging.path, target.executable)]);
         if (made.exitCode != 0) throw const RetroHostReleaseFailure('the host could not be made executable');
@@ -311,17 +327,20 @@ abstract final class RetroHostRelease {
   }
 
   /// The signature of a release and the names it gives this [system]'s files: [sums] (SHA256SUMS)
-  /// and [signature] (SHA256SUMS.sig) as downloaded. The first check on download, before anything
-  /// else of the release is fetched.
+  /// and [signature] (SHA256SUMS.sig) as downloaded from the release tagged [tag], whose version
+  /// must be the signed one ([checkTag]). The first check on download, before anything else of the
+  /// release is fetched.
   static RetroHostSignedRelease signed(
     List<int> sums,
     List<int> signature, {
+    required String tag,
     List<ReleaseKey>? keys,
     RetroHostSystem? system,
     RetroHostVersion minimum = minimumVersion,
   }) {
     final signed = _verify(sums, signature, keys);
     final release = _releaseOf(signed, system ?? _currentSystem(), minimum);
+    checkTag(tag, release.version);
     return RetroHostSignedRelease(
       version: release.version,
       zipName: release.zipName,
@@ -452,6 +471,14 @@ abstract final class RetroHostRelease {
       return file.readAsBytesSync();
     } on FileSystemException {
       throw RetroHostReleaseFailure('${p.basename(path)} is missing');
+    }
+  }
+
+  static String _readTag(Directory folder) {
+    try {
+      return utf8.decode(_readSmall(p.join(folder.path, tagName)));
+    } on FormatException {
+      throw const RetroHostReleaseFailure('the release tag beside the host cannot be read');
     }
   }
 

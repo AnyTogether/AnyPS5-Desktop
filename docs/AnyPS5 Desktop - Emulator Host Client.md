@@ -161,8 +161,8 @@ where the maintainers sign.
   folder, beside its toolkits and its ffmpeg (`AppPaths.retroHost`:
   `%LOCALAPPDATA%\AnyPS5\RetroHost` on Windows,
   `~/.local/share/AnyPS5/RetroHost` on Linux). The folder holds the unpacked
-  zip, with `SHA256SUMS`, `SHA256SUMS.sig` and this system's `.files` kept
-  beside it. This departs from protocol.md as written (at
+  zip, with `SHA256SUMS`, `SHA256SUMS.sig`, this system's `.files` and
+  `.release-tag` (the tag the release was published under) kept beside it. This departs from protocol.md as written (at
   9052aff), which says a release launcher runs "a host it ships with or
   downloads into its own storage: from its own directory on Windows and
   Linux", found with `GetModuleFileNameW` or `/proc/self/exe`. The launcher's
@@ -176,6 +176,17 @@ where the maintainers sign.
   `linux-x64` or `macos-arm64`, by exact name. A release with no `.files` for
   this system, or more than one, is refused. The version is read from that
   name, so it is covered by the signature.
+- **The tag must be the signed version.** The launcher picks a release by its
+  tag, but installs the version its signed `.files` name gives. Someone who
+  can publish releases without the signing key could otherwise publish an
+  older signed release again under a higher tag, and launchers would take it
+  for an update. So a release tagged anything but `v<signed version>` is
+  refused (`RetroHostRelease.checkTag`): on download, right after the
+  signature and before the zip is fetched; on install; and before every
+  start, against the tag kept in `.release-tag`. A host with no
+  `.release-tag`, or with another tag in it, does not start and is offered
+  for download again. The name starts with a dot, which no file of a release
+  may, so it never clashes with one.
 - **Minimum version.** `RetroHostRelease.minimumVersion` (1.0.0 now) is built
   in. An older host is refused even when it is signed, so a signed host with a
   known fault cannot be put back. Versions are exactly three numbers.
@@ -192,19 +203,20 @@ where the maintainers sign.
   downloaded. Files go to `RetroHost/.downloads/<tag>`, resuming as the ffmpeg
   and toolkit downloads do. A release with no signature is "not available yet",
   and there is no way to take one unsigned. A release that has no host for
-  this system is also "not available". `putInPlace` then installs.
-- **On install** (`RetroHostRelease.install`). The signature is checked again
-  from the files on disk, then the zip and the `.files` against `SHA256SUMS`,
-  then every file in the zip against the `.files`. A file that is missing, an
-  extra file, or a symbolic link is refused, and so is any name with `..`,
-  `\`, `:` or an empty part. Only then is the zip written out, into
-  `host.new`. The old host is moved aside to `host.old` first, then
-  `host.new` takes its place, and `host.old` is removed. On Windows the move
-  fails while a host started from that folder still holds its files. The
-  install then stops with the old host whole ("the host is in use"), never
-  half deleted. Stop the host before installing.
+  this system is also "not available". `fetch` gives the folder with the tag,
+  and `putInPlace` then installs it under that tag.
+- **On install** (`RetroHostRelease.install`). The signature and the tag are
+  checked again from the files on disk, then the zip and the `.files` against
+  `SHA256SUMS`, then every file in the zip against the `.files`. A file that
+  is missing, an extra file, or a symbolic link is refused, and so is any name
+  with `..`, `\`, `:` or an empty part. Only then is the zip written out, into `host.new`. The
+  old host is moved aside to `host.old` first, then `host.new` takes its
+  place, and `host.old` is removed. On Windows the first move fails while a host started from that folder still
+  holds its files. The install then stops with the old host whole ("the host
+  is in use"), never half deleted. Stop the host before installing.
 - **Before each start** (`checkBeforeStart`, through `RetroHostStore.check`).
-  The signature is checked again, then the `.files` against `SHA256SUMS`, then
+  The signature is checked again, then the kept tag against the signed
+  version, then the `.files` against `SHA256SUMS`, then
   the host executable and SwanStation against the `.files`. Each of the two is
   hashed from a `CheckedFile`, on another isolate.
   - On Windows both stay open with read sharing only (no `FILE_SHARE_WRITE`
@@ -450,13 +462,16 @@ reads the fixture for the tests. They check:
 - that a signed download unpacks and checks out before a start;
 - that each of these is refused: an untrusted key, a changed zip or `.files`,
   an extra or missing file in the zip, a host below the minimum version, a
-  changed, missing or replaced host or core, and unsafe names;
+  release under a tag that is not its signed version (an older signed
+  release published again under a higher tag, on install, and a changed,
+  missing or unreadable `.release-tag` before a start), a changed, missing or
+  replaced host or core, and unsafe names;
 - that on Windows the held files cannot be written, renamed or deleted;
 - that on Linux a real program started from a checked release runs from the
   checked descriptor even after its path was replaced, and that the
   descriptor does not reach it;
-- that installing over a host replaces it whole, and that on Windows a host
-  whose files are held is left whole and is replaced once they are let go.
+- that installing over a host replaces it whole, and that on Windows a host whose files are held is
+  left whole and is replaced once they are let go.
 
 Tests that change the release sign the copy again with keys of their own,
 to tell the trusted key from a stranger's.
@@ -478,7 +493,9 @@ download. It checks that only this system's `.files` and zip are fetched after
 the signed sums, and that the result installs and checks before a start. It
 checks that the newest signed release at or above the minimum is taken, never
 a pre-release. A release without a signature downloads nothing, and one signed
-by an untrusted key stops after the sums. A changed zip is refused before it is
+by an untrusted key stops after the sums. An older signed release published
+again under a higher tag also stops after the sums, a newer one installs as
+its tag's version (and not under another tag). A changed zip is refused before it is
 unpacked, a release with no host for this system is not available, and a
 stopped download resumes.
 
