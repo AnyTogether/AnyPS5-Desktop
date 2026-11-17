@@ -530,7 +530,28 @@ void main() {
   });
 
   group('file lists', () {
-    for (final name in ['../escape', '/root', 'a//b', r'a\b', 'C:x', './a', 'a/']) {
+    for (final name in [
+      '../escape',
+      '/root',
+      'a//b',
+      r'a\b',
+      'C:x',
+      './a',
+      'a/',
+      '.hidden',
+      'licenses/.notice',
+      'trailing.',
+      'licenses./x.txt',
+      'a b',
+      'caf\u00e9.txt',
+      'CON',
+      'con.txt',
+      'licenses/Aux.dll',
+      'nul.tar.gz',
+      'COM1',
+      'lpt9.log',
+      'prn',
+    ]) {
       test('refuse the name "$name"', () {
         expect(
           () => RetroHostRelease.parseFileList(utf8.encode('${'0' * 64}  $name\n')),
@@ -544,6 +565,29 @@ void main() {
         'licenses/x.txt': 'a' * 64,
       });
     });
+
+    test('take names a device name only begins, as the host does', () {
+      final names = ['console.txt', 'com10', 'lpt.txt', 'nulls/x', 'a.b-c_d+e', 'Readme'];
+      expect(
+        RetroHostRelease.parseFileList(utf8.encode(names.map((name) => '${'a' * 64}  $name\n').join())).keys,
+        names,
+      );
+    });
+
+    for (final (first, second) in [
+      ('SOURCE.txt', 'source.TXT'),
+      ('licenses/x.txt', 'Licenses/X.txt'),
+      ('licenses', 'licenses/x.txt'),
+      ('Licenses/x.txt', 'licenses'),
+      ('a/b/c', 'A/B'),
+    ]) {
+      test('refuse "$first" with "$second", which differ only in case or are a file and a folder', () {
+        expect(
+          () => RetroHostRelease.parseFileList(utf8.encode('${'0' * 64}  $first\n${'1' * 64}  $second\n')),
+          throwsA(isA<RetroHostReleaseFailure>()),
+        );
+      });
+    }
   });
 
   test('versions are three numbers and compare by number', () {

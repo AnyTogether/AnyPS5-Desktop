@@ -208,8 +208,13 @@ where the maintainers sign.
 - **On install** (`RetroHostRelease.install`). The signature and the tag are
   checked again from the files on disk, then the zip and the `.files` against
   `SHA256SUMS`, then every file in the zip against the `.files`. A file that
-  is missing, an extra file, or a symbolic link is refused, and so is any name
-  with `..`, `\`, `:` or an empty part. Only then is the zip written out, into `host.new`. The
+  is missing, an extra file, or a symbolic link is refused. Names follow the
+  host's `package_release.py --check`: each part is letters, digits and
+  `._+-`, does not start or end with a dot and is no Windows device name
+  (`con`, `prn`, `aux`, `nul`, `com0`-`com9`, `lpt0`-`lpt9`, with or without
+  an extension), and no two names differ only in case or are a file and a
+  folder of each other (`parseFileList`). The names are signed, so this is
+  defence in depth. Only then is the zip written out, into `host.new`. The
   reading, hashing and writing run on another isolate (`Isolate.run`), so the
   window stays responsive through a large zip. The two renames then run on
   the UI isolate, one after the other: the old host is moved aside to
@@ -474,7 +479,9 @@ reads the fixture for the tests. They check:
   release under a tag that is not its signed version (an older signed
   release published again under a higher tag, on install, and a changed,
   missing or unreadable `.release-tag` before a start), a changed, missing or
-  replaced host or core, and unsafe names;
+  replaced host or core, unsafe names (dots at either end, device names,
+  other characters) and names that differ only in case or are a file and a
+  folder;
 - that on Windows the held files cannot be written, renamed or deleted;
 - that on Linux a real program started from a checked release runs from the
   checked descriptor even after its path was replaced, and that the

@@ -414,7 +414,10 @@ abstract final class RetroHostRelease {
   }
 
   /// A `.files` list: `<64 hex digits>  <name>` a line, as shasum writes it, with `/` between
-  /// directories. Each name is relative and plain: no `\`, no empty, `.` or `..` part, no `:`.
+  /// directories. The names follow the host's `package_release.py --check`: each part is letters,
+  /// digits and `._+-`, does not start or end with a dot and is no Windows device name, and no two
+  /// names differ only in case, nor is one name a file and a folder of another; so no file
+  /// unpacks outside its folder, or over another, on any system.
   static Map<String, String> parseFileList(List<int> bytes) {
     final String text;
     try {
@@ -424,23 +427,32 @@ abstract final class RetroHostRelease {
     }
     final line = RegExp(r'^([0-9a-f]{64})  (.+)$');
     final files = <String, String>{};
+    final seenFiles = <String>{};
+    final seenFolders = <String>{};
     for (final raw in const LineSplitter().convert(text)) {
       if (raw.isEmpty) continue;
       final match = line.firstMatch(raw);
       if (match == null) throw const RetroHostReleaseFailure('the file list has a line it cannot read');
       final name = match.group(2)!;
       final parts = name.split('/');
-      if (name.contains(r'\') ||
-          name.contains(':') ||
-          parts.any((part) => part.isEmpty || part == '.' || part == '..') ||
-          files.containsKey(name)) {
+      if (!parts.every((part) => _memberPart.hasMatch(part) && !_deviceName.hasMatch(part))) {
         throw const RetroHostReleaseFailure('the file list names a file it cannot');
       }
+      final key = name.toLowerCase();
+      final folders = [for (var count = 1; count < parts.length; count++) parts.take(count).join('/').toLowerCase()];
+      if (seenFiles.contains(key) || seenFolders.contains(key) || folders.any(seenFiles.contains)) {
+        throw RetroHostReleaseFailure('the file list names $name twice, or as a file and a folder, ignoring case');
+      }
+      seenFiles.add(key);
+      seenFolders.addAll(folders);
       files[name] = match.group(1)!;
     }
     if (files.isEmpty) throw const RetroHostReleaseFailure('the file list lists no file');
     return files;
   }
+
+  static final _memberPart = RegExp(r'^[A-Za-z0-9_+-](?:[A-Za-z0-9._+-]*[A-Za-z0-9_+-])?$');
+  static final _deviceName = RegExp(r'^(?:con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\..*)?$', caseSensitive: false);
 
   static final _releaseName = RegExp(r'^anyps5-retro-host-([^-]+)-([a-z0-9]+-[a-z0-9]+)\.(zip|files)$');
 
