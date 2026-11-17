@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'capture/game_sound.dart';
 import 'capture/video_encoders.dart';
 import 'capture/wayland_capture.dart';
+import 'child_processes.dart';
 import 'host.dart';
 
 /// Starts a program and gives its process; Process.start by default.
@@ -38,7 +39,7 @@ class ReplayBuffer {
     this.wayland,
     ProcessStarter? start,
     ProcessRunner? run,
-  }) : _start = start ?? ((executable, arguments) => Process.start(executable, arguments)),
+  }) : _start = start ?? ((executable, arguments) => ChildProcesses.start(executable, arguments)),
        _run = run ?? ((executable, arguments) => Process.run(executable, arguments));
 
   /// The lengths offered in Settings › Captures, in seconds.

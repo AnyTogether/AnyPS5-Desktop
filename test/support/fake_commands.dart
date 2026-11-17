@@ -44,6 +44,9 @@ class FakeCommands extends CommandRunner {
   final Map<String, FakeResult> results;
   final calls = <FakeCall>[];
 
+  /// The `endsWithLauncher` each command in [calls] was run with.
+  final endsWithLauncherOf = <bool>[];
+
   /// The lines of the commands run, `git status --porcelain --untracked-files=no` and so on.
   List<String> get lines => [for (final call in calls) call.line];
 
@@ -55,9 +58,11 @@ class FakeCommands extends CommandRunner {
     Map<String, String>? environment,
     void Function(String line)? onLine,
     CommandCancel? cancel,
+    bool endsWithLauncher = true,
   }) async {
     final call = FakeCall(executable, arguments, workingDirectory, environment);
     calls.add(call);
+    endsWithLauncherOf.add(endsWithLauncher);
     final result = results.entries.where((entry) => call.line.startsWith(entry.key)).firstOrNull?.value;
     if (result == null) return 0;
     if (result.missing) throw ProcessException(executable, arguments, 'No such file or directory', 2);

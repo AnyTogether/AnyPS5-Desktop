@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'child_processes.dart';
+
 /// A video played over and over as the launcher's background (the macOS launcher's LoopingVideo,
 /// AVPlayerLooper there). Flutter has no video player on Windows and Linux, so ffmpeg (the one
 /// the replay buffer uses: beside the launcher or on the PATH) decodes it at the video's own pace,
@@ -16,7 +18,7 @@ class LoopingVideo {
     this.height = 540,
     this.framesPerSecond = 30,
     Future<Process> Function(String executable, List<String> arguments)? start,
-  }) : _start = start ?? ((executable, arguments) => Process.start(executable, arguments));
+  }) : _start = start ?? ((executable, arguments) => ChildProcesses.start(executable, arguments));
 
   final String ffmpeg;
   final String file;

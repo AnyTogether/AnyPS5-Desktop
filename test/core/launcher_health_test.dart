@@ -174,18 +174,44 @@ void main() {
       expect(File(p.join(folder, 'running-300.json')).existsSync(), isFalse);
     });
 
-    test('a window that never closes after Quit: exit after a few seconds, the marker gone first', () {
+    test('a window that never closes after Quit: exit after a while, the marker gone first', () {
       fakeAsync((async) {
         final health = run(100)
           ..start()
           ..runnerRemovesMarker = true;
         final exits = <int>[];
         LauncherShutdown(health: health, closeWindow: () async => true, exit: exits.add).quit(0);
-        async.elapse(const Duration(seconds: 4));
+        async.elapse(LauncherShutdown.defaultUnansweredAfter - const Duration(seconds: 1));
         expect(exits, isEmpty);
-        async.elapse(LauncherShutdown.fallbackAfter);
+        async.elapse(const Duration(seconds: 1));
         expect(exits, [0]);
         expect(File(p.join(folder, 'running-100.json')).existsSync(), isFalse);
+      });
+    });
+
+    test('Quit: the five seconds start once the exit request is answered, not at the close', () {
+      fakeAsync((async) {
+        final health = run(100)
+          ..start()
+          ..runnerRemovesMarker = true;
+        final exits = <int>[];
+        final shutdown = LauncherShutdown(health: health, closeWindow: () async => true, exit: exits.add)..quit(0);
+        async.elapse(const Duration(seconds: 12));
+        expect(exits, isEmpty, reason: 'a game saving for 12 seconds is not cut off');
+        shutdown.childrenEnded();
+        async.elapse(LauncherShutdown.defaultFallbackAfter - const Duration(seconds: 1));
+        expect(exits, isEmpty);
+        async.elapse(const Duration(seconds: 1));
+        expect(exits, [0], reason: 'a close that hangs after the game ended is still ended');
+      });
+    });
+
+    test('the title bar\'s close has no timer', () {
+      fakeAsync((async) {
+        final exits = <int>[];
+        LauncherShutdown(health: run(100)..start(), closeWindow: () async => true, exit: exits.add).childrenEnded();
+        async.elapse(const Duration(minutes: 1));
+        expect(exits, isEmpty);
       });
     });
 

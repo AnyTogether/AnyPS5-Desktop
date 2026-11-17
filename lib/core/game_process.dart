@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'child_processes.dart';
 import 'game_log.dart';
 import 'host.dart';
 
@@ -77,7 +78,7 @@ abstract final class GameProcess {
     }
     final Process process;
     try {
-      process = await Process.start(
+      process = await ChildProcesses.start(
         executable,
         arguments,
         workingDirectory: installed,

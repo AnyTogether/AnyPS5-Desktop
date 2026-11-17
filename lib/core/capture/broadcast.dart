@@ -5,6 +5,7 @@ import 'dart:math';
 
 import 'package:path/path.dart' as p;
 
+import '../child_processes.dart';
 import '../desktop/desktop.dart';
 import '../host.dart';
 import '../replay_buffer.dart' show ProcessRunner, ProcessStarter;
@@ -390,7 +391,7 @@ class Broadcaster {
       Duration(seconds: 30),
     ],
     this.log,
-  }) : _start = start ?? ((executable, arguments) => Process.start(executable, arguments)),
+  }) : _start = start ?? ((executable, arguments) => ChildProcesses.start(executable, arguments)),
        _runTool = run ?? ((executable, arguments) => Process.run(executable, arguments));
 
   final String ffmpeg;

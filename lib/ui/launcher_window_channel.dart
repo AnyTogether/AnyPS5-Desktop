@@ -24,6 +24,11 @@ class ChannelLauncherWindow implements LauncherWindow {
   @override
   Future<bool> removeAfterClose(String path) => _call('removeAfterClose', path);
 
+  /// The exit was approved and the child programs are ended: the Windows runner ends the process
+  /// after five seconds if its shutdown has not by then (windows/runner/utils.cpp). Not part of
+  /// [LauncherWindow]: only the Windows runner answers it, elsewhere it is false.
+  Future<bool> armExitWatchdog() => _call('armExitWatchdog');
+
   @override
   void listen({required void Function(bool fullscreen) fullscreenChanged}) {
     _channel.setMethodCallHandler((call) async {

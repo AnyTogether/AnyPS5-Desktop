@@ -5,8 +5,11 @@
 #include <stdio.h>
 #include <windows.h>
 
+#include <atomic>
 #include <climits>
+#include <cstdio>
 #include <iostream>
+#include <thread>
 
 void CreateAndAttachConsole() {
   if (::AllocConsole()) {
@@ -85,4 +88,69 @@ std::wstring Utf16FromUtf8(const std::string& utf8_string) {
       CP_UTF8, MB_ERR_INVALID_CHARS, utf8_string.data(), input_length,
       utf16_string.data(), target_length);
   return converted == target_length ? utf16_string : std::wstring();
+}
+
+namespace {
+
+// The shutdown log's path; empty until SetShutdownLog.
+std::wstring g_shutdown_log;
+
+}  // namespace
+
+void SetShutdownLog(const std::wstring& run_marker) {
+  const size_t slash = run_marker.find_last_of(L"\\/");
+  if (slash == std::wstring::npos) {
+    return;
+  }
+  const std::wstring folder = run_marker.substr(0, slash + 1);
+  const std::wstring current = folder + L"shutdown.log";
+  const std::wstring previous = folder + L"shutdown.previous.log";
+  // The log of the run before is kept, not deleted.
+  if (!::MoveFileExW(current.c_str(), previous.c_str(), MOVEFILE_REPLACE_EXISTING)) {
+    ::DeleteFileW(current.c_str());
+  }
+  g_shutdown_log = current;
+}
+
+void ShutdownLog(const char* what) {
+  if (g_shutdown_log.empty()) {
+    return;
+  }
+  char line[256];
+  const int length =
+      _snprintf_s(line, sizeof(line), _TRUNCATE, "%llu ms, thread %lu: %s\r\n",
+                  static_cast<unsigned long long>(::GetTickCount64()),
+                  static_cast<unsigned long>(::GetCurrentThreadId()), what);
+  if (length <= 0) {
+    return;
+  }
+  HANDLE file = ::CreateFileW(g_shutdown_log.c_str(), FILE_APPEND_DATA,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                              OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (file == INVALID_HANDLE_VALUE) {
+    return;
+  }
+  DWORD written = 0;
+  ::WriteFile(file, line, static_cast<DWORD>(length), &written, nullptr);
+  ::CloseHandle(file);
+}
+
+void StartExitWatchdog(const std::wstring& run_marker) {
+  static std::atomic<bool> started{false};
+  if (started.exchange(true)) {
+    return;
+  }
+  ShutdownLog("exit watchdog started");
+  try {
+    std::thread([run_marker]() {
+      ::Sleep(5000);
+      ShutdownLog("exit watchdog fired: the shutdown is hung, ending the process");
+      if (!run_marker.empty()) {
+        ::DeleteFileW(run_marker.c_str());
+      }
+      ::TerminateProcess(::GetCurrentProcess(), 0);
+    }).detach();
+  } catch (...) {
+    // No thread: the shutdown goes on without the safety net.
+  }
 }

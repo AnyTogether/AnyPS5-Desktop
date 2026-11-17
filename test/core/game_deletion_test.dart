@@ -283,6 +283,7 @@ void main() {
       });
       expect(await LinuxTrash(commands).move(astro), isA<Trashed>());
       expect(commands.lines, ['gio trash -- $astro']);
+      expect(commands.endsWithLauncherOf, [false], reason: 'a move to the Trash is finished when the launcher closes');
     });
 
     test('without gio, KDE\'s kioclient is asked', () async {

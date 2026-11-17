@@ -126,7 +126,16 @@ bool FlutterWindow::OnCreate() {
             return;
           }
           run_marker_ = Utf16FromUtf8(*path);
+          SetShutdownLog(run_marker_);
           result->Success(flutter::EncodableValue(!run_marker_.empty()));
+          return;
+        }
+        // The exit was approved and the children are ended: from here a shutdown that hangs is
+        // ended after five seconds (StartExitWatchdog).
+        if (call.method_name() == "armExitWatchdog") {
+          ShutdownLog("dart: exit approved");
+          StartExitWatchdog(run_marker_);
+          result->Success(flutter::EncodableValue(true));
           return;
         }
         // Delete game: a folder or a file into the Recycle Bin, on a thread of its own
@@ -294,12 +303,16 @@ flutter::EncodableValue FlutterWindow::NowPlayingValue() {
 
 void FlutterWindow::OnDestroy() {
   // Its thread is waited for, so no "changed" is posted to a window that is gone.
+  ShutdownLog("OnDestroy: Now playing stops");
   NowPlayingDestroy(now_playing_);
+  ShutdownLog("OnDestroy: Now playing stopped");
   now_playing_ = nullptr;
   now_playing_channel_ = nullptr;
   window_channel_ = nullptr;
   if (flutter_controller_) {
+    ShutdownLog("OnDestroy: Flutter shuts down");
     flutter_controller_ = nullptr;
+    ShutdownLog("OnDestroy: Flutter is shut down");
   }
 
   Win32Window::OnDestroy();
@@ -310,6 +323,14 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
   switch (message) {
+    case WM_CLOSE:
+      ShutdownLog("WM_CLOSE");
+      break;
+    // The window is going: whatever hangs from here on is ended after five seconds.
+    case WM_DESTROY:
+      ShutdownLog("WM_DESTROY");
+      StartExitWatchdog(run_marker_);
+      break;
     // The title bar's Maximize (its button, a double click on it, the system menu, Win+Up):
     // the launcher's full screen, with no title bar left, instead of a maximized window that
     // keeps its (dark) title bar along the top and that the launcher did not know of.

@@ -338,7 +338,14 @@ class LauncherHealth {
 /// the engine still drawing, crashed on Windows (the full-screen close), and took the marker
 /// away before it did. With no window to close, exit() as before.
 class LauncherShutdown {
-  LauncherShutdown({required this.health, required this.closeWindow, required this.exit, this.beforeClose});
+  LauncherShutdown({
+    required this.health,
+    required this.closeWindow,
+    required this.exit,
+    this.beforeClose,
+    this.fallbackAfter = defaultFallbackAfter,
+    this.unansweredAfter = defaultUnansweredAfter,
+  });
 
   final LauncherHealth health;
 
@@ -349,10 +356,43 @@ class LauncherShutdown {
   /// Before the marker is written: the watchdog stops writing it.
   final void Function()? beforeClose;
 
-  /// A close that has not ended the process by then is not coming: exit().
-  static const fallbackAfter = Duration(seconds: 5);
+  /// A close that has not ended the process this long after the exit request was answered (the
+  /// game asked to close and given its time, the child programs ended: [childrenEnded]) is not
+  /// coming: exit().
+  static const defaultFallbackAfter = Duration(seconds: 5);
+
+  /// A close the launcher never answered (the exit request does not come, or hangs before the
+  /// game's time even starts): exit() after this long. Longer than what the request itself waits
+  /// for (the emulator hosts, the game's grace, the replay buffer) and [fallbackAfter].
+  static const defaultUnansweredAfter = Duration(seconds: 20);
+
+  /// See [defaultFallbackAfter].
+  final Duration fallbackAfter;
+
+  /// See [defaultUnansweredAfter].
+  final Duration unansweredAfter;
 
   bool _quitting = false;
+  bool _closeAsked = false;
+  bool _childrenEnded = false;
+  int _code = 0;
+  Timer? _fallback;
+
+  /// The exit request was answered: the game had its time to save and the child programs are
+  /// ended. Only now does a Quit's five seconds start (a game that takes longer than that to
+  /// save is not cut off); the title bar's close has no timer at all.
+  void childrenEnded() {
+    _childrenEnded = true;
+    if (_closeAsked) _arm(fallbackAfter);
+  }
+
+  void _arm(Duration after) {
+    _fallback?.cancel();
+    _fallback = Timer(after, () {
+      health.closed();
+      exit(_code);
+    });
+  }
 
   Future<void> quit(int code) async {
     if (_quitting) return;
@@ -360,10 +400,9 @@ class LauncherShutdown {
     beforeClose?.call();
     health.closing();
     if (await closeWindow()) {
-      Timer(fallbackAfter, () {
-        health.closed();
-        exit(code);
-      });
+      _code = code;
+      _closeAsked = true;
+      _arm(_childrenEnded ? fallbackAfter : unansweredAfter);
       return;
     }
     health.closed();

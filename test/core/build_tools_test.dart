@@ -202,6 +202,7 @@ void main() {
       commands.results['winget install'] = const FakeResult(lines: ['Successfully installed']);
       expect(await update.install(fixes.last, onLine: lines.add), isTrue);
       expect(commands.lines.single, startsWith('winget install -e --id BrechtSanders.WinLibs.POSIX.UCRT'));
+      expect(commands.endsWithLauncherOf.last, isFalse, reason: 'Install now is left to finish at the close');
       expect(lines, ['Successfully installed']);
     });
   });

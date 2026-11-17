@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
+import '../child_processes.dart';
 import '../host.dart';
 import '../replay_buffer.dart' show ProcessRunner, ProcessStarter;
 import 'game_sound_native.dart';
@@ -130,7 +131,7 @@ class PulseGameSound implements GameSound {
     ProcessStarter? start,
     ProcessRunner? run,
     this.lookEvery = const Duration(seconds: 3),
-  }) : _start = start ?? ((executable, arguments) => Process.start(executable, arguments, environment: _cLocale)),
+  }) : _start = start ?? ((executable, arguments) => ChildProcesses.start(executable, arguments, environment: _cLocale)),
        _run = run ?? ((executable, arguments) => Process.run(executable, arguments, environment: _cLocale));
 
   final int pid;
