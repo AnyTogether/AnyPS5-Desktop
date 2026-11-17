@@ -387,11 +387,7 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
     // Let SDL finish creating its window and swapchain first.
     await Future<void>.delayed(const Duration(milliseconds: 1200));
     if (windowOf(pid) != window) return false;
-    if (fullscreen) {
-      // F11 toggles: skip if the window already covers its monitor without a frame.
-      if (_isFullscreen(window)) return true;
-      return _pressF11(window);
-    }
+    if (fullscreen) return _pressF11(window);
     final screens = _screenOf(window);
     if (screens == null) return false;
     final (work, _) = screens;
@@ -412,25 +408,6 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
       final x = work[0] + (work[2] - work[0] - size.width) ~/ 2;
       final y = work[1] + (work[3] - work[1] - size.height) ~/ 2;
       return _w.setWindowPos(window, 0, x, y, size.width, size.height, _noZOrder | _noActivate) != 0;
-    });
-  }
-
-  /// Whether [window] already covers its whole monitor without a frame. False when it cannot
-  /// tell: F11 is pressed then, as before.
-  bool _isFullscreen(int window) {
-    final screens = _screenOf(window);
-    if (screens == null) return false;
-    final (_, screen) = screens;
-    return using((arena) {
-      final outer = arena<Int32>(4);
-      final inner = arena<Int32>(4);
-      if (_w.getWindowRect(window, outer) == 0 || _w.getClientRect(window, inner) == 0) return false;
-      return windowIsFullscreen(
-        window: [outer[0], outer[1], outer[2], outer[3]],
-        screen: screen,
-        clientWidth: inner[2],
-        clientHeight: inner[3],
-      );
     });
   }
 
