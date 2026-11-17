@@ -328,7 +328,11 @@ version), and selecting it looks for a newer release: "PS1 emulator 1.0.0 is
 up to date" when there is none and the installed host passes its checks. A
 host that failed its check before a start, or that is missing a file, is
 downloaded again at any version. A file that cannot be written ends the
-download with its reason. With no signed release yet the row says so.
+download with its reason, and so does a release whose tag is not the version
+it is signed as: an older host published again under a higher tag is not taken
+for an update. With no signed release yet the row says so. In Turkish every row
+and message of the PS1 emulator addresses the player in the same informal
+form as the PS1 rows beside them ("seç", "koy", "dene", "indir").
 The download is refused while a PS1 game plays, while one is starting in the
 host (`RetroHostDownloadModel.holdForStart`, held from the checks before a
 start until the game's play is set). Before the new host is put in place, the host kept for the next game is
@@ -338,10 +342,12 @@ already fetched is not put in place (`RetroHostDownloadModel.close`), since
 the hosts shut down as it goes may not have exited yet. The launcher does not
 wait for one already being put in place, and quitting can cut it short. That
 leaves no half-replaced host: `RetroHostRelease.install` writes the new files
-into `RetroHost/host.new` and only then swaps the folders with two renames in
-one synchronous step, so the old host stays whole until then. The next start
-checks the installed host anyway, and a missing host is offered for download
-again. The first host installed turns the setting
+into `RetroHost/host.new` on another isolate, so the window stays responsive,
+and only then swaps the folders with two renames in one synchronous step on
+the UI isolate, so the old host stays whole until then. A launcher stopped
+between the two renames leaves the old host in `host.old`, and the next start
+puts it back (`RetroHostRelease.restore`). The next start checks the installed
+host anyway, and a missing host is offered for download again. The first host installed turns the setting
 below on, since the player asked for the emulator to play PS1 games with it.
 
 **The setting.** Settings › Emulators › **Run PS1 games in the separate

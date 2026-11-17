@@ -2430,7 +2430,7 @@
   "retroHostProgress": "%@। থামাতে নির্বাচন করুন",
   "retroHostLooking": "সর্বশেষ রিলিজ খোঁজা হচ্ছে",
   "retroHostChecking": "এর স্বাক্ষর ও ফাইল যাচাই করা হচ্ছে",
-  "retroHostNotYet": "এখনও কোনো স্বাক্ষরিত PS1 এমুলেটর প্রকাশিত হয়নি। পরে আবার চেষ্টা করুন",
+  "retroHostNotYet": "এখনও কোনো স্বাক্ষরিত PS1 এমুলেটর প্রকাশিত হয়নি। পরে আবার চেষ্টা করুন।",
   "retroHostDownloadFailed": "PS1 এমুলেটর ডাউনলোড করা যায়নি: %@",
   "retroHostReady": "PS1 এমুলেটর %@ প্রস্তুত",
   "retroHostUpToDate": "PS1 এমুলেটর %@ হালনাগাদ আছে",

@@ -187,7 +187,8 @@ GitHub's API and takes the two files for this system:
 
 Downloads go into `.part` files that carry on after a dropped connection or a restart; each
 file's size and the sha256 digest GitHub publishes for it are checked (a file without a digest
-is only used after the user agrees). The archive is unpacked without letting any name or link
+is only used after the user agrees). A download asked for over https is never redirected to
+plain http. The archive is unpacked without letting any name or link
 leave its folder, the folder holding the `.prx` files becomes `libs/` (0.1.0 had them at the
 archive's top, later releases in `libs/`), the relinker is renamed and made executable, and
 `version.txt` says `upstream-v<ver>`. Toolkits live in `%LOCALAPPDATA%\AnyPS5\Toolkits\<ver>`

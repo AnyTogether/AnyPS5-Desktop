@@ -7,12 +7,17 @@ import '../toolkit_download.dart';
 import 'retro_host_install.dart';
 import 'retro_host_release.dart';
 
+/// A release [RetroHostStore.fetch] downloaded: the [folder] its files are in, and the [tag] it
+/// was published under, which its signed version must match on install too.
+typedef RetroHostDownload = ({Directory folder, String tag});
+
 /// The emulator host the launcher downloaded from the host repository's signed GitHub releases,
 /// beside its toolkits and its ffmpeg:
 ///
 /// ```text
 /// RetroHost/
-///     host/          the unpacked zip, with SHA256SUMS, SHA256SUMS.sig and the .files beside it
+///     host/          the unpacked zip, with SHA256SUMS, SHA256SUMS.sig, the .files and
+///                    .release-tag (the tag it was published under) beside it
 ///     host.new/      a host being unpacked (RetroHostRelease.install)
 ///     host.old/      the host it replaces, until it can be removed
 ///     .downloads/    files on their way, kept to carry on after a stop
@@ -37,10 +42,14 @@ class RetroHostStore {
   Directory get folder => Directory(p.join(root, 'host'));
   String get _downloads => p.join(root, '.downloads');
 
-  /// The host to start, when its files are there; it is checked before each start ([check]).
+  /// The host to start, when its files are there; it is checked before each start ([check]). A
+  /// host left in `host.old` by a launcher stopped in the middle of putting a new one in place is
+  /// put back first ([RetroHostRelease.restore]).
   RetroHostInstall? installed() {
     final target = system;
-    if (target == null || version == null) return null;
+    if (target == null) return null;
+    RetroHostRelease.restore(folder);
+    if (version == null) return null;
     final host = p.join(folder.path, target.executable);
     final core = p.join(folder.path, target.core);
     if (!File(host).existsSync() || !File(core).existsSync()) return null;
@@ -66,15 +75,15 @@ class RetroHostStore {
     return null;
   }
 
-  /// Downloads [release] into `.downloads/<tag>` and gives that folder, once its signature is
-  /// checked and its files match the signed sums; [putInPlace] then installs it.
+  /// Downloads [release] into `.downloads/<tag>` and gives that folder with the tag, once its
+  /// signature is checked and its files match the signed sums; [putInPlace] then installs it.
   ///
   /// The signature comes first: SHA256SUMS and SHA256SUMS.sig are fetched and checked before
-  /// anything else, and this system's zip and `.files` are fetched against the digests the signed
-  /// sums give them. A release without a signature, or without files for this system, is not
+  /// anything else, with the version they sign held to the release's tag, and this system's zip
+  /// and `.files` are fetched against the digests the signed sums give them. A release without a signature, or without files for this system, is not
   /// available; there is no way to take it unsigned. Files fetched before a stop are kept, so the
   /// next try carries on.
-  Future<Directory> fetch(
+  Future<RetroHostDownload> fetch(
     UpstreamRelease? release, {
     void Function(ToolkitProgress)? onProgress,
     DownloadCancel? cancel,
@@ -109,6 +118,7 @@ class RetroHostStore {
       signed = RetroHostRelease.signed(
         File(p.join(download.path, ReleaseSigning.sumsName)).readAsBytesSync(),
         File(p.join(download.path, ReleaseSigning.signatureName)).readAsBytesSync(),
+        tag: release.tag,
         keys: keys,
         system: target,
       );
@@ -139,17 +149,18 @@ class RetroHostStore {
       before += asset.size;
     }
     if (cancel?.cancelled ?? false) throw ToolkitFailure(ToolkitFailureKind.cancelled, 'the download was stopped');
-    return download;
+    return (folder: download, tag: release.tag);
   }
 
   /// Installs what [fetch] downloaded in place of the installed host, through
   /// [RetroHostRelease.install], which checks it all again from the files on disk before it
-  /// unpacks; gives its version. Stop the host first: on Windows its files are held while it
-  /// runs, and the install then fails with the installed host left whole.
-  Future<RetroHostVersion> putInPlace(Directory download) async {
+  /// unpacks, its signed version against the tag included; gives its version. Stop the host
+  /// first: on Windows its files are held while it runs, and the install then fails with the
+  /// installed host left whole.
+  Future<RetroHostVersion> putInPlace(RetroHostDownload download) async {
     final RetroHostVersion version;
     try {
-      version = await RetroHostRelease.install(download, folder, keys: keys, system: system);
+      version = await RetroHostRelease.install(download.folder, folder, tag: download.tag, keys: keys, system: system);
     } on RetroHostReleaseFailure catch (failure) {
       throw ToolkitFailure(ToolkitFailureKind.badLayout, failure.message);
     } on FileSystemException catch (failure) {

@@ -134,6 +134,56 @@ void main() {
     expect(error.message, contains('no host for linux-arm64'));
   });
 
+  test('an older signed release published again under a higher tag is refused before its zip is fetched', () async {
+    github.releases.add(retroHostFixtureRelease(tag: 'v1.2.0', signedAs: '1.0.0'));
+    final release = await newest();
+    expect(release?.tag, 'v1.2.0', reason: 'picked by its tag, as any newer release');
+    final error = await failure(store().fetch(release));
+    expect(error.kind, ToolkitFailureKind.signature);
+    expect(error.message, 'v1.2.0: the release tagged v1.2.0 is signed as host 1.0.0');
+    expect(github.downloads.map((path) => path.split('/').last).toSet(), {'SHA256SUMS', 'SHA256SUMS.sig'});
+    expect(Directory(p.join(temp.path, 'RetroHost', '.downloads', 'v1.2.0')).existsSync(), isFalse);
+    expect(store().installed(), isNull);
+  });
+
+  test('a newer release is signed as its own tag, and installs as that version', () async {
+    github.releases.add(retroHostFixtureRelease(tag: 'v1.2.0'));
+    final host = store();
+    final download = await host.fetch(await newest());
+    expect(download.tag, 'v1.2.0');
+    expect(
+      (await failure(host.putInPlace((folder: download.folder, tag: 'v1.3.0')))).message,
+      'the release tagged v1.3.0 is signed as host 1.2.0',
+      reason: 'the tag is held to the signed version on install too',
+    );
+    expect(host.installed(), isNull);
+    expect(await host.putInPlace(download), const RetroHostVersion(1, 2, 0));
+    expect(host.version, const RetroHostVersion(1, 2, 0));
+    (await host.check()).release();
+  });
+
+  test('a host left in host.old by a launcher stopped while putting a new one in place is found again', () async {
+    github.releases.add(retroHostFixtureRelease());
+    final host = store();
+    await host.putInPlace(await host.fetch(await newest()));
+    host.folder.renameSync('${host.folder.path}.old');
+    final found = store().installed();
+    expect(found?.host, p.join(host.folder.path, 'anyps5-retro-host.exe'));
+    expect(Directory('${host.folder.path}.old').existsSync(), isFalse);
+    (await host.check()).release();
+  });
+
+  test('a host that cannot be written on the unpacking isolate fails as a write, leaving the old host', () async {
+    github.releases.add(retroHostFixtureRelease());
+    final host = store();
+    await host.putInPlace(await host.fetch(await newest()));
+    File('${host.folder.path}.new').writeAsStringSync('in the way\n');
+    final error = await failure(host.putInPlace(await host.fetch(await newest())));
+    expect(error.kind, ToolkitFailureKind.badLayout);
+    expect(error.message, startsWith('the host could not be written'));
+    (await host.check()).release();
+  });
+
   test('a stopped download keeps what came, and the next try carries on', () async {
     github.releases.add(retroHostFixtureRelease());
     final zip = 'anyps5-retro-host-1.0.0-windows-x64.zip';

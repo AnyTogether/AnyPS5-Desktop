@@ -2430,7 +2430,7 @@
   "retroHostProgress": "%@. Válaszd ki a leállításhoz",
   "retroHostLooking": "A legújabb kiadás keresése",
   "retroHostChecking": "Az aláírás és a fájlok ellenőrzése",
-  "retroHostNotYet": "Még nem jelent meg aláírt PS1-emulátor. Próbáld újra később",
+  "retroHostNotYet": "Még nem jelent meg aláírt PS1-emulátor. Próbáld újra később.",
   "retroHostDownloadFailed": "A PS1-emulátor letöltése nem sikerült: %@",
   "retroHostReady": "A(z) %@ verziójú PS1-emulátor készen áll",
   "retroHostUpToDate": "A(z) %@ verziójú PS1-emulátor naprakész",

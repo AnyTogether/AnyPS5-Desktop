@@ -2416,7 +2416,7 @@
   "retroHostProgress": "%@. ເລືອກເພື່ອຢຸດ",
   "retroHostLooking": "ກຳລັງຊອກຫາລຸ້ນໃໝ່ລ່າສຸດ",
   "retroHostChecking": "ກຳລັງກວດລາຍເຊັນ ແລະ ໄຟລ໌ຂອງມັນ",
-  "retroHostNotYet": "ຍັງບໍ່ມີອີມູເລເຕີ PS1 ທີ່ລົງລາຍເຊັນຖືກເຜີຍແຜ່ເທື່ອ. ລອງໃໝ່ພາຍຫຼັງ",
+  "retroHostNotYet": "ຍັງບໍ່ມີອີມູເລເຕີ PS1 ທີ່ລົງລາຍເຊັນຖືກເຜີຍແຜ່ເທື່ອ. ລອງໃໝ່ພາຍຫຼັງ.",
   "retroHostDownloadFailed": "ດາວໂຫຼດອີມູເລເຕີ PS1 ບໍ່ໄດ້: %@",
   "retroHostReady": "ອີມູເລເຕີ PS1 %@ ພ້ອມແລ້ວ",
   "retroHostUpToDate": "ອີມູເລເຕີ PS1 %@ ເປັນລຸ້ນລ່າສຸດແລ້ວ",

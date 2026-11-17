@@ -2430,7 +2430,7 @@
   "retroHostProgress": "%@۔ روکنے کے لیے منتخب کریں",
   "retroHostLooking": "تازہ ترین ریلیز تلاش کی جا رہی ہے",
   "retroHostChecking": "اس کے دستخط اور فائلیں جانچی جا رہی ہیں",
-  "retroHostNotYet": "ابھی تک کوئی دستخط شدہ PS1 ایمولیٹر شائع نہیں ہوا۔ بعد میں دوبارہ کوشش کریں",
+  "retroHostNotYet": "ابھی تک کوئی دستخط شدہ PS1 ایمولیٹر شائع نہیں ہوا۔ بعد میں دوبارہ کوشش کریں۔",
   "retroHostDownloadFailed": "PS1 ایمولیٹر ڈاؤن لوڈ نہیں ہو سکا: %@",
   "retroHostReady": "PS1 ایمولیٹر %@ تیار ہے",
   "retroHostUpToDate": "PS1 ایمولیٹر %@ تازہ ترین ہے",

@@ -2430,7 +2430,7 @@
   "retroHostProgress": "%@. Välj för att stoppa",
   "retroHostLooking": "Söker efter den senaste versionen",
   "retroHostChecking": "Kontrollerar signatur och filer",
-  "retroHostNotYet": "Ingen signerad PS1-emulator har publicerats än. Försök igen senare",
+  "retroHostNotYet": "Ingen signerad PS1-emulator har publicerats än. Försök igen senare.",
   "retroHostDownloadFailed": "PS1-emulatorn kunde inte laddas ner: %@",
   "retroHostReady": "PS1-emulator %@ är klar",
   "retroHostUpToDate": "PS1-emulator %@ är uppdaterad",

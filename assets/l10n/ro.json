@@ -2430,7 +2430,7 @@
   "retroHostProgress": "%@. Selectează pentru a opri",
   "retroHostLooking": "Se caută cea mai nouă versiune",
   "retroHostChecking": "Se verifică semnătura și fișierele",
-  "retroHostNotYet": "Nu a fost publicat încă niciun emulator PS1 semnat. Încearcă din nou mai târziu",
+  "retroHostNotYet": "Nu a fost publicat încă niciun emulator PS1 semnat. Încearcă din nou mai târziu.",
   "retroHostDownloadFailed": "Emulatorul PS1 nu a putut fi descărcat: %@",
   "retroHostReady": "Emulatorul PS1 %@ este gata",
   "retroHostUpToDate": "Emulatorul PS1 %@ este actualizat",

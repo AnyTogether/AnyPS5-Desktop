@@ -2430,7 +2430,7 @@
   "retroHostProgress": "%@. Zum Beenden auswählen",
   "retroHostLooking": "Neueste Version wird gesucht",
   "retroHostChecking": "Signatur und Dateien werden geprüft",
-  "retroHostNotYet": "Es wurde noch kein signierter PS1-Emulator veröffentlicht. Versuche es später erneut",
+  "retroHostNotYet": "Es wurde noch kein signierter PS1-Emulator veröffentlicht. Versuche es später erneut.",
   "retroHostDownloadFailed": "Der PS1-Emulator konnte nicht heruntergeladen werden: %@",
   "retroHostReady": "PS1-Emulator %@ ist bereit",
   "retroHostUpToDate": "PS1-Emulator %@ ist aktuell",

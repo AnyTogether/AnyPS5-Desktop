@@ -2430,7 +2430,7 @@
   "retroHostProgress": "%@。選択すると停止します",
   "retroHostLooking": "最新のリリースを確認しています",
   "retroHostChecking": "署名とファイルを確認しています",
-  "retroHostNotYet": "署名済みの PS1 エミュレーターはまだ公開されていません。後でもう一度お試しください",
+  "retroHostNotYet": "署名済みの PS1 エミュレーターはまだ公開されていません。後でもう一度お試しください。",
   "retroHostDownloadFailed": "PS1 エミュレーターをダウンロードできませんでした: %@",
   "retroHostReady": "PS1 エミュレーター %@ の準備ができました",
   "retroHostUpToDate": "PS1 エミュレーター %@ は最新です",

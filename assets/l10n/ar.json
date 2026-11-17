@@ -2430,7 +2430,7 @@
   "retroHostProgress": "%@. حدد للإيقاف",
   "retroHostLooking": "جارٍ البحث عن أحدث إصدار",
   "retroHostChecking": "جارٍ التحقق من توقيعه وملفاته",
-  "retroHostNotYet": "لم يُنشر محاكي PS1 موقّع بعد. حاول مرة أخرى لاحقًا",
+  "retroHostNotYet": "لم يُنشر محاكي PS1 موقّع بعد. حاول مرة أخرى لاحقًا.",
   "retroHostDownloadFailed": "تعذر تنزيل محاكي PS1: %@",
   "retroHostReady": "محاكي PS1 %@ جاهز",
   "retroHostUpToDate": "محاكي PS1 %@ محدّث",

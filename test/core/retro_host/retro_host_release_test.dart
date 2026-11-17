@@ -74,6 +74,7 @@ void main() {
       final version = await RetroHostRelease.install(
         Directory(_fixtures),
         into,
+        tag: 'v1.0.0',
         keys: retroHostFixtureKeys(),
         system: system,
       );
@@ -86,7 +87,9 @@ void main() {
       expect(RetroHostRelease.installedVersion(into, system: system), const RetroHostVersion(1, 0, 0));
     }
     expect(
-      await failure(() => RetroHostRelease.install(Directory(_fixtures), installed(), keys: keys, system: _linux)),
+      await failure(
+        () => RetroHostRelease.install(Directory(_fixtures), installed(), tag: 'v1.0.0', keys: keys, system: _linux),
+      ),
       contains('does not trust'),
       reason: "the fixture key is not one of the test's own",
     );
@@ -95,7 +98,13 @@ void main() {
   test("the signed sums give the names of this system's zip and .files", () {
     final sums = File(p.join(_fixtures, 'SHA256SUMS')).readAsBytesSync();
     final signature = File(p.join(_fixtures, 'SHA256SUMS.sig')).readAsBytesSync();
-    final release = RetroHostRelease.signed(sums, signature, keys: retroHostFixtureKeys(), system: _windows);
+    final release = RetroHostRelease.signed(
+      sums,
+      signature,
+      tag: 'v1.0.0',
+      keys: retroHostFixtureKeys(),
+      system: _windows,
+    );
     expect(
       (release.version, release.zipName, release.filesName),
       (
@@ -106,13 +115,13 @@ void main() {
     );
     expect(release.sums.digestFor(release.zipName), hasLength(64));
     expect(
-      () => RetroHostRelease.signed(sums, signature, keys: keys, system: _windows),
+      () => RetroHostRelease.signed(sums, signature, tag: 'v1.0.0', keys: keys, system: _windows),
       throwsA(isA<RetroHostReleaseFailure>()),
     );
   });
 
   test('a signed download is unpacked with its sums, signature and file list, and checks before a start', () async {
-    final version = await RetroHostRelease.install(download(), installed(), keys: keys, system: _linux);
+    final version = await RetroHostRelease.install(download(), installed(), tag: 'v1.0.0', keys: keys, system: _linux);
     expect('$version', '1.0.0');
     expect(
       installed()
@@ -124,6 +133,7 @@ void main() {
         'SHA256SUMS',
         'SHA256SUMS.sig',
         'anyps5-retro-host-1.0.0-linux-x64.files',
+        '.release-tag',
         'SOURCE.txt',
         'anyps5-retro-host',
         'swanstation_libretro.so',
@@ -134,6 +144,7 @@ void main() {
       },
     );
     expect(File(p.join(installed().path, 'anyps5-retro-host')).readAsStringSync(), 'anyps5-retro-host stand-in\n');
+    expect(File(p.join(installed().path, '.release-tag')).readAsStringSync(), 'v1.0.0');
 
     final checked = await RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _linux);
     expect('${checked.version}', '1.0.0');
@@ -146,12 +157,38 @@ void main() {
     checked.release();
   });
 
+  test('an older signed release published again under a higher tag is refused on download and on install', () async {
+    final folder = download();
+    final sums = File(p.join(folder.path, 'SHA256SUMS')).readAsBytesSync();
+    final signature = File(p.join(folder.path, 'SHA256SUMS.sig')).readAsBytesSync();
+    expect(
+      () => RetroHostRelease.signed(sums, signature, tag: 'v1.2.0', keys: keys, system: _linux),
+      throwsA(
+        isA<RetroHostReleaseFailure>().having(
+          (failure) => failure.message,
+          'message',
+          'the release tagged v1.2.0 is signed as host 1.0.0',
+        ),
+      ),
+    );
+    for (final tag in ['v1.2.0', 'v0.9.0', '1.0.0', 'v1.0.0-rc1']) {
+      expect(
+        await failure(() => RetroHostRelease.install(folder, installed(), tag: tag, keys: keys, system: _linux)),
+        'the release tagged $tag is signed as host 1.0.0',
+        reason: tag,
+      );
+    }
+    expect(installed().existsSync(), isFalse);
+    expect(Directory('${installed().path}.new').existsSync(), isFalse);
+  });
+
   test('a download signed by a key the launcher does not trust is not unpacked', () async {
     expect(
       await failure(
         () => RetroHostRelease.install(
           download(signer: stranger),
           installed(),
+          tag: 'v1.0.0',
           keys: keys,
           system: _linux,
         ),
@@ -167,12 +204,12 @@ void main() {
     final bytes = zip.readAsBytesSync();
     zip.writeAsBytesSync([...bytes.take(bytes.length - 1), bytes.last ^ 1]);
     expect(
-      await failure(() => RetroHostRelease.install(folder, installed(), keys: keys, system: _linux)),
+      await failure(() => RetroHostRelease.install(folder, installed(), tag: 'v1.0.0', keys: keys, system: _linux)),
       'anyps5-retro-host-1.0.0-linux-x64.zip does not match the signed release',
     );
     File(p.join(folder.path, 'anyps5-retro-host-1.0.0-linux-x64.files')).writeAsStringSync('changed\n');
     expect(
-      await failure(() => RetroHostRelease.install(folder, installed(), keys: keys, system: _linux)),
+      await failure(() => RetroHostRelease.install(folder, installed(), tag: 'v1.0.0', keys: keys, system: _linux)),
       'anyps5-retro-host-1.0.0-linux-x64.files does not match the signed release',
     );
     expect(installed().existsSync(), isFalse);
@@ -189,7 +226,7 @@ void main() {
     extra.add(ArchiveFile.bytes('extra.dll', utf8.encode('extra')));
     resign(folder, zipPath, ZipEncoder().encodeBytes(extra), key);
     expect(
-      await failure(() => RetroHostRelease.install(folder, installed(), keys: keys, system: _linux)),
+      await failure(() => RetroHostRelease.install(folder, installed(), tag: 'v1.0.0', keys: keys, system: _linux)),
       contains('holds extra.dll'),
     );
 
@@ -199,7 +236,7 @@ void main() {
     }
     resign(folder, zipPath, ZipEncoder().encodeBytes(missing), key);
     expect(
-      await failure(() => RetroHostRelease.install(folder, installed(), keys: keys, system: _linux)),
+      await failure(() => RetroHostRelease.install(folder, installed(), tag: 'v1.0.0', keys: keys, system: _linux)),
       contains('does not hold SOURCE.txt'),
     );
     expect(installed().existsSync(), isFalse);
@@ -209,11 +246,18 @@ void main() {
     const newer = RetroHostVersion(1, 0, 1);
     expect(
       await failure(
-        () => RetroHostRelease.install(download(), installed(), keys: keys, system: _linux, minimum: newer),
+        () => RetroHostRelease.install(
+          download(),
+          installed(),
+          tag: 'v1.0.0',
+          keys: keys,
+          system: _linux,
+          minimum: newer,
+        ),
       ),
       contains('older than 1.0.1'),
     );
-    await RetroHostRelease.install(download(), installed(), keys: keys, system: _linux);
+    await RetroHostRelease.install(download(), installed(), tag: 'v1.0.0', keys: keys, system: _linux);
     expect(
       await failure(() => RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _linux, minimum: newer)),
       contains('older than 1.0.1'),
@@ -226,6 +270,7 @@ void main() {
         () => RetroHostRelease.install(
           download(),
           installed(),
+          tag: 'v1.0.0',
           keys: keys,
           system: const RetroHostSystem(
             'linux-arm64',
@@ -236,14 +281,14 @@ void main() {
       ),
       'the release has no host for linux-arm64',
     );
-    await RetroHostRelease.install(download(), installed(), keys: keys, system: _windows);
+    await RetroHostRelease.install(download(), installed(), tag: 'v1.0.0', keys: keys, system: _windows);
     final checked = await RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _windows);
     expect(p.basename(checked.executable), 'anyps5-retro-host.exe');
     checked.release();
   });
 
   group('before each start', () {
-    setUp(() async => RetroHostRelease.install(download(), installed(), keys: keys, system: _linux));
+    setUp(() async => RetroHostRelease.install(download(), installed(), tag: 'v1.0.0', keys: keys, system: _linux));
 
     test('the signature is checked again', () async {
       final sums = File(p.join(installed().path, 'SHA256SUMS')).readAsBytesSync();
@@ -252,6 +297,27 @@ void main() {
         await failure(() => RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _linux)),
         contains('does not trust'),
       );
+    });
+
+    test('the tag kept on install is held to the signed version', () async {
+      final tag = File(p.join(installed().path, '.release-tag'));
+      tag.writeAsStringSync('v1.2.0');
+      expect(
+        await failure(() => RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _linux)),
+        'the release tagged v1.2.0 is signed as host 1.0.0',
+      );
+      tag.deleteSync();
+      expect(
+        await failure(() => RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _linux)),
+        '.release-tag is missing',
+      );
+      tag.writeAsBytesSync([0xff, 0xfe]);
+      expect(
+        await failure(() => RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _linux)),
+        'the release tag beside the host cannot be read',
+      );
+      tag.writeAsStringSync('v1.0.0');
+      (await RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _linux)).release();
     });
 
     test('a changed file list is refused', () async {
@@ -397,7 +463,7 @@ void main() {
   });
 
   test('a FIFO in the place of a checked file is refused without blocking', () async {
-    await RetroHostRelease.install(download(), installed(), keys: keys, system: _linux);
+    await RetroHostRelease.install(download(), installed(), tag: 'v1.0.0', keys: keys, system: _linux);
     final core = p.join(installed().path, 'swanstation_libretro.so');
     File(core).deleteSync();
     expect(Process.runSync('mkfifo', [core]).exitCode, 0);
@@ -410,33 +476,53 @@ void main() {
 
   group('installing over a host', () {
     test('replaces it whole, and leaves no staging or old folder', () async {
-      await RetroHostRelease.install(download(), installed(), keys: keys, system: _current);
+      await RetroHostRelease.install(download(), installed(), tag: 'v1.0.0', keys: keys, system: _current);
       File(p.join(installed().path, 'left-over')).writeAsStringSync('old\n');
-      await RetroHostRelease.install(download(), installed(), keys: keys, system: _current);
+      await RetroHostRelease.install(download(), installed(), tag: 'v1.0.0', keys: keys, system: _current);
       expect(File(p.join(installed().path, 'left-over')).existsSync(), isFalse);
       expect(Directory('${installed().path}.new').existsSync(), isFalse);
       expect(Directory('${installed().path}.old').existsSync(), isFalse);
       (await RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _current)).release();
     });
 
+    test('a launcher stopped between the two renames gets its old host back, checked as before', () async {
+      await RetroHostRelease.install(download(), installed(), tag: 'v1.0.0', keys: keys, system: _current);
+      installed().renameSync('${installed().path}.old');
+      Directory('${installed().path}.new').createSync();
+      File(p.join('${installed().path}.new', 'half-written')).writeAsStringSync('part\n');
+      RetroHostRelease.restore(installed());
+      expect(Directory('${installed().path}.old').existsSync(), isFalse);
+      (await RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _current)).release();
+      RetroHostRelease.restore(installed());
+      (await RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _current)).release();
+
+      installed().renameSync('${installed().path}.old');
+      await RetroHostRelease.install(download(), installed(), tag: 'v1.0.0', keys: keys, system: _current);
+      expect(Directory('${installed().path}.new').existsSync(), isFalse);
+      expect(Directory('${installed().path}.old').existsSync(), isFalse);
+      (await RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _current)).release();
+    });
+
     test('on Windows a host whose files are held is left whole, and replaced once they are let go', () async {
-      await RetroHostRelease.install(download(), installed(), keys: keys, system: _windows);
+      await RetroHostRelease.install(download(), installed(), tag: 'v1.0.0', keys: keys, system: _windows);
       final checked = await RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _windows);
       expect(
-        await failure(() => RetroHostRelease.install(download(), installed(), keys: keys, system: _windows)),
+        await failure(
+          () => RetroHostRelease.install(download(), installed(), tag: 'v1.0.0', keys: keys, system: _windows),
+        ),
         'the host is in use; close it and try again',
       );
       expect(Directory('${installed().path}.new').existsSync(), isFalse);
       checked.release();
       (await RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _windows)).release();
-      await RetroHostRelease.install(download(), installed(), keys: keys, system: _windows);
+      await RetroHostRelease.install(download(), installed(), tag: 'v1.0.0', keys: keys, system: _windows);
       (await RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _windows)).release();
     }, skip: Platform.isWindows ? null : 'Windows only');
   });
 
   test('the installed version is read from the sums without a check, for showing', () async {
     expect(RetroHostRelease.installedVersion(installed(), system: _linux), isNull);
-    await RetroHostRelease.install(download(), installed(), keys: keys, system: _linux);
+    await RetroHostRelease.install(download(), installed(), tag: 'v1.0.0', keys: keys, system: _linux);
     expect(RetroHostRelease.installedVersion(installed(), system: _linux), const RetroHostVersion(1, 0, 0));
     expect(RetroHostRelease.installedVersion(installed(), system: _windows), isNull, reason: 'another system');
     File(p.join(installed().path, 'SHA256SUMS')).writeAsStringSync('not sums\n');
@@ -444,7 +530,28 @@ void main() {
   });
 
   group('file lists', () {
-    for (final name in ['../escape', '/root', 'a//b', r'a\b', 'C:x', './a', 'a/']) {
+    for (final name in [
+      '../escape',
+      '/root',
+      'a//b',
+      r'a\b',
+      'C:x',
+      './a',
+      'a/',
+      '.hidden',
+      'licenses/.notice',
+      'trailing.',
+      'licenses./x.txt',
+      'a b',
+      'caf\u00e9.txt',
+      'CON',
+      'con.txt',
+      'licenses/Aux.dll',
+      'nul.tar.gz',
+      'COM1',
+      'lpt9.log',
+      'prn',
+    ]) {
       test('refuse the name "$name"', () {
         expect(
           () => RetroHostRelease.parseFileList(utf8.encode('${'0' * 64}  $name\n')),
@@ -458,6 +565,29 @@ void main() {
         'licenses/x.txt': 'a' * 64,
       });
     });
+
+    test('take names a device name only begins, as the host does', () {
+      final names = ['console.txt', 'com10', 'lpt.txt', 'nulls/x', 'a.b-c_d+e', 'Readme'];
+      expect(
+        RetroHostRelease.parseFileList(utf8.encode(names.map((name) => '${'a' * 64}  $name\n').join())).keys,
+        names,
+      );
+    });
+
+    for (final (first, second) in [
+      ('SOURCE.txt', 'source.TXT'),
+      ('licenses/x.txt', 'Licenses/X.txt'),
+      ('licenses', 'licenses/x.txt'),
+      ('Licenses/x.txt', 'licenses'),
+      ('a/b/c', 'A/B'),
+    ]) {
+      test('refuse "$first" with "$second", which differ only in case or are a file and a folder', () {
+        expect(
+          () => RetroHostRelease.parseFileList(utf8.encode('${'0' * 64}  $first\n${'1' * 64}  $second\n')),
+          throwsA(isA<RetroHostReleaseFailure>()),
+        );
+      });
+    }
   });
 
   test('versions are three numbers and compare by number', () {
@@ -498,6 +628,7 @@ Directory signedRelease(Directory temp, String program, TestReleaseKey key) {
   final sums = sumsOf({listName: listing});
   File(p.join(folder.path, 'SHA256SUMS')).writeAsBytesSync(sums);
   File(p.join(folder.path, 'SHA256SUMS.sig')).writeAsStringSync('${key.signatureLine(sums)}\n');
+  File(p.join(folder.path, RetroHostRelease.tagName)).writeAsStringSync('v1.0.0');
   return folder;
 }
 

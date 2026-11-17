@@ -2413,7 +2413,7 @@
   "retroHostProgress": "%@। रोके खातिर चुनीं",
   "retroHostLooking": "सबसे नया रिलीज़ खोजल जात बा",
   "retroHostChecking": "एकर साइन आ फाइल जाँचल जात बा",
-  "retroHostNotYet": "अबहीं ले कवनो साइन कइल PS1 एमुलेटर प्रकाशित नइखे भइल। बाद में फेर कोशिश करीं",
+  "retroHostNotYet": "अबहीं ले कवनो साइन कइल PS1 एमुलेटर प्रकाशित नइखे भइल। बाद में फेर कोशिश करीं।",
   "retroHostDownloadFailed": "PS1 एमुलेटर डाउनलोड ना हो सकल: %@",
   "retroHostReady": "PS1 एमुलेटर %@ तइयार बा",
   "retroHostUpToDate": "PS1 एमुलेटर %@ नया बा",

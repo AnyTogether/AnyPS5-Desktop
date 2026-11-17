@@ -2430,7 +2430,7 @@
   "retroHostProgress": "%@。选择以停止",
   "retroHostLooking": "正在查找最新版本",
   "retroHostChecking": "正在检查其签名和文件",
-  "retroHostNotYet": "尚未发布已签名的 PS1 模拟器。请稍后重试",
+  "retroHostNotYet": "尚未发布已签名的 PS1 模拟器。请稍后重试。",
   "retroHostDownloadFailed": "无法下载 PS1 模拟器：%@",
   "retroHostReady": "PS1 模拟器 %@ 已就绪",
   "retroHostUpToDate": "PS1 模拟器 %@ 已是最新版本",
