@@ -84,7 +84,7 @@ void main() {
           "import 'package:anyps5_desktop/core/retro_host/retro_host_build.dart';\n"
           "import 'package:anyps5_desktop/core/retro_host/retro_host_install.dart';\n"
           'void main() => RetroHostInstall.locate(const {}, build: RetroHostBuild.of(debug: false), '
-          'system: HostSystem.current, log: print);\n',
+          'system: HostSystem.current);\n',
         );
       Future<String> compile(String name, List<String> defines) async {
         final out = p.join(folder.path, '$name.aot');
@@ -111,7 +111,7 @@ void main() {
         '-D${RetroHostBuild.testDefine}=true',
         program.path,
       ]);
-      expect('${looked.stdout}', contains(RetroHostBuild.testMark), reason: 'the lookup writes it');
+      expect('${looked.stderr}', contains(RetroHostBuild.testMark), reason: 'the lookup writes it');
 
       List<String> files(String name, Uint8List snapshot, Uint8List installs) {
         final dir = Directory(p.join(folder.path, name))..createSync();

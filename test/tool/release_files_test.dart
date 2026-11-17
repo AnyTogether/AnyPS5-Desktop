@@ -145,6 +145,19 @@ void main() {
       }
     });
 
+    test('a zip whose snapshot does not match its CRC-32 is refused', () {
+      final zip = ZipEncoder().encodeBytes(
+        Archive()..addFile(ArchiveFile.bytes('data/app.so', snapshot)..compression = CompressionType.none),
+      );
+      expect(ReleaseFile.windowsZip.snapshotIn(zip), snapshot);
+      final damaged = Uint8List.fromList(zip);
+      damaged[indexOfBytes(damaged, snapshot) + 5] ^= 1;
+      expect(
+        () => ReleaseFile.windowsZip.snapshotIn(damaged),
+        throwsA(isA<FormatException>().having((e) => e.message, 'message', contains('CRC-32'))),
+      );
+    });
+
     test('a missing, doubled or linked snapshot is refused', () {
       final twice = ZipEncoder().encodeBytes(
         Archive()

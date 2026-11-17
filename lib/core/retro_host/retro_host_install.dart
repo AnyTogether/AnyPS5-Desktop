@@ -47,19 +47,19 @@ class RetroHostInstall {
   /// The host [environment] names and the SwanStation library beside it, when [build] runs an
   /// unchecked host and both files are there; null otherwise, and always for a release.
   ///
-  /// A test build writes [RetroHostBuild.testMark] to [log] first, every time it looks. The mark
-  /// is here, where the unchecked host is found, so that no test build can have this lookup
-  /// without the mark that `tool/check_release_build.dart` finds in its compiled program; it is
-  /// under [RetroHostBuild.testDefined], so every other build is compiled without it.
+  /// A test build writes [RetroHostBuild.testMark] to its standard error first, every time it
+  /// looks. The mark is here, where the unchecked host is found, and written by this function
+  /// itself, so that no test build can have this lookup without the mark that
+  /// `tool/check_release_build.dart` finds in its compiled program; it is under
+  /// [RetroHostBuild.testDefined], so every other build is compiled without it.
   static RetroHostInstall? locate(
     Map<String, String> environment, {
     required RetroHostBuild build,
     required HostSystem system,
-    void Function(String line)? log,
   }) {
     if (!build.runsUnchecked) return null;
     if (RetroHostBuild.testDefined) {
-      log?.call('${RetroHostBuild.testMark}: runs the PS1 host $variable names without checking it');
+      stderr.writeln('${RetroHostBuild.testMark}: runs the PS1 host $variable names without checking it');
     }
     final named = environment[variable];
     if (named == null || named.isEmpty || !p.isAbsolute(named)) return null;

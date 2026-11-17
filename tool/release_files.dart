@@ -73,10 +73,15 @@ enum ReleaseFile {
   };
 }
 
+/// The file at [path] in the zip [bytes], checked against the CRC-32 the zip gives it (the zip
+/// decoder does not check it).
 Uint8List _zipEntry(Uint8List bytes, String path) {
   final decoder = ZipDecoder();
   final archive = decoder.decodeBytes(bytes);
-  return _entry(archive, [for (final header in decoder.directory.fileHeaders) header.filename], path);
+  final file = _entry(archive, [for (final header in decoder.directory.fileHeaders) header.filename], path);
+  final content = file.content;
+  if (file.crc32 != getCrc32(content)) throw FormatException('its $path does not match its CRC-32');
+  return content;
 }
 
 Uint8List _tarEntry(Uint8List bytes, String path) {
@@ -85,20 +90,20 @@ Uint8List _tarEntry(Uint8List bytes, String path) {
   return _entry(archive, [
     for (final file in decoder.files)
       file.filenamePrefix.isEmpty ? file.filename : '${file.filenamePrefix}/${file.filename}',
-  ], path);
+  ], path).content;
 }
 
 /// The one regular file at [path] in [archive], whose entries are [names] (an [Archive] keeps
 /// one file of a name given twice), with any `./` or `/` before names and `\` between them read
 /// as nothing and `/`.
-Uint8List _entry(Archive archive, List<String> names, String path) {
+ArchiveFile _entry(Archive archive, List<String> names, String path) {
   String normal(String name) => name.replaceAll(r'\', '/').replaceFirst(RegExp(r'^(\./|/)+'), '');
   final times = names.where((name) => normal(name) == path).length;
   if (times > 1) throw FormatException('it has $path $times times');
   final file = archive.files.where((file) => normal(file.name) == path).firstOrNull;
   if (times == 0 || file == null) throw FormatException('it has no $path');
   if (!file.isFile || file.isSymbolicLink) throw FormatException('its $path is not a file');
-  return file.content;
+  return file;
 }
 
 /// The file at [path] in the data of the .deb [bytes]: its `data.tar` member, uncompressed or

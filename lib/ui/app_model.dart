@@ -2768,7 +2768,6 @@ class AppModel extends ChangeNotifier {
           services.environment ?? Platform.environment,
           build: RetroHostPlaying.retroHostBuild,
           system: HostSystem.current,
-          log: debugPrint,
         )
       : null;
 

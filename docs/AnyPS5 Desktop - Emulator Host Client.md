@@ -354,10 +354,11 @@ after `flutter build`, and fails on a test build in two ways:
   is one the check cannot read, and it fails rather than pass a Flutter that
   writes another format.
 - **What it built.** A test build writes `RetroHostBuild.testMark`
-  ("AnyPS5 launcher test build") to its log where it looks for the unchecked
-  host, every time (`RetroHostInstall.locate`). The mark lives in that lookup,
-  not in a line `main` calls, so no test build can have the unchecked path
-  without it: taking the line out would take the lookup with it. That code is
+  ("AnyPS5 launcher test build") to its standard error where it looks for the
+  unchecked host, every time (`RetroHostInstall.locate`, which writes it
+  itself; no caller passes a logger that could be left out). The mark lives in
+  that lookup, not in a line `main` calls, so no test build can have the
+  unchecked path without it. That code is
   under `if (testDefined)`, and the Dart compiler drops it, and the text with
   it, from every other build, as it does with code under `kDebugMode` in a
   release. Dart keeps an ASCII string in an AOT snapshot as its bytes, so the
@@ -377,7 +378,12 @@ reads it as that packaging writes it, with
 
 - **The Windows zip** (`AnyPS5-Desktop-windows-x64.zip`, ci.yml's
   `Compress-Archive` of the release folder): `data/app.so` at its root, written
-  with `/` or `\`, exactly once and a regular file.
+  with `/` or `\`, exactly once and a regular file, and matching the CRC-32
+  the zip gives it (the zip decoder does not check it itself).
+- **Damage** is found as each format allows: the zip's CRC-32, gzip's and
+  xz's checksums, zstd's frame checks, the installer's offset-table CRC32 and
+  LZMA2's own end conditions. A tar entry and a SquashFS block carry no
+  checksum, so a damaged one is found only when it cannot be read.
 - **The Linux .tar.gz** (`AnyPS5-Desktop-linux-x64.tar.gz`, the bundle as
   `AnyPS5-Desktop/`): `AnyPS5-Desktop/lib/libapp.so`, likewise.
 - **The .deb** ([`build-deb.sh`](../packaging/linux/build-deb.sh), the bundle in
