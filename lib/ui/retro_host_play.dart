@@ -636,8 +636,8 @@ extension RetroHostPlaying on AppModel {
     if (!wanted) unawaited(retroHostKeeper.shutdown());
   }
 
-  /// How long quitting the launcher waits for the emulator hosts to save and exit: under
-  /// LauncherShutdown.fallbackAfter, which ends the process anyway.
+  /// How long quitting the launcher waits for the emulator hosts to save and exit: well under
+  /// LauncherShutdown.defaultUnansweredAfter, which ends the process anyway.
   static const quitLimit = Duration(seconds: 3);
 
   /// The launcher is quitting (the exit request in lib/main.dart, which every close goes

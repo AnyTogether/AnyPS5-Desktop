@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:anyps5_desktop/core/engine_checkout.dart';
 import 'package:anyps5_desktop/core/game_library.dart';
 import 'package:anyps5_desktop/core/installer.dart';
+import 'package:anyps5_desktop/core/launcher_health.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/components.dart';
 import 'package:anyps5_desktop/ui/game_action.dart';
@@ -174,6 +175,47 @@ void main() {
         await until(() => model.running != null);
         await model.endChildProcesses();
         expect(starts.last.signals, [ProcessSignal.sigterm]);
+      },
+      skip: Platform.isWindows ? 'Windows asks with taskkill' : null,
+    );
+
+    test(
+      'Quit gives a slow game its whole grace: the shutdown\'s fallback starts after it',
+      () async {
+        starts = FakeGameStarts(() => FakeGameProcess(ignoresTerm: true));
+        model.startGame = starts.call;
+        model.stopGrace = const Duration(milliseconds: 300);
+        final health = LauncherHealth(
+          p.join(fixture.temp.path, 'Launcher'),
+          version: '0.1.12',
+          platform: 'Linux',
+          pid: 100,
+          alive: (_) => false,
+        )..start();
+        final exits = <int>[];
+        late final LauncherShutdown shutdown;
+        shutdown = LauncherShutdown(
+          health: health,
+          fallbackAfter: const Duration(milliseconds: 100),
+          unansweredAfter: const Duration(seconds: 5),
+          // The window's close, answered as lib/main.dart answers the exit request.
+          closeWindow: () async {
+            unawaited(() async {
+              await model.endChildProcesses();
+              shutdown.childrenEnded();
+            }());
+            return true;
+          },
+          exit: exits.add,
+        );
+        model.primaryAction(orbit);
+        await until(() => model.running != null);
+        await shutdown.quit(0);
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        expect(exits, isEmpty, reason: 'the 100 ms fallback does not run while the game has its 300 ms to save');
+        expect(starts.last.signals, [ProcessSignal.sigterm]);
+        await until(() => exits.isNotEmpty);
+        expect(starts.last.signals, [ProcessSignal.sigterm, ProcessSignal.sigkill], reason: 'ended after the grace');
       },
       skip: Platform.isWindows ? 'Windows asks with taskkill' : null,
     );

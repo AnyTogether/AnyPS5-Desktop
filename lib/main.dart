@@ -204,6 +204,8 @@ Future<void> main(List<String> arguments) async {
       // The game is asked to close and given time to save, then ffmpeg, the relinker and the
       // rest end with the launcher.
       await model.endChildProcesses();
+      // A Quit's fallback timer starts here, not before: the game's time to save is not counted.
+      shutdown.childrenEnded();
       // Only now: the question, the "Cancel and quit" seconds and the game's closing do not count
       // against the runner's five seconds for a shutdown that hangs.
       await window.armExitWatchdog();
