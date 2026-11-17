@@ -6,9 +6,13 @@ import 'package:anyps5_desktop/core/gamepad/pad_navigation.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_client.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_protocol.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
+import 'package:anyps5_desktop/ui/background.dart';
+import 'package:anyps5_desktop/ui/components.dart';
+import 'package:anyps5_desktop/ui/home.dart';
 import 'package:anyps5_desktop/ui/retro_host/retro_host_game.dart';
 import 'package:anyps5_desktop/ui/retro_host/retro_option_sections.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
@@ -645,6 +649,188 @@ void main() {
     await pumpEventQueue();
     expect(model.retroPlay, isNull);
     expect(launcher.session.startArgs, isNull, reason: 'start is never sent for a start given up');
+  });
+
+  testWidgets('the home screen rests under a game in the host: its background and focus ring are still', (
+    tester,
+  ) async {
+    launcher = Ps1Launcher();
+    final model = launcher.model..setRetroHostPs1(true);
+    ArtworkImage.readSynchronously = true;
+    await tester.runAsync(ThemeBackground.preload);
+    Widget home() => Directionality(
+      textDirection: TextDirection.ltr,
+      child: Backdrop(model: model),
+    );
+    bool still() => tester.widget<ThemeBackground>(find.byType(ThemeBackground)).paused;
+    await tester.pumpWidget(home());
+    expect(still(), isFalse);
+    expect(model.homeRingMoves, isTrue);
+
+    await tester.runAsync(launcher.start);
+    await tester.pumpWidget(home());
+    expect(model.gamePlaying, isTrue);
+    expect(still(), isTrue);
+    expect(model.homeRingMoves, isFalse);
+
+    await tester.runAsync(model.closeRetroGame);
+    await tester.pumpWidget(home());
+    expect(still(), isFalse, reason: 'the library is back');
+    expect(model.homeRingMoves, isTrue);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  test('a status that says nothing new changes nothing in the launcher; the menu follows one that does', () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model..setRetroHostPs1(true);
+    await launcher.start(status: menuStatus());
+    var heard = 0;
+    model.addListener(() => heard++);
+    for (var asked = 0; asked < 4; asked++) {
+      launcher.session.nextStatus = menuStatus();
+      await launcher.play.host.refresh();
+    }
+    expect(heard, 0, reason: 'a game that plays on is not the launcher rebuilt twice a second');
+
+    launcher.session.nextStatus = menuStatus(busy: true);
+    await launcher.play.host.refresh();
+    expect(heard, 0, reason: "with no menu open, only the game's own screen follows the host");
+
+    model.openRetroMenu();
+    await pumpEventQueue();
+    heard = 0;
+    launcher.session.nextStatus = menuStatus();
+    await launcher.play.host.refresh();
+    expect(heard, 1, reason: 'the open menu shows that the disc change ended');
+    expect(launcher.row('disc-1').detail, isNull);
+    model.resumeRetroGame();
+    await pumpEventQueue();
+
+    heard = 0;
+    launcher.session.nextStatus = fakeStatus(ended: true, errorCode: RetroErrorCode.disc);
+    await launcher.play.host.refresh();
+    expect(heard, greaterThan(0), reason: "a game that stopped on an error is the launcher's change");
+    expect(launcher.play.problem, 'retroHostDiscDetail');
+  });
+
+  test('the host is looked for once, not on every use', () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model..setRetroHostPs1(true);
+    final found = model.retroHostInstall;
+    expect(found, isNotNull);
+    File(launcher.host).deleteSync();
+    expect(model.retroHostInstall, same(found));
+    expect(model.playsInHost(RetroPlatform.ps1), isTrue);
+  });
+
+  test("quitting shuts the game's host down, which stops the game and writes its memory cards", () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model..setRetroHostPs1(true);
+    await launcher.start();
+    final session = launcher.session;
+    await model.shutDownRetroHosts();
+    expect(session.shutdownAsked, isTrue, reason: 'protocol.md "shutdown": the host stops its game as stop does');
+    expect(session.closed, isTrue);
+    expect(model.retroHostKeeper.holding, isFalse);
+  });
+
+  test('quitting shuts a kept host down', () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model..setRetroHostPs1(true);
+    model.select(model.games.indexOf(launcher.game));
+    await launcher.start();
+    await model.closeRetroGame();
+    expect(model.retroHostKeeper.holding, isTrue);
+    await model.shutDownRetroHosts();
+    expect(launcher.session.shutdownAsked, isTrue);
+    expect(launcher.session.closed, isTrue);
+    expect(model.retroHostKeeper.holding, isFalse);
+  });
+
+  test('quitting while Close Game still waits on the host shuts it down, not kept', () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model..setRetroHostPs1(true);
+    model.select(model.games.indexOf(launcher.game));
+    await launcher.start();
+    final session = launcher.session;
+    final gate = session.callGate = Completer<void>();
+    final closing = model.closeRetroGame();
+    await pumpEventQueue();
+    final quitting = model.shutDownRetroHosts();
+    gate.complete();
+    await Future.wait([closing, quitting]);
+    expect(session.shutdownAsked, isTrue);
+    expect(session.closed, isTrue);
+    expect(model.retroHostKeeper.holding, isFalse, reason: 'a host told to shut down is not kept for a next game');
+    expect(model.retroPlay, isNull);
+  });
+
+  test('quitting waits only a short while for a host that does not exit', () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model..setRetroHostPs1(true);
+    await launcher.start();
+    final session = launcher.session..exitsOnShutdown = false;
+    final waited = Stopwatch()..start();
+    await model.shutDownRetroHosts(limit: const Duration(milliseconds: 50));
+    expect(session.shutdownAsked, isTrue);
+    expect(session.closed, isFalse, reason: 'the host has not exited');
+    expect(waited.elapsed, lessThan(RetroHostPlaying.quitLimit));
+    session.endedCompleter.complete(RetroHostEnd.clean);
+    await pumpEventQueue();
+  });
+
+  test('a game with no BIOS offers the BIOS folder on its error screen', () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model..setRetroHostPs1(true);
+    await launcher.start();
+    launcher.session.nextStatus = fakeStatus(ended: true, errorCode: RetroErrorCode.bios);
+    await launcher.play.host.refresh();
+    model.handle(Command.options);
+    expect(launcher.fixture.folders, [model.paths.retroSystem]);
+    expect(model.retroPlay, isNotNull, reason: 'the error screen stays');
+  });
+
+  test('another error has no folder to open', () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model..setRetroHostPs1(true);
+    await launcher.start();
+    launcher.session.nextStatus = fakeStatus(ended: true, errorCode: RetroErrorCode.disc);
+    await launcher.play.host.refresh();
+    model.handle(Command.options);
+    expect(launcher.fixture.folders, isEmpty);
+    expect(model.retroPlay, isNotNull);
+  });
+
+  test('Screenshot and Share say they are not there yet for a game in the host', () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model..setRetroHostPs1(true);
+    await launcher.start();
+    expect(await model.takeScreenshot(), isNull);
+    expect(model.toast, T.text('retroHostNoCapture'));
+    model.show('something else');
+    expect(await model.saveClip(), isNull);
+    expect(model.toast, T.text('retroHostNoCapture'));
+  });
+
+  test("the loading line is the host's own words in English and the launcher's in other languages", () {
+    launcher = Ps1Launcher();
+    const status = RetroStatus(
+      ready: false,
+      ended: false,
+      error: '',
+      errorCode: '',
+      progressLabel: 'Compiling shaders',
+      progressPercent: 40,
+    );
+    expect(retroLoadingText(status), 'Compiling shaders');
+    expect(retroLoadingText(null), T.text('retroHostLoading'));
+    try {
+      T.language = Language.byCode('tr');
+      expect(T.language.code, 'tr');
+      expect(retroLoadingText(status), T.text('retroHostLoading'));
+    } finally {
+      T.language = Language.english;
+    }
   });
 }
 

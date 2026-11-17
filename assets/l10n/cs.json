@@ -2453,6 +2453,7 @@
   "retroHostOutdatedDetail": "Tento hostitel emulátoru neodpovídá tomuto spouštěči. Je potřeba ho aktualizovat.",
   "retroHostNotStartedDetail": "Hostitele emulátoru nelze spustit.",
   "retroHostCardUnreadable": "Paměťovou kartu této hry nelze přečíst, takže se její uložené pozice neukládají. Soubor karty zůstává beze změny.",
+  "retroHostNoCapture": "Snímky obrazovky a klipy zatím nejsou pro hry PS1 v hostiteli emulátoru dostupné.",
   "retroMenuVolume": "Hlasitost",
   "retroMenuMute": "Ztlumit",
   "retroMenuDiscInsertedDetail": "V konzoli.",

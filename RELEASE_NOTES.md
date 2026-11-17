@@ -11,6 +11,27 @@ section is copied into the release.
 
 Nothing yet.
 
+## 0.1.25
+
+- **The focus ring on the home tiles now has the console's glint and halo.** A brighter glint
+  travels slowly around the focused tile's ring while the halo around it breathes, and the ring
+  closes in with a small settle as it lands. The ring itself stays as visible as before (full width,
+  at least 90 % white). It only moves on the home screen while nothing else needs the computer: it
+  rests while a game starts or runs, with a layer open, and with reduced motion, the system's
+  animation setting or the low-power dimming. Everywhere else the same ring stands still. Thanks to
+  Lenny4250gh, who built this.
+- **The launcher opens with the console's start animation.** A dark screen with a soft spotlight and
+  four breathing dots fades away as the tiles pop in one after the other, then the top bar, the
+  selected game's details and the button hints come in. It plays once per run, the first time you
+  see the home screen (after "Who's playing?" if it asks), never with a game starting or running,
+  and not with Reduce motion on in the launcher or in the system. A key, a button or a click
+  finishes it at once. Thanks to Lenny4250gh, who built this.
+- **The Windows launcher no longer ships a library that needs Visual Studio.** The clip player's
+  video package put a zlib.dll built against the Visual C++ debug runtime beside the launcher.
+  Nothing used it, but it could only be loaded on a PC with Visual Studio. It is left out of the
+  release and the installer deletes the copy an older release left; every build checks that no
+  program or library in it needs the debug runtime. Thanks to B-Howell, who found and fixed it.
+
 ## 0.1.24
 
 - **The previous game stays in view on the home screen.** The game before the selected one stays

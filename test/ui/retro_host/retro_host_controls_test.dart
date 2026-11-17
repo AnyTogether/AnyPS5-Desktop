@@ -113,6 +113,24 @@ void main() {
     expect(session.inputStates.last, (1, RetroPadInput.idle));
   });
 
+  test('a connectedPorts the host did not take is asked again', () async {
+    await started();
+    session.callResults['connectedPorts'] = false;
+    pads
+      ..connect('a')
+      ..connect('b');
+    controls.poll();
+    controls.poll();
+    expect(session.calls, [('connectedPorts', 2)], reason: 'not asked again while the call waits');
+    await pumpEventQueue();
+    session.callResults['connectedPorts'] = true;
+    controls.poll();
+    expect(session.calls, [('connectedPorts', 2), ('connectedPorts', 2)]);
+    await pumpEventQueue();
+    controls.poll();
+    expect(session.calls, hasLength(2), reason: 'taken: not asked again');
+  });
+
   test('a game started with two controllers connects port 2 as soon as it loads', () async {
     pads
       ..connect('a')

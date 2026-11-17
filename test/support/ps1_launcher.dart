@@ -6,6 +6,7 @@ import 'package:anyps5_desktop/core/host.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_install.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_protocol.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_release.dart';
+import 'package:anyps5_desktop/core/retro_host/retro_host_store.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -57,7 +58,7 @@ class Ps1Launcher {
   /// release build has it.
   static Future<Ps1Launcher> withRelease({FakeRetroHostSession? session, Uri? retroHostApi}) async {
     final launcher = Ps1Launcher._(hostFound: true, release: true, session: session, retroHostApi: retroHostApi);
-    await installRetroHostFixture(launcher.model.retroHostDownload.store.folder);
+    await installRetroHostFixture(RetroHostStore(launcher.model.paths.retroHost).folder);
     return launcher;
   }
 

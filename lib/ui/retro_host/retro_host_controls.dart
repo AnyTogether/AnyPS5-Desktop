@@ -91,6 +91,10 @@ class RetroHostControls {
   /// The `connectedPorts` the host has: 1 for a game that has not loaded yet ("A game starts
   /// with 1"), unknown (null) for one that was loaded before these controls, so it is sent.
   int? _portsSent;
+
+  /// The `connectedPorts` asked last and not answered yet. A count is the host's only once it
+  /// says it took it, so a call that failed is asked again by the next read.
+  int? _portsAsked;
   bool _suspended = false;
   bool _disposed = false;
 
@@ -146,10 +150,7 @@ class RetroHostControls {
       return;
     }
     final count = seats.connectedPorts;
-    if (count != _portsSent) {
-      _portsSent = count;
-      unawaited(game.connectedPorts(count));
-    }
+    if (count != (_portsAsked ?? _portsSent)) unawaited(_sendPorts(count));
     for (var port = 0; port < RetroSeats.portCount; port++) {
       final now = held[port];
       final input = now == null ? RetroPadInput.idle : now.withButtons(now.buttons & ~_swallowed[port]);
@@ -164,6 +165,13 @@ class RetroHostControls {
         rightY: input.rightY,
       );
     }
+  }
+
+  Future<void> _sendPorts(int count) async {
+    _portsAsked = count;
+    final taken = await game.connectedPorts(count);
+    if (_portsAsked == count) _portsAsked = null;
+    if (taken && !_disposed && game.loaded) _portsSent = count;
   }
 
   /// Seats the controllers connected now, and lets go of what a leaving one had.

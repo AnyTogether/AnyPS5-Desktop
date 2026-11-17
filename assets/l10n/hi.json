@@ -2453,6 +2453,7 @@
   "retroHostOutdatedDetail": "यह एमुलेटर होस्ट इस लॉन्चर से मेल नहीं खाता। इसे अपडेट करना होगा।",
   "retroHostNotStartedDetail": "एमुलेटर होस्ट शुरू नहीं हो सका।",
   "retroHostCardUnreadable": "इस गेम का मेमोरी कार्ड पढ़ा नहीं जा सका, इसलिए इसकी सेव नहीं रखी जा रहीं। कार्ड की फ़ाइल जैसी है वैसी छोड़ दी गई है।",
+  "retroHostNoCapture": "एमुलेटर होस्ट में PS1 गेम के लिए स्क्रीनशॉट और क्लिप अभी उपलब्ध नहीं हैं।",
   "retroMenuVolume": "वॉल्यूम",
   "retroMenuMute": "म्यूट",
   "retroMenuDiscInsertedDetail": "कंसोल में।",

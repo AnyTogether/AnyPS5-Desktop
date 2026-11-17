@@ -2453,6 +2453,7 @@
   "retroHostOutdatedDetail": "Este host de emulación no coincide con este lanzador. Hay que actualizarlo.",
   "retroHostNotStartedDetail": "No se pudo iniciar el host de emulación.",
   "retroHostCardUnreadable": "No se pudo leer la tarjeta de memoria de este juego, así que sus partidas no se guardan. El archivo de la tarjeta se deja como está.",
+  "retroHostNoCapture": "Las capturas y los clips aún no están disponibles para los juegos de PS1 en el host de emulación.",
   "retroMenuVolume": "Volumen",
   "retroMenuMute": "Silenciar",
   "retroMenuDiscInsertedDetail": "En la consola.",

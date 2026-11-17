@@ -109,7 +109,7 @@ class _LauncherShellState extends State<LauncherShell> {
       _recent.add(timing.buildDuration, timing.rasterDuration);
     }
     // Only Glass's own frames count: not while a game shares the GPU, nor once it is solid.
-    if (model.look != LookStyle.glass || model.solidGlass || model.running != null || model.resting) {
+    if (model.look != LookStyle.glass || model.solidGlass || model.gamePlaying || model.resting) {
       _raster.reset();
       return;
     }

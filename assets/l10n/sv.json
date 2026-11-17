@@ -2453,6 +2453,7 @@
   "retroHostOutdatedDetail": "Den här emulatorvärden passar inte ihop med det här startprogrammet. Den behöver uppdateras.",
   "retroHostNotStartedDetail": "Emulatorvärden kunde inte startas.",
   "retroHostCardUnreadable": "Det här spelets minneskort kunde inte läsas, så dess sparningar behålls inte. Kortets fil lämnas som den är.",
+  "retroHostNoCapture": "Skärmdumpar och klipp finns ännu inte för PS1-spel i emulatorvärden.",
   "retroMenuVolume": "Volym",
   "retroMenuMute": "Ljud av",
   "retroMenuDiscInsertedDetail": "I konsolen.",

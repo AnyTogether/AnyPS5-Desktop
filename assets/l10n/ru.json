@@ -2453,6 +2453,7 @@
   "retroHostOutdatedDetail": "Этот хост эмуляции не соответствует этому лаунчеру. Его нужно обновить.",
   "retroHostNotStartedDetail": "Не удалось запустить хост эмуляции.",
   "retroHostCardUnreadable": "Не удалось прочитать карту памяти этой игры, поэтому её сохранения не записываются. Файл карты остаётся без изменений.",
+  "retroHostNoCapture": "Снимки экрана и клипы пока недоступны для игр PS1 в хосте эмуляции.",
   "retroMenuVolume": "Громкость",
   "retroMenuMute": "Без звука",
   "retroMenuDiscInsertedDetail": "В консоли.",

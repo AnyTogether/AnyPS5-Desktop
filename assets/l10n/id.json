@@ -2453,6 +2453,7 @@
   "retroHostOutdatedDetail": "Host emulator ini tidak cocok dengan peluncur ini. Host perlu diperbarui.",
   "retroHostNotStartedDetail": "Host emulator tidak dapat dimulai.",
   "retroHostCardUnreadable": "Kartu memori game ini tidak dapat dibaca, jadi progresnya tidak disimpan. File kartu dibiarkan apa adanya.",
+  "retroHostNoCapture": "Tangkapan layar dan klip belum tersedia untuk game PS1 di host emulator.",
   "retroMenuVolume": "Volume",
   "retroMenuMute": "Bisukan",
   "retroMenuDiscInsertedDetail": "Di dalam konsol.",

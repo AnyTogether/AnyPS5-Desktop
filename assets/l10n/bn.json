@@ -2453,6 +2453,7 @@
   "retroHostOutdatedDetail": "এই এমুলেটর হোস্ট এই লঞ্চারের সঙ্গে মেলে না। এটি আপডেট করতে হবে।",
   "retroHostNotStartedDetail": "এমুলেটর হোস্ট শুরু করা যায়নি।",
   "retroHostCardUnreadable": "এই গেমের মেমরি কার্ড পড়া যায়নি, তাই এর সেভ রাখা হচ্ছে না। কার্ডের ফাইলটি যেমন ছিল তেমনই রাখা হয়েছে।",
+  "retroHostNoCapture": "এমুলেটর হোস্টে PS1 গেমের জন্য স্ক্রিনশট ও ক্লিপ এখনও পাওয়া যায় না।",
   "retroMenuVolume": "ভলিউম",
   "retroMenuMute": "নিঃশব্দ",
   "retroMenuDiscInsertedDetail": "কনসোলে আছে।",

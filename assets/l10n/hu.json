@@ -2453,6 +2453,7 @@
   "retroHostOutdatedDetail": "Ez az emulátor-gazdaprogram nem illik ehhez az indítóprogramhoz. Frissíteni kell.",
   "retroHostNotStartedDetail": "Az emulátor-gazdaprogramot nem sikerült elindítani.",
   "retroHostCardUnreadable": "A játék memóriakártyája nem olvasható, ezért a mentései nem maradnak meg. A kártya fájlja változatlan marad.",
+  "retroHostNoCapture": "Az emulátor-gazdaprogramban futó PS1-játékokhoz még nem érhető el képernyőkép és klip.",
   "retroMenuVolume": "Hangerő",
   "retroMenuMute": "Némítás",
   "retroMenuDiscInsertedDetail": "A konzolban.",

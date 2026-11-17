@@ -34,13 +34,14 @@ class RetroPlayView extends StatelessWidget {
                 text: T.text(problem),
                 accent: model.accentChoice.color,
                 action: T.text('retroHostBack'),
+                optionsAction: problem == retroHostBiosProblem ? T.text('retroHostBiosFolder') : null,
               )
             else if (play.loading && !play.closing)
               RetroGameNotice(
                 key: const ValueKey('retro-loading'),
                 name: play.game.name,
                 icon: play.game.icon,
-                text: status?.progressLabel ?? T.text('retroHostLoading'),
+                text: retroLoadingText(status),
                 accent: model.accentChoice.color,
                 progress: status?.progressPercent == null ? null : status!.progressPercent! / 100,
                 working: true,
@@ -65,6 +66,7 @@ class RetroGameNotice extends StatelessWidget {
     this.progress,
     this.working = false,
     this.action,
+    this.optionsAction,
   });
 
   final String name;
@@ -80,6 +82,9 @@ class RetroGameNotice extends StatelessWidget {
 
   /// The words of the hint that goes on (Enter, Cross).
   final String? action;
+
+  /// The words of the hint beside it that does something else (O, Triangle).
+  final String? optionsAction;
 
   @override
   Widget build(BuildContext context) {
@@ -123,7 +128,16 @@ class RetroGameNotice extends StatelessWidget {
             ],
             if (action != null) ...[
               SizedBox(height: 28 * scale),
-              Hint(keys: 'Enter', glyph: PadGlyph.cross, label: action!, action: HintAction.select),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Hint(keys: 'Enter', glyph: PadGlyph.cross, label: action!, action: HintAction.select),
+                  if (optionsAction != null) ...[
+                    SizedBox(width: 28 * scale),
+                    Hint(keys: 'O', glyph: PadGlyph.triangle, label: optionsAction!, action: HintAction.options),
+                  ],
+                ],
+              ),
             ],
           ],
         ),
