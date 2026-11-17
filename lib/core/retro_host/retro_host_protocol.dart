@@ -2,6 +2,8 @@
 /// docs/protocol.md), as the launcher's client checks them.
 library;
 
+import 'dart:convert';
+
 /// The other side broke a rule that protocol.md "Protocol errors" lists. The launcher kills the
 /// host and handles it as a host failure.
 class RetroProtocolError implements Exception {
@@ -247,6 +249,10 @@ class RetroStatus {
     'cardUnreadable': cardUnreadable,
     'discs': ?discs?.toJson(),
   };
+
+  /// Whether [other] says the same as this status, field by field, as protocol.md "status" writes
+  /// it (the order of the options too, which is the menu's order).
+  bool sameAs(RetroStatus other) => identical(this, other) || jsonEncode(toJson()) == jsonEncode(other.toJson());
 
   /// The four fields protocol.md "Host failure" gives for a status the client made.
   Map<String, Object?> toFailureJson() => {'ready': ready, 'ended': ended, 'error': error, 'errorCode': errorCode};

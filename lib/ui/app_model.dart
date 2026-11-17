@@ -58,7 +58,7 @@ import '../core/prepare_queue.dart';
 import '../core/relinker_flags.dart';
 import '../core/retro_host/retro_host_client.dart' show RetroHostClient, RetroHostEnd;
 import '../core/retro_host/retro_host_install.dart';
-import '../core/retro_host/retro_host_protocol.dart' show RetroErrorCode, RetroOption;
+import '../core/retro_host/retro_host_protocol.dart' show RetroErrorCode, RetroOption, RetroStatus;
 import '../core/retro_host/retro_host_session.dart' show RetroHostSession, RetroHostStartRequest;
 import '../core/retro_host/retro_keyboard.dart';
 import '../core/remote/adb_tunnel.dart';
@@ -2377,6 +2377,11 @@ class AppModel extends ChangeNotifier {
   /// Something outside the model changed what the screen shows.
   void refresh() => _changed();
 
+  /// Only the screen shows something new (the rows of a PS1 game's menu): drawn again, without
+  /// what [_changed] does for a change of the launcher's state (the phones' library, every
+  /// game's state).
+  void _redraw() => notifyListeners();
+
   final AppPaths paths;
 
   /// Replaced by another profile's when that profile plays (profiles_model.dart).
@@ -2747,6 +2752,14 @@ class AppModel extends ChangeNotifier {
   @visibleForTesting
   final retroHostKeeper = RetroHostKeeper();
 
+  /// The host this build may run, where one is found (only debug builds, for now): looked for
+  /// once, as the environment that names it does not change while the launcher runs.
+  late final RetroHostInstall? retroHostInstall = RetroHostInstall.locate(
+    services.environment ?? Platform.environment,
+    debug: kDebugMode,
+    system: HostSystem.current,
+  );
+
   /// How often a PS1 game in the host is asked its `status`; tests ask by hand.
   @visibleForTesting
   Duration retroStatusEvery = const Duration(milliseconds: 500);
@@ -2810,11 +2823,15 @@ class AppModel extends ChangeNotifier {
       glassFallback ||
       (backdrop.kind.seeThrough && preferences.glassTransparency == 0);
 
+  /// A game plays: one the launcher started, or a PS1 game in the emulator host over the home
+  /// screen. The home screen rests under it, as the GPU is the game's.
+  bool get gamePlaying => running != null || retroPlay != null;
+
   /// The home tiles' focus ring may move: only when nothing else needs the computer, as with the
-  /// background (no game starting or running, the launcher in front, no layer open) and not with
+  /// background (no game starting or playing, the launcher in front, no layer open) and not with
   /// reduced motion or the low-power dimming.
   bool get homeRingMoves =>
-      running == null &&
+      !gamePlaying &&
       starting == null &&
       overlay == null &&
       !resting &&
@@ -5792,7 +5809,7 @@ class AppModel extends ChangeNotifier {
   /// The game's window now, into its gallery (Share held); the picture's path.
   Future<String?> takeScreenshot() async {
     final playing = running;
-    if (playing == null) return null;
+    if (playing == null) return _noRetroCapture();
     final (game, run) = playing;
     final frame = await desktop.captureGame(run.pid);
     if (frame == null) {
@@ -5819,7 +5836,7 @@ class AppModel extends ChangeNotifier {
   /// buffer off, a screenshot.
   Future<String?> saveClip() async {
     final playing = running;
-    if (playing == null) return null;
+    if (playing == null) return _noRetroCapture();
     final buffer = _replay;
     if (buffer == null || !buffer.running) return takeScreenshot();
     final saved = await buffer.save(Screenshots.clipPath(picturesFolder, playing.$1, DateTime.now()));
@@ -5832,6 +5849,12 @@ class AppModel extends ChangeNotifier {
       ),
     );
     return saved;
+  }
+
+  /// No capture: a PS1 game in the emulator host has none yet, which the player is told.
+  String? _noRetroCapture() {
+    if (retroPlay != null) show(T.text('retroHostNoCapture'));
+    return null;
   }
 
   static String replayLengthText(int seconds) =>

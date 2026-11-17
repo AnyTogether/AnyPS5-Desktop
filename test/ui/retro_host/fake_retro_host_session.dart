@@ -89,6 +89,9 @@ class FakeRetroHostSession extends FakeFrameSource implements RetroHostSession {
   Object? statusError;
   RetroStatus? stopStatus = const RetroStatus(ready: true, ended: true, error: '', errorCode: '');
   bool shutdownAsked = false;
+
+  /// Whether the host exits when it is told to shut down; false for one that never does.
+  bool exitsOnShutdown = true;
   bool closed = false;
   final _rumble = StreamController<RetroRumble>.broadcast(sync: true);
 
@@ -155,7 +158,7 @@ class FakeRetroHostSession extends FakeFrameSource implements RetroHostSession {
   @override
   void shutdown() {
     shutdownAsked = true;
-    if (!endedCompleter.isCompleted) endedCompleter.complete(RetroHostEnd.clean);
+    if (exitsOnShutdown && !endedCompleter.isCompleted) endedCompleter.complete(RetroHostEnd.clean);
   }
 
   @override

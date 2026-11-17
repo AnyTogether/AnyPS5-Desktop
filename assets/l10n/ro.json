@@ -2437,6 +2437,7 @@
   "retroHostOutdatedDetail": "Această gazdă de emulare nu se potrivește cu acest lansator. Trebuie actualizată.",
   "retroHostNotStartedDetail": "Gazda de emulare nu a putut fi pornită.",
   "retroHostCardUnreadable": "Cardul de memorie al acestui joc nu a putut fi citit, așa că salvările sale nu sunt păstrate. Fișierul cardului rămâne neschimbat.",
+  "retroHostNoCapture": "Capturile de ecran și clipurile nu sunt încă disponibile pentru jocurile PS1 din gazda de emulare.",
   "retroMenuVolume": "Volum",
   "retroMenuMute": "Fără sunet",
   "retroMenuDiscInsertedDetail": "În consolă.",

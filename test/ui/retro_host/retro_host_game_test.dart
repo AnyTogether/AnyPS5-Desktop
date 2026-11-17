@@ -80,6 +80,43 @@ void main() {
     expect(game.aspect, 1.5);
   });
 
+  test('the same status asked again tells no one; a status that says something new does', () async {
+    await started();
+    final playing = RetroStatus.parse(jsonDecode(_protocolStatus) as Map<String, Object?>);
+    session.nextStatus = playing;
+    await game.refresh();
+    var heard = 0;
+    game.addListener(() => heard++);
+    for (var asked = 0; asked < 3; asked++) {
+      session.nextStatus = RetroStatus.parse(jsonDecode(_protocolStatus) as Map<String, Object?>);
+      await game.refresh();
+    }
+    expect(heard, 0, reason: 'a game that plays on with the same status rebuilds nothing');
+    final changing = jsonDecode(_protocolStatus) as Map<String, Object?>;
+    (changing['discs']! as Map<String, Object?>)['busy'] = true;
+    session.nextStatus = RetroStatus.parse(changing);
+    await game.refresh();
+    expect(heard, 1);
+    session.nextStatus = fakeStatus(aspect: 1.5);
+    await game.refresh();
+    expect(heard, 2);
+    await game.refresh();
+    expect(heard, 2);
+  });
+
+  test('a loading game that loads on with the same status tells no one until it is ready', () async {
+    await started(status: fakeStatus(ready: false));
+    var heard = 0;
+    game.addListener(() => heard++);
+    await game.refresh();
+    await game.refresh();
+    expect(heard, 0);
+    session.nextStatus = fakeStatus();
+    await game.refresh();
+    expect(game.phase, RetroHostGamePhase.playing);
+    expect(heard, 1);
+  });
+
   test('input reaches the host only while a game is loaded and the window has focus', () async {
     game.input(0, 1);
     await started(status: fakeStatus());

@@ -89,10 +89,10 @@ class Backdrop extends StatelessWidget {
         }
       }
     }
-    // Still while a game runs (in front or not: the GPU is the game's), while the launcher is not
-    // in front, under a layer and with reduced motion.
+    // Still while a game plays (in front or not, in the emulator host too: the GPU is the game's),
+    // while the launcher is not in front, under a layer and with reduced motion.
     final still =
-        model.running != null || model.resting || model.preferences.reducedMotion || covered || (glass && artwork);
+        model.gamePlaying || model.resting || model.preferences.reducedMotion || covered || (glass && artwork);
     final animation = ThemeBackground(style: model.look, palette: model.palette, paused: still, time: time);
     // The user's own picture or video (Appearance › Background, or the theme's), else the animation.
     final own = model.ownBackground;
@@ -130,7 +130,7 @@ class Backdrop extends StatelessWidget {
                         time == null &&
                         !covered &&
                         !glass &&
-                        model.running == null &&
+                        !model.gamePlaying &&
                         !model.resting,
                   )
                 : const SizedBox.expand(),

@@ -2437,6 +2437,7 @@
   "retroHostOutdatedDetail": "یہ ایمولیٹر ہوسٹ اس لانچر سے مطابقت نہیں رکھتا۔ اسے اپ ڈیٹ کرنے کی ضرورت ہے۔",
   "retroHostNotStartedDetail": "ایمولیٹر ہوسٹ شروع نہیں ہو سکا۔",
   "retroHostCardUnreadable": "اس گیم کا میموری کارڈ پڑھا نہیں جا سکا، اس لیے اس کی سیوز محفوظ نہیں ہو رہیں۔ کارڈ کی فائل جیسی ہے ویسی چھوڑ دی گئی ہے۔",
+  "retroHostNoCapture": "ایمولیٹر ہوسٹ میں PS1 گیمز کے لیے اسکرین شاٹس اور کلپس ابھی دستیاب نہیں ہیں۔",
   "retroMenuVolume": "والیوم",
   "retroMenuMute": "خاموش",
   "retroMenuDiscInsertedDetail": "کنسول میں۔",

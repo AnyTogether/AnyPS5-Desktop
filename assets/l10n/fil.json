@@ -2437,6 +2437,7 @@
   "retroHostOutdatedDetail": "Hindi tugma ang emulator host na ito sa launcher na ito. Kailangan itong i-update.",
   "retroHostNotStartedDetail": "Hindi masimulan ang emulator host.",
   "retroHostCardUnreadable": "Hindi mabasa ang memory card ng larong ito, kaya hindi naiimbak ang progreso nito. Hindi ginagalaw ang file ng card.",
+  "retroHostNoCapture": "Wala pang screenshot at clip para sa mga PS1 game sa emulator host.",
   "retroMenuVolume": "Volume",
   "retroMenuMute": "I-mute",
   "retroMenuDiscInsertedDetail": "Nasa console.",

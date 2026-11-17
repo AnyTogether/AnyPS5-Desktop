@@ -2437,6 +2437,7 @@
   "retroHostOutdatedDetail": "Cet hôte d’émulation ne correspond pas à ce lanceur. Il doit être mis à jour.",
   "retroHostNotStartedDetail": "L’hôte d’émulation n’a pas pu être démarré.",
   "retroHostCardUnreadable": "La carte mémoire de ce jeu n'a pas pu être lue, ses sauvegardes ne sont donc pas conservées. Le fichier de la carte reste tel quel.",
+  "retroHostNoCapture": "Les captures d’écran et les clips ne sont pas encore disponibles pour les jeux PS1 dans l’hôte d’émulation.",
   "retroMenuVolume": "Volume",
   "retroMenuMute": "Couper le son",
   "retroMenuDiscInsertedDetail": "Dans la console.",

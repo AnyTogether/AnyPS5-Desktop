@@ -80,11 +80,12 @@ void main() {
     await expectLater(shell, matchesGoldenFile('goldens/retro_host_loading_en.png'));
   });
 
-  testWidgets('stopped: no BIOS, and the way back to the library', (tester) async {
+  testWidgets('stopped: no BIOS, the way back to the library, and the BIOS folder', (tester) async {
     await playing(tester, status: fakeStatus(ready: false, ended: true, errorCode: RetroErrorCode.bios), frame: false);
     expect(find.byKey(const ValueKey('retro-error')), findsOneWidget);
     expect(find.text('Night Racer stopped'), findsOneWidget);
     expect(find.text(T.text('retroHostBiosDetail')), findsOneWidget);
+    expect(find.text(T.text('retroHostBiosFolder')), findsOneWidget);
     await expectLater(shell, matchesGoldenFile('goldens/retro_host_error_bios_en.png'));
   });
 

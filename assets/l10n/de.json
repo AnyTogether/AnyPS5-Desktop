@@ -2437,6 +2437,7 @@
   "retroHostOutdatedDetail": "Dieser Emulator-Host passt nicht zu diesem Launcher. Er muss aktualisiert werden.",
   "retroHostNotStartedDetail": "Der Emulator-Host konnte nicht gestartet werden.",
   "retroHostCardUnreadable": "Die Memory Card dieses Spiels konnte nicht gelesen werden, daher werden seine Spielstände nicht gespeichert. Die Kartendatei bleibt unverändert.",
+  "retroHostNoCapture": "Screenshots und Clips gibt es für PS1-Spiele im Emulator-Host noch nicht.",
   "retroMenuVolume": "Lautstärke",
   "retroMenuMute": "Stummschalten",
   "retroMenuDiscInsertedDetail": "In der Konsole.",

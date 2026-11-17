@@ -41,6 +41,9 @@ class RetroPlay {
   /// The section of the menu shown, or null for the menu's first page.
   RetroOptionSection? menuSection;
 
+  /// The phase and the problem the launcher last acted on ([RetroHostPlaying._retroChanged]).
+  (RetroHostGamePhase, String?)? _seen;
+
   bool _released = false;
 
   /// Lets go of the controllers, the menu and the host, once, whoever asks first: Close Game, or
@@ -75,12 +78,20 @@ String? retroHostProblem(RetroHostGame host) {
   return retroHostErrorKey(status.errorCode) ?? (host.failure == null ? null : 'retroHostOtherDetail');
 }
 
+/// The problem of a game that found no BIOS it can use: its error screen offers the BIOS folder.
+const retroHostBiosProblem = 'retroHostBiosDetail';
+
+/// The loading screen's line: the host's own words for what it loads (`status.progressLabel`)
+/// where the launcher speaks English, as the host's are English; the launcher's otherwise.
+String retroLoadingText(RetroStatus? status) =>
+    (T.language.code == Language.english.code ? status?.progressLabel : null) ?? T.text('retroHostLoading');
+
 /// The words for a status's `errorCode` (protocol.md "status", its `errorCode` table, and "Host
 /// failure"): null for `""`, a game stopped without an error. A code this launcher does not know
 /// is "a game that ended with an error" (protocol.md "Compatibility").
 String? retroHostErrorKey(String errorCode) => switch (errorCode) {
   RetroErrorCode.none => null,
-  RetroErrorCode.bios => 'retroHostBiosDetail',
+  RetroErrorCode.bios => retroHostBiosProblem,
   RetroErrorCode.disc => 'retroHostDiscDetail',
   RetroErrorCode.core => 'retroHostCoreDetail',
   RetroErrorCode.stalled => 'retroHostStalledDetail',
@@ -112,13 +123,6 @@ const retroMenuSections = {
 /// window through the emulator host, with the launcher's controllers and keyboard, and the game's
 /// menu on PS.
 extension RetroHostPlaying on AppModel {
-  /// The host this build may run, where one is found (only debug builds, for now).
-  RetroHostInstall? get retroHostInstall => RetroHostInstall.locate(
-    services.environment ?? Platform.environment,
-    debug: kDebugMode,
-    system: HostSystem.current,
-  );
-
   /// Whether [platform]'s discs play in the emulator host: PS1, with the setting on and a host
   /// found. Otherwise they go to the emulator chosen in Settings › Emulators, as before.
   bool playsInHost(RetroPlatform platform) =>
@@ -152,12 +156,21 @@ extension RetroHostPlaying on AppModel {
           id: 'retro-host-bios',
           title: T.text('retroHostBiosFolder'),
           detail: T.text('retroHostBiosFolderDetail'),
-          kind: ActionRow(() {
-            Directory(paths.retroSystem).createSync(recursive: true);
-            services.openFolder?.call(paths.retroSystem);
-          }),
+          kind: ActionRow(openRetroBiosFolder),
         ),
     ];
+  }
+
+  /// The folder the host looks for the PS1 BIOS in, made if it is not there yet, opened in the
+  /// system's file manager.
+  void openRetroBiosFolder() {
+    try {
+      Directory(paths.retroSystem).createSync(recursive: true);
+    } on FileSystemException catch (error) {
+      _padLog?.call('emulator host: no BIOS folder: $error');
+      return;
+    }
+    services.openFolder?.call(paths.retroSystem);
   }
 
   /// Starts [game]'s PS1 disc in a new emulator host and shows it in the launcher's window.
@@ -247,7 +260,9 @@ extension RetroHostPlaying on AppModel {
 
   /// The game moved on: a memory card the host cannot read is said once; a game that ended
   /// without an error, and was not closed by the player, goes back to the library; one with an
-  /// error stays on its error screen.
+  /// error stays on its error screen. The launcher's state changes only with the game's phase or
+  /// problem. Anything else (a loading step, the discs, an option) is shown by the game's own
+  /// screen, which follows the host itself (RetroPlayView), and by its menu while it is open.
   void _retroChanged() {
     final play = retroPlay;
     if (play == null || _disposed) return;
@@ -255,6 +270,12 @@ extension RetroHostPlaying on AppModel {
       play.cardWarned = true;
       show(T.text('retroHostCardUnreadable'));
     }
+    final seen = (play.host.phase, play.problem);
+    if (seen == play._seen) {
+      if (overlay == Layer.retroMenu) _redraw();
+      return;
+    }
+    play._seen = seen;
     if (play.host.phase == RetroHostGamePhase.ended && !play.closing) {
       if (!play.over) {
         play.endedAt = DateTime.now();
@@ -350,10 +371,13 @@ extension RetroHostPlaying on AppModel {
       return command == Command.previousGame || command == Command.nextGame;
     }
     if (overlay != null) return false;
-    if (play.problem != null) {
+    if (play.problem case final problem?) {
       if (command == Command.select || command == Command.back || command == Command.home) {
         sounds.play(Cue.back);
         unawaited(closeRetroGame());
+      } else if (command == Command.options && problem == retroHostBiosProblem) {
+        sounds.play(Cue.select);
+        openRetroBiosFolder();
       }
       return true;
     }
@@ -525,6 +549,25 @@ extension RetroHostPlaying on AppModel {
         selectedGame?.retro?.platform == RetroPlatform.ps1 &&
         playsInHost(RetroPlatform.ps1);
     if (!wanted) unawaited(retroHostKeeper.shutdown());
+  }
+
+  /// How long quitting the launcher waits for the emulator hosts to save and exit: under
+  /// LauncherShutdown.fallbackAfter, which ends the process anyway.
+  static const quitLimit = Duration(seconds: 3);
+
+  /// The launcher is quitting (the exit request in lib/main.dart, which every close goes
+  /// through): every emulator host is shut down, the game's and the kept one, and waited for up
+  /// to [limit]. A host told to shut down stops its game as `stop` does, its memory cards written
+  /// (protocol.md "shutdown"). Without this a Windows host would go with the launcher's job object
+  /// unsaved. On Linux a host still there when the launcher has gone gets SIGTERM
+  /// (PR_SET_PDEATHSIG), which it handles like `shutdown`.
+  Future<void> shutDownRetroHosts({Duration limit = quitLimit}) async {
+    final hosts = Future.wait([if (retroPlay case final play?) play.host.shutdown(), retroHostKeeper.shutdown()]);
+    try {
+      await hosts.timeout(limit);
+    } on TimeoutException {
+      _padLog?.call('emulator host: not exited ${limit.inMilliseconds} ms after shutdown; the launcher quits');
+    }
   }
 
   /// The launcher goes: the game's controllers and menu let go, and its host is shut down.
