@@ -72,7 +72,6 @@ final class _Win32 {
     );
     getDC = user.lookupFunction<_H Function(_H), int Function(int)>('GetDC');
     releaseDC = user.lookupFunction<Int32 Function(_H, _H), int Function(int, int)>('ReleaseDC');
-    getSystemMetrics = user.lookupFunction<Int32 Function(Int32), int Function(int)>('GetSystemMetrics');
     printWindow = user.lookupFunction<Int32 Function(_H, _H, Uint32), int Function(int, int, int)>('PrintWindow');
     registerClassEx = user.lookupFunction<Uint16 Function(Pointer<Uint8>), int Function(Pointer<Uint8>)>(
       'RegisterClassExW',
@@ -169,7 +168,6 @@ final class _Win32 {
   late final int Function(int, int) monitorFromWindow;
   late final int Function(int, Pointer<Uint32>) getMonitorInfo;
   late final int Function(int) getDC;
-  late final int Function(int) getSystemMetrics;
   late final int Function(int, int) releaseDC;
   late final int Function(int, int, int) printWindow;
   late final int Function(Pointer<Uint8>) registerClassEx;
@@ -657,15 +655,26 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
     var processEnded = false;
     unawaited(exited?.then<void>((_) => processEnded = true, onError: (Object _) => processEnded = true));
     try {
-      // Kick off a full-monitor snapshot while the window opens, so toImage is not after the
-      // game is already visible. If metrics or the boundary are not ready, the wait path below
-      // still takes a snapshot as before — the fade must not be skipped.
-      Future<RgbaImage?>? early;
-      final primary = _primaryScreen();
-      if (primary != null) {
-        final pw = primary[2] - primary[0];
-        final ph = primary[3] - primary[1];
-        if (pw > 0 && ph > 0) early = cover(pw, ph);
+      // Snapshot the cover as soon as we can (launcher monitor) so the layered window is ready
+      // the moment the game window appears. Waiting for the window first left a gap of a few
+      // hundred ms in which the desktop / taskbar / game window flashed (the flicker reported
+      // when the cover hands over for the fade).
+      final launcher = _launcher;
+      final earlyScreens = launcher != 0 ? _screenOf(launcher) : null;
+      RgbaImage? prepared;
+      List<int>? preparedScreen;
+      if (earlyScreens != null) {
+        final (_, screen) = earlyScreens;
+        final w = screen[2] - screen[0];
+        final h = screen[3] - screen[1];
+        if (w > 0 && h > 0) {
+          prepared = await cover(w, h);
+          if (prepared != null && prepared.width == w && prepared.height == h) {
+            preparedScreen = screen;
+          } else {
+            prepared = null;
+          }
+        }
       }
 
       final window = await _waitForWindow(
@@ -682,16 +691,15 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
       final height = screen[3] - screen[1];
       if (width <= 0 || height <= 0) return false;
 
-      RgbaImage? image;
-      if (early != null) {
-        final prepared = await early;
-        if (prepared != null) {
-          image = (prepared.width == width && prepared.height == height)
-              ? prepared
-              : cropCentered(prepared, width, height);
-        }
-      }
-      if (image == null || image.width != width || image.height != height) {
+      RgbaImage? image = prepared;
+      if (image == null ||
+          preparedScreen == null ||
+          preparedScreen[0] != screen[0] ||
+          preparedScreen[1] != screen[1] ||
+          preparedScreen[2] != screen[2] ||
+          preparedScreen[3] != screen[3]) {
+        // Different monitor (or no early snapshot): take one now. Still much shorter than the
+        // old path because the cover has already been painted for a while.
         image = await cover(width, height);
       }
       if (image == null || image.width != width || image.height != height) return false;
@@ -706,11 +714,13 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
         image,
         (elapsed) {
           if (releaseAt == null) {
+            // The window is looked for a few times a second only: it lists every window.
             if (elapsed - checkedAt >= const Duration(milliseconds: 250)) {
               checkedAt = elapsed;
               windowGone = windowOf(pid) == 0;
             }
             if (windowGone) {
+              // The game closed: the picture only goes.
               releaseAt = elapsed;
             } else if (released || elapsed >= coverHoldLimit) {
               releaseAt = elapsed + coverSettle;
@@ -723,19 +733,8 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
         onShown: onCovered,
       );
     } on Object {
+      // Whatever went wrong, the game starts as it did without the picture.
       return false;
-    }
-  }
-
-  /// The primary monitor as left, top, right, bottom. Null if the metrics are unavailable.
-  List<int>? _primaryScreen() {
-    try {
-      final cx = _w.getSystemMetrics(0); // SM_CXSCREEN
-      final cy = _w.getSystemMetrics(1); // SM_CYSCREEN
-      if (cx <= 0 || cy <= 0) return null;
-      return [0, 0, cx, cy];
-    } on Object {
-      return null;
     }
   }
 
@@ -794,13 +793,15 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
           shown = true;
           _w.showWindow(window, 4 /* SW_SHOWNOACTIVATE */);
           _w.setWindowPos(window, _topmost, 0, 0, 0, 0, _noMove | _noSize | _noActivate | _showWindow);
+          // Tell the Flutter side the moment the layered window is on screen, so its own cover
+          // can drop with no gap (and no flash of the taskbar / desktop underneath).
+          if (!told) {
+            told = true;
+            onShown?.call();
+          }
         }
         _pumpCard(message);
         await Future<void>.delayed(const Duration(milliseconds: 16));
-        if (shown && !told) {
-          told = true;
-          onShown?.call();
-        }
       }
       return true;
     } finally {
