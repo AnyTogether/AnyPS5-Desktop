@@ -32,6 +32,15 @@ class StartCoverLayer extends StatelessWidget {
           duration: leaves,
           switchOutCurve: Curves.easeIn,
           layoutBuilder: uniqueSwitcherLayout(),
+          // Cover appears at full opacity so the black base covers the home immediately
+          // (no semi-transparent home UI bleeding through during the entrance). The inner
+          // TweenAnimationBuilder still fades/zooms the artwork. Only the switch-out fades.
+          transitionBuilder: (child, animation) {
+            final opacity = animation.status == AnimationStatus.reverse
+                ? animation
+                : const AlwaysStoppedAnimation(1.0);
+            return FadeTransition(opacity: opacity, child: child);
+          },
           child: game == null
               ? const SizedBox.shrink(key: ValueKey('no cover'))
               : _CoverBody(key: ValueKey(game.id), game: game, accent: model.accentChoice.color),
