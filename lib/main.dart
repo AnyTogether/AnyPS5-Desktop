@@ -21,6 +21,7 @@ import 'core/desktop/windows_desktop.dart';
 import 'core/controllers/pad_reader.dart';
 import 'core/controllers/troubleshooter.dart';
 import 'core/app_update.dart';
+import 'core/child_processes.dart';
 import 'core/ffmpeg_download.dart' show FfmpegBuild;
 import 'core/host.dart';
 import 'core/opened_files.dart';
@@ -107,7 +108,10 @@ Future<void> main(List<String> arguments) async {
     health: health,
     beforeClose: () => watch?.closing(),
     closeWindow: window.close,
-    exit: exit,
+    exit: (code) {
+      ChildProcesses.killAll();
+      exit(code);
+    },
   );
   void closing() {
     watch?.closing();
@@ -197,6 +201,12 @@ Future<void> main(List<String> arguments) async {
       closing();
       // A PS1 game in the emulator host is saved first: the host stops it and exits.
       await model.shutDownRetroHosts();
+      // The game is asked to close and given time to save, then ffmpeg, the relinker and the
+      // rest end with the launcher.
+      await model.endChildProcesses();
+      // Only now: the question, the "Cancel and quit" seconds and the game's closing do not count
+      // against the runner's five seconds for a shutdown that hangs.
+      await window.armExitWatchdog();
       return AppExitResponse.exit;
     },
   );

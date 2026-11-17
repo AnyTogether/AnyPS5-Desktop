@@ -61,16 +61,26 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
       ::TranslateMessage(&msg);
       ::DispatchMessage(&msg);
     }
+    ShutdownLog("main: the message loop ended");
     run_marker = window.run_marker();
+    StartExitWatchdog(run_marker);
     // The window (and Flutter with it) goes here, while COM is still there for the plugins
     // that shut down with it.
   }
 
+  ShutdownLog("main: the window and Flutter are gone");
   ::CoUninitialize();
   // A clean close: the launcher's marker of this run goes, so the next start finds no crash.
   // A crash anywhere before this line leaves it, and the next start offers a report.
   if (!run_marker.empty()) {
     ::DeleteFileW(run_marker.c_str());
   }
+  // The window, Flutter and Dart are closed, the preferences are written, Now playing and COM
+  // are released and the marker is gone: what Windows would still do once this function
+  // returns (the C runtime's exit handlers, unloading the DLLs, the plugins' global
+  // destructors) is of no use, and has been seen to hang, leaving a window-less AnyPS5 process
+  // in the background. The process ends here instead.
+  ShutdownLog("main: ending the process");
+  ::TerminateProcess(::GetCurrentProcess(), EXIT_SUCCESS);
   return EXIT_SUCCESS;
 }

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import '../child_processes.dart';
 import '../desktop/desktop.dart';
 import '../host.dart';
 import '../replay_buffer.dart' show ProcessStarter;
@@ -43,7 +44,7 @@ class RemotePlayStream {
     this.wayland,
     ProcessStarter? start,
     this.log,
-  }) : _start = start ?? ((executable, arguments) => Process.start(executable, arguments));
+  }) : _start = start ?? ((executable, arguments) => ChildProcesses.start(executable, arguments));
 
   final String ffmpeg;
   final HostSystem system;

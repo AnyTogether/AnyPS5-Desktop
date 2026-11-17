@@ -150,6 +150,33 @@ void main() {
       await until(() => model.running == null);
       expect(starts.last.signals, [ProcessSignal.sigterm]);
     });
+
+    test(
+      'the launcher closing asks the game to close first and ends it only after the grace',
+      () async {
+        starts = FakeGameStarts(() => FakeGameProcess(ignoresTerm: true));
+        model.startGame = starts.call;
+        model.primaryAction(orbit);
+        await until(() => model.running != null);
+        final ending = model.endChildProcesses();
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        expect(starts.last.signals, [ProcessSignal.sigterm], reason: 'asked to close, not ended within the grace');
+        await ending;
+        expect(starts.last.signals, [ProcessSignal.sigterm, ProcessSignal.sigkill]);
+      },
+      skip: Platform.isWindows ? 'Windows asks with taskkill' : null,
+    );
+
+    test(
+      'the launcher closing leaves a game that closes by itself with the one request',
+      () async {
+        model.primaryAction(orbit);
+        await until(() => model.running != null);
+        await model.endChildProcesses();
+        expect(starts.last.signals, [ProcessSignal.sigterm]);
+      },
+      skip: Platform.isWindows ? 'Windows asks with taskkill' : null,
+    );
   });
 
   group('the engine built before a game plays', () {

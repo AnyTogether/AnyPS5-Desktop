@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import '../child_processes.dart';
 import '../desktop/desktop.dart' show ScreenArea;
 import '../host.dart';
 import '../replay_buffer.dart' show ProcessRunner, ProcessStarter;
@@ -146,7 +147,7 @@ class WaylandCapture {
     bool Function(String path)? exists,
     Directory Function()? newFolder,
   }) : _run = run ?? ((executable, arguments) => Process.run(executable, arguments)),
-       _start = start ?? ((executable, arguments) => Process.start(executable, arguments)),
+       _start = start ?? ((executable, arguments) => ChildProcesses.start(executable, arguments)),
        _exists = exists ?? ((path) => FileSystemEntity.typeSync(path) != FileSystemEntityType.notFound),
        _newFolder = newFolder ?? (() => Directory.systemTemp.createTempSync('anyps5-wayland-'));
 

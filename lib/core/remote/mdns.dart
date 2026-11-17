@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import '../child_processes.dart';
+
 /// DNS record types the responder knows.
 abstract final class DnsType {
   static const a = 1;
@@ -434,7 +436,7 @@ class AvahiAdvertiser implements ServiceAdvertiser {
 
   @override
   Future<void> start() async {
-    _process = await Process.start(tool, ['-s', instance, serviceType, '$port']);
+    _process = await ChildProcesses.start(tool, ['-s', instance, serviceType, '$port']);
     unawaited(_process!.stdout.drain<void>());
     unawaited(_process!.stderr.drain<void>());
   }

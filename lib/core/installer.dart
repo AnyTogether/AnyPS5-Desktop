@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:crypto/crypto.dart';
 
 import 'binary.dart';
+import 'child_processes.dart';
 import 'file_links.dart';
 import 'free_space.dart';
 import 'game_library.dart';
@@ -1335,7 +1336,7 @@ class Installer {
     _checkCancelled();
     final Process process;
     try {
-      process = await Process.start(
+      process = await ChildProcesses.start(
         tool,
         arguments,
         workingDirectory: workingDirectory,

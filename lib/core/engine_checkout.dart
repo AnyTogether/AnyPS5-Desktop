@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'child_processes.dart';
 import 'host.dart';
 
 /// A git checkout of the AnyPS5 engine's source (upstream's tree or AnyPS5-ARM's) chosen as the
@@ -222,7 +223,9 @@ abstract class CommandRunner {
   const CommandRunner();
 
   /// Runs [executable] in [workingDirectory] and returns its exit code. Throws ProcessException
-  /// when it cannot start (not installed); [cancel] stops it and its children.
+  /// when it cannot start (not installed); [cancel] stops it and its children. With
+  /// [endsWithLauncher] false the program is left to finish when the launcher closes (a package
+  /// manager installing Git, a move to the Trash), instead of ending with it.
   Future<int> run(
     String executable,
     List<String> arguments, {
@@ -230,6 +233,7 @@ abstract class CommandRunner {
     Map<String, String>? environment,
     void Function(String line)? onLine,
     CommandCancel? cancel,
+    bool endsWithLauncher = true,
   });
 }
 
@@ -245,12 +249,14 @@ class SystemCommands extends CommandRunner {
     Map<String, String>? environment,
     void Function(String line)? onLine,
     CommandCancel? cancel,
+    bool endsWithLauncher = true,
   }) async {
-    final process = await Process.start(
+    final process = await ChildProcesses.start(
       executable,
       arguments,
       workingDirectory: workingDirectory,
       environment: environment,
+      endsWithLauncher: endsWithLauncher,
     );
     final forget = cancel?.listen(() => unawaited(_stop(process)));
     try {
@@ -841,6 +847,7 @@ class EngineGit {
         missing: GitFailureKind.prerequisites,
         onLine: onLine,
         cancel: cancel,
+        endsWithLauncher: false,
       );
       return code == 0;
     } on GitUpdateFailure {
@@ -896,6 +903,7 @@ class EngineGit {
     void Function(String line)? onLine,
     CommandCancel? cancel,
     bool quiet = false,
+    bool endsWithLauncher = true,
   }) async {
     if (cancel?.cancelled ?? false) throw const GitUpdateFailure(GitFailureKind.cancelled);
     final lines = <String>[];
@@ -908,6 +916,7 @@ class EngineGit {
         workingDirectory: checkout.root,
         environment: environment ?? (_path == null ? null : _pathEnvironment),
         cancel: cancel,
+        endsWithLauncher: endsWithLauncher,
         onLine: (line) {
           lines.add(line);
           if (quiet) return;

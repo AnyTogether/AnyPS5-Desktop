@@ -110,6 +110,8 @@ class LinuxTrash extends Trash {
           [...arguments, path, if (tool != 'gio') 'trash:/'],
           workingDirectory: p.dirname(path),
           onLine: lines.add,
+          // Moving to the Trash is finished even when the launcher closes meanwhile.
+          endsWithLauncher: false,
         );
         if (code == 0 && FileSystemEntity.typeSync(path, followLinks: false) == FileSystemEntityType.notFound) {
           return const Trashed();

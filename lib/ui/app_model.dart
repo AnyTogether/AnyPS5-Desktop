@@ -15,6 +15,7 @@ import '../core/capture/game_sound.dart';
 import '../core/capture/screen_cast_portal.dart';
 import '../core/capture/video_encoders.dart';
 import '../core/capture/wayland_capture.dart';
+import '../core/child_processes.dart';
 import '../core/audio/audio_out.dart';
 import '../core/audio/interface_sounds.dart';
 import '../core/audio/theme_music.dart';
@@ -5524,14 +5525,41 @@ class AppModel extends ChangeNotifier {
     (services.quit ?? exit)(code);
   }
 
-  /// Quit AnyPS5 (the home menu): the game playing closes with it.
+  /// Quit AnyPS5 (the home menu): the game playing closes with it, asked to as its window would
+  /// be and given time to save: the window's close that follows ends in [endChildProcesses].
   void quitLauncher() {
     _exitApproved = true;
-    stopGame();
     unawaited(_stopReplay());
     unawaited(discord.close());
     unawaited(nowPlaying.close());
     (services.quit ?? exit)(0);
+  }
+
+  /// The launcher is closing: the game playing is asked to close as its window would (as Close
+  /// Game does: taskkill without /F on Windows, SIGTERM on Linux) and has [stopGrace] to save,
+  /// then it is ended. Stop's TerminateProcess would leave it no time. The replay buffer, Remote
+  /// Play and a broadcast end next, and ChildProcesses ends what is left (the relinker, an
+  /// engine build, a program of a program).
+  Future<void> endChildProcesses() async {
+    try {
+      final playing = running;
+      if (playing != null) {
+        final run = playing.$2;
+        _stopped = true;
+        _stopTimer?.cancel();
+        _stopTimer = null;
+        await run.close();
+        await run.exitCode.timeout(stopGrace, onTimeout: () {
+          run.kill();
+          return -1;
+        });
+      }
+      media.dispose();
+      await _stopReplay().timeout(const Duration(seconds: 3), onTimeout: () {});
+    } on Object {
+      // What is left goes below.
+    }
+    ChildProcesses.killAll();
   }
 
   // Captures: Share, the replay buffer, screenshots.
