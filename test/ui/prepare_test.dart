@@ -200,6 +200,11 @@ void main() {
       await until(() => model.prepare.paused);
       model.cancelUnlock(neon);
       await until(() => !model.prepare.paused);
+      // It goes on where it was, maybe still writing the executable it unwraps on another
+      // isolate: it ends before the folder goes, as dispose only asks it to stop.
+      model.cancelUnlock(comet);
+      await until(() => model.prepare.active == null);
+      expect(model.stateOf(comet), isA<Locked>());
     }, skip: Platform.isWindows ? 'the fake relinker is a shell script' : false);
 
     test('Play on a game being prepared makes it the user\'s own; Cancel unlock gives it up', () async {
