@@ -65,9 +65,9 @@ void main() {
     expect((row('defaultVsync').kind as ToggleRow).value, isTrue);
     expect(model.preferences.displayDefaults, const DisplayDefaults());
     expect(
-      model.preferences.toJson()['displayDefaults'],
-      {'fullscreen': true, 'windowSize': 75, 'vsync': true},
-      reason: 'written in every file, so a file without it is an older launcher\'s',
+      model.preferences.toJson().containsKey('displayDefaults'),
+      isFalse,
+      reason: 'built-in defaults are not written',
     );
   });
 
@@ -218,7 +218,7 @@ void main() {
       final full = GameSettings.fromJson(const {'fullscreen': true, 'windowSize': 75, 'vsync': true, 'overlay': 'off'});
       const defaults = DisplayDefaults();
       expect(window.withDefaults(defaults).fullscreen, isFalse, reason: 'own Window choice kept');
-      expect(full.withDefaults(const DisplayDefaults.window()).fullscreen, isTrue);
+      expect(full.withDefaults(const DisplayDefaults(fullscreen: false)).fullscreen, isTrue);
       expect(window.followingDisplayDefaults().withDefaults(const DisplayDefaults(fullscreen: true)).fullscreen, isTrue, reason: 'Use defaults is the way back');
     });
   });

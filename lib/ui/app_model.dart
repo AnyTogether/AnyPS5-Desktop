@@ -242,7 +242,7 @@ class Preferences {
         if (id is String) id,
     }
     ..prepareNewGames = json['prepareNewGames'] as bool? ?? true
-    ..displayDefaults = DisplayDefaults.inPreferences(json)
+    ..displayDefaults = DisplayDefaults.fromJson(json['displayDefaults'])
     ..launcherFullscreen = json['launcherFullscreen'] as bool?
     ..windowButtons = json['windowButtons'] as bool? ?? true
     ..pauseOnMenu = json['pauseOnMenu'] as bool? ?? true
@@ -558,8 +558,7 @@ class Preferences {
     'assistPlayerOne': assistPlayerOne,
     'cjkGames': cjkGames.toList()..sort(),
     'prepareNewGames': prepareNewGames,
-    // Always written: a file without it is an older launcher's, whose games opened in a window.
-    'displayDefaults': displayDefaults.toJson(),
+    if (!displayDefaults.isBuiltIn) 'displayDefaults': displayDefaults.toJson(),
     'launcherFullscreen': launcherFullscreen,
     'windowButtons': windowButtons,
     'pauseOnMenu': pauseOnMenu,
@@ -3115,10 +3114,12 @@ class AppModel extends ChangeNotifier {
 
   void _changed() {
     // A menu opened over the cover (the PS button): the cover is drawn above the overlays, so it
-    // goes instead of hiding a menu that still takes the presses.
-    if (overlay != null && starting == null && coverGame != null) {
+    // goes instead of hiding a menu that still takes the presses. During the Windows layered
+    // hand-off coverGame is already null; completing _coverDismissed still releases the picture.
+    if (overlay != null && starting == null && _coverDismissed != null) {
       coverGame = null;
-      _coverDismissed?.complete();
+      final dismissed = _coverDismissed;
+      if (dismissed != null && !dismissed.isCompleted) dismissed.complete();
     }
     if (launcherProblem != null) offerLauncherReport();
     // The small Cancel went away (the unlock ended): a focus on it goes back to the main button,
@@ -5622,10 +5623,10 @@ class AppModel extends ChangeNotifier {
     (services.quit ?? exit)(code);
   }
 
-  /// Quit AnyPS5 (the home menu): the game playing closes with it.
+  /// Quit AnyPS5 (the home menu): the game playing closes with it, asked to as its window would
+  /// be and given time to save: the window's close that follows ends in [endChildProcesses].
   void quitLauncher() {
     _exitApproved = true;
-    stopGame();
     unawaited(_stopReplay());
     unawaited(discord.close());
     unawaited(nowPlaying.close());
@@ -5658,8 +5659,6 @@ class AppModel extends ChangeNotifier {
     }
     ChildProcesses.killAll();
   }
-
-
 
   // Captures: Share, the replay buffer, screenshots.
 
@@ -7499,7 +7498,8 @@ class AppModel extends ChangeNotifier {
             set: (value) => change(settings.copyWith(windowSize: value)),
           ),
         ),
-      // Only in full screen: a window has no jump to hide, so there the cover goes without a fade.
+      // Cover while the game opens: in full screen it can fade over the game; in a window it
+      // stays on the home screen until the display step finishes.
       PanelRow(
           id: 'startAnimation',
           title: T.text('startAnimation'),

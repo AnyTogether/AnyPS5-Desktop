@@ -465,10 +465,6 @@ StickModifier = KEY:F24
       expect(DisplayDefaults.fromJson(const {'windowSize': 1}).windowSize, 30);
       expect(const DisplayDefaults().isBuiltIn, isTrue);
       expect(defaults.isBuiltIn, isFalse);
-      expect(const DisplayDefaults.window(), const DisplayDefaults(fullscreen: false));
-      expect(DisplayDefaults.inPreferences(const {'theme': 1}), const DisplayDefaults.window());
-      expect(DisplayDefaults.inPreferences({'displayDefaults': defaults.toJson()}), defaults);
-      expect(DisplayDefaults.inPreferences(const {'displayDefaults': 'nonsense'}), const DisplayDefaults());
     });
 
     test('read from the launcher\'s preferences file; built-in when it is missing or broken', () {
@@ -481,7 +477,7 @@ StickModifier = KEY:F24
       File(file).writeAsStringSync('{"theme":1,"displayDefaults":{"fullscreen":true}}');
       expect(DisplayDefaults.load(file), const DisplayDefaults(fullscreen: true));
       File(file).writeAsStringSync('{"theme":1}');
-      expect(DisplayDefaults.load(file), const DisplayDefaults.window(), reason: 'an older launcher\'s file: Window');
+      expect(DisplayDefaults.load(file), const DisplayDefaults(), reason: 'no displayDefaults key: built-in');
     });
   });
 

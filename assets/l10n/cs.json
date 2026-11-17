@@ -1423,7 +1423,7 @@
   "launcherVolumeDetail": "Vše, co spouštěč přehrává: jeho zvuky a hudba. 0 % je ticho; hry si ponechají vlastní hlasitost.",
   "start": "Spustit",
   "startAnimation": "Úvodní animace",
-  "startAnimationDetail": "Na celé obrazovce se hra otevře z obalu, který se nad hrou pozvolna ztratí. Při vypnutí nebo v okně obal zmizí hned, jakmile hra začne.",
+  "startAnimationDetail": "Zatímco se hra načítá, obal zůstane. Na celou obrazovku pak zmizí přes hru, v okně na domovské obrazovce. Vypnuto: žádný obal.",
   "startFailed": "Hru se nepodařilo spustit",
   "starting": "Spouštění…",
   "status": "Stav",

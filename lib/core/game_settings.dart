@@ -32,13 +32,9 @@ enum Upscaler { bilinear, fsr1 }
 
 /// Settings › Default Display: how a game starts that made no display choice of its own (Game
 /// Settings › Display, Window Size and Vertical Sync left at Default). The built-in values are
-/// the ones a game starts with when nothing was chosen: windowed at 75%.
+/// the ones every game started with before there were defaults.
 class DisplayDefaults {
   const DisplayDefaults({this.fullscreen = false, this.windowSize = 75, this.vsync = true, this.startAnimation = true});
-
-  /// What a launcher that saved its preferences before full screen became the default has: the
-  /// games it started opened in a window, so they still do until Default Display is changed.
-  const DisplayDefaults.window() : this(fullscreen: false);
 
   /// A value missing or of the wrong kind is the built-in one.
   factory DisplayDefaults.fromJson(Object? json) {
@@ -55,20 +51,13 @@ class DisplayDefaults {
 
   static const minimumWindowSize = 30;
 
-  /// The defaults in a preferences file's JSON. The launcher writes `displayDefaults` in every file
-  /// it saves, so a file without it is an older launcher's, written when games opened in a
-  /// window: those keep opening in a window ([DisplayDefaults.window]) instead of switching to
-  /// the new full-screen default. Only a first start, with no file, begins in full screen.
-  static DisplayDefaults inPreferences(Map<dynamic, dynamic> json) =>
-      json.containsKey('displayDefaults') ? DisplayDefaults.fromJson(json['displayDefaults']) : const DisplayDefaults.window();
-
   /// The defaults the launcher saved in its preferences file (`displayDefaults`), for a game
-  /// started without the launcher's window (the command line): as [inPreferences] says for a
-  /// file; the built-in ones (full screen) when there is no file or it cannot be read.
+  /// started without the launcher's window (the command line); the built-in ones when there are
+  /// none or the file cannot be read.
   static DisplayDefaults load(String preferencesFile) {
     try {
       final json = jsonDecode(File(preferencesFile).readAsStringSync());
-      return json is Map ? inPreferences(json) : const DisplayDefaults();
+      return DisplayDefaults.fromJson(json is Map ? json['displayDefaults'] : null);
     } on Object {
       return const DisplayDefaults();
     }
@@ -80,8 +69,8 @@ class DisplayDefaults {
   final int windowSize;
   final bool vsync;
 
-  /// Whether a game that starts in full screen opens from its cover, which then fades away over
-  /// the game. Only full screen has it: a window has no jump to hide.
+  /// Whether a game opens from its cover while it loads. In full screen the cover can fade over
+  /// the game; in a window it stays on the launcher home until the display step finishes.
   final bool startAnimation;
 
   bool get isBuiltIn => this == const DisplayDefaults();
@@ -162,13 +151,13 @@ class GameSettings {
     var windowSize = (json['windowSize'] as num?)?.toInt();
     var vsync = json['vsync'] is bool ? json['vsync'] as bool : null;
     if ((json['settingsVersion'] as num? ?? 1) < version) {
-      // A file from before the defaults wrote every display key, changed or not: a window size
-      // or vertical sync equal to the old built-in one was most likely never chosen, so it
-      // follows the defaults. Full screen is kept as written: the built-in is now full screen
-      // and the old one was windowed, and a file cannot say "Window chosen" from "never
-      // touched", so a `false` stays the game's own choice rather than silently switching.
+      // A file from before the defaults wrote every display key, changed or not: a value that
+      // is the old built-in one was most likely never chosen, so it follows the defaults (which
+      // start as those same values: nothing changes until they do). Windowed with a size of its
+      // own was chosen, though.
       const builtIn = DisplayDefaults();
       if (windowSize == builtIn.windowSize) windowSize = null;
+      if (fullscreen == builtIn.fullscreen && windowSize == null) fullscreen = null;
       if (vsync == builtIn.vsync) vsync = null;
     }
     return GameSettings(

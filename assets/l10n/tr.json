@@ -1423,7 +1423,7 @@
   "launcherVolumeDetail": "Başlatıcının çaldığı her şey: arayüz sesleri ve müzik. %0 sessizdir; oyunların sesi değişmez.",
   "start": "Başla",
   "startAnimation": "Başlangıç animasyonu",
-  "startAnimationDetail": "Oyun yüklenirken kapağı ekranda kalır. Tam ekranda kapak oyunun üzerinde solar; pencerede ana ekranda solar. Kapalıysa kapak yok.",
+  "startAnimationDetail": "Oyun yüklenirken kapağı ekranda kalır. Tam ekranda kapak oyunun üzerinde, pencerede ana ekranda solar. Kapalıysa kapak gösterilmez.",
   "startFailed": "Oyun başlatılamadı",
   "starting": "Başlatılıyor…",
   "status": "Durum",

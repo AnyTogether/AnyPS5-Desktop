@@ -1423,7 +1423,7 @@
   "launcherVolumeDetail": "Alt startprogrammet spiller av: lydene og musikken. 0 % er stille; spill beholder sin egen lydstyrke.",
   "start": "Start",
   "startAnimation": "Startanimasjon",
-  "startAnimationDetail": "I fullskjerm åpnes et spill fra omslaget sitt, som tones ut over spillet. Slått av, eller i et vindu, forsvinner omslaget så snart spillet har startet.",
+  "startAnimationDetail": "Mens et spill lastes, blir omslaget stående. I fullskjerm fades det ut over spillet, i vindu på startskjermen. Av: ingen omslag.",
   "startFailed": "Spillet kunne ikke starte",
   "starting": "Starter …",
   "status": "Status",
