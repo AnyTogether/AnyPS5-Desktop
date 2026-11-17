@@ -1422,6 +1422,8 @@
   "launcherVolume": "Volumen del lanzador",
   "launcherVolumeDetail": "Todo lo que reproduce el lanzador: sus sonidos y su música. 0 % es silencio; los juegos mantienen su propio volumen.",
   "start": "Iniciar",
+  "startAnimation": "Animación de inicio",
+  "startAnimationDetail": "En pantalla completa, el juego se abre desde su carátula, que se desvanece sobre el juego. Desactivada, o en una ventana, la carátula desaparece en cuanto el juego ha arrancado.",
   "startFailed": "No se pudo iniciar el juego",
   "starting": "Iniciando…",
   "status": "Estado",

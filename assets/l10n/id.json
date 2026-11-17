@@ -1422,6 +1422,8 @@
   "launcherVolume": "Volume peluncur",
   "launcherVolumeDetail": "Semua yang diputar peluncur: suara dan musiknya. 0% berarti senyap; game tetap memakai volumenya sendiri.",
   "start": "Mulai",
+  "startAnimation": "Animasi mulai",
+  "startAnimationDetail": "Dalam layar penuh, gim terbuka dari sampulnya, lalu sampul memudar di atas gim. Saat mati atau dalam jendela, sampul hilang begitu gim dimulai.",
   "startFailed": "Permainan tidak dapat dimulai",
   "starting": "Mulai…",
   "status": "Status",

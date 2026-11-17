@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:anyps5_desktop/core/game_library.dart';
@@ -50,36 +51,45 @@ void main() {
     model.open(Layer.gameSettings);
   }
 
-  test('the Settings section starts as games always started: windowed at 75%, vertical sync on', () {
+  test('the Settings section starts in full screen, vertical sync on', () {
     openDefaults();
     final category = model.panelCategories()[model.panelCategory];
     expect(category.title, T.text('displayDefaults'));
-    expect(category.rows.map((row) => row.id), ['defaultDisplay', 'defaultWindowSize', 'defaultVsync']);
-    expect((row('defaultDisplay').kind as ChoiceRow).selected, 0);
-    expect((row('defaultWindowSize').kind as StepperRow).value, 75);
+    expect(
+      category.rows.map((row) => row.id),
+      ['defaultDisplay', 'defaultStartAnimation', 'defaultVsync'],
+      reason: 'no size in full screen, but the start animation',
+    );
+    expect((row('defaultDisplay').kind as ChoiceRow).selected, 1);
+    expect(model.preferences.displayDefaults.windowSize, 75);
     expect((row('defaultVsync').kind as ToggleRow).value, isTrue);
     expect(model.preferences.displayDefaults, const DisplayDefaults());
-    expect(model.preferences.toJson().containsKey('displayDefaults'), isFalse, reason: 'nothing written until changed');
+    expect(
+      model.preferences.toJson()['displayDefaults'],
+      {'fullscreen': true, 'windowSize': 75, 'vsync': true},
+      reason: 'written in every file, so a file without it is an older launcher\'s',
+    );
   });
 
   test('a controller changes the defaults like any other row: ✕ to edit, → to change', () {
     openDefaults();
     expect(model.panelCategories()[model.panelCategory].rows[model.panelRow].id, 'defaultDisplay');
     pads.press(PadButton.south);
-    pads.press(PadButton.dpadRight);
-    expect(model.preferences.displayDefaults.fullscreen, isTrue);
+    pads.press(PadButton.dpadLeft);
+    expect(model.preferences.displayDefaults.fullscreen, isFalse);
     pads.press(PadButton.south);
-    expect(hasRow('defaultWindowSize'), isFalse, reason: 'full screen has no window size');
+    expect(hasRow('defaultWindowSize'), isTrue, reason: 'windowed has a size');
+    pads.press(PadButton.dpadDown);
     pads.press(PadButton.dpadDown);
     expect(model.panelCategories()[model.panelCategory].rows[model.panelRow].id, 'defaultVsync');
     pads.press(PadButton.south);
     expect(model.preferences.displayDefaults.vsync, isFalse);
-    expect(model.preferences.toJson()['displayDefaults'], {'fullscreen': true, 'windowSize': 75, 'vsync': false});
+    expect(model.preferences.toJson()['displayDefaults'], {'fullscreen': false, 'windowSize': 75, 'vsync': false});
     expect(Preferences.fromJson(model.preferences.toJson()).displayDefaults, model.preferences.displayDefaults);
   });
 
   test('a game with no choice of its own follows the defaults; its own choice wins', () {
-    model.preferences.displayDefaults = const DisplayDefaults(fullscreen: true, vsync: false);
+    model.preferences.displayDefaults = const DisplayDefaults(vsync: false);
     final following = model.launchSettings(orbit());
     expect(following.fullscreen, isTrue);
     expect(following.vsync, isFalse);
@@ -145,8 +155,7 @@ void main() {
     expect(model.launchSettings(orbit()).vsync, isFalse);
   });
 
-  test('a game started with the defaults opens the way they say', () async {
-    model.preferences.displayDefaults = const DisplayDefaults(fullscreen: true);
+  test('a game started with no choice anywhere opens in full screen', () async {
     final installed = Installer.installedFolder(orbit(), model.root!);
     File(p.join(installed, 'app.elf')).writeAsStringSync('#!/bin/sh\nexit 0\n');
     if (!Platform.isWindows) Process.runSync('chmod', ['755', p.join(installed, 'app.elf')]);
@@ -154,6 +163,64 @@ void main() {
     await model.play(orbit());
     expect(desktop.calls.first, 'display fullscreen', reason: 'upstream\'s engine: the launcher presses F11');
   }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
+
+  group('an update keeps what games opened with before', () {
+    late Directory folder;
+
+    setUp(() => folder = Directory.systemTemp.createTempSync('display_defaults_prefs'));
+    tearDown(() => folder.deleteSync(recursive: true));
+
+    test('preferences saved before the full-screen default still open games in a window', () {
+      final old = Preferences.fromJson({'prepareNewGames': true, 'stickDeadzone': 10});
+      expect(old.displayDefaults.fullscreen, isFalse);
+      expect(old.displayDefaults.windowSize, 75);
+      final game = const GameSettings().withDefaults(old.displayDefaults);
+      expect(game.fullscreen, isFalse);
+      expect(game.environment(launcherLanguage: 1)['ANYPS5_FULLSCREEN'], '0');
+      expect(game.fadesCover, isFalse);
+    });
+
+    test('a first start, with no file, opens games in full screen', () {
+      final file = p.join(folder.path, 'preferences.json');
+      expect(Preferences.load(file, systemLocales: const ['en']).displayDefaults.fullscreen, isTrue);
+      expect(Preferences().displayDefaults.fullscreen, isTrue);
+    });
+
+    test('a file from an older launcher stays Window, and the launcher\'s own save keeps the choice either way', () {
+      final file = p.join(folder.path, 'preferences.json');
+      File(file).writeAsStringSync('{"prepareNewGames":true}');
+      final loaded = Preferences.load(file);
+      expect(loaded.displayDefaults.fullscreen, isFalse);
+      File(file).writeAsStringSync(jsonEncode(loaded.toJson()));
+      expect(Preferences.load(file).displayDefaults.fullscreen, isFalse, reason: 'saved as Window, read as Window');
+      // Window chosen for a launcher that started in full screen, and full screen chosen back.
+      final fresh = Preferences()..displayDefaults = const DisplayDefaults(fullscreen: false);
+      File(file).writeAsStringSync(jsonEncode(fresh.toJson()));
+      expect(Preferences.load(file).displayDefaults.fullscreen, isFalse);
+      File(file).writeAsStringSync(jsonEncode((Preferences()..prepareNewGames = false).toJson()));
+      expect(Preferences.load(file).displayDefaults.fullscreen, isTrue, reason: 'new launcher, nothing changed: its default stays');
+    });
+
+    test('a game started from the command line reads the same rule', () {
+      final file = p.join(folder.path, 'preferences.json');
+      expect(DisplayDefaults.load(file).fullscreen, isTrue, reason: 'no file');
+      File(file).writeAsStringSync('{"theme":1}');
+      expect(DisplayDefaults.load(file).fullscreen, isFalse, reason: 'older launcher');
+      File(file).writeAsStringSync('{"theme":1,"displayDefaults":{"fullscreen":true}}');
+      expect(DisplayDefaults.load(file).fullscreen, isTrue);
+      File(file).writeAsStringSync('{"displayDefaults":"nonsense"}');
+      expect(DisplayDefaults.load(file), const DisplayDefaults(), reason: 'a broken value is the built-in one');
+    });
+
+    test('a game file from before the settings version keeps Window or Full Screen as written', () {
+      final window = GameSettings.fromJson(const {'fullscreen': false, 'windowSize': 75, 'vsync': true, 'overlay': 'off'});
+      final full = GameSettings.fromJson(const {'fullscreen': true, 'windowSize': 75, 'vsync': true, 'overlay': 'off'});
+      const defaults = DisplayDefaults();
+      expect(window.withDefaults(defaults).fullscreen, isFalse, reason: 'still Window under a full-screen default');
+      expect(full.withDefaults(const DisplayDefaults.window()).fullscreen, isTrue);
+      expect(window.followingDisplayDefaults().withDefaults(defaults).fullscreen, isTrue, reason: 'Use defaults is the way back');
+    });
+  });
 
   test('the texts are in English and Turkish', () {
     for (final language in [Language.english, Language.byCode('tr')]) {

@@ -1422,6 +1422,8 @@
   "launcherVolume": "启动器音量",
   "launcherVolumeDetail": "启动器播放的一切：音效和音乐。0% 为静音；游戏保持各自的音量。",
   "start": "开始",
+  "startAnimation": "启动动画",
+  "startAnimationDetail": "在全屏模式下，游戏从封面打开，封面在游戏上方缓缓淡出。关闭时或在窗口模式下，游戏一启动封面就消失。",
   "startFailed": "无法启动游戏",
   "starting": "正在启动…",
   "status": "状态",

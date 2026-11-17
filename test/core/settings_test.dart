@@ -165,7 +165,7 @@ StickModifier = KEY:F24
   group('game settings', () {
     test('the default environment', () {
       expect(const GameSettings().environment(launcherLanguage: 19), {
-        'ANYPS5_FULLSCREEN': '0',
+        'ANYPS5_FULLSCREEN': '1',
         'ANYPS5_WINDOW_SIZE': '75',
         'ANYPS5_PRESENT_MODE': 'fifo',
         'ANYPS5_LANGUAGE': '19',
@@ -329,9 +329,9 @@ StickModifier = KEY:F24
   });
 
   group('display defaults', () {
-    test('the built-in defaults are what a game with no settings always started with', () {
+    test('the built-in defaults: full screen, a window of 75% when windowed, vertical sync on', () {
       const defaults = DisplayDefaults();
-      expect(defaults.fullscreen, isFalse);
+      expect(defaults.fullscreen, isTrue);
       expect(defaults.windowSize, 75);
       expect(defaults.vsync, isTrue);
       expect(
@@ -392,11 +392,15 @@ StickModifier = KEY:F24
       expect(const GameSettings().toJson().containsKey('fullscreen'), isFalse);
     });
 
-    test('files from before keep their choices; the old built-in values follow the defaults', () {
+    test('files from before keep their choices; only a window size or sync equal to the old built-in follows', () {
       GameSettings old(String text) => GameSettings.fromJson(jsonDecode(text) as Map<String, dynamic>);
-      // Never changed: everything was written as the built-in values.
+      // Everything was written as the old built-in values: "never chosen" cannot be told from
+      // "Window chosen", so the windowed mode stays the game's own choice (not switched silently).
       final untouched = old('{"fullscreen":false,"windowSize":75,"vsync":true,"overlay":"off"}');
-      expect(untouched.followsDisplayDefaults, isTrue);
+      expect(untouched.ownFullscreen, isFalse);
+      expect(untouched.ownWindowSize, isNull);
+      expect(untouched.ownVsync, isNull);
+      expect(untouched.fullscreen, isFalse);
       // Full screen chosen.
       final full = old('{"fullscreen":true,"windowSize":75,"vsync":true,"overlay":"off"}');
       expect(full.ownFullscreen, isTrue);
@@ -410,7 +414,8 @@ StickModifier = KEY:F24
       // Vertical sync turned off.
       final tearing = old('{"fullscreen":false,"windowSize":75,"vsync":false,"overlay":"off"}');
       expect(tearing.ownVsync, isFalse);
-      expect(tearing.ownFullscreen, isNull);
+      expect(tearing.ownFullscreen, isFalse, reason: 'windowed stays the game\'s own choice, like above');
+      expect(tearing.ownWindowSize, isNull);
       // Unchanged after the update: with the built-in defaults each starts as it did.
       for (final settings in [untouched, full, window, tearing]) {
         final text = jsonEncode(jsonDecode(jsonEncode(settings.toJson())));
@@ -425,11 +430,30 @@ StickModifier = KEY:F24
         untouched.withDefaults(const DisplayDefaults()).environment(launcherLanguage: 1)['ANYPS5_FULLSCREEN'],
         '0',
       );
+      expect(
+        full.withDefaults(const DisplayDefaults()).environment(launcherLanguage: 1)['ANYPS5_FULLSCREEN'],
+        '1',
+      );
       expect(window.withDefaults(const DisplayDefaults()).environment(launcherLanguage: 1)['ANYPS5_WINDOW_SIZE'], '60');
       expect(
         tearing.withDefaults(const DisplayDefaults()).environment(launcherLanguage: 1)['ANYPS5_PRESENT_MODE'],
         'immediate',
       );
+    });
+
+    test('the full-screen default does not change a game that has a windowed or full-screen choice on file', () {
+      GameSettings read(String text) => GameSettings.fromJson(jsonDecode(text) as Map<String, dynamic>);
+      // Current format: only a game's own choices are written.
+      expect(read('{"settingsVersion":${GameSettings.version},"fullscreen":false}').fullscreen, isFalse);
+      expect(read('{"settingsVersion":${GameSettings.version},"fullscreen":true}').ownFullscreen, isTrue);
+      final none = read('{"settingsVersion":${GameSettings.version}}');
+      expect(none.ownFullscreen, isNull);
+      expect(none.fullscreen, isTrue, reason: 'no choice: the new default');
+      // Before the format: a missing key follows the default, true and false are kept.
+      expect(read('{"overlay":"off"}').ownFullscreen, isNull);
+      expect(read('{"fullscreen":true,"windowSize":75}').ownFullscreen, isTrue);
+      expect(read('{"fullscreen":false,"windowSize":75}').ownFullscreen, isFalse);
+      expect(read('{"fullscreen":false,"windowSize":60}').ownWindowSize, 60);
     });
 
     test('the defaults as JSON, and a broken or missing value as the built-in one', () {
@@ -441,6 +465,10 @@ StickModifier = KEY:F24
       expect(DisplayDefaults.fromJson(const {'windowSize': 1}).windowSize, 30);
       expect(const DisplayDefaults().isBuiltIn, isTrue);
       expect(defaults.isBuiltIn, isFalse);
+      expect(const DisplayDefaults.window(), const DisplayDefaults(fullscreen: false));
+      expect(DisplayDefaults.inPreferences(const {'theme': 1}), const DisplayDefaults.window());
+      expect(DisplayDefaults.inPreferences({'displayDefaults': defaults.toJson()}), defaults);
+      expect(DisplayDefaults.inPreferences(const {'displayDefaults': 'nonsense'}), const DisplayDefaults());
     });
 
     test('read from the launcher\'s preferences file; built-in when it is missing or broken', () {
@@ -452,6 +480,8 @@ StickModifier = KEY:F24
       expect(DisplayDefaults.load(file), const DisplayDefaults());
       File(file).writeAsStringSync('{"theme":1,"displayDefaults":{"fullscreen":true}}');
       expect(DisplayDefaults.load(file), const DisplayDefaults(fullscreen: true));
+      File(file).writeAsStringSync('{"theme":1}');
+      expect(DisplayDefaults.load(file), const DisplayDefaults.window(), reason: 'an older launcher\'s file: Window');
     });
   });
 

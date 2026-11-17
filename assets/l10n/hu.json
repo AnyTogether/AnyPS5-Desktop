@@ -1422,6 +1422,8 @@
   "launcherVolume": "Az indítóprogram hangereje",
   "launcherVolumeDetail": "Minden, amit az indítóprogram lejátszik: a hangjai és a zenéje. 0% esetén néma; a játékok hangereje nem változik.",
   "start": "Indítás",
+  "startAnimation": "Indítási animáció",
+  "startAnimationDetail": "Teljes képernyőn a játék a borítójából nyílik meg, a borító pedig lassan eltűnik a játék fölött. Kikapcsolva vagy ablakban a borító a játék indulásakor azonnal eltűnik.",
   "startFailed": "A játék nem tudott elindulni",
   "starting": "Indítás…",
   "status": "Állapot",

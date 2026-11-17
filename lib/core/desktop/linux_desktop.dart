@@ -494,6 +494,8 @@ class LinuxDesktop implements DesktopWindows, GameAreas {
       if (found.exitCode != 0 || window == null) return false;
       await Future<void>.delayed(const Duration(milliseconds: 1200));
       if (fullscreen) {
+        // Already full screen (the default opens it so): F11 would take it out again.
+        if (await _coversScreen(window)) return true;
         final result = await Process.run('xdotool', [
           'windowactivate',
           '--sync',
@@ -527,6 +529,33 @@ class LinuxDesktop implements DesktopWindows, GameAreas {
         '${((height - h) / 2).round()}',
       ]);
       return result.exitCode == 0;
+    } on Object {
+      return false;
+    }
+  }
+
+  /// Whether the X11 window [window] is as big as the screen and sits at its corner, by xdotool.
+  /// False when it cannot tell (including several monitors: the screen is then all of them).
+  Future<bool> _coversScreen(String window) async {
+    try {
+      final geometry = await Process.run('xdotool', ['getwindowgeometry', '--shell', window]);
+      final screen = await Process.run('xdotool', ['getdisplaygeometry']);
+      if (geometry.exitCode != 0 || screen.exitCode != 0) return false;
+      final values = <String, int>{};
+      for (final line in (geometry.stdout as String).split('\n')) {
+        final parts = line.trim().split('=');
+        if (parts.length == 2) values[parts[0]] = int.tryParse(parts[1]) ?? -1;
+      }
+      final size = (screen.stdout as String).trim().split(RegExp(r'\s+')).map(int.tryParse).toList();
+      final x = values['X'], y = values['Y'], width = values['WIDTH'], height = values['HEIGHT'];
+      if (size.length < 2 || size[0] == null || size[1] == null) return false;
+      if (x == null || y == null || width == null || height == null) return false;
+      return windowIsFullscreen(
+        window: [x, y, x + width, y + height],
+        screen: [0, 0, size[0]!, size[1]!],
+        clientWidth: width,
+        clientHeight: height,
+      );
     } on Object {
       return false;
     }
@@ -818,6 +847,18 @@ class LinuxDesktop implements DesktopWindows, GameAreas {
       _showing = false;
     }
   }
+
+  // No window over the game here (a layered window is Windows'): the launcher's own cover fades.
+  @override
+  Future<bool> fadeCover(
+    int pid, {
+    required Future<RgbaImage?> Function(int width, int height) cover,
+    required Future<void> until,
+    Duration fade = coverFade,
+    Duration windowTimeout = coverWindowWait,
+    Future<void>? exited,
+    void Function()? onCovered,
+  }) async => false;
 
   @override
   Future<bool> showCard(RgbaImage card, {int? pid}) async {

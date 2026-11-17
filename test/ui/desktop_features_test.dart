@@ -93,6 +93,39 @@ class FakeDesktop implements DesktopWindows {
     return cardsWork;
   }
 
+  /// What a start cover does here: [coverWorks] false is a desktop without one; true waits for
+  /// the display to settle, as Windows' does, and then goes.
+  bool coverWorks = false;
+
+  /// The game's window never opens: the wait for it ends only when the process does ([exited]),
+  /// as on Windows, where it would otherwise run for [windowTimeout].
+  bool windowNeverOpens = false;
+  final List<String> coverEvents = [];
+
+  @override
+  Future<bool> fadeCover(
+    int pid, {
+    required Future<RgbaImage?> Function(int width, int height) cover,
+    required Future<void> until,
+    Duration fade = coverFade,
+    Duration windowTimeout = coverWindowWait,
+    Future<void>? exited,
+    void Function()? onCovered,
+  }) async {
+    coverEvents.add('asked');
+    if (windowNeverOpens) {
+      await (exited ?? Future<void>.delayed(windowTimeout));
+      coverEvents.add('no window');
+      return false;
+    }
+    if (!coverWorks) return false;
+    onCovered?.call();
+    coverEvents.add('covered');
+    await until;
+    coverEvents.add('gone');
+    return true;
+  }
+
   @override
   Future<bool> notify(String title, String body, {String? icon}) async {
     calls.add('notify $body');
@@ -262,7 +295,7 @@ void main() {
       await Future<void>.delayed(GuideSwitch.defaultDebounce);
       pads.press(PadButton.guide);
       expect(desktop.calls.where((call) => call == 'raise' || call == 'focus'), ['raise', 'focus']);
-      expect(desktop.calls.first, 'display 75%', reason: 'upstream\'s engine: the launcher sizes the window');
+      expect(desktop.calls.first, 'display fullscreen', reason: 'upstream\'s engine: full screen is the default, the launcher presses F11 if needed');
       model.stopGame();
       await playing;
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);

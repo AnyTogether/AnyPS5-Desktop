@@ -352,12 +352,19 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
   }
 
   /// Waits for the game's first window: a game can take a while to open it.
-  Future<int> _waitForWindow(int pid, {Duration timeout = const Duration(minutes: 3)}) async {
+  Future<int> _waitForWindow(
+    int pid, {
+    Duration timeout = const Duration(minutes: 3),
+    Duration interval = const Duration(milliseconds: 500),
+    bool Function()? gone,
+  }) async {
     final end = DateTime.now().add(timeout);
     while (DateTime.now().isBefore(end)) {
       final window = windowOf(pid);
       if (window != 0) return window;
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      // The process ended without a window: nothing to wait for.
+      if (gone?.call() ?? false) return 0;
+      await Future<void>.delayed(interval);
     }
     return 0;
   }
@@ -380,7 +387,11 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
     // Let SDL finish creating its window and swapchain first.
     await Future<void>.delayed(const Duration(milliseconds: 1200));
     if (windowOf(pid) != window) return false;
-    if (fullscreen) return _pressF11(window);
+    if (fullscreen) {
+      // Full screen is the default now: a game that opened that way already must not get F11.
+      if (_isFullscreen(window)) return true;
+      return _pressF11(window);
+    }
     final screens = _screenOf(window);
     if (screens == null) return false;
     final (work, _) = screens;
@@ -401,6 +412,25 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
       final x = work[0] + (work[2] - work[0] - size.width) ~/ 2;
       final y = work[1] + (work[3] - work[1] - size.height) ~/ 2;
       return _w.setWindowPos(window, 0, x, y, size.width, size.height, _noZOrder | _noActivate) != 0;
+    });
+  }
+
+  /// Whether [window] already covers its whole monitor without a frame. False when it cannot
+  /// tell: the key is pressed then, as before.
+  bool _isFullscreen(int window) {
+    final screens = _screenOf(window);
+    if (screens == null) return false;
+    final (_, screen) = screens;
+    return using((arena) {
+      final outer = arena<Int32>(4);
+      final inner = arena<Int32>(4);
+      if (_w.getWindowRect(window, outer) == 0 || _w.getClientRect(window, inner) == 0) return false;
+      return windowIsFullscreen(
+        window: [outer[0], outer[1], outer[2], outer[3]],
+        screen: screen,
+        clientWidth: inner[2],
+        clientHeight: inner[3],
+      );
     });
   }
 
@@ -594,7 +624,97 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
     final screens = _screenOf(anchor);
     if (screens == null) return false;
     final (_, screen) = screens;
-    final window = _makeCardWindow(card.width, card.height);
+    final scale = cardScale(pid);
+    return _playLayered(card, (elapsed) {
+      final phase = cardPhase(elapsed);
+      if (phase.done) return null;
+      final place = cardPosition(
+        screenLeft: screen[0],
+        screenTop: screen[1],
+        screenWidth: screen[2] - screen[0],
+        cardWidth: card.width,
+        margin: (18 * scale).round(),
+        slide: (22 * scale).round(),
+        t: phase.t,
+      );
+      return (x: place.x, y: place.y, opacity: phase.opacity);
+    });
+  }
+
+  @override
+  Future<bool> fadeCover(
+    int pid, {
+    required Future<RgbaImage?> Function(int width, int height) cover,
+    required Future<void> until,
+    Duration fade = coverFade,
+    Duration windowTimeout = coverWindowWait,
+    void Function()? onCovered,
+  }) async {
+    if (_card != 0) return false;
+    var processEnded = false;
+    unawaited(exited?.then<void>((_) => processEnded = true, onError: (Object _) => processEnded = true));
+    try {
+      // A quick poll: the game's window must not be on screen long before the picture is.
+      final window = await _waitForWindow(
+        pid,
+        timeout: windowTimeout,
+        interval: const Duration(milliseconds: 40),
+        gone: () => processEnded,
+      );
+      if (window == 0) return false;
+      final screens = _screenOf(window);
+      if (screens == null) return false;
+      final (_, screen) = screens;
+      final width = screen[2] - screen[0];
+      final height = screen[3] - screen[1];
+      if (width <= 0 || height <= 0) return false;
+      final image = await cover(width, height);
+      if (image == null || image.width != width || image.height != height) return false;
+      if (_card != 0 || windowOf(pid) != window) return false;
+      var released = false;
+      unawaited(until.then<void>((_) {}, onError: (Object _) {}).whenComplete(() => released = true));
+      Duration? releaseAt;
+      var checkedAt = Duration.zero;
+      var windowGone = false;
+      return await _playLayered(
+        image,
+        (elapsed) {
+          if (releaseAt == null) {
+            // The window is looked for a few times a second only: it lists every window.
+            if (elapsed - checkedAt >= const Duration(milliseconds: 250)) {
+              checkedAt = elapsed;
+              windowGone = windowOf(pid) == 0;
+            }
+            if (windowGone) {
+              // The game closed: the picture only goes.
+              releaseAt = elapsed;
+            } else if (released || elapsed >= coverHoldLimit) {
+              releaseAt = elapsed + coverSettle;
+            }
+          }
+          final opacity = releaseAt == null ? 1.0 : coverOpacity(elapsed - releaseAt!, fade);
+          if (opacity <= 0) return null;
+          return (x: screen[0], y: screen[1], opacity: opacity);
+        },
+        onShown: onCovered,
+      );
+    } on Object {
+      // Whatever went wrong, the game starts as it did without the picture.
+      return false;
+    }
+  }
+
+  /// A layered window over everything with [image] (clicks and focus pass through it), moved and
+  /// faded as [frame] says at each step (null ends it), and destroyed at the end, whatever
+  /// happens. [onShown] runs once the first frame has been on screen for a step. Completes true
+  /// when [frame] ended it; false when the window could not be made.
+  Future<bool> _playLayered(
+    RgbaImage image,
+    ({int x, int y, double opacity})? Function(Duration elapsed) frame, {
+    void Function()? onShown,
+  }) async {
+    if (_card != 0) return false;
+    final window = _makeCardWindow(image.width, image.height);
     if (window == 0) return false;
     _card = window;
     final screenDc = _w.getDC(0);
@@ -603,45 +723,36 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
     final header = calloc<Uint8>(44);
     final ints = header.cast<Int32>();
     ints[0] = 40;
-    ints[1] = card.width;
-    ints[2] = -card.height;
+    ints[1] = image.width;
+    ints[2] = -image.height;
     (header + 12).cast<Uint16>().value = 1;
     (header + 14).cast<Uint16>().value = 32;
     final bitmap = _w.createDIBSection(memory, header, 0, bitsOut, 0, 0);
     final previous = bitmap == 0 ? 0 : _w.selectObject(memory, bitmap);
     final point = calloc<Int32>(2);
     final size = calloc<Int32>(2)
-      ..[0] = card.width
-      ..[1] = card.height;
+      ..[0] = image.width
+      ..[1] = image.height;
     final source = calloc<Int32>(2);
     final blend = calloc<Uint8>(4);
     final message = calloc<Uint8>(48);
-    final scale = cardScale(pid);
     try {
       if (bitmap == 0) return false;
-      bitsOut.value.asTypedList(card.pixels.length).setAll(0, card.premultipliedBgra());
+      bitsOut.value.asTypedList(image.pixels.length).setAll(0, image.premultipliedBgra());
       final started = DateTime.now();
       var shown = false;
+      var told = false;
       while (true) {
-        final phase = cardPhase(DateTime.now().difference(started));
-        if (phase.done) break;
-        final place = cardPosition(
-          screenLeft: screen[0],
-          screenTop: screen[1],
-          screenWidth: screen[2] - screen[0],
-          cardWidth: card.width,
-          margin: (18 * scale).round(),
-          slide: (22 * scale).round(),
-          t: phase.t,
-        );
+        final state = frame(DateTime.now().difference(started));
+        if (state == null) break;
         point
-          ..[0] = place.x
-          ..[1] = place.y;
+          ..[0] = state.x
+          ..[1] = state.y;
         blend
           ..[0] =
               0 // AC_SRC_OVER
           ..[1] = 0
-          ..[2] = (phase.opacity * 255).round().clamp(0, 255)
+          ..[2] = (state.opacity * 255).round().clamp(0, 255)
           ..[3] = 1; // AC_SRC_ALPHA
         _w.updateLayeredWindow(window, screenDc, point, size, memory, source, 0, blend, 2 /* ULW_ALPHA */);
         if (!shown) {
@@ -651,6 +762,10 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
         }
         _pumpCard(message);
         await Future<void>.delayed(const Duration(milliseconds: 16));
+        if (shown && !told) {
+          told = true;
+          onShown?.call();
+        }
       }
       return true;
     } finally {

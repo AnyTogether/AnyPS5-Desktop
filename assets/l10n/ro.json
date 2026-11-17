@@ -1422,6 +1422,8 @@
   "launcherVolume": "Volumul lansatorului",
   "launcherVolumeDetail": "Tot ce redă lansatorul: sunetele și muzica sa. 0% înseamnă liniște; jocurile își păstrează volumul propriu.",
   "start": "Pornește",
+  "startAnimation": "Animație de pornire",
+  "startAnimationDetail": "În ecran complet, jocul se deschide din coperta sa, care se estompează peste joc. Dezactivată sau într-o fereastră, coperta dispare imediat ce jocul a pornit.",
   "startFailed": "Jocul nu a putut porni",
   "starting": "Se pornește…",
   "status": "Stare",

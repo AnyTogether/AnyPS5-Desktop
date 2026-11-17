@@ -1422,6 +1422,8 @@
   "launcherVolume": "Startprogrammets volym",
   "launcherVolumeDetail": "Allt som startprogrammet spelar: dess ljud och musik. 0 % är tyst; spel behåller sin egen volym.",
   "start": "Starta",
+  "startAnimation": "Startanimation",
+  "startAnimationDetail": "I helskärm öppnas ett spel från sitt omslag, som tonas ut över spelet. Avstängd, eller i ett fönster, försvinner omslaget så fort spelet har startat.",
   "startFailed": "Spelet kunde inte startas",
   "starting": "Startar…",
   "status": "Status",

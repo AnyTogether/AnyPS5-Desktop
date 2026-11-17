@@ -44,9 +44,9 @@ void main() {
 
   testWidgets('← on a choice goes to the option before, even on a row of two; → to the next', (tester) async {
     await openGameSettings(tester);
-    expect(settings().fullscreen, isFalse);
+    expect(settings().fullscreen, isTrue);
     await press(tester, LogicalKeyboardKey.arrowLeft);
-    expect(settings().fullscreen, isFalse, reason: 'already at the first option: ← stays');
+    expect(settings().fullscreen, isTrue, reason: 'already at the first option: ← stays');
     expect(settings().ownFullscreen, isNull, reason: 'at the first option, Default');
     await press(tester, LogicalKeyboardKey.arrowRight);
     expect(settings().ownFullscreen, isFalse, reason: 'Window');
@@ -68,6 +68,9 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('overlay-previous')));
     await settle(tester);
     expect(settings().overlay, OverlayCorner.topLeft, reason: 'the left arrow goes back');
+    // The size row only exists in a window: full screen is the default now.
+    model.saveSettings(orbit(), settings().copyWith(fullscreen: false));
+    await settle(tester);
     await tester.tap(find.byKey(const ValueKey('windowSize-previous')));
     await settle(tester);
     expect(settings().windowSize, 70);

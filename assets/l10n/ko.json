@@ -1422,6 +1422,8 @@
   "launcherVolume": "런처 음량",
   "launcherVolumeDetail": "런처가 재생하는 모든 소리(효과음과 음악)입니다. 0%는 무음이며, 게임 음량은 그대로입니다.",
   "start": "시작",
+  "startAnimation": "시작 애니메이션",
+  "startAnimationDetail": "전체 화면에서는 게임이 커버에서 열리고, 커버는 게임 위에서 서서히 사라집니다. 꺼져 있거나 창 모드에서는 게임이 시작되자마자 커버가 사라집니다.",
   "startFailed": "게임을 시작할 수 없습니다",
   "starting": "시작 중…",
   "status": "상태",

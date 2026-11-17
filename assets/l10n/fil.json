@@ -1422,6 +1422,8 @@
   "launcherVolume": "Volume ng launcher",
   "launcherVolumeDetail": "Lahat ng pinapatugtog ng launcher: ang mga tunog at musika nito. Tahimik sa 0%; may sariling volume ang mga laro.",
   "start": "Simulan",
+  "startAnimation": "Animasyon sa pagsisimula",
+  "startAnimationDetail": "Sa full screen, bumubukas ang laro mula sa cover nito, na dahan-dahang nawawala sa ibabaw ng laro. Kapag naka-off, o nasa window, nawawala ang cover pagkasimula ng laro.",
   "startFailed": "Hindi magawa ng laro simula",
   "starting": "Simula…",
   "status": "Katayuan",

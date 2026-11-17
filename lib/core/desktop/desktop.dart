@@ -88,6 +88,26 @@ abstract class DesktopWindows {
   /// [notify] is the way).
   Future<bool> showCard(RgbaImage card, {int? pid});
 
+  /// The start of a game, PS5 style: once the game's window exists, a picture ([cover], asked for
+  /// at the size in pixels of the screen the window is on) covers that whole screen, above the
+  /// game and never taking its input, while the window settles ([until] completes when it has:
+  /// full screen or its size applied). Then the picture fades away over [fade] and is gone. The
+  /// game's own window is never touched: only the picture fades. [onCovered] runs once the
+  /// picture is on screen. Completes when the picture has gone, true if it was shown at all;
+  /// false (nothing was drawn, [onCovered] never ran) when this desktop cannot, the window did
+  /// not open within [windowTimeout], the process ended first ([exited] completes: it is not
+  /// waited for any longer), or [cover] gave nothing. The picture always goes, also when
+  /// the game closes meanwhile.
+  Future<bool> fadeCover(
+    int pid, {
+    required Future<RgbaImage?> Function(int width, int height) cover,
+    required Future<void> until,
+    Duration fade = coverFade,
+    Duration windowTimeout = coverWindowWait,
+    Future<void>? exited,
+    void Function()? onCovered,
+  }) async => false;
+
   /// The small badge over the game (the top left of its screen, clicks passing through), drawn
   /// over and over as it changes; null takes it away. False where there is no such window, or
   /// where it would be in the picture now (X11 without a compositing manager).
@@ -179,6 +199,17 @@ class NoDesktop implements DesktopWindows {
   @override
   Future<bool> showCard(RgbaImage card, {int? pid}) async => false;
   @override
+  Future<bool> fadeCover(
+    int pid, {
+    required Future<RgbaImage?> Function(int width, int height) cover,
+    required Future<void> until,
+    Duration fade = coverFade,
+    Duration windowTimeout = coverWindowWait,
+    Future<void>? exited,
+    void Function()? onCovered,
+  }) async => false;
+
+  @override
   Future<bool> showBadge(RgbaImage? badge, {int? pid}) async => false;
   @override
   BadgeReach get badgeReach => BadgeReach.none;
@@ -222,6 +253,60 @@ class NoDesktop implements DesktopWindows {
   final out = (ms - enterMs - stayMs) / leaveMs;
   if (out >= 1) return (opacity: 0, t: 1, done: true);
   return (opacity: 1 - out, t: 1, done: false);
+}
+
+/// How long the start picture fades away over (a game's start, [DesktopWindows.fadeCover]).
+const coverFade = Duration(milliseconds: 700);
+
+/// How long the start picture waits for the game's window to open before giving up.
+const coverWindowWait = Duration(seconds: 20);
+
+/// The longest the start picture stays opaque over the opened window waiting for it to settle.
+const coverHoldLimit = Duration(seconds: 6);
+
+/// How long the picture stays opaque after the window has settled, so its first frames are drawn
+/// before the picture goes.
+const coverSettle = Duration(milliseconds: 250);
+
+/// The start picture's opacity [sinceRelease] after the game's window settled: 1 before that
+/// (negative), then an ease in and out down to 0 over [fade]. A zero [fade] goes at once.
+double coverOpacity(Duration sinceRelease, Duration fade) {
+  if (sinceRelease.isNegative) return 1;
+  if (fade <= Duration.zero) return 0;
+  final t = (sinceRelease.inMicroseconds / fade.inMicroseconds).clamp(0.0, 1.0);
+  return 1 - t * t * (3 - 2 * t);
+}
+
+/// The factor to draw a [width] x [height] picture at so it covers a [targetWidth] x
+/// [targetHeight] screen (the larger of the two ratios: the rest is cropped, [cropCentered]).
+double coverScale(double width, double height, int targetWidth, int targetHeight) {
+  if (width <= 0 || height <= 0) return 1;
+  final ratio = targetWidth / width > targetHeight / height ? targetWidth / width : targetHeight / height;
+  // A hair more, so rounding never leaves the picture a pixel short.
+  return ratio * 1.002;
+}
+
+/// The middle [width] x [height] of [image]; what the image does not reach is opaque black.
+RgbaImage cropCentered(RgbaImage image, int width, int height) {
+  if (image.width == width && image.height == height) return image;
+  final out = Uint8List(width * height * 4);
+  for (var index = 3; index < out.length; index += 4) {
+    out[index] = 255;
+  }
+  final shiftX = (image.width - width) ~/ 2;
+  final shiftY = (image.height - height) ~/ 2;
+  final copyWidth = image.width < width ? image.width : width;
+  final copyHeight = image.height < height ? image.height : height;
+  final fromX = shiftX > 0 ? shiftX : 0;
+  final fromY = shiftY > 0 ? shiftY : 0;
+  final toX = shiftX < 0 ? -shiftX : 0;
+  final toY = shiftY < 0 ? -shiftY : 0;
+  for (var row = 0; row < copyHeight; row++) {
+    final source = ((fromY + row) * image.width + fromX) * 4;
+    final target = ((toY + row) * width + toX) * 4;
+    out.setRange(target, target + copyWidth * 4, image.pixels, source);
+  }
+  return RgbaImage(width, height, out);
 }
 
 /// The keys the controls name ([Controls.keyName]) as each desktop's own key codes.
@@ -273,4 +358,21 @@ abstract final class KeyCodes {
       _ => null,
     };
   }
+}
+
+/// Whether a window is already full screen: its rectangle is the monitor's and it has no frame
+/// (its client area is as big as the window). [window] and [screen] are left, top, right, bottom.
+/// The launcher presses F11 for upstream's engine only when this is false: it toggles, so
+/// pressing it in a window that is already full screen would leave it.
+bool windowIsFullscreen({
+  required List<int> window,
+  required List<int> screen,
+  required int clientWidth,
+  required int clientHeight,
+}) {
+  if (window.length != 4 || screen.length != 4) return false;
+  for (var index = 0; index < 4; index++) {
+    if (window[index] != screen[index]) return false;
+  }
+  return clientWidth == window[2] - window[0] && clientHeight == window[3] - window[1];
 }

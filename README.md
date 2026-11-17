@@ -253,7 +253,11 @@ Some environment variables the launcher passes exist only in the fork's engine
 (`ANYPS5_FULLSCREEN`, `ANYPS5_WINDOW_SIZE`, `ANYPS5_OVERLAY_STYLE`, `ANYPS5_FRAME_GEN`,
 `ANYPS5_REMOTE_PAD*`); with upstream's libraries they are ignored. For full screen and window
 size the launcher stands in: with upstream's engine (which opens at 60% of the screen and
-switches with F11) it sizes the game's window once it opens, or presses F11 for it.
+switches with F11) it sizes the game's window once it opens, or presses F11 for it (only if the
+window is not full screen already). A launcher started for the first time opens games in
+full screen, unless a game, or Settings → Default Display, says Window; one that had saved
+settings before keeps Window until Default Display is changed. On Linux this needs X11, Wayland
+windows are left as they open.
 
 Settings → AnyPS5 Engine → *Engine* switches to the **AnyPS5-ARM engine**: the fork's toolkit,
 built for Windows (and Linux, when published) and attached to
