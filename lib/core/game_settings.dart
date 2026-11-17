@@ -32,8 +32,7 @@ enum Upscaler { bilinear, fsr1 }
 
 /// Settings › Default Display: how a game starts that made no display choice of its own (Game
 /// Settings › Display, Window Size and Vertical Sync left at Default). The built-in values are
-/// the ones a game starts with when nothing was chosen: full screen (it was windowed at 75% before
-/// the launcher made full screen the default).
+/// the ones a game starts with when nothing was chosen: windowed at 75%.
 class DisplayDefaults {
   const DisplayDefaults({this.fullscreen = false, this.windowSize = 75, this.vsync = true, this.startAnimation = true});
 

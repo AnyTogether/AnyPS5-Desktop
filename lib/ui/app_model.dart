@@ -4469,11 +4469,10 @@ class AppModel extends ChangeNotifier {
           : desktop
                 .applyDisplay(run.pid, fullscreen: settings.fullscreen, windowSize: settings.windowSize)
                 .catchError((Object _) => false);
-      if (settings.fadesCover) {
-        // Full screen with the start animation on: the cover stays until the window has opened and
-        // settled, then fades; the launcher steps aside after. A window, or the animation off, has
-        // the cover while the game opens and no fade.
-        unawaited(_handOff(game, run, display));
+      if (settings.startAnimation) {
+        // Start animation on: cover stays while the game loads. Full screen then fades over the
+        // game window; windowed fades out on the launcher home. Off: no cover hand-off.
+        unawaited(_handOff(game, run, display, fadeOverGame: settings.fadesCover));
       } else if (preferences.hideWhilePlaying) {
         // Settings › Behaviour › Hide the launcher while a game runs.
         unawaited(_hideForGame());
@@ -4555,7 +4554,7 @@ class AppModel extends ChangeNotifier {
   /// the game on Windows, by itself elsewhere), and only then does the launcher step aside
   /// (Hide the launcher while a game runs). Never keeps the cover when the game closes, or when
   /// its window does not open.
-  Future<void> _handOff(Game game, RunningGame run, Future<bool>? display) async {
+  Future<void> _handOff(Game game, RunningGame run, Future<bool>? display, {required bool fadeOverGame}) async {
     final watch = Stopwatch()..start();
     var ended = false;
     final exited = run.exitCode.then<void>((_) => ended = true, onError: (Object _) => ended = true);
@@ -4574,22 +4573,26 @@ class AppModel extends ChangeNotifier {
     _changed();
     try {
       final reduced = Motion.reduced || ui.PlatformDispatcher.instance.accessibilityFeatures.disableAnimations;
-      final shown = await desktop.fadeCover(
-        run.pid,
-        until: settled,
-        exited: exited,
-        // Reduced motion: only a very short fade.
-        fade: reduced ? const Duration(milliseconds: 120) : coverFade,
-        cover: (width, height) => snapshotCover(coverBoundary, width, height),
-        onCovered: () {
-          if (!identical(_coverDismissed, dismissed)) return;
-          coverHandedOver = true;
-          coverGame = null;
-          _changed();
-        },
-      );
+      // Full screen: layered fade over the game when possible. Windowed (or Linux): keep the
+      // Flutter cover on the home screen until settled, then drop it — never over the game.
+      var shown = false;
+      if (fadeOverGame) {
+        shown = await desktop.fadeCover(
+          run.pid,
+          until: settled,
+          exited: exited,
+          fade: reduced ? const Duration(milliseconds: 120) : coverFade,
+          cover: (width, height) => snapshotCover(coverBoundary, width, height),
+          onCovered: () {
+            if (!identical(_coverDismissed, dismissed)) return;
+            coverHandedOver = true;
+            coverGame = null;
+            _changed();
+          },
+        );
+      }
       if (!shown && !ended) {
-        // No picture over the game here: the cover itself goes when the window has settled.
+        // Cover on the launcher home: wait until the game is ready, then remove it.
         final left = coverWindowWait - watch.elapsed;
         await settled.timeout(left.isNegative ? Duration.zero : left, onTimeout: () {});
       }
@@ -7059,9 +7062,7 @@ class AppModel extends ChangeNotifier {
           change(defaults.copyWith(fullscreen: index == 1));
         }),
       ),
-      // Only a game that starts in full screen fades its cover.
-      if (defaults.fullscreen)
-        PanelRow(
+      PanelRow(
           id: 'defaultStartAnimation',
           title: T.text('startAnimation'),
           detail: T.text('startAnimationDetail'),
@@ -7499,8 +7500,7 @@ class AppModel extends ChangeNotifier {
           ),
         ),
       // Only in full screen: a window has no jump to hide, so there the cover goes without a fade.
-      if (display.fullscreen)
-        PanelRow(
+      PanelRow(
           id: 'startAnimation',
           title: T.text('startAnimation'),
           detail: T.text('startAnimationDetail'),
