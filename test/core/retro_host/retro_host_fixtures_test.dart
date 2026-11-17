@@ -6,8 +6,11 @@ import 'package:anyps5_desktop/core/retro_host/checked_file.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_client.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_protocol.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_release.dart';
+import 'package:anyps5_desktop/core/retro_host/retro_host_session.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
+
+import '../../support/ps2_host_recording.dart';
 
 /// The launcher's conformance test (anyps5-retro-host docs/protocol.md "Fixtures"): every session
 /// whose `tests` includes `launcher` is played by the host repository's fake host, which the client
@@ -66,6 +69,73 @@ void main() {
       directory.deleteSync(recursive: true);
     }
   }, timeout: const Timeout(Duration(seconds: 90)));
+  test("the host's PS2 message fixtures: the launcher's start is the one they show, and its status reads", () {
+    Map<String, Object?> fixture(String name) =>
+        jsonDecode(File(p.join(checkout, 'fixtures', 'v1', 'messages', name)).readAsStringSync())
+            as Map<String, Object?>;
+    final start = (fixture('call-start-ps2.json')['message']! as Map<String, Object?>)['args']! as Map<String, Object?>;
+    final options = (start['options']! as Map<String, Object?>).cast<String, String>();
+    final ours = RetroHostStartRequest(
+      console: RetroConsole.ps2,
+      core: start['core']! as String,
+      disc: start['disc']! as String,
+      system: start['system']! as String,
+      saves: start['saves']! as String,
+      options: options,
+    ).toArgs();
+    expect(ours, start);
+    final reply = fixture('call-status-ps2-no-bios.json')['reply']! as Map<String, Object?>;
+    final status = RetroStatus.parse(reply['result']! as Map<String, Object?>, ps2: true);
+    expect((status.ended, status.errorCode, status.console), (true, RetroErrorCode.bios, RetroConsole.ps2));
+    expect(status.options.keys, everyElement(startsWith('pcsx2_')));
+  });
+  test(
+    'a PS2 game goes only to a host that lists ps2',
+    () => _playOwn(
+      checkout,
+      python,
+      'A host without ps2 is sent no start.console: the client refuses it before it is sent, and the '
+          'next call is answered in order.',
+      'clean',
+      [
+        {
+          'from': 'launcher',
+          'message': {'type': 'call', 'id': 2, 'method': 'status', 'args': null},
+          'anyValueFor': ['id'],
+        },
+        {
+          'from': 'host',
+          'message': {'type': 'reply', 'id': 2, 'result': null},
+          'anyValueFor': ['id'],
+        },
+      ],
+      afterReady: (client) async {
+        expect(client.canPlayPs2, isFalse);
+        final ps2 = {'console': RetroConsole.ps2, 'core': 'c', 'disc': 'd.iso', 'system': 's', 'saves': 'v'};
+        expect(() => client.call('start', ps2), throwsStateError);
+        expect(() => client.call('start', {...ps2, 'console': RetroConsole.ps1}), throwsStateError);
+      },
+    ),
+    timeout: const Timeout(Duration(seconds: 90)),
+  );
+  test(
+    "a PS2 game's start and the real LRPS2's missing BIOS pass the client's checks",
+    () => _playOwn(
+      checkout,
+      python,
+      'A host that lists ps2, with the capabilities a host built from main 1b57932 listed: start with '
+          'console ps2, the status that host sent with the real LRPS2 and no BIOS, then release.',
+      'clean',
+      _ps2NoBiosSteps(),
+      capabilities: _ps2Recording.welcome('lrps2-welcome')['capabilities']! as List<Object?>,
+      afterReady: (client) async {
+        expect(client.canPlayPs2, isTrue);
+        final ps2 = {'console': RetroConsole.ps2, 'core': 'c', 'disc': 'd.iso', 'system': 's', 'saves': 'v'};
+        expect(() => client.call('start', {...ps2, 'initialDisc': 0}), throwsStateError);
+      },
+    ),
+    timeout: const Timeout(Duration(seconds: 90)),
+  );
   test(
     'a frame of another game takes away the frame shown',
     () => _playOwn(checkout, python, 'A drawn frame, then a frame of another epoch in the same ring.', 'clean', [
@@ -733,14 +803,25 @@ Future<void> _playOwn(
   FutureOr<void> Function(_Session session)? check,
   RetroHostChecked Function(String program, Map<String, String> paths)? checkedFor,
   void Function(_Session session, int id)? afterReply,
+  List<Object?> capabilities = const [retroCapabilityPs1],
 }) async {
   final directory = Directory.systemTemp.createTempSync('retro-host-own-');
   try {
+    final greeting = [
+      for (final step in _greeting)
+        if ((step['message']! as Map<String, Object?>)['type'] == 'welcome')
+          {
+            ...step,
+            'message': {...step['message']! as Map<String, Object?>, 'capabilities': capabilities},
+          }
+        else
+          step,
+    ];
     final session = <String, Object?>{
       'description': name,
       'tests': ['launcher'],
       'outcome': outcome,
-      'steps': [..._greeting, ...steps],
+      'steps': [...greeting, ...steps],
     };
     final file = File(p.join(directory.path, 'own.json'))..writeAsStringSync(jsonEncode(session));
     await _Session(
@@ -756,6 +837,42 @@ Future<void> _playOwn(
   } finally {
     directory.deleteSync(recursive: true);
   }
+}
+
+final _ps2Recording = Ps2HostRecording.load();
+
+/// A PS2 game's `start` and the replies a host built from anyps5-retro-host main 1b57932 sent with
+/// the real LRPS2 core and no BIOS ([Ps2HostRecording], `lrps2-no-bios-folder`): its reply, the
+/// `status` of the game that ended with `bios`, and `release`, each with the id of its call here.
+List<Map<String, Object?>> _ps2NoBiosSteps() {
+  Map<String, Object?> reply(String method, int id) => {
+    ..._ps2Recording.calls('lrps2-no-bios-folder', method).last.reply,
+    'id': id,
+  };
+  Map<String, Object?> step(String from, Map<String, Object?> message) => {
+    'from': from,
+    'message': message,
+    'anyValueFor': ['id'],
+  };
+  return [
+    step('launcher', {
+      'type': 'call',
+      'id': 2,
+      'method': 'start',
+      'args': {
+        'console': RetroConsole.ps2,
+        'core': r'${core}',
+        'disc': r'${disc}',
+        'system': r'${system}',
+        'saves': r'${saves}',
+      },
+    }),
+    step('host', reply('start', 2)),
+    step('launcher', {'type': 'call', 'id': 3, 'method': 'status', 'args': null}),
+    step('host', reply('status', 3)),
+    step('launcher', {'type': 'call', 'id': 4, 'method': 'release', 'args': null}),
+    step('host', reply('release', 4)),
+  ];
 }
 
 /// Steps 4 to 7 of ring-grows: `start`, its reply, a ring, and a frame of the game.
@@ -863,6 +980,11 @@ class _Session {
   late final File resume;
   late final RetroHostClient client;
   final calls = <Future<Object?>>[];
+
+  /// The calls answered by a status the client made itself from the host's ([RetroHostClient.stopGame]):
+  /// it has only the fields this client reads, so `core` and `timing` (capabilities `coreIdentity`
+  /// and `gameTiming`, which it does not read yet) are not compared.
+  final _clientStatuses = <Future<Object?>>{};
   final frames = <RetroFrameEvent>[];
   int frameSteps = 0;
 
@@ -972,7 +1094,9 @@ class _Session {
             } else if (method == 'status' && stopping != null) {
               final stopped = stopping;
               stopping = null;
-              calls.add(stopped.then((status) => status?.toJson()));
+              final made = stopped.then((status) => status?.toJson());
+              _clientStatuses.add(made);
+              calls.add(made);
             } else {
               final pending = client.call(method, _fill(message['args']));
               unawaited(pending.then((_) {}, onError: (_) {}));
@@ -995,7 +1119,10 @@ class _Session {
         switch (message['type']) {
           case 'reply':
             final pending = calls.removeAt(0);
-            await _checkReply(pending, message, step['anyValueFor'] as List<Object?>?);
+            await _checkReply(pending, message, [
+              ...?step['anyValueFor'] as List<Object?>?,
+              if (_clientStatuses.contains(pending)) ...['result.core', 'result.timing'],
+            ]);
             afterReply?.call(this, message['id']! as int);
           case 'frame':
             frameSteps++;

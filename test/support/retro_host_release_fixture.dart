@@ -15,6 +15,13 @@ import 'signing.dart';
 /// key beside them (test-release-signing.key), which no launcher trusts.
 const retroHostFixture = 'test/fixtures/retro_host_release';
 
+/// A host release with PS2, recorded in test/fixtures/retro_host_release_ps2: each system's zip and
+/// `.files` packed from small stand-in files by the host repository's tools/package_release.py at
+/// its `ps2-release` branch (4441cc2), which puts LRPS2 (`pcsx2_libretro`) beside the host and
+/// SwanStation, SHA256SUMS from its `--sums`, and SHA256SUMS.sig signed by [retroHostFixtureKey]
+/// as the release in [retroHostFixture] is. It has no source archive.
+const retroHostPs2Fixture = 'test/fixtures/retro_host_release_ps2';
+
 /// The fixture key's public half, release-signing.pub's format: the only key its release passes.
 List<ReleaseKey> retroHostFixtureKeys() =>
     ReleaseSigning.keysFrom(File(p.join(retroHostFixture, 'test-release-signing.pub')).readAsStringSync());
@@ -61,11 +68,13 @@ const retroHostFixtureVersion = '1.0.0';
 FakeRelease retroHostFixtureRelease({String tag = 'v$retroHostFixtureVersion', String? signedAs}) =>
     FakeRelease(tag, retroHostFixtureFiles(version: signedAs ?? tag.substring(1)));
 
-/// The release unpacked into [into] as a download leaves it, for [system] (this one by default).
-Future<void> installRetroHostFixture(Directory into, {RetroHostSystem? system}) => RetroHostRelease.install(
-  Directory(retroHostFixture),
-  into,
-  tag: 'v$retroHostFixtureVersion',
-  keys: retroHostFixtureKeys(),
-  system: system,
-);
+/// The release unpacked into [into] as a download leaves it, for [system] (this one by default):
+/// [retroHostFixture], or with [ps2] the release with LRPS2 ([retroHostPs2Fixture]).
+Future<void> installRetroHostFixture(Directory into, {RetroHostSystem? system, bool ps2 = false}) =>
+    RetroHostRelease.install(
+      Directory(ps2 ? retroHostPs2Fixture : retroHostFixture),
+      into,
+      tag: 'v$retroHostFixtureVersion',
+      keys: retroHostFixtureKeys(),
+      system: system,
+    );

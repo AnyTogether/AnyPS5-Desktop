@@ -37,6 +37,21 @@ void main() {
     expect((found?.host, found?.core, found?.checked), (host, core.path, false));
   });
 
+  test('LRPS2 beside that host is its PS2 core, unchecked like it; a host without one has none', () {
+    for (final system in HostSystem.values) {
+      final core = File(p.join(folder.path, RetroHostInstall.coreName(system)))..createSync();
+      final environment = {'ANYPS5_RETRO_HOST': host};
+      expect(RetroHostInstall.locate(environment, build: RetroHostBuild.test, system: system)?.ps2Core, isNull);
+      final ps2 = File(p.join(folder.path, RetroHostInstall.ps2CoreName(system)))..createSync();
+      final found = RetroHostInstall.locate(environment, build: RetroHostBuild.test, system: system);
+      expect((found?.core, found?.ps2Core, found?.checked), (core.path, ps2.path, false));
+      core.deleteSync();
+      ps2.deleteSync();
+    }
+    expect(RetroHostInstall.ps2CoreName(HostSystem.windows), 'pcsx2_libretro.dll');
+    expect(RetroHostInstall.ps2CoreName(HostSystem.linux), 'pcsx2_libretro.so');
+  });
+
   test('a release build ignores the variable, as protocol.md says, whatever else the environment holds', () {
     File(p.join(folder.path, RetroHostInstall.coreName(HostSystem.current))).createSync();
     final environment = {'ANYPS5_RETRO_HOST': host, RetroHostBuild.testDefine: 'true'};

@@ -276,6 +276,7 @@ void main() {
             'linux-arm64',
             executable: 'anyps5-retro-host',
             core: 'swanstation_libretro.so',
+            ps2Core: 'pcsx2_libretro.so',
           ),
         ),
       ),

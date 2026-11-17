@@ -28,28 +28,33 @@ class RetroHostNotReleased extends RetroHostReleaseFailure {
 }
 
 /// One system a host release is built for: `<os>-<arch>` in its file names, and the names of the
-/// host and of SwanStation inside its zip (the host repository's tools/package_release.py).
+/// host, of SwanStation and of LRPS2 inside its zip (the host repository's
+/// tools/package_release.py). A release that does not ship LRPS2 has no [ps2Core] in its zip.
 class RetroHostSystem {
-  const RetroHostSystem(this.name, {required this.executable, required this.core});
+  const RetroHostSystem(this.name, {required this.executable, required this.core, required this.ps2Core});
 
   final String name;
   final String executable;
   final String core;
+  final String ps2Core;
 
   static const windowsX64 = RetroHostSystem(
     'windows-x64',
     executable: 'anyps5-retro-host.exe',
     core: 'swanstation_libretro.dll',
+    ps2Core: 'pcsx2_libretro.dll',
   );
   static const linuxX64 = RetroHostSystem(
     'linux-x64',
     executable: 'anyps5-retro-host',
     core: 'swanstation_libretro.so',
+    ps2Core: 'pcsx2_libretro.so',
   );
   static const macosArm64 = RetroHostSystem(
     'macos-arm64',
     executable: 'anyps5-retro-host',
     core: 'swanstation_libretro.dylib',
+    ps2Core: 'pcsx2_libretro.dylib',
   );
 
   /// The system this launcher runs on, or null where no host is released.
@@ -103,6 +108,7 @@ class RetroHostChecked {
     required this.executable,
     required this.core,
     required this._files,
+    this.ps2Core,
     this.program,
   });
 
@@ -111,8 +117,13 @@ class RetroHostChecked {
   /// The host executable's path, the command's first argument.
   final String executable;
 
-  /// The SwanStation library the release ships: the only core a release launcher runs.
+  /// The SwanStation library the release ships: with [ps2Core], the only cores a release launcher
+  /// runs.
   final String core;
+
+  /// The LRPS2 library the release ships, checked with the others, or null when its `.files` lists
+  /// none: a release without PS2.
+  final String? ps2Core;
 
   /// Where the operating system takes the host from, when that is not [executable]: on Linux the
   /// checked descriptor, `/proc/self/fd/<n>`.
@@ -177,8 +188,10 @@ abstract final class RetroHostRelease {
   }
 
   /// The checks before each start: the signature, the tag kept on install against the signed
-  /// version, the `.files` against SHA256SUMS, and the host executable and SwanStation against the
-  /// `.files`, each hashed from a [CheckedFile] that stays held in the result.
+  /// version, the `.files` against SHA256SUMS, and the host executable, SwanStation and, when the
+  /// `.files` lists it, LRPS2 against the `.files`, each hashed from a [CheckedFile] that stays held
+  /// in the result. LRPS2 is checked for a PS1 game too, since one host plays the next game, PS1 or
+  /// PS2, on the cores checked when it started.
   static Future<RetroHostChecked> checkBeforeStart(
     Directory folder, {
     List<ReleaseKey>? keys,
@@ -198,9 +211,10 @@ abstract final class RetroHostRelease {
       throw RetroHostReleaseFailure('${release.filesName} does not match the signed release');
     }
     final files = parseFileList(listing);
+    final ps2 = files.containsKey(target.ps2Core);
     final held = <CheckedFile>[];
     try {
-      for (final name in [target.executable, target.core]) {
+      for (final name in [target.executable, target.core, if (ps2) target.ps2Core]) {
         final expected = files[name];
         if (expected == null) throw RetroHostReleaseFailure('${release.filesName} does not list $name');
         final CheckedFile file;
@@ -221,12 +235,15 @@ abstract final class RetroHostRelease {
       rethrow;
     }
     if (!Platform.isWindows) {
-      held[1].close();
+      for (final core in held.skip(1)) {
+        core.close();
+      }
     }
     return RetroHostChecked(
       version: release.version,
       executable: p.join(folder.path, target.executable),
       core: p.join(folder.path, target.core),
+      ps2Core: ps2 ? p.join(folder.path, target.ps2Core) : null,
       files: held,
       program: held[0].execPath,
     );

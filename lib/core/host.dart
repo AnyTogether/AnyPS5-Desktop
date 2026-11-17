@@ -112,6 +112,11 @@ class AppPaths {
   String get retroSystem => p.join(config, 'retro', 'system');
   String get retroSaves => p.join(config, 'retro', 'saves', 'ps1');
 
+  /// Where LRPS2 looks for the PS2 BIOS, `pcsx2/bios` in that same system directory
+  /// (anyps5-retro-host docs/protocol.md "start", `system`), and the PS2 games' memory cards.
+  String get retroPs2Bios => p.join(retroSystem, 'pcsx2', 'bios');
+  String get retroPs2Saves => p.join(config, 'retro', 'saves', 'ps2');
+
   String logFile(String titleId) => p.join(logs, '$titleId.log');
   String shaderCache(String slug) => p.join(cache, slug, 'shader_cache');
 }

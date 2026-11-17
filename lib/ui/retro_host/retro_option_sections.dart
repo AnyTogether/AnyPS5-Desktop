@@ -35,7 +35,8 @@ enum RetroOptionSection {
 ///   `CPU_RecompilerBlockLinking`, `CPU_FastmemMode`);
 /// - the light gun crosshair (`Controller_ShowCrosshair`): the host plugs in only DualShocks.
 ///
-/// Keys are `swanstation_<Group>_<Name>`; a key of another form is [RetroOptionSection.advanced].
+/// Keys are `swanstation_<Group>_<Name>`; a key of another form is [RetroOptionSection.advanced], as
+/// every LRPS2 option of a PS2 game is (`pcsx2_...`), its BIOS (`pcsx2_bios`) included.
 RetroOptionSection? retroOptionSection(String key) {
   const prefix = 'swanstation_';
   if (!key.startsWith(prefix)) return RetroOptionSection.advanced;
@@ -57,8 +58,10 @@ bool retroOptionShown(String key) => retroOptionSection(key) != null;
 
 /// Whether a value kept for [key] goes to a game's `start`: one the in-game menu shows. A graphics
 /// option is kept back too, since the launcher has no page yet where the player could see or
-/// change it.
-bool retroOptionSent(String key) {
+/// change it. The two cores' options share one list of values the player chose, so LRPS2's
+/// (`pcsx2_...`) go to a [ps2] game only and every other to a PS1 game only.
+bool retroOptionSent(String key, {bool ps2 = false}) {
+  if (key.startsWith('pcsx2_') != ps2) return false;
   final section = retroOptionSection(key);
   return section != null && section != RetroOptionSection.graphics;
 }

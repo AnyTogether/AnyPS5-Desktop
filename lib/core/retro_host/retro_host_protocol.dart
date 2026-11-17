@@ -47,6 +47,18 @@ const retroProtocolVersion = 1;
 /// The capability every method of version 1 needs.
 const retroCapabilityPs1 = 'ps1';
 
+/// The capability that plays PS2 games on LRPS2: `start.console` and `status.console`
+/// (protocol.md "Capabilities", anyps5-retro-host docs/ps2.md).
+const retroCapabilityPs2 = 'ps2';
+
+/// The consoles `start.console` names and `status.console` gives (capability [retroCapabilityPs2]).
+abstract final class RetroConsole {
+  static const ps1 = 'ps1';
+  static const ps2 = 'ps2';
+
+  static const all = {ps1, ps2};
+}
+
 /// The `errorCode` values a `status` can carry, and the two the client reports itself after a host
 /// failure (protocol.md "Host failure").
 abstract final class RetroErrorCode {
@@ -199,6 +211,7 @@ class RetroStatus {
     this.options = const {},
     this.cardUnreadable = false,
     this.discs,
+    this.console,
   });
 
   /// What the client reports from a host failure until the UI calls `release`.
@@ -213,7 +226,8 @@ class RetroStatus {
       progressPercent = null,
       options = const {},
       cardUnreadable = false,
-      discs = null;
+      discs = null,
+      console = null;
 
   final bool ready;
   final bool ended;
@@ -233,6 +247,10 @@ class RetroStatus {
 
   final RetroDiscs? discs;
 
+  /// The console the game was started as ([RetroConsole]); null from a host without
+  /// [retroCapabilityPs2].
+  final String? console;
+
   /// The most discs `status.discs.labels` may list.
   static const maxDiscs = 128;
 
@@ -248,6 +266,7 @@ class RetroStatus {
     'options': {for (final option in options.values) option.key: option.toJson()},
     'cardUnreadable': cardUnreadable,
     'discs': ?discs?.toJson(),
+    'console': ?console,
   };
 
   /// Whether [other] says the same as this status, field by field, as protocol.md "status" writes
@@ -264,8 +283,10 @@ class RetroStatus {
 
   /// Reads a `status` result, throwing [RetroProtocolError] for a field out of what protocol.md
   /// allows. Unknown fields are ignored. A host's `errorCode` of `hostExited` or `hostHung`, which
-  /// only the client may report, is read as `other` (protocol.md "status").
-  static RetroStatus parse(Map<String, Object?> map) {
+  /// only the client may report, is read as `other` (protocol.md "status"). A host that lists
+  /// [retroCapabilityPs2] ([ps2]) sends `console` in every status, `"ps1"` or `"ps2"`; any other
+  /// host's `console` is ignored.
+  static RetroStatus parse(Map<String, Object?> map, {bool ps2 = false}) {
     final f = RetroFields(map, 'status');
     final options = <String, RetroOption>{};
     final optionFields = f.object('options');
@@ -327,6 +348,13 @@ class RetroStatus {
       options: options,
       cardUnreadable: f.has('cardUnreadable') && f.boolean('cardUnreadable'),
       discs: discs,
+      console: ps2 ? _console(f) : null,
     );
+  }
+
+  static String _console(RetroFields f) {
+    final console = f.string('console');
+    if (!RetroConsole.all.contains(console)) throw RetroProtocolError('status.console $console is unknown.');
+    return console;
   }
 }

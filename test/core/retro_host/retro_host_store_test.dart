@@ -128,7 +128,12 @@ void main() {
 
   test('a release that names no host for this system is not available', () async {
     github.releases.add(retroHostFixtureRelease());
-    const other = RetroHostSystem('linux-arm64', executable: 'anyps5-retro-host', core: 'swanstation_libretro.so');
+    const other = RetroHostSystem(
+      'linux-arm64',
+      executable: 'anyps5-retro-host',
+      core: 'swanstation_libretro.so',
+      ps2Core: 'pcsx2_libretro.so',
+    );
     final error = await failure(store(on: other).fetch(await newest()));
     expect(error.kind, ToolkitFailureKind.notAvailable);
     expect(error.message, contains('no host for linux-arm64'));

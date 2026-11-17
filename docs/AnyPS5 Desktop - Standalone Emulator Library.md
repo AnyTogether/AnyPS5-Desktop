@@ -22,7 +22,10 @@ download from the host's releases, checked before every game (a debug build can
 run the host `ANYPS5_RETRO_HOST` names instead). Once a host is there,
 **Run PS1 games in the separate host** appears, off by default and turned on by
 the first download. With it on, a PS1 disc plays in the launcher's own window
-through that host instead of DuckStation, and needs no DuckStation. That path is
+through that host instead of DuckStation, and needs no DuckStation. Where the
+host has LRPS2, the PS2 core, beside it, **Run PS2 games in the separate host**
+and **PS2 BIOS folder** do the same for PS2 discs instead of PCSX2; a host
+without it says PS2 games stay in PCSX2. That path is
 described in [The emulator host in the launcher](<AnyPS5 Desktop - Emulator Host UI.md>).
 
 ## Discovery
@@ -30,8 +33,14 @@ described in [The emulator host in the launcher](<AnyPS5 Desktop - Emulator Host
 [Game discovery](../lib/core/game_library.dart) recognizes PS1 cue sheets
 with local tracks, PBP files and local M3U playlists, PS2 ISO images with
 a PS2 boot entry, and CHD images under a console-named PS1 or PS2 folder.
-Any cue sheet with a data track outside a PS2 folder, and any PBP (PSP ones
-included), is listed as PS1.
+Under a folder named for PS2 alone (`PS2` or `PlayStation 2`), a cue sheet
+with its tracks is a PS2 disc, and so are CSO and ZSO images (compressed
+ISOs) whose header says `CISO` or `ZISO`; outside one, a CSO or ZSO is not
+listed, since PSP games use them too. Any other cue sheet with a data track,
+and any PBP (PSP ones included), is listed as PS1. These are the PS2 disc
+files the emulator host takes, but `.elf`, a PS2 program rather than a disc,
+which a `retro.json` may name (with `.iso`, `.chd`, `.cso`, `.zso` or `.cue`)
+but a scan never lists on its own.
 [PS3 disc discovery](../lib/core/ps3_disc.dart) reads the title from
 `PS3_GAME/PARAM.SFO` in an extracted disc folder. The file
 `PS3_GAME/USRDIR/EBOOT.BIN` is the RPCS3 launch target. A PS1 or PS2 game

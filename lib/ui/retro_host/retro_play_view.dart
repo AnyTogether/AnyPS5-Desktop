@@ -6,7 +6,7 @@ import '../strings.dart';
 import '../theme.dart';
 import 'retro_host_game_view.dart';
 
-/// A PS1 game playing in the launcher's window through the emulator host: its picture over the
+/// A PS1 or PS2 game playing in the launcher's window through the emulator host: its picture over the
 /// whole window, the loading screen while it starts, and its error screen when it stopped on one.
 class RetroPlayView extends StatelessWidget {
   const RetroPlayView({super.key, required this.model, required this.play});
@@ -34,7 +34,10 @@ class RetroPlayView extends StatelessWidget {
                 text: T.text(problem),
                 accent: model.accentChoice.color,
                 action: T.text('retroHostBack'),
-                optionsAction: problem == retroHostBiosProblem ? T.text('retroHostBiosFolder') : null,
+                optionsAction: switch (retroBiosFolderOf(problem)) {
+                  final folder? => T.text(folder),
+                  null => null,
+                },
               )
             else if (play.loading && !play.closing)
               RetroGameNotice(

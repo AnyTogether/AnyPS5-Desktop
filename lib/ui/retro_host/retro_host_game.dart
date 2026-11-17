@@ -128,6 +128,11 @@ class RetroHostGame extends ChangeNotifier {
   String? get failure => _failure;
   String? _failure;
 
+  /// The game was a PS2 one and its host does not list `ps2`, so it was never started: that host
+  /// plays PS1 games only and needs updating for PS2.
+  bool get consoleRefused => _consoleRefused;
+  bool _consoleRefused = false;
+
   /// How the host's connection ended; null while it is open. [RetroHostEnd.unsupported] means
   /// the host speaks no protocol version this launcher does: the emulator needs updating.
   RetroHostEnd? get hostEnd => _hostEnd;
@@ -156,6 +161,11 @@ class RetroHostGame extends ChangeNotifier {
     try {
       await session.ready;
       if (_phase != RetroHostGamePhase.starting) return;
+      if (request.console == RetroConsole.ps2 && !session.canPlayPs2) {
+        _consoleRefused = true;
+        _end(failure: 'The host does not list the $retroCapabilityPs2 capability.');
+        return;
+      }
       await session.startGame(request.toArgs());
     } on Object catch (error) {
       if (_phase == RetroHostGamePhase.starting) _end(failure: '$error');

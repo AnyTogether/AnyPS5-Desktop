@@ -294,10 +294,14 @@ abstract final class GameLibrary {
     }
   }
 
-  /// The discs among [files], all in [folder]: cue sheets whose tracks are all there, PBP files,
-  /// PS2 ISOs, CHDs under a folder named for one console, and the playlists that gather a game's
-  /// discs (the discs they list are not games of their own then). What is read from each file
-  /// comes from [_RetroScan.cache] while the file is unchanged.
+  /// The discs among [files], all in [folder]: cue sheets whose tracks are all there (PS2 discs
+  /// under a folder named for PS2 alone, PS1 discs anywhere else), PBP files, PS2 ISOs, CHDs under
+  /// a folder named for one console, CSO and ZSO images (compressed ISOs, which PSP games use too)
+  /// under a folder named for PS2 alone, and the playlists that gather a PS1 game's discs (the discs
+  /// they list are not games of their own then). These are the PS2 disc files the emulator host
+  /// takes (anyps5-retro-host docs/protocol.md "start"), but `.elf`, a program rather than a disc,
+  /// which only a game's own `retro.json` names. What is read from each file comes from
+  /// [_RetroScan.cache] while the file is unchanged.
   static List<Game> _scanRetroFiles(String folder, Iterable<File> files, _RetroScan retro) {
     final cache = retro.cache;
     final discs = <String, RetroPlatform>{};
@@ -310,10 +314,10 @@ abstract final class GameLibrary {
         switch (p.extension(file.path).toLowerCase()) {
           case '.m3u':
             playlists.add(file);
-          case '.cue' when !ps2Folder:
+          case '.cue' when !(ps1Folder && ps2Folder):
             final local = cache.read(file, () => _cueFiles(file))?.map((name) => _localDiscFile(folder, name)).toList();
             if (local != null && local.isNotEmpty && local.every((path) => path != null)) {
-              discs[file.path] = RetroPlatform.ps1;
+              discs[file.path] = ps2Folder ? RetroPlatform.ps2 : RetroPlatform.ps1;
               tracks[file.path] = local.nonNulls.toList();
             }
           case '.pbp' when cache.read(file, () => _fileMagic(file, [0, 80, 66, 80])):
@@ -321,6 +325,10 @@ abstract final class GameLibrary {
           case '.chd' when ps1Folder != ps2Folder && cache.read(file, () => _fileMagic(file, ascii.encode('MComprHD'))):
             discs[file.path] = ps1Folder ? RetroPlatform.ps1 : RetroPlatform.ps2;
           case '.iso' when cache.read(file, () => _ps2Iso(file)):
+            discs[file.path] = RetroPlatform.ps2;
+          case '.cso' when ps2Folder && !ps1Folder && cache.read(file, () => _fileMagic(file, ascii.encode('CISO'))):
+            discs[file.path] = RetroPlatform.ps2;
+          case '.zso' when ps2Folder && !ps1Folder && cache.read(file, () => _fileMagic(file, ascii.encode('ZISO'))):
             discs[file.path] = RetroPlatform.ps2;
         }
       } on FileSystemException {
@@ -591,7 +599,7 @@ abstract final class GameLibrary {
 
       final disc = localFile('disc', switch (platform) {
         RetroPlatform.ps1 => {'.cue', '.chd', '.m3u', '.pbp'},
-        RetroPlatform.ps2 => {'.iso', '.chd'},
+        RetroPlatform.ps2 => {'.iso', '.chd', '.cso', '.zso', '.cue', '.elf'},
         RetroPlatform.ps3 => {'.sfb'},
       });
       if (disc == null) return null;

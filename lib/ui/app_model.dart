@@ -60,7 +60,7 @@ import '../core/relinker_flags.dart';
 import '../core/retro_host/retro_host_client.dart' show RetroHostClient, RetroHostEnd;
 import '../core/retro_host/retro_host_build.dart';
 import '../core/retro_host/retro_host_install.dart';
-import '../core/retro_host/retro_host_protocol.dart' show RetroErrorCode, RetroOption, RetroStatus;
+import '../core/retro_host/retro_host_protocol.dart' show RetroConsole, RetroErrorCode, RetroOption, RetroStatus;
 import '../core/retro_host/retro_host_release.dart' show RetroHostChecked, RetroHostReleaseFailure;
 import '../core/retro_host/retro_host_session.dart' show RetroHostSession, RetroHostStartRequest;
 import '../core/retro_host/retro_keyboard.dart';
@@ -168,6 +168,7 @@ class Preferences {
     }
     ..showRetroFolders = json['showRetroFolders'] == true
     ..retroHostPs1 = json['retroHostPs1'] == true
+    ..retroHostPs2 = json['retroHostPs2'] == true
     ..retroHostVolume = switch (json['retroHostVolume']) {
       final num value => value.toInt().clamp(0, 100),
       _ => 100,
@@ -304,6 +305,11 @@ class Preferences {
   /// launcher's window through the emulator host (retro_host_play.dart) instead of DuckStation.
   /// Off until turned on; it acts only where a host is found ([RetroHostInstall.locate]).
   bool retroHostPs1 = false;
+
+  /// Settings › Emulators › Run PS2 games in the separate host: a PS2 disc plays in the launcher's
+  /// window through the emulator host instead of PCSX2. Off until turned on; it acts only where the
+  /// host has LRPS2 beside it ([RetroHostInstall.ps2Core]).
+  bool retroHostPs2 = false;
 
   /// The emulator host's volume in percent and whether it is muted, as the player last set them
   /// in the game's menu; every PS1 game in the host starts with them.
@@ -502,6 +508,7 @@ class Preferences {
     if (retroEmulators.isNotEmpty) 'retroEmulators': retroEmulators,
     if (showRetroFolders) 'showRetroFolders': true,
     if (retroHostPs1) 'retroHostPs1': true,
+    if (retroHostPs2) 'retroHostPs2': true,
     if (retroHostVolume != 100) 'retroHostVolume': retroHostVolume,
     if (retroHostMuted) 'retroHostMuted': true,
     if (retroHostOptions.isNotEmpty) 'retroHostOptions': retroHostOptions,

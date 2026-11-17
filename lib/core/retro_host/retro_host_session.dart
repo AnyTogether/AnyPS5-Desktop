@@ -41,6 +41,9 @@ abstract interface class RetroHostSession implements RetroFrameSource {
   /// The controller state of one port.
   void input(int port, int buttons, {int leftX = 0, int leftY = 0, int rightX = 0, int rightY = 0});
 
+  /// Whether the host lists `ps2`, so a PS2 game can be started on it ([RetroHostStartRequest.console]).
+  bool get canPlayPs2;
+
   /// Asks the host to stop its game and exit.
   void shutdown();
 
@@ -57,12 +60,14 @@ class RetroHostStartRequest {
     required this.saves,
     this.options = const {},
     this.initialDisc,
+    this.console,
   });
 
-  /// The SwanStation library the launcher checked.
+  /// The SwanStation library the launcher checked, or for a PS2 game the LRPS2 library.
   final String core;
 
-  /// A `.cue`, `.chd`, `.pbp` or `.m3u` file.
+  /// A `.cue`, `.chd`, `.pbp` or `.m3u` file; for a PS2 game a `.iso`, `.chd`, `.cso`, `.zso`,
+  /// `.cue` or `.elf` file.
   final String disc;
 
   /// The core's system directory (BIOS files).
@@ -77,7 +82,12 @@ class RetroHostStartRequest {
   /// Only for an `.m3u`: the playlist entry to insert at boot, 0 to 127.
   final int? initialDisc;
 
+  /// [RetroConsole.ps2] for a PS2 game, which only a host that lists `ps2` takes; null for a PS1
+  /// game, the host's default, so a PS1 start is the same on every host.
+  final String? console;
+
   Map<String, Object?> toArgs() => {
+    'console': ?console,
     'core': core,
     'disc': disc,
     'system': system,
