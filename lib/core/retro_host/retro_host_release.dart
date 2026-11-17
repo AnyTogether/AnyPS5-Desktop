@@ -294,10 +294,24 @@ abstract final class RetroHostRelease {
     return release.version;
   }
 
+  /// Puts the host back after a launcher stopped between [_replace]'s two renames: [into] is
+  /// missing and `<into>.old` is there. Every start checks the host put back all the same.
+  static void restore(Directory into) {
+    final old = Directory('${into.path}.old');
+    if (into.existsSync() || !old.existsSync()) return;
+    try {
+      old.renameSync(into.path);
+    } on FileSystemException {
+      // Left for the next look or install.
+    }
+  }
+
   /// Puts [staging] in the place of [into] whole or not at all: [into] is first moved aside to
   /// `<into>.old`, which fails while a host started from it holds its files on Windows, so a host
-  /// in use is never left half deleted. The old folder is removed afterwards when it can be.
+  /// in use is never left half deleted. The old folder is removed afterwards when it can be. A
+  /// launcher stopped between the two renames leaves only `<into>.old`, which [restore] puts back.
   static void _replace(Directory into, Directory staging) {
+    restore(into);
     final old = Directory('${into.path}.old');
     if (old.existsSync()) {
       try {

@@ -214,6 +214,12 @@ where the maintainers sign.
   place, and `host.old` is removed. On Windows the first move fails while a host started from that folder still
   holds its files. The install then stops with the old host whole ("the host
   is in use"), never half deleted. Stop the host before installing.
+- **A launcher stopped between the two renames.** It leaves no `host` and
+  the old host in `host.old`. `RetroHostRelease.restore` puts `host.old`
+  back whenever `host` is missing: on the next look for the installed host
+  (`RetroHostStore.installed`, when the launcher starts) and before the next
+  install's renames. The host put back is checked before every start, like
+  any other.
 - **Before each start** (`checkBeforeStart`, through `RetroHostStore.check`).
   The signature is checked again, then the kept tag against the signed
   version, then the `.files` against `SHA256SUMS`, then
@@ -470,7 +476,9 @@ reads the fixture for the tests. They check:
 - that on Linux a real program started from a checked release runs from the
   checked descriptor even after its path was replaced, and that the
   descriptor does not reach it;
-- that installing over a host replaces it whole, and that on Windows a host whose files are held is
+- that installing over a host replaces it whole, that a launcher stopped
+  between the two renames gets its old host back (and that the next install
+  over that state works), and that on Windows a host whose files are held is
   left whole and is replaced once they are let go.
 
 Tests that change the release sign the copy again with keys of their own,
@@ -495,7 +503,8 @@ checks that the newest signed release at or above the minimum is taken, never
 a pre-release. A release without a signature downloads nothing, and one signed
 by an untrusted key stops after the sums. An older signed release published
 again under a higher tag also stops after the sums, a newer one installs as
-its tag's version (and not under another tag). A changed zip is refused before it is
+its tag's version (and not under another tag), and a host left in `host.old`
+is found again. A changed zip is refused before it is
 unpacked, a release with no host for this system is not available, and a
 stopped download resumes.
 

@@ -340,7 +340,9 @@ the hosts shut down as it goes may not have exited yet. The launcher does not
 wait for one already being put in place, and quitting can cut it short. That
 leaves no half-replaced host: `RetroHostRelease.install` writes the new files
 into `RetroHost/host.new` and only then swaps the folders with two renames in
-one synchronous step, so the old host stays whole until then. The next start checks the installed
+one synchronous step, so the old host stays whole until then. A launcher stopped
+between the two renames leaves the old host in `host.old`, and the next start
+puts it back (`RetroHostRelease.restore`). The next start checks the installed
 host anyway, and a missing host is offered for download again. The first host installed turns the setting
 below on, since the player asked for the emulator to play PS1 games with it.
 

@@ -485,6 +485,24 @@ void main() {
       (await RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _current)).release();
     });
 
+    test('a launcher stopped between the two renames gets its old host back, checked as before', () async {
+      await RetroHostRelease.install(download(), installed(), tag: 'v1.0.0', keys: keys, system: _current);
+      installed().renameSync('${installed().path}.old');
+      Directory('${installed().path}.new').createSync();
+      File(p.join('${installed().path}.new', 'half-written')).writeAsStringSync('part\n');
+      RetroHostRelease.restore(installed());
+      expect(Directory('${installed().path}.old').existsSync(), isFalse);
+      (await RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _current)).release();
+      RetroHostRelease.restore(installed());
+      (await RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _current)).release();
+
+      installed().renameSync('${installed().path}.old');
+      await RetroHostRelease.install(download(), installed(), tag: 'v1.0.0', keys: keys, system: _current);
+      expect(Directory('${installed().path}.new').existsSync(), isFalse);
+      expect(Directory('${installed().path}.old').existsSync(), isFalse);
+      (await RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _current)).release();
+    });
+
     test('on Windows a host whose files are held is left whole, and replaced once they are let go', () async {
       await RetroHostRelease.install(download(), installed(), tag: 'v1.0.0', keys: keys, system: _windows);
       final checked = await RetroHostRelease.checkBeforeStart(installed(), keys: keys, system: _windows);

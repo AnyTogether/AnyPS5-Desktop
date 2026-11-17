@@ -162,6 +162,17 @@ void main() {
     (await host.check()).release();
   });
 
+  test('a host left in host.old by a launcher stopped while putting a new one in place is found again', () async {
+    github.releases.add(retroHostFixtureRelease());
+    final host = store();
+    await host.putInPlace(await host.fetch(await newest()));
+    host.folder.renameSync('${host.folder.path}.old');
+    final found = store().installed();
+    expect(found?.host, p.join(host.folder.path, 'anyps5-retro-host.exe'));
+    expect(Directory('${host.folder.path}.old').existsSync(), isFalse);
+    (await host.check()).release();
+  });
+
   test('a stopped download keeps what came, and the next try carries on', () async {
     github.releases.add(retroHostFixtureRelease());
     final zip = 'anyps5-retro-host-1.0.0-windows-x64.zip';

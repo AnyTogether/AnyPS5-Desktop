@@ -42,10 +42,14 @@ class RetroHostStore {
   Directory get folder => Directory(p.join(root, 'host'));
   String get _downloads => p.join(root, '.downloads');
 
-  /// The host to start, when its files are there; it is checked before each start ([check]).
+  /// The host to start, when its files are there; it is checked before each start ([check]). A
+  /// host left in `host.old` by a launcher stopped in the middle of putting a new one in place is
+  /// put back first ([RetroHostRelease.restore]).
   RetroHostInstall? installed() {
     final target = system;
-    if (target == null || version == null) return null;
+    if (target == null) return null;
+    RetroHostRelease.restore(folder);
+    if (version == null) return null;
     final host = p.join(folder.path, target.executable);
     final core = p.join(folder.path, target.core);
     if (!File(host).existsSync() || !File(core).existsSync()) return null;
