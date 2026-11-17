@@ -339,8 +339,9 @@ already fetched is not put in place (`RetroHostDownloadModel.close`), since
 the hosts shut down as it goes may not have exited yet. The launcher does not
 wait for one already being put in place, and quitting can cut it short. That
 leaves no half-replaced host: `RetroHostRelease.install` writes the new files
-into `RetroHost/host.new` and only then swaps the folders with two renames in
-one synchronous step, so the old host stays whole until then. A launcher stopped
+into `RetroHost/host.new` on another isolate, so the window stays responsive,
+and only then swaps the folders with two renames in one synchronous step on
+the UI isolate, so the old host stays whole until then. A launcher stopped
 between the two renames leaves the old host in `host.old`, and the next start
 puts it back (`RetroHostRelease.restore`). The next start checks the installed
 host anyway, and a missing host is offered for download again. The first host installed turns the setting

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
@@ -234,8 +235,9 @@ abstract final class RetroHostRelease {
   /// The checks on download, then the unpacking: the signature, the signed version against [tag],
   /// the zip and the `.files` against SHA256SUMS, and every file of the zip against the `.files`.
   /// [download] holds the files as published under [tag]; [into] is replaced by the unpacked zip
-  /// with SHA256SUMS, SHA256SUMS.sig, the `.files` and the tag ([tagName]) beside it. Gives the
-  /// version installed.
+  /// with SHA256SUMS, SHA256SUMS.sig, the `.files` and the tag ([tagName]) beside it. The reading,
+  /// hashing and writing run on another isolate, so the window stays responsive; only the two
+  /// renames that put the new host in place run here. Gives the version installed.
   static Future<RetroHostVersion> install(
     Directory download,
     Directory into, {
@@ -245,18 +247,41 @@ abstract final class RetroHostRelease {
     RetroHostVersion minimum = minimumVersion,
   }) async {
     final target = system ?? _currentSystem();
-    final sumsBytes = _readSmall(p.join(download.path, ReleaseSigning.sumsName));
-    final signatureBytes = _readSmall(p.join(download.path, ReleaseSigning.signatureName));
-    final release = signed(sumsBytes, signatureBytes, tag: tag, keys: keys, system: target, minimum: minimum);
+    final from = download.path;
+    final staging = Directory('${into.path}.new');
+    final stagingPath = staging.path;
+    final version = await Isolate.run(
+      () => _stage(from, stagingPath, tag: tag, keys: keys, system: target, minimum: minimum),
+    );
+    try {
+      _replace(into, staging);
+    } on Object {
+      if (staging.existsSync()) staging.deleteSync(recursive: true);
+      rethrow;
+    }
+    return version;
+  }
+
+  /// [install]'s checks and unpacking into [stagingPath], on its own isolate.
+  static Future<RetroHostVersion> _stage(
+    String download,
+    String stagingPath, {
+    required String tag,
+    required List<ReleaseKey>? keys,
+    required RetroHostSystem system,
+    required RetroHostVersion minimum,
+  }) async {
+    final sumsBytes = _readSmall(p.join(download, ReleaseSigning.sumsName));
+    final signatureBytes = _readSmall(p.join(download, ReleaseSigning.signatureName));
+    final release = signed(sumsBytes, signatureBytes, tag: tag, keys: keys, system: system, minimum: minimum);
     final sums = release.sums;
-    final listing = _readSmall(p.join(download.path, release.filesName));
+    final listing = _readSmall(p.join(download, release.filesName));
     if (sha256.convert(listing).toString() != sums.digestFor(release.filesName)) {
       throw RetroHostReleaseFailure('${release.filesName} does not match the signed release');
     }
-    final zipPath = p.join(download.path, release.zipName);
     final List<int> zipBytes;
     try {
-      zipBytes = await File(zipPath).readAsBytes();
+      zipBytes = File(p.join(download, release.zipName)).readAsBytesSync();
     } on FileSystemException {
       throw RetroHostReleaseFailure('${release.zipName} is missing');
     }
@@ -264,12 +289,12 @@ abstract final class RetroHostRelease {
       throw RetroHostReleaseFailure('${release.zipName} does not match the signed release');
     }
     final files = parseFileList(listing);
-    for (final name in [target.executable, target.core]) {
+    for (final name in [system.executable, system.core]) {
       if (!files.containsKey(name)) throw RetroHostReleaseFailure('${release.filesName} does not list $name');
     }
     final unpacked = _unpack(zipBytes, files, release.zipName);
 
-    final staging = Directory('${into.path}.new');
+    final staging = Directory(stagingPath);
     if (staging.existsSync()) staging.deleteSync(recursive: true);
     staging.createSync(recursive: true);
     try {
@@ -283,10 +308,9 @@ abstract final class RetroHostRelease {
       File(p.join(staging.path, release.filesName)).writeAsBytesSync(listing, flush: true);
       File(p.join(staging.path, tagName)).writeAsStringSync(tag, flush: true);
       if (!Platform.isWindows) {
-        final made = await Process.run('chmod', ['755', p.join(staging.path, target.executable)]);
+        final made = await Process.run('chmod', ['755', p.join(staging.path, system.executable)]);
         if (made.exitCode != 0) throw const RetroHostReleaseFailure('the host could not be made executable');
       }
-      _replace(into, staging);
     } on Object {
       if (staging.existsSync()) staging.deleteSync(recursive: true);
       rethrow;

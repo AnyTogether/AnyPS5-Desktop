@@ -210,8 +210,11 @@ where the maintainers sign.
   `SHA256SUMS`, then every file in the zip against the `.files`. A file that
   is missing, an extra file, or a symbolic link is refused, and so is any name
   with `..`, `\`, `:` or an empty part. Only then is the zip written out, into `host.new`. The
-  old host is moved aside to `host.old` first, then `host.new` takes its
-  place, and `host.old` is removed. On Windows the first move fails while a host started from that folder still
+  reading, hashing and writing run on another isolate (`Isolate.run`), so the
+  window stays responsive through a large zip. The two renames then run on
+  the UI isolate, one after the other: the old host is moved aside to
+  `host.old`, `host.new` takes its place, and `host.old` is removed. On
+  Windows the first move fails while a host started from that folder still
   holds its files. The install then stops with the old host whole ("the host
   is in use"), never half deleted. Stop the host before installing.
 - **A launcher stopped between the two renames.** It leaves no `host` and
