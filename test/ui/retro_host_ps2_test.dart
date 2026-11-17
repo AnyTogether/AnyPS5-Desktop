@@ -5,14 +5,17 @@ import 'package:anyps5_desktop/core/host.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_install.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_protocol.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_release.dart';
+import 'package:anyps5_desktop/core/retro_host/retro_host_store.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/retro_host/retro_host_game.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
+import '../support/fake_github.dart';
 import '../support/ps1_launcher.dart';
 import '../support/ps2_host_recording.dart';
+import '../support/retro_host_release_fixture.dart';
 import 'retro_host/real_host_support.dart' show until;
 
 /// PS2 discs in the emulator host (anyps5-retro-host docs/ps2.md): Settings › Emulators' PS2 rows,
@@ -47,13 +50,9 @@ void main() {
   });
 
   test('a PS2 cue sheet, which PCSX2 does not boot, is in the library only while PS2 discs play in the host', () {
-    launcher = Ps1Launcher(ps2: true);
+    launcher = Ps1Launcher(ps2: true)..addPs2CueSheet('Cue Racer');
     final model = launcher.model;
-    final folder = Directory(p.join(model.root!, 'PS2', 'Cue Racer'))..createSync(recursive: true);
-    File(p.join(folder.path, 'Cue Racer.bin')).createSync();
-    File(p.join(folder.path, 'Cue Racer.cue'))
-        .writeAsStringSync('FILE "Cue Racer.bin" BINARY\n  TRACK 01 MODE2/2352\n');
-    bool listed() => model.games.any((game) => game.name == 'Cue Racer');
+    bool listed() => launcher.lists('Cue Racer');
     model.rescan();
     expect(listed(), isFalse, reason: 'it would start in PCSX2');
     model.setRetroHostPs2(true);
@@ -217,6 +216,38 @@ void main() {
       await model.play(launcher.game);
       expect(launcher.opened, isEmpty);
       expect(model.toast, T.text('retroHostCheckFailed'));
+    });
+
+    group('downloaded', () {
+      late FakeGitHub github;
+      setUp(() async {
+        HttpOverrides.global = null;
+        github = await FakeGitHub.start(repository: RetroHostStore.repository);
+      });
+      tearDown(() async => github.close());
+
+      test('one that adds LRPS2 lists PS2 cue sheets, and a newer one without it hides them again', () async {
+        github.releases.add(retroHostFixtureRelease(ps2: true));
+        launcher = Ps1Launcher(hostFound: false, retroHostApi: github.api)..addPs2CueSheet('Cue Racer');
+        final model = launcher.model..setRetroHostPs2(true);
+        expect(model.playsInHost(RetroPlatform.ps2), isFalse, reason: 'no host yet');
+        expect(launcher.lists('Cue Racer'), isFalse, reason: 'it would start in PCSX2');
+
+        await model.retroHostDownload.download();
+        expect(model.toast, T.format('retroHostReady', ['1.0.0']));
+        expect(model.retroHostInstall!.ps2Core, isNotNull);
+        expect(model.playsInHost(RetroPlatform.ps2), isTrue);
+        expect(launcher.lists('Cue Racer'), isTrue, reason: 'scanned again once the host gained LRPS2');
+        expect(model.games.singleWhere((game) => game.name == 'Cue Racer').retro!.platform, RetroPlatform.ps2);
+
+        github.releases.insert(0, retroHostFixtureRelease(tag: 'v1.0.1'));
+        await model.retroHostDownload.download();
+        expect(model.toast, T.format('retroHostReady', ['1.0.1']));
+        expect(model.retroHostInstall!.ps2Core, isNull);
+        expect(model.preferences.retroHostPs2, isTrue, reason: 'the setting is kept for a later host');
+        expect(model.playsInHost(RetroPlatform.ps2), isFalse);
+        expect(launcher.lists('Cue Racer'), isFalse, reason: 'scanned again once the host lost LRPS2');
+      });
     });
   });
 }

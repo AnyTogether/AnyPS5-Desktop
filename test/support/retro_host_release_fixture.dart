@@ -32,20 +32,21 @@ TestReleaseKey retroHostFixtureKey() => TestReleaseKey.fromPem(
   name: 'retro-host-test',
 );
 
-/// The release's files by name, as published: those SHA256SUMS lists, SHA256SUMS and its signature.
-/// With another [version], the same files named for that version and signed again by the fixture
-/// key, as the host repository would publish a newer release of them.
-Map<String, List<int>> retroHostFixtureFiles({String version = retroHostFixtureVersion}) {
-  final sums = File(p.join(retroHostFixture, ReleaseSigning.sumsName)).readAsBytesSync();
+/// The release's files by name, as published: those SHA256SUMS lists, SHA256SUMS and its signature;
+/// with [ps2], the release with LRPS2 ([retroHostPs2Fixture]). With another [version], the same
+/// files named for that version and signed again by the fixture key, as the host repository would
+/// publish a newer release of them.
+Map<String, List<int>> retroHostFixtureFiles({String version = retroHostFixtureVersion, bool ps2 = false}) {
+  final folder = ps2 ? retroHostPs2Fixture : retroHostFixture;
+  final sums = File(p.join(folder, ReleaseSigning.sumsName)).readAsBytesSync();
   final files = {
-    for (final name in ReleaseSigning.parseSums(sums).keys)
-      name: File(p.join(retroHostFixture, name)).readAsBytesSync(),
+    for (final name in ReleaseSigning.parseSums(sums).keys) name: File(p.join(folder, name)).readAsBytesSync(),
   };
   if (version == retroHostFixtureVersion) {
     return {
       ...files,
       ReleaseSigning.sumsName: sums,
-      ReleaseSigning.signatureName: File(p.join(retroHostFixture, ReleaseSigning.signatureName)).readAsBytesSync(),
+      ReleaseSigning.signatureName: File(p.join(folder, ReleaseSigning.signatureName)).readAsBytesSync(),
     };
   }
   final renamed = {
@@ -64,9 +65,10 @@ Map<String, List<int>> retroHostFixtureFiles({String version = retroHostFixtureV
 const retroHostFixtureVersion = '1.0.0';
 
 /// The release on a fake GitHub under [tag], as the host repository tags it: its files signed as
-/// the tag's version, or as [signedAs] for a release published under a tag it was not signed for.
-FakeRelease retroHostFixtureRelease({String tag = 'v$retroHostFixtureVersion', String? signedAs}) =>
-    FakeRelease(tag, retroHostFixtureFiles(version: signedAs ?? tag.substring(1)));
+/// the tag's version, or as [signedAs] for a release published under a tag it was not signed for;
+/// with [ps2], the release with LRPS2.
+FakeRelease retroHostFixtureRelease({String tag = 'v$retroHostFixtureVersion', String? signedAs, bool ps2 = false}) =>
+    FakeRelease(tag, retroHostFixtureFiles(version: signedAs ?? tag.substring(1), ps2: ps2));
 
 /// The release unpacked into [into] as a download leaves it, for [system] (this one by default):
 /// [retroHostFixture], or with [ps2] the release with LRPS2 ([retroHostPs2Fixture]).

@@ -98,6 +98,17 @@ class Ps1Launcher {
 
   /// The PS2 game, when the launcher was made with `ps2`.
   Game get ps2Game => model.games.singleWhere((game) => game.retro?.platform == RetroPlatform.ps2);
+
+  /// Puts the PS2 cue sheet [name] (and its bin) under a PS2 folder in the games folder: a disc
+  /// PCSX2 does not boot, so the library lists it only while PS2 discs play in the host.
+  void addPs2CueSheet(String name) {
+    final folder = Directory(p.join(model.root!, 'PS2', name))..createSync(recursive: true);
+    File(p.join(folder.path, '$name.bin')).createSync();
+    File(p.join(folder.path, '$name.cue')).writeAsStringSync('FILE "$name.bin" BINARY\n  TRACK 01 MODE2/2352\n');
+  }
+
+  /// Whether the library lists a game named [name].
+  bool lists(String name) => model.games.any((game) => game.name == name);
   final folders = <Directory>[];
 
   /// The fake hosts, in the order they are started; the first is the one given, if any.
