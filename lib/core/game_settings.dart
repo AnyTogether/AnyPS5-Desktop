@@ -147,7 +147,7 @@ class GameSettings {
 
     final controls = json['controls'];
     final tuning = json['tuning'];
-    final fullscreen = json['fullscreen'] is bool ? json['fullscreen'] as bool : null;
+    var fullscreen = json['fullscreen'] is bool ? json['fullscreen'] as bool : null;
     var windowSize = (json['windowSize'] as num?)?.toInt();
     var vsync = json['vsync'] is bool ? json['vsync'] as bool : null;
     if ((json['settingsVersion'] as num? ?? 1) < version) {
