@@ -10,6 +10,7 @@ class RetroPlay {
     required this.menu,
     required this.started,
     required this.program,
+    required this.core,
   });
 
   final Game game;
@@ -17,6 +18,9 @@ class RetroPlay {
 
   /// The host executable the game runs in, so its host is kept only for games of the same one.
   final String program;
+
+  /// The SwanStation library the game was started with.
+  final String core;
   final RetroHostControls controls;
   final RetroGameMenu menu;
   final DateTime started;
@@ -102,9 +106,11 @@ String? retroHostErrorKey(String errorCode) => switch (errorCode) {
   _ => 'retroHostOtherDetail',
 };
 
-/// Starts one emulator host for PS1 games, with the player's volume.
+/// Starts one emulator host for PS1 games, with the player's volume: [checked] is the check of a
+/// signed release's host ([RetroHostInstall.checked]), whose files the host holds until it exits.
 typedef RetroHostOpener = RetroHostSession Function(
   RetroHostInstall install, {
+  RetroHostChecked? checked,
   required double volume,
   required bool muted,
 });
@@ -123,6 +129,12 @@ const retroMenuSections = {
 /// window through the emulator host, with the launcher's controllers and keyboard, and the game's
 /// menu on PS.
 extension RetroHostPlaying on AppModel {
+  /// The host this build runs: in a debug build the one `ANYPS5_RETRO_HOST` names, unchecked;
+  /// otherwise the signed host downloaded in Settings › Emulators, checked before each start.
+  /// Null when neither is there. Neither is looked for here ([retroHostDebug],
+  /// [RetroHostDownloadModel.installed]).
+  RetroHostInstall? get retroHostInstall => retroHostDebug ?? retroHostDownload.installed;
+
   /// Whether [platform]'s discs play in the emulator host: PS1, with the setting on and a host
   /// found. Otherwise they go to the emulator chosen in Settings › Emulators, as before.
   bool playsInHost(RetroPlatform platform) =>
@@ -134,6 +146,10 @@ extension RetroHostPlaying on AppModel {
   /// Whether the game's own screen is in front: a game in the host and no layer over it.
   bool get retroInGame => retroPlay != null && overlay == null;
 
+  /// Shuts down the host kept for the next game and waits until it has exited, so its files are
+  /// no longer held: before the host is replaced by a download.
+  Future<void> stopKeptRetroHost() => retroHostKeeper.shutdown();
+
   void setRetroHostPs1(bool enabled) {
     if (preferences.retroHostPs1 == enabled) return;
     preferences.retroHostPs1 = enabled;
@@ -141,10 +157,13 @@ extension RetroHostPlaying on AppModel {
     _changed();
   }
 
-  /// Settings › Emulators' rows for the host, shown where a host is found.
+  /// Settings › Emulators' rows for the host: its download, and where a host is found, the
+  /// setting and the BIOS folder.
   List<PanelRow> _retroHostSettingsRows() {
-    if (retroHostInstall == null) return const [];
+    final download = retroHostDownload.rows(debugHost: retroHostDebug != null);
+    if (retroHostInstall == null) return download;
     return [
+      ...download,
       PanelRow(
         id: 'retro-host-ps1',
         title: T.text('retroHostPs1'),
@@ -176,6 +195,10 @@ extension RetroHostPlaying on AppModel {
   /// Starts [game]'s PS1 disc in a new emulator host and shows it in the launcher's window.
   Future<void> _playInHost(Game game, RetroDisc disc) async {
     if (starting != null || running != null || retroPlay != null) return;
+    if (retroHostDownload.installing) {
+      show(T.text('retroHostUpdating'));
+      return;
+    }
     final install = retroHostInstall;
     if (install == null) return;
     final allowed = together.family.beforePlay(game);
@@ -193,17 +216,46 @@ extension RetroHostPlaying on AppModel {
       _padLog?.call('emulator host: no BIOS folder: $error');
     }
 
+    if (!retroHostDownload.holdForStart()) {
+      show(T.text('retroHostUpdating'));
+      return;
+    }
+    try {
+      await _playInHeldHost(game, disc, install);
+    } finally {
+      retroHostDownload.releaseStart();
+    }
+  }
+
+  /// [_playInHost] once the installed host is held for the start, so no download replaces it
+  /// between its check and the game's play being set.
+  Future<void> _playInHeldHost(Game game, RetroDisc disc, RetroHostInstall install) async {
     final volume = preferences.retroHostVolume / 100;
     final muted = preferences.retroHostMuted;
+    final recheck = install.checked && retroHostKeeper.keeps(program: install.host);
+    if (recheck && !await _recheckKeptRetroHost(install)) return;
     final kept = retroHostKeeper.take(program: install.host);
     final RetroHostSession session;
     if (kept != null) {
       session = kept;
       _padLog?.call('emulator host: the kept ${install.host} plays the next game');
     } else {
+      RetroHostChecked? checked;
+      if (install.checked) {
+        try {
+          checked = await _checkRetroHost(install);
+        } on RetroHostReleaseFailure {
+          return;
+        }
+        if (_disposed || starting != null || running != null || retroPlay != null) {
+          checked?.release();
+          return;
+        }
+      }
       try {
-        session = openRetroHost(install, volume: volume, muted: muted);
+        session = openRetroHost(install, checked: checked, volume: volume, muted: muted);
       } on Object catch (error) {
+        checked?.release();
         _padLog?.call('emulator host: ${install.host} did not start: $error');
         show(T.text('retroHostNotStartedDetail'));
         return;
@@ -234,6 +286,7 @@ extension RetroHostPlaying on AppModel {
       menu: menu,
       started: DateTime.now(),
       program: install.host,
+      core: install.core,
     );
     retroPlay = play;
     host.addListener(_retroChanged);
@@ -256,6 +309,38 @@ extension RetroHostPlaying on AppModel {
         },
       ),
     );
+  }
+
+  /// The checks before a start of a signed release's host (protocol.md "Finding and checking the
+  /// host"), whose files then stay held until that host has exited; null for the debug host. A
+  /// host that fails them is not started: the player is told to download it again, and its row in
+  /// Settings › Emulators offers it again.
+  Future<RetroHostChecked?> _checkRetroHost(RetroHostInstall install) async {
+    if (!install.checked) return null;
+    try {
+      return await retroHostDownload.store.check();
+    } on RetroHostReleaseFailure catch (failure) {
+      _padLog?.call('emulator host: ${install.host} failed its check: ${failure.message}');
+      retroHostDownload.failedCheck(failure.message);
+      if (!_disposed) show(T.text('retroHostCheckFailed'));
+      rethrow;
+    }
+  }
+
+  /// The checks again before a kept signed host loads its next game: its files are still held from
+  /// its own start on Windows, but on Linux SwanStation was checked by path and is loaded again for
+  /// every game, so it is checked again (a second check, let go at once; the host's own stays held).
+  /// The start holds the installed host ([RetroHostDownloadModel.holdForStart]) and the host stays
+  /// in [retroHostKeeper] meanwhile; it is taken only once the check passed. One that fails is shut
+  /// down through the keeper, which a download waits for. False when no game may start.
+  Future<bool> _recheckKeptRetroHost(RetroHostInstall install) async {
+    try {
+      (await _checkRetroHost(install))?.release();
+    } on RetroHostReleaseFailure {
+      unawaited(retroHostKeeper.shutdown());
+      return false;
+    }
+    return !_disposed && starting == null && running == null && retroPlay == null;
   }
 
   /// The game moved on: a memory card the host cannot read is said once; a game that ended
@@ -560,8 +645,10 @@ extension RetroHostPlaying on AppModel {
   /// to [limit]. A host told to shut down stops its game as `stop` does, its memory cards written
   /// (protocol.md "shutdown"). Without this a Windows host would go with the launcher's job object
   /// unsaved. On Linux a host still there when the launcher has gone gets SIGTERM
-  /// (PR_SET_PDEATHSIG), which it handles like `shutdown`.
+  /// (PR_SET_PDEATHSIG), which it handles like `shutdown`. A host download stops first, so one
+  /// waiting for the kept host to exit does not put a new host in place as the launcher goes.
   Future<void> shutDownRetroHosts({Duration limit = quitLimit}) async {
+    retroHostDownload.close();
     final hosts = Future.wait([if (retroPlay case final play?) play.host.shutdown(), retroHostKeeper.shutdown()]);
     try {
       await hosts.timeout(limit);

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:anyps5_desktop/core/retro_host/retro_host_store.dart';
 import 'package:anyps5_desktop/core/discord_presence.dart';
 import 'package:anyps5_desktop/core/now_playing.dart';
 import 'package:anyps5_desktop/core/ffmpeg_download.dart';
@@ -162,6 +163,8 @@ Fixture makeFixture({
   Uri? ffmpegApi,
   List<ReleaseKey>? ffmpegKeys,
   ProcessRunner? ffmpegRun,
+  Uri? retroHostApi,
+  List<ReleaseKey>? retroHostKeys,
   DesktopWindows? desktop,
   WindowBackdrop? backdrop,
   PadSource Function()? pads,
@@ -267,6 +270,13 @@ Fixture makeFixture({
           ? null
           : GitHubReleases(api: ffmpegApi, repository: FfmpegBuild.repository, signingKeys: ffmpegKeys),
       ffmpegRun: ffmpegRun,
+      retroHostReleases: retroHostApi == null && retroHostKeys == null
+          ? null
+          : GitHubReleases(
+              api: retroHostApi ?? Uri.parse('http://127.0.0.1:9/api'),
+              repository: RetroHostStore.repository,
+              signingKeys: retroHostKeys,
+            ),
       desktop: desktop,
       backdrop: backdrop,
       pads: pads,

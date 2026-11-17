@@ -21,6 +21,10 @@ described in [The emulator host in the launcher's UI](<AnyPS5 Desktop - Emulator
 | [`lib/core/retro_host/retro_host_protocol.dart`](../lib/core/retro_host/retro_host_protocol.dart) | The protocol's values, field checks and the game's `status`. |
 | [`lib/core/retro_host/frame_ring.dart`](../lib/core/retro_host/frame_ring.dart) | Checks a ring's header and growth. Pins the newest frame and checks its size. |
 | [`lib/core/retro_host/retro_host_client.dart`](../lib/core/retro_host/retro_host_client.dart) | One host process, as described in the sections below. |
+| [`lib/core/retro_host/retro_host_release.dart`](../lib/core/retro_host/retro_host_release.dart) | Checks a signed host release before it is unpacked and before each start, and installs it whole or not at all (see "Finding and checking the host" below). |
+| [`lib/core/retro_host/retro_host_store.dart`](../lib/core/retro_host/retro_host_store.dart) | `RetroHostStore`: the host downloaded from the host repository's signed GitHub releases into the launcher's own storage, and its check before each start. |
+| [`lib/core/retro_host/retro_host_install.dart`](../lib/core/retro_host/retro_host_install.dart) | `RetroHostInstall`: the host and SwanStation a build runs, the downloaded release's (checked) or, in a debug build, the one `ANYPS5_RETRO_HOST` names (unchecked). |
+| [`lib/core/retro_host/checked_file.dart`](../lib/core/retro_host/checked_file.dart) | A release file held open while it is checked and started: no sharing for writing or deleting on Windows, a close-on-exec descriptor above 3 elsewhere. It hashes what it holds, never the path again. |
 
 `retro_host_client.dart` handles:
 
@@ -140,6 +144,135 @@ something else still holds the host's end of the stream: the reader then
 cannot see the stream end, and the exit is reported after 2 seconds anyway.
 (In lost mode, where a Linux host's identity could not be checked, the end of
 the stream is the exit, so there is no such limit.)
+
+## Finding and checking the host
+
+`RetroHostRelease` does what the protocol's "Finding and checking the host"
+section asks of a launcher. A host release is signed like a launcher release:
+`SHA256SUMS` and `SHA256SUMS.sig`, checked with
+[`release_signing.dart`](../lib/core/release_signing.dart) and the keys in
+[`release_keys.dart`](../lib/core/release_keys.dart). Beside them, each system
+has `anyps5-retro-host-<version>-<os>-<arch>.zip` and its `.files`, which lists
+every file in the zip in `shasum` format. The host repository's
+`tools/package_release.py` writes them, and its `docs/host.md` "Releases" says
+where the maintainers sign.
+
+- **Where the host lives.** In `RetroHost/host` in the launcher's own data
+  folder, beside its toolkits and its ffmpeg (`AppPaths.retroHost`:
+  `%LOCALAPPDATA%\AnyPS5\RetroHost` on Windows,
+  `~/.local/share/AnyPS5/RetroHost` on Linux). The folder holds the unpacked
+  zip, with `SHA256SUMS`, `SHA256SUMS.sig`, this system's `.files` and
+  `.release-tag` (the tag the release was published under) kept beside it. This departs from protocol.md as written (at
+  9052aff), which says a release launcher runs "a host it ships with or
+  downloads into its own storage: from its own directory on Windows and
+  Linux", found with `GetModuleFileNameW` or `/proc/self/exe`. The launcher's
+  own directory cannot take a download: the AppImage mounts it read-only, and
+  the Windows installer may put it where the user cannot write. The data
+  folder is the launcher's own storage that only the user can write, which is
+  what the protocol's Linux rule for SwanStation relies on, and the toolkits
+  and ffmpeg already live there. The host repository's release pull request
+  makes the same change to the protocol text (see "Not yet").
+- **Which files are this system's.** Only the names for `windows-x64`,
+  `linux-x64` or `macos-arm64`, by exact name. A release with no `.files` for
+  this system, or more than one, is refused. The version is read from that
+  name, so it is covered by the signature.
+- **The tag must be the signed version.** The launcher picks a release by its
+  tag, but installs the version its signed `.files` name gives. Someone who
+  can publish releases without the signing key could otherwise publish an
+  older signed release again under a higher tag, and launchers would take it
+  for an update. So a release tagged anything but `v<signed version>` is
+  refused (`RetroHostRelease.checkTag`): on download, right after the
+  signature and before the zip is fetched; on install; and before every
+  start, against the tag kept in `.release-tag`. A host with no
+  `.release-tag`, or with another tag in it, does not start and is offered
+  for download again. The name starts with a dot, which no file of a release
+  may, so it never clashes with one.
+- **Minimum version.** `RetroHostRelease.minimumVersion` (1.0.0 now) is built
+  in. An older host is refused even when it is signed, so a signed host with a
+  known fault cannot be put back. Versions are exactly three numbers.
+- **The download** (`RetroHostStore`,
+  [`retro_host_store.dart`](../lib/core/retro_host/retro_host_store.dart)).
+  Host releases are read from the GitHub releases of
+  `AnyTogether/anyps5-retro-host`, tagged `v<version>`. `RetroHostStore.newest`
+  takes the newest that is not a draft or a pre-release, is at or above the
+  minimum version, and has `SHA256SUMS` and `SHA256SUMS.sig`. `fetch` then
+  downloads `SHA256SUMS` and `SHA256SUMS.sig` first and checks the signature
+  (`RetroHostRelease.signed`) before anything else is fetched. Only then does it
+  download this system's `.files` and zip, each checked against the digest the
+  signed sums give it. The other systems' files and the source archive are not
+  downloaded. A redirect from https to plain http is refused for every
+  download (`AssetDownload.redirected`); GitHub's release downloads only
+  redirect within https. Files go to `RetroHost/.downloads/<tag>`, resuming as the ffmpeg
+  and toolkit downloads do. A release with no signature is "not available yet",
+  and there is no way to take one unsigned. A release that has no host for
+  this system is also "not available". `fetch` gives the folder with the tag,
+  and `putInPlace` then installs it under that tag.
+- **On install** (`RetroHostRelease.install`). The signature and the tag are
+  checked again from the files on disk, then the zip and the `.files` against
+  `SHA256SUMS`, then every file in the zip against the `.files`. A file that
+  is missing, an extra file, or a symbolic link is refused. Names follow the
+  host's `package_release.py --check`: each part is letters, digits and
+  `._+-`, does not start or end with a dot and is no Windows device name
+  (`con`, `prn`, `aux`, `nul`, `com0`-`com9`, `lpt0`-`lpt9`, with or without
+  an extension), and no two names differ only in case or are a file and a
+  folder of each other (`parseFileList`). The names are signed, so this is
+  defence in depth. Only then is the zip written out, into `host.new`. The
+  reading, hashing and writing run on another isolate (`Isolate.run`), so the
+  window stays responsive through a large zip. The two renames then run on
+  the UI isolate, one after the other: the old host is moved aside to
+  `host.old`, `host.new` takes its place, and `host.old` is removed. On
+  Windows the first move fails while a host started from that folder still
+  holds its files. The install then stops with the old host whole ("the host
+  is in use"), never half deleted. Stop the host before installing.
+- **A launcher stopped between the two renames.** It leaves no `host` and
+  the old host in `host.old`. `RetroHostRelease.restore` puts `host.old`
+  back whenever `host` is missing: on the next look for the installed host
+  (`RetroHostStore.installed`, when the launcher starts) and before the next
+  install's renames. The host put back is checked before every start, like
+  any other.
+- **Before each start** (`checkBeforeStart`, through `RetroHostStore.check`).
+  The signature is checked again, then the kept tag against the signed
+  version, then the `.files` against `SHA256SUMS`, then
+  the host executable and SwanStation against the `.files`. Each of the two is
+  hashed from a `CheckedFile`, on another isolate.
+  - On Windows both stay open with read sharing only (no `FILE_SHARE_WRITE`
+    or `FILE_SHARE_DELETE`). Nothing can write, rename or delete them, or
+    rename another file onto them, until the host has exited. The host loads
+    SwanStation again for every game it starts, so a file let go after the
+    first game would leave the next game's load unchecked.
+  - On Linux the host's descriptor is above 3 and close-on-exec. The host is
+    started through it: `RetroHostChecked.program` is `/proc/self/fd/<n>`,
+    which the native start passes to `posix_spawn` as the path, while
+    `argv[0]` stays the real path. So the file that was checked is the file
+    that runs, even if the path is replaced in between. SwanStation is checked
+    by path, as the protocol allows on Linux.
+  - `RetroHostClient.start(checked: ...)` releases the files once the host
+    has exited, whether it was shut down, exited unasked or was killed after
+    a time limit or a broken rule, and before `exited` completes; a start that
+    fails releases them at once. It refuses a command whose program is not
+    the checked executable, and for the whole life of that host it refuses
+    any `start` whose `core` is not the release's SwanStation, so a checked
+    host never loads another core. A check is good for one start: a second
+    start with it, or a start after it was released, is refused, so run
+    `checkBeforeStart` again before each start.
+  - A kept host that plays another game is checked again before that game
+    (`AppModel._recheckKeptRetroHost`): its own check's files are still held,
+    but on Linux SwanStation was checked by path and is loaded again for each
+    game. The second check is let go at once. A host that fails it is shut
+    down, and so is a kept host while a download is installing.
+  - A file swapped for something that is not a regular file (a FIFO, say) is
+    refused at once; the descriptor is opened without blocking.
+- **When a check fails.** `RetroHostReleaseFailure` is thrown and the host is
+  not started. The UI says that the emulator needs to be downloaded again
+  ([Emulator host UI](<AnyPS5 Desktop - Emulator Host UI.md>), "In the launcher").
+- **Debug builds.** `RetroHostInstall.locate`
+  ([`retro_host_install.dart`](../lib/core/retro_host/retro_host_install.dart))
+  finds the host that `ANYPS5_RETRO_HOST` names, with the SwanStation library
+  beside it, only in a debug build (`kDebugMode`), as the protocol allows. That
+  host is started without any check. Release and profile builds ignore the
+  variable and only run the downloaded release's host
+  (`RetroHostStore.installed`, a `RetroHostInstall` with `checked` set), and
+  only with that release's SwanStation.
 
 ## Threads and the UI
 
@@ -322,7 +455,84 @@ host repository's `tests/real_core.py` does:
   `host`, `core`, `bios`, `program` and `discBuilder` (the path of
   `make_test_disc.py`), with an optional `environment` for the host, such as
   a `PATH` that has the host's runtime libraries. Python 3 must be on `PATH`.
-  Without the variable the test is skipped, so CI skips it.
+  Add `packer` (the host repository's `tools/package_release.py`) and
+  `coreLicence` (SwanStation's `LICENSE`) to start the host from a checked
+  release. Without the variable the test is skipped, so CI skips it.
+
+[`test/core/retro_host/retro_host_release_test.dart`](../test/core/retro_host/retro_host_release_test.dart)
+covers the release checks. It replays a recorded release in
+[`test/fixtures/retro_host_release`](../test/fixtures/retro_host_release), as
+the host repository publishes one: each system's zip and `.files` and a source
+archive, packed from small stand-in files by that repository's
+`tools/package_release.py` (from the host's release pull request), `SHA256SUMS` from its
+`--sums`, and `SHA256SUMS.sig` written by AnyPS5-ARM's `tools/release/sign.sh`
+with a throwaway key kept beside them (`test-release-signing.key`, its public
+half in `test-release-signing.pub`). No launcher trusts that key; it is not a
+secret. [`retro_host_release_fixture.dart`](../test/support/retro_host_release_fixture.dart)
+reads the fixture for the tests. They check:
+
+- that the recorded `SHA256SUMS.sig` is exactly the fixture key's signature
+  (Ed25519 signatures are deterministic, so the launcher's own signing of the
+  same sums gives the same line), and that the recorded release installs and
+  checks out unchanged for all three systems;
+- that a signed download unpacks and checks out before a start;
+- that each of these is refused: an untrusted key, a changed zip or `.files`,
+  an extra or missing file in the zip, a host below the minimum version, a
+  release under a tag that is not its signed version (an older signed
+  release published again under a higher tag, on install, and a changed,
+  missing or unreadable `.release-tag` before a start), a changed, missing or
+  replaced host or core, unsafe names (dots at either end, device names,
+  other characters) and names that differ only in case or are a file and a
+  folder;
+- that on Windows the held files cannot be written, renamed or deleted;
+- that on Linux a real program started from a checked release runs from the
+  checked descriptor even after its path was replaced, and that the
+  descriptor does not reach it;
+- that installing over a host replaces it whole, that a launcher stopped
+  between the two renames gets its old host back (and that the next install
+  over that state works), and that on Windows a host whose files are held is
+  left whole and is replaced once they are let go.
+
+Tests that change the release sign the copy again with keys of their own,
+to tell the trusted key from a stranger's.
+
+To make the fixture again, pack each system's stand-in files with
+`package_release.py --version 1.0.0 --system <system> --host <stand-in>
+--core <stand-in> --core-licence <stand-in> --core-notices <folder>
+--notice swanstation-vulkan-headers-Apache-2.0.txt=<stand-in> --host-commit
+<sha> --swanstation-commit <sha> --out <folder>`, add a stand-in source archive,
+write `SHA256SUMS` with `--sums`, then sign it with `sign.sh -k <key> -o
+<folder> <zips> <.files> <source archive>`, after adding the key's public line
+to a copy of `tools/release/release-signing.pub`. Keep the key file beside the
+release.
+
+[`test/core/retro_host/retro_host_store_test.dart`](../test/core/retro_host/retro_host_store_test.dart)
+serves the recorded release from a fake GitHub
+([`fake_github.dart`](../test/support/fake_github.dart)) and checks the
+download. It checks that only this system's `.files` and zip are fetched after
+the signed sums, and that the result installs and checks before a start. It
+checks that the newest signed release at or above the minimum is taken, never
+a pre-release. A release without a signature downloads nothing, and one signed
+by an untrusted key stops after the sums. An older signed release published
+again under a higher tag also stops after the sums, a newer one installs as
+its tag's version (and not under another tag), and a host left in `host.old`
+is found again. A changed zip is refused before it is
+unpacked, a release with no host for this system is not available, and a
+stopped download resumes.
+
+With `packer` and `coreLicence` in its JSON, the real-host test packs the host
+and SwanStation as a release, signs it, installs it, checks it and starts it
+from the checked files. It also checks that both files stay held while the
+game loads and after it was stopped and released, ready for the next game's
+core load (on Windows, that nothing can write them), and that they are
+released once the host has exited.
+
+The fixture test also starts the fake host as a checked host, with the
+session's core as the checked file. It checks that the file stays held after
+every reply through a game that gets ready, ends and is released, and a second
+game, then is let go once the host exits; on Windows it tries to write,
+replace, rename and delete the core after each reply. Two more sessions check
+the same when the host exits unasked and when it is killed for a broken rule.
 
 [`test/core/retro_host/retro_host_environment_test.dart`](../test/core/retro_host/retro_host_environment_test.dart)
 covers how the host's environment is put together, and
@@ -364,11 +574,18 @@ when `ANYPS5_RETRO_HOST_CHECKOUT` is set.
 
 ## Not yet
 
-- **Debug builds only.** A PS1 game plays through the host behind a setting
-  ([Emulator host UI](<AnyPS5 Desktop - Emulator Host UI.md>), "In the launcher"), and only debug
-  builds find a host, through `ANYPS5_RETRO_HOST`. Release builds get the
-  signed host release later.
-- **No signature checks.** The release-time file checks from the protocol's
-  "Finding and checking the host" section come with signed distribution.
-  Until then, the client runs the command it is given.
+- **No signed release yet.** The download reads the host repository's
+  GitHub releases, and none is published there yet: until the maintainers
+  sign and publish one (that repository's `docs/host.md` "Releases"), a
+  release build says no signed PS1 emulator has been published yet, and has no
+  host to run. The whole path was tested with a real release that the host
+  repository's release workflow packed, signed with the test key
+  ([Emulator host UI](<AnyPS5 Desktop - Emulator Host UI.md>), "Against the real host").
+- **The protocol's storage sentence.** protocol.md at 9052aff still says the
+  host lives in the launcher's own directory; the launcher keeps a downloaded
+  host in its data folder (above), since an AppImage's directory is read-only.
+  The host repository's release pull request changes that text.
+- **No update check on its own.** A newer host is looked for only when the
+  player selects the emulator's row in Settings › Emulators, as ffmpeg's
+  download works. Nothing asks GitHub unprompted.
 - **No host log.** The host's standard error is not captured.

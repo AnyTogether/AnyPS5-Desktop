@@ -482,4 +482,27 @@ void main() {
       expect(ToolkitStore.versionText('0.1.3'), 'upstream-v0.1.3');
     });
   });
+
+  group('redirects', () {
+    test('a download asked for over https is never sent on to plain http', () {
+      final from = Uri.parse('https://github.com/AnyTogether/anyps5-retro-host/releases/download/v1.0.0/SHA256SUMS');
+      expect(
+        AssetDownload.redirected(from, 'https://release-assets.githubusercontent.com/x?sig=1'),
+        Uri.parse('https://release-assets.githubusercontent.com/x?sig=1'),
+      );
+      expect(AssetDownload.redirected(from, '/other'), Uri.parse('https://github.com/other'));
+      for (final location in ['http://release-assets.githubusercontent.com/x', 'ftp://example.org/x']) {
+        expect(
+          () => AssetDownload.redirected(from, location),
+          throwsA(isA<ToolkitFailure>().having((failure) => failure.kind, 'kind', ToolkitFailureKind.network)),
+          reason: location,
+        );
+      }
+    });
+
+    test('a plain http address may still redirect within http, as the fake GitHub does', () {
+      final from = Uri.parse('http://127.0.0.1:8080/download/v1/a.zip');
+      expect(AssetDownload.redirected(from, '/blob/v1/a.zip'), Uri.parse('http://127.0.0.1:8080/blob/v1/a.zip'));
+    });
+  });
 }

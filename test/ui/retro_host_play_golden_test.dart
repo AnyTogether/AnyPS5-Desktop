@@ -130,4 +130,26 @@ void main() {
     expect(find.text('PS1 BIOS folder'), findsOneWidget);
     await expectLater(shell, matchesGoldenFile('goldens/settings_emulators_host_en.png'));
   });
+
+  testWidgets('settings: Emulators offering the PS1 emulator before one is installed', (tester) async {
+    launcher = Ps1Launcher(hostFound: false, retroHostApi: Uri.parse('http://127.0.0.1:9/api'));
+    final model = launcher.model;
+    model.open(Layer.settings);
+    model.selectCategory(model.panelCategories().indexWhere((category) => category.id == 'emulators'));
+    await pumpLauncher(tester, model);
+    expect(find.text(T.text('retroHostDownload')), findsOneWidget);
+    expect(find.text('Run PS1 games in the separate host'), findsNothing);
+    await expectLater(shell, matchesGoldenFile('goldens/settings_emulators_host_download_en.png'));
+  });
+
+  testWidgets('settings: Emulators with the downloaded PS1 emulator installed and turned on', (tester) async {
+    launcher = (await tester.runAsync(Ps1Launcher.withRelease))!;
+    final model = launcher.model..setRetroHostPs1(true);
+    model.open(Layer.settings);
+    model.selectCategory(model.panelCategories().indexWhere((category) => category.id == 'emulators'));
+    await pumpLauncher(tester, model);
+    expect(find.text(T.format('retroHostInstalled', ['1.0.0'])), findsOneWidget);
+    expect(find.text('Run PS1 games in the separate host'), findsOneWidget);
+    await expectLater(shell, matchesGoldenFile('goldens/settings_emulators_host_release_en.png'));
+  });
 }

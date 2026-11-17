@@ -23,7 +23,8 @@ the launcher plays a PS1 disc from its emulator library through all of them
 | [`lib/ui/retro_host/retro_host_controls.dart`](../lib/ui/retro_host/retro_host_controls.dart) | `RetroHostControls`: plays a `RetroHostGame` with the launcher's controllers, connects port 2 and forwards vibration. `RetroPadReader` is how it reads the controllers. |
 | [`lib/ui/retro_host/retro_game_menu.dart`](../lib/ui/retro_host/retro_game_menu.dart) | `RetroGameMenu`: the in-game menu's rows (discs, core options, volume) and what choosing them does. |
 | [`lib/ui/retro_host/retro_option_sections.dart`](../lib/ui/retro_host/retro_option_sections.dart) | `RetroOptionSection` and `retroOptionSection`: which section of the menu each SwanStation option belongs to, which options are graphics options the menu leaves out, and which options are not shown. |
-| [`lib/core/retro_host/retro_host_install.dart`](../lib/core/retro_host/retro_host_install.dart) | `RetroHostInstall`: the host and SwanStation library a build may run. |
+| [`lib/core/retro_host/retro_host_install.dart`](../lib/core/retro_host/retro_host_install.dart) | `RetroHostInstall`: the host and SwanStation library a build runs, and whether it is checked before each start. |
+| [`lib/ui/retro_host/retro_host_download_model.dart`](../lib/ui/retro_host/retro_host_download_model.dart) | `RetroHostDownloadModel`: Settings › Emulators' row that downloads, updates and repairs the signed host, and what a failed check before a start leaves it saying. |
 | [`lib/core/retro_host/retro_keyboard.dart`](../lib/core/retro_host/retro_keyboard.dart) | `RetroKeyboard`: the keyboard as a PS1 controller, with the keys of a game's Controls. |
 | [`lib/ui/retro_host_play.dart`](../lib/ui/retro_host_play.dart) | `RetroPlay` and the `RetroHostPlaying` part of `AppModel`: the setting, starting a disc in the host, the commands while it plays, the menu's panel rows, closing. |
 | [`lib/ui/retro_host/retro_play_view.dart`](../lib/ui/retro_host/retro_play_view.dart) | `RetroPlayView`: the game over the whole window, with `RetroGameNotice` for the loading and error screens. |
@@ -311,27 +312,83 @@ is not loaded has no menu to open.
 
 ## In the launcher
 
+**The host.** A release build gets its host as it gets ffmpeg: Settings ›
+Emulators has a row for the PS1 emulator (`RetroHostDownloadModel`). Before
+anything is installed it says **Download the PS1 emulator**. Nothing is asked
+of GitHub until the player selects it. Then the row shows the download's
+progress, and selecting it again stops it, even while the kept host is still
+exiting. Once the checked files are being written over the old host's
+(`RetroHostDownloadModel.placing`), the row says only that it is checking and
+no longer stops it, so a half-replaced host is never left behind. The host comes from the host
+repository's signed releases and is checked on download, as
+[Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>) "Finding and checking the host"
+describes. Once it is installed the row says **PS1 emulator 1.0.0** (its
+version), and selecting it looks for a newer release: "PS1 emulator 1.0.0 is
+up to date" when there is none and the installed host passes its checks. A
+host that failed its check before a start, or that is missing a file, is
+downloaded again at any version. A file that cannot be written ends the
+download with its reason, and so does a release whose tag is not the version
+it is signed as: an older host published again under a higher tag is not taken
+for an update. With no signed release yet the row says so. In Turkish every row
+and message of the PS1 emulator addresses the player in the same informal
+form as the PS1 rows beside them ("seç", "koy", "dene", "indir").
+The download is refused while a PS1 game plays, while one is starting in the
+host (`RetroHostDownloadModel.holdForStart`, held from the checks before a
+start until the game's play is set). Before the new host is put in place, the host kept for the next game is
+shut down and waited for, so its held files are let go, and no game starts
+until the install is done. When the launcher goes, a download stops and one
+already fetched is not put in place (`RetroHostDownloadModel.close`), since
+the hosts shut down as it goes may not have exited yet. The launcher does not
+wait for one already being put in place, and quitting can cut it short. That
+leaves no half-replaced host: `RetroHostRelease.install` writes the new files
+into `RetroHost/host.new` on another isolate, so the window stays responsive,
+and only then swaps the folders with two renames in one synchronous step on
+the UI isolate, so the old host stays whole until then. A launcher stopped
+between the two renames leaves the old host in `host.old`, and the next start
+puts it back (`RetroHostRelease.restore`). The next start checks the installed
+host anyway, and a missing host is offered for download again. The first host installed turns the setting
+below on, since the player asked for the emulator to play PS1 games with it.
+
 **The setting.** Settings › Emulators › **Run PS1 games in the separate
 host** (`Preferences.retroHostPs1`) is off by default. The row shows only
-where a host is found. `RetroHostInstall.locate` finds one only in a debug
-build, as protocol.md "Finding and checking the host" allows: "Debug builds of
-the launcher MAY run the host named by the environment variable
-`ANYPS5_RETRO_HOST`, and any core, without the checks. Release builds ignore
-that variable." The core is the SwanStation library beside that host
-(`swanstation_libretro.dll` on Windows, `swanstation_libretro.so` on Linux),
-as a host release's zip holds the two. The launcher looks for it once
-(`AppModel.retroHostInstall`), since the environment that names it does not
-change while the launcher runs; every PS1 tile and row uses that answer. A
-release build finds no host, so the
-row is hidden and a PS1 disc goes to DuckStation as before, even with the
-setting saved as on. With the setting on, a PS1 disc needs no DuckStation:
-it is not shown as "Emulator required", and the PS1 folder on Home groups
-its games. The row **PS1 BIOS folder** opens the folder the BIOS goes in.
+where a host is found (`AppModel.retroHostInstall`): the downloaded release
+(`RetroHostDownloadModel.installed`), or in a debug build the host that
+`ANYPS5_RETRO_HOST` names (`AppModel.retroHostDebug`, from
+`RetroHostInstall.locate`), as protocol.md "Finding and checking the host"
+allows: "Debug builds of the launcher MAY run the host named by the
+environment variable `ANYPS5_RETRO_HOST`, and any core, without the checks.
+Release builds ignore that variable." That debug host comes first, and while
+it is used no download row is shown. The core is the SwanStation library
+beside the host (`swanstation_libretro.dll` on Windows,
+`swanstation_libretro.so` on Linux), as a host release's zip holds the two.
+Neither is looked for on every read: every PS1 tile and row uses the same
+answer. The debug host is looked for once, since the environment that names
+it does not change while the launcher runs. The downloaded host is read from
+`RetroHost/host` (`RetroHostStore.installed` and its version) when the model
+is made and again only when that folder may have changed: after a download
+reached putting its host in place, and after the installed host failed its
+check before a start, so a host with a file gone stops being offered to PS1
+games. With no host found the row is hidden and a PS1 disc goes to
+DuckStation as before, even with the setting saved as on. With the setting
+on, a PS1 disc needs no DuckStation: it is not shown as "Emulator required",
+and the PS1 folder on Home groups its games. The row **PS1 BIOS folder**
+opens the folder the BIOS goes in.
 
 **Starting.** `AppModel.play` sends a PS1 disc to `_playInHost` when
-`playsInHost` says so. It asks the family rules first, as every start does,
-then opens a host (`AppModel.openRetroHost`, which tests replace) with the
-player's volume, and sends `start` with:
+`playsInHost` says so. It asks the family rules first, as every start does.
+For the downloaded release's host it then runs the checks before a start
+(`RetroHostStore.check`). A host that fails them is not started: the toast
+says the PS1 emulator did not pass its check and to download it again, and
+its row in Settings › Emulators says why and offers it again. Then it opens a
+host (`AppModel.openRetroHost`, which tests replace) with the player's volume.
+A checked host is started through its checked files
+(`RetroHostClient.start(checked: ...)`), which stay held until that host has
+exited, across every game it plays. A kept host is checked again before each
+later game while it stays in the keeper, so a download can still find it, and
+is taken only once the check passed; one that fails is shut down through the
+keeper, which a download waits for. No host starts, and no kept host is used, while
+a download is putting a new host in place ("The PS1 emulator is being
+updated"). Then it sends `start` with:
 
 - `core`: the SwanStation library above;
 - `disc`: the disc's file (`.cue`, `.chd`, `.pbp` or `.m3u`);
@@ -365,8 +422,10 @@ shut down:
 **Quitting.** Every close of the launcher (its Quit, the window's close,
 Alt+F4, an update's installer) comes through the exit request in
 `lib/main.dart`. Before it lets the launcher go, it calls
-`AppModel.shutDownRetroHosts`: the game's host and the kept one are told to
-shut down, and the launcher waits up to `RetroHostPlaying.quitLimit` (3 s,
+`AppModel.shutDownRetroHosts`: a host download stops first
+(`RetroHostDownloadModel.close`), so one waiting for the kept host to exit is
+not put in place as the launcher goes; then the game's host and the kept one
+are told to shut down, and the launcher waits up to `RetroHostPlaying.quitLimit` (3 s,
 under `LauncherShutdown.fallbackAfter`) for them to exit. A host told to shut
 down "stops its game as `stop` does (memory cards are written), then exits"
 (protocol.md "shutdown"). On Windows that is what saves the game: a host
@@ -590,7 +649,29 @@ native memory as a real ring slot would be, so no host is started.
   draws the loading screen, the error screen (no BIOS, with its folder hint),
   the game's picture, the menu's
   first page over it, its Console page, and Settings › Emulators with the
-  host's rows.
+  host's rows: the debug host's, the download offered
+  before a host is installed, and the downloaded release installed and turned on.
+- [`retro_host_release_play_test.dart`](../test/ui/retro_host_release_play_test.dart)
+  plays a PS1 disc the release way, with the recorded signed release of
+  `test/fixtures/retro_host_release` and no `ANYPS5_RETRO_HOST`. The host is
+  started with a check whose files are still held, from the launcher's own
+  storage and with that release's SwanStation. A host whose file changed is not
+  started, the toast says so, and its row offers it again. From a fake GitHub
+  the row downloads, checks and installs the release and turns the setting on.
+  Selecting the row again finds it up to date and downloads nothing, while a
+  broken host, or one missing a file, is downloaded again at the same version.
+  A missing file is not looked for on every read: the host stays found until
+  its check before a start fails, and only then is no longer offered.
+  A kept host is checked again before its next game and shut down when its
+  core changed, and nothing starts while a download is installing. A download
+  shuts the kept host down and waits for it before the new host goes in, and
+  is refused, leaving the kept host, while a game is starting; one the
+  launcher closes during is not put in place. With no release the row
+  says none is published yet. A download stopped while the kept host is
+  still exiting is not put in place, nor is one when the launcher quits
+  meanwhile (`shutDownRetroHosts`), and once the new host is being put in
+  place the row no longer offers to stop it. Nothing downloads while a game plays, and a debug
+  build that runs `ANYPS5_RETRO_HOST` shows no download.
 - [`retro_keyboard_test.dart`](../test/core/retro_host/retro_keyboard_test.dart)
   checks the keyboard layout as a PS1 pad, a moved key, the stick modifier
   and the keys joining a controller.
@@ -605,7 +686,7 @@ time. So the view test waits for a picture by taking turns: a short real wait
 ```bash
 flutter test test/ui/retro_host test/ui/retro_host_play_test.dart test/ui/retro_host_play_golden_test.dart \
   test/core/retro_host/retro_pad_test.dart test/core/retro_host/retro_seats_test.dart \
-  test/core/retro_host/retro_keyboard_test.dart test/core/retro_host/retro_host_install_test.dart
+  test/core/retro_host/retro_keyboard_test.dart test/core/retro_host/retro_host_install_test.dart   test/ui/retro_host_release_play_test.dart test/core/retro_host/retro_host_store_test.dart
 ```
 
 ### Against the real host
@@ -639,9 +720,16 @@ and SwanStation built for Windows. They have not been run again against the
 host's `main` at 9052aff.
 
 [`retro_host_app_real_test.dart`](../test/ui/retro_host/retro_host_app_real_test.dart)
-reads the same file and runs the whole launcher against the real host: the
-host and SwanStation are copied into one folder that `ANYPS5_RETRO_HOST`
-names, the PS-EXE is put on a disc in a games folder, OpenBIOS goes in the
+reads the same file and runs the whole launcher against the real host. By
+default the host and SwanStation are copied into one folder that
+`ANYPS5_RETRO_HOST` names. With `releaseFolder` (a folder of what the host
+repository's release workflow packed, such as its `release-<system>`
+artifact) or `packer` and `coreLicence` (the packer packs the host and core),
+the launcher gets its host as a release build does instead. The release is
+signed with the fixture key of `test/fixtures/retro_host_release`, served from
+a fake GitHub and downloaded through Settings › Emulators' row, and every host
+is started through its checked files. Those must be held while it plays and
+let go after it has exited. Then the PS-EXE is put on a disc in a games folder, OpenBIOS goes in the
 PS1 BIOS folder, and `AppModel.play` starts the disc with the setting on. The
 game reaches `playing` and shows two pictures that differ. A second
 controller in the app's controller reader connects port 2. PS opens the menu
@@ -654,14 +742,19 @@ host), Close game keeps the host again, and turning the setting off shuts it
 down with a clean exit. Its helpers, shared with the test above, are
 in [`real_host_support.dart`](../test/ui/retro_host/real_host_support.dart).
 It passed on Windows on 13 November 2026 with the same host and SwanStation
-builds, and again with the sections and the kept host the same day. The host runs with the test's own environment, as the launcher starts
+builds, and again with the sections and the kept host the same day. On 15
+November 2026 it passed on Windows the release way, with `releaseFolder` set to
+the `release-windows-x64` artifact of a run of the host repository's release
+workflow (fork run 43535853189): downloaded, installed into the launcher's storage,
+started from the checked files, two games in one host, files let go after the
+host exited. The host runs with the test's own environment, as the launcher starts
 it, so WinLibs' `bin` folder has to be on `PATH` there.
 
 ## Not yet
 
-- **Release builds.** Only debug builds find a host. Release builds get the
-  signed host release, with the checks of protocol.md "Finding and checking
-  the host", later.
+- **No signed host release yet.** A release build offers the download, but
+  the host repository has published no signed release yet, so the row says so
+  ([Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>), "Not yet").
 - **No phone pad.** A phone or browser pad (Remote Play's) does not play a
   PS1 game in the host, and does not move the launcher while the game's own
   screen is in front.

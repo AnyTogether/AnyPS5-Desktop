@@ -12,6 +12,18 @@ class TestReleaseKey {
   TestReleaseKey(String seed, {this.name = 'test'})
     : signing = nacl.SigningKey.fromSeed(Uint8List.fromList(sha256.convert(utf8.encode(seed)).bytes));
 
+  /// The key in [pem], as `openssl genpkey -algorithm ed25519` writes it (PKCS#8, whose last 32
+  /// bytes are the seed); text before the PEM block is skipped, as OpenSSL skips it.
+  factory TestReleaseKey.fromPem(String pem, {String name = 'test'}) {
+    final body = RegExp(r'-----BEGIN PRIVATE KEY-----([A-Za-z0-9+/=\s]+)-----END PRIVATE KEY-----').firstMatch(pem);
+    if (body == null) throw const FormatException('no PKCS#8 private key');
+    final der = base64.decode(body.group(1)!.replaceAll(RegExp(r'\s'), ''));
+    if (der.length != 48) throw const FormatException('not an Ed25519 private key');
+    return TestReleaseKey._(nacl.SigningKey.fromSeed(Uint8List.fromList(der.sublist(16))), name);
+  }
+
+  TestReleaseKey._(this.signing, this.name);
+
   final nacl.SigningKey signing;
   final String name;
 

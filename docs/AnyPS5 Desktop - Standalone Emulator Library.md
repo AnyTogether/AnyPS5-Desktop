@@ -17,11 +17,13 @@ separate window. Window focus depends on the desktop environment. A title
 whose emulator is not selected yet shows the **Emulator required** badge,
 and its action opens the file picker.
 
-In debug builds that find the separate emulator host (`ANYPS5_RETRO_HOST`),
-Settings → Emulators also has **Run PS1 games in the separate host**, off by
-default. With it on, a PS1 disc plays in the launcher's own window through that
-host instead of DuckStation, and needs no DuckStation. That path is described
-in [The emulator host in the launcher](<AnyPS5 Desktop - Emulator Host UI.md>).
+Settings → Emulators also offers the AnyPS5 emulator host for PS1, a signed
+download from the host's releases, checked before every game (a debug build can
+run the host `ANYPS5_RETRO_HOST` names instead). Once a host is there,
+**Run PS1 games in the separate host** appears, off by default and turned on by
+the first download. With it on, a PS1 disc plays in the launcher's own window
+through that host instead of DuckStation, and needs no DuckStation. That path is
+described in [The emulator host in the launcher](<AnyPS5 Desktop - Emulator Host UI.md>).
 
 ## Discovery
 
