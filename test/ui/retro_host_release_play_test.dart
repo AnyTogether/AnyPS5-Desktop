@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:anyps5_desktop/core/retro_host/retro_host_client.dart' show RetroHostEnd;
+import 'package:anyps5_desktop/core/retro_host/retro_host_release.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_store.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
@@ -45,6 +46,25 @@ void main() {
     await playing;
     expect(launcher.session.startArgs?['core'], install.core);
     expect(launcher.play.core, install.core);
+  });
+
+  test('the unchecked host of a debug or test build has no release tag and is not held to one', () async {
+    launcher = Ps1Launcher();
+    final store = RetroHostStore(launcher.model.paths.retroHost, keys: retroHostFixtureKeys());
+    await installRetroHostFixture(store.folder);
+    File(p.join(store.folder.path, RetroHostRelease.tagName)).deleteSync();
+    await expectLater(store.check(), throwsA(isA<RetroHostReleaseFailure>()));
+    final model = launcher.model..setRetroHostPs1(true);
+    expect(model.retroHostDownload.installed?.checked, isTrue, reason: 'a downloaded host without its tag');
+    expect(File(p.join(p.dirname(launcher.host), RetroHostRelease.tagName)).existsSync(), isFalse);
+    expect(model.retroHostInstall?.host, launcher.host, reason: 'the unchecked host is the one played');
+
+    await launcher.start();
+    expect(launcher.checked, [null]);
+    expect(launcher.opened.single.$1.host, launcher.host);
+    expect(launcher.play.unchecked, isTrue);
+    expect(model.toast, isNot(T.text('retroHostCheckFailed')));
+    expect(model.retroHostDownload.installed, isNotNull, reason: 'no check ran, so none failed');
   });
 
   test('a host whose files changed is not started, and its row offers it again', () async {

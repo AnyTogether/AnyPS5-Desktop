@@ -273,7 +273,13 @@ where the maintainers sign.
   beside it, only in a debug build or a test build (`RetroHostBuild`, below).
   That host is started without any check, and Settings › Emulators says so
   ("Unchecked PS1 emulator (test build)"), as does a mark in the corner of
-  the game's screen while a game plays on it. A release, and a profile build,
+  the game's screen while a game plays on it. It has no `.release-tag` and is
+  not held to one: the tag belongs to the signed release it was downloaded
+  as, and an unchecked host (`checked` false) never reaches
+  `checkBeforeStart`. It is also played in preference to a downloaded host
+  (`retroHostInstall` is `retroHostUnchecked ?? retroHostDownload.installed`),
+  so a downloaded host that would fail its check, a missing tag included, is
+  neither checked nor marked broken while the unchecked one is used. A release, and a profile build,
   ignore the variable and only run the downloaded release's host
   (`RetroHostStore.installed`, a `RetroHostInstall` with `checked` set), and
   only with that release's SwanStation.
@@ -596,6 +602,10 @@ reads the fixture for the tests. They check:
   same sums gives the same line), and that the recorded release installs and
   checks out unchanged for all three systems;
 - that a signed download unpacks and checks out before a start;
+- that the unchecked host of a debug or test build, with no `.release-tag`,
+  plays without a check while a downloaded host missing its tag sits beside
+  it, and that host is not marked broken
+  (`test/ui/retro_host_release_play_test.dart`);
 - that each of these is refused: an untrusted key, a changed zip or `.files`,
   an extra or missing file in the zip, a host below the minimum version, a
   release under a tag that is not its signed version (an older signed
