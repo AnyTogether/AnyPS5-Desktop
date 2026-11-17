@@ -4577,6 +4577,8 @@ class AppModel extends ChangeNotifier {
       // Flutter cover on the home screen until settled, then drop it — never over the game.
       var shown = false;
       if (fadeOverGame) {
+        // One frame so StartCoverLayer has painted into coverBoundary before the snapshot.
+        await Future<void>.delayed(const Duration(milliseconds: 32));
         shown = await desktop.fadeCover(
           run.pid,
           until: settled,

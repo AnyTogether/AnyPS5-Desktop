@@ -657,15 +657,16 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
     var processEnded = false;
     unawaited(exited?.then<void>((_) => processEnded = true, onError: (Object _) => processEnded = true));
     try {
-      // Snapshot while the process starts (not after the window shows): the toImage / crop /
-      // BGRA work must not leave a gap in which the game window or the taskbar flashes.
-      // Size from the primary monitor; refined to the game's monitor once its window exists.
+      // Kick off a full-monitor snapshot while the window opens, so toImage is not after the
+      // game is already visible. If metrics or the boundary are not ready, the wait path below
+      // still takes a snapshot as before — the fade must not be skipped.
+      Future<RgbaImage?>? early;
       final primary = _primaryScreen();
-      if (primary == null) return false;
-      final prepWidth = primary[2] - primary[0];
-      final prepHeight = primary[3] - primary[1];
-      if (prepWidth <= 0 || prepHeight <= 0) return false;
-      final prepared = cover(prepWidth, prepHeight);
+      if (primary != null) {
+        final pw = primary[2] - primary[0];
+        final ph = primary[3] - primary[1];
+        if (pw > 0 && ph > 0) early = cover(pw, ph);
+      }
 
       final window = await _waitForWindow(
         pid,
@@ -681,8 +682,15 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
       final height = screen[3] - screen[1];
       if (width <= 0 || height <= 0) return false;
 
-      // Prefer the image already in flight; re-snap only if the game's monitor differs.
-      RgbaImage? image = await prepared;
+      RgbaImage? image;
+      if (early != null) {
+        final prepared = await early;
+        if (prepared != null) {
+          image = (prepared.width == width && prepared.height == height)
+              ? prepared
+              : cropCentered(prepared, width, height);
+        }
+      }
       if (image == null || image.width != width || image.height != height) {
         image = await cover(width, height);
       }
@@ -698,13 +706,11 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
         image,
         (elapsed) {
           if (releaseAt == null) {
-            // The window is looked for a few times a second only: it lists every window.
             if (elapsed - checkedAt >= const Duration(milliseconds: 250)) {
               checkedAt = elapsed;
               windowGone = windowOf(pid) == 0;
             }
             if (windowGone) {
-              // The game closed: the picture only goes.
               releaseAt = elapsed;
             } else if (released || elapsed >= coverHoldLimit) {
               releaseAt = elapsed + coverSettle;
@@ -717,7 +723,6 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
         onShown: onCovered,
       );
     } on Object {
-      // Whatever went wrong, the game starts as it did without the picture.
       return false;
     }
   }
@@ -725,9 +730,8 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
   /// The primary monitor as left, top, right, bottom. Null if the metrics are unavailable.
   List<int>? _primaryScreen() {
     try {
-      // SM_CXSCREEN / SM_CYSCREEN — primary monitor only (matches most game windows).
-      final cx = _w.getSystemMetrics(0);
-      final cy = _w.getSystemMetrics(1);
+      final cx = _w.getSystemMetrics(0); // SM_CXSCREEN
+      final cy = _w.getSystemMetrics(1); // SM_CYSCREEN
       if (cx <= 0 || cy <= 0) return null;
       return [0, 0, cx, cy];
     } on Object {
