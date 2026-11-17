@@ -33,6 +33,24 @@ void main() {
     'failed': false,
   };
 
+  test('two statuses are the same only when every field is', () {
+    final playing = RetroStatus.parse(status({'discs': discs(2)}));
+    expect(playing.sameAs(RetroStatus.parse(status({'discs': discs(2)}))), isTrue);
+    expect(
+      playing.sameAs(
+        RetroStatus.parse(
+          status({
+            'discs': {...discs(2), 'busy': true},
+          }),
+        ),
+      ),
+      isFalse,
+    );
+    expect(playing.sameAs(RetroStatus.parse(status({'discs': discs(2), 'progressPercent': 10}))), isFalse);
+    expect(playing.sameAs(RetroStatus.parse(status({'discs': discs(2), 'cardUnreadable': true}))), isFalse);
+    expect(playing.sameAs(RetroStatus.parse(status({'discs': discs(2), 'aspect': 1.5}))), isFalse);
+  });
+
   test('a status without cardUnreadable reads as a readable card', () {
     expect(RetroStatus.parse(status()).cardUnreadable, isFalse);
   });

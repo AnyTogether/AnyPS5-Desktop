@@ -40,6 +40,9 @@ described in [The emulator host in the launcher's UI](<AnyPS5 Desktop - Emulator
 `RetroStatus.parse` reads a `status` result by the protocol's "status" section
 and throws `RetroProtocolError` for a field outside it. Unknown fields are
 ignored.
+`RetroStatus.sameAs` says whether two statuses hold the same values, field by
+field as `toJson` writes them, options in their order; the UI uses it to
+tell no one of a status that says nothing new.
 
 - **`cardUnreadable`.** True when memory card 1's file is there but the host
   could not read it as a card, so this game's saves are not written anywhere.

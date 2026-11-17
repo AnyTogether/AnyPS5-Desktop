@@ -2455,6 +2455,7 @@
   "retroHostOutdatedDetail": "Denne emulatorvært passer ikke til denne launcher. Den skal opdateres.",
   "retroHostNotStartedDetail": "Emulatorværten kunne ikke startes.",
   "retroHostCardUnreadable": "Dette spils hukommelseskort kunne ikke læses, så spillets fremskridt bliver ikke gemt. Kortets fil bliver ikke rørt.",
+  "retroHostNoCapture": "Skærmbilleder og klip findes endnu ikke til PS1-spil i emulatorværten.",
   "retroMenuVolume": "Lydstyrke",
   "retroMenuMute": "Slå lyden fra",
   "retroMenuDiscInsertedDetail": "I konsollen.",

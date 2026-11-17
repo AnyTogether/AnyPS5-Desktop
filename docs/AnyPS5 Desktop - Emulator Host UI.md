@@ -112,7 +112,10 @@ one kept from the last game, or a fake in the tests.
   game from `loading` to `playing`. An ended status ends it. After a host
   failure, the client's own short failure report (`errorCode` `hostExited` or
   `hostHung`) ends it the same way. When the host's connection ends, the game
-  asks `status` at once instead of waiting for the next poll.
+  asks `status` at once instead of waiting for the next poll. Listeners hear
+  of a status only when it says something new (`RetroStatus.sameAs`, which
+  compares every field as protocol.md "status" writes it): a game that plays
+  on with the same status, asked twice a second, rebuilds nothing.
 - **Input.** `input(port, buttons, …)` forwards a controller state to the host,
   but only while a game is loaded and the window has input focus
   (`acceptsInput`). The client zeroes both ports when focus is lost, so
@@ -210,6 +213,9 @@ so `connectedPorts` with `2` is sent when the game loads with two
 controllers or a second one sits down, and `1` when it leaves. Port 1 always
 has a controller in the host. Controls made for a game that is already loaded
 do not know what the host has, so they send the count on their first read.
+A count is the host's only once it answered `true`: one it did not take, or
+a call that failed, is asked again by the next read, and nothing is asked
+twice while a call waits.
 
 **Sending.** The controllers are read every 16 ms, as the SDL reader polls
 them. A port's state is sent when it changes. The protocol says the launcher
@@ -340,24 +346,32 @@ below on, since the player asked for the emulator to play PS1 games with it.
 **The setting.** Settings › Emulators › **Run PS1 games in the separate
 host** (`Preferences.retroHostPs1`) is off by default. The row shows only
 where a host is found (`AppModel.retroHostInstall`): the downloaded release
-(`RetroHostStore.installed`), or in a debug or test build the host that
-`ANYPS5_RETRO_HOST` names (`RetroHostInstall.locate`), as protocol.md
-"Finding and checking the host" allows: "Debug builds of the launcher MAY run
-the host named by the environment variable `ANYPS5_RETRO_HOST`, and any core,
-without the checks. Release builds ignore that variable." (A test build is a
-release-mode build compiled to allow it, never published:
+(`RetroHostDownloadModel.installed`), or in a debug or test build the host
+that `ANYPS5_RETRO_HOST` names (`AppModel.retroHostUnchecked`, from
+`RetroHostInstall.locate`), as protocol.md "Finding and checking the host"
+allows: "Debug builds of the launcher MAY run the host named by the
+environment variable `ANYPS5_RETRO_HOST`, and any core, without the checks.
+Release builds ignore that variable." (A test build is a release-mode build
+compiled to allow it, never published:
 [Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>) "Debug and test builds".) That
 unchecked host comes first, and while it is used no download row is shown;
 instead **Unchecked PS1 emulator (test build)** says that this build runs it
 without checking its signature or files, and that normal releases only run the
-signed emulator. The core is the
-SwanStation library beside the host (`swanstation_libretro.dll` on Windows,
+signed emulator. The core is the SwanStation library beside the host
+(`swanstation_libretro.dll` on Windows,
 `swanstation_libretro.so` on Linux), as a host release's zip holds the two.
-With no host found the row is hidden and a PS1 disc goes to DuckStation as
-before, even with the setting saved as on. With the setting on, a PS1 disc
-needs no DuckStation: it is not shown as "Emulator required", and the PS1
-folder on Home groups its games. The row **PS1 BIOS folder** opens the folder
-the BIOS goes in.
+Neither is looked for on every read: every PS1 tile and row uses the same
+answer. The unchecked host is looked for once, since the environment that names
+it does not change while the launcher runs. The downloaded host is read from
+`RetroHost/host` (`RetroHostStore.installed` and its version) when the model
+is made and again only when that folder may have changed: after a download
+reached putting its host in place, and after the installed host failed its
+check before a start, so a host with a file gone stops being offered to PS1
+games. With no host found the row is hidden and a PS1 disc goes to
+DuckStation as before, even with the setting saved as on. With the setting
+on, a PS1 disc needs no DuckStation: it is not shown as "Emulator required",
+and the PS1 folder on Home groups its games. The row **PS1 BIOS folder**
+opens the folder the BIOS goes in.
 
 **Starting.** `AppModel.play` sends a PS1 disc to `_playInHost` when
 `playsInHost` says so. It asks the family rules first, as every start does.
@@ -402,7 +416,23 @@ shut down:
   is starting or running (`_letUnwantedRetroHostGo`, checked on every change
   of the launcher's state);
 - after five minutes without a game (`RetroHostKeeper.idleLimit`);
-- when the launcher goes away.
+- when the launcher quits.
+
+**Quitting.** Every close of the launcher (its Quit, the window's close,
+Alt+F4, an update's installer) comes through the exit request in
+`lib/main.dart`. Before it lets the launcher go, it calls
+`AppModel.shutDownRetroHosts`: a host download stops first
+(`RetroHostDownloadModel.close`), so one waiting for the kept host to exit is
+not put in place as the launcher goes; then the game's host and the kept one
+are told to shut down, and the launcher waits up to `RetroHostPlaying.quitLimit` (3 s,
+under `LauncherShutdown.fallbackAfter`) for them to exit. A host told to shut
+down "stops its game as `stop` does (memory cards are written), then exits"
+(protocol.md "shutdown"). On Windows that is what saves the game: a host
+still running when the launcher's process ends goes with its job object,
+unsaved. On Linux a host still there gets SIGTERM from `PR_SET_PDEATHSIG`,
+which it handles like `shutdown`. `AppModel.dispose` lets go of the game and
+shuts the hosts down too, for a launcher that goes away without quitting (the
+tests).
 
 A kept host that ends by itself (it crashed, or exited after `release` as
 protocol.md "release" allows) is forgotten and freed, and the next game starts
@@ -435,14 +465,32 @@ scale. Mouse buttons and the wheel are not read. The keys are read from
 Flutter's `HardwareKeyboard.physicalKeysPressed` at each poll. While the game's
 screen is in front, the launcher's own keys do nothing: only the in-game
 shortcuts of Settings › Shortcuts and full screen act. PS opens the game's
-menu; the screenshot and clip shortcuts do nothing for a game in the host
-yet, since they follow a game the launcher started as its own process. A PS1 game's Game Settings has a **Controls** row for its
-keys.
+menu. The screenshot and clip shortcuts (and Share) take nothing for a game
+in the host yet, since they follow a game the launcher started as its own
+process; they say so in a toast (`retroHostNoCapture`). A PS1 game's Game
+Settings has a **Controls** row for its keys.
 
 **The game's screen.** `RetroPlayView` draws the game over the whole window,
 over the home screen and under every layer. While it starts or loads it shows
-the game's name and `status.progressLabel` (or "Loading the game…"), with a
-progress line from `status.progressPercent` when the host gives one. On the
+the game's name and a line of what it loads, with a progress line from
+`status.progressPercent` when the host gives one. The line is the host's
+`status.progressLabel` where the launcher speaks English, as the host's words
+are English, and "Loading the game…" in the player's language otherwise
+(`retroLoadingText`). It follows its `RetroHostGame` itself (a
+`ListenableBuilder`), so a loading step redraws only the game's screen.
+
+**The home screen under the game.** A game in the host counts as a game
+playing (`AppModel.gamePlaying`, true for `running` or `retroPlay`). The home
+screen rests under it as under any game: the theme's animation, a background
+video or picture and the game artwork's drift stay still (`Backdrop`), the
+home tiles' focus ring stops (`homeRingMoves`), and Glass's frame-time watch
+does not count the game's frames.
+
+**What the launcher redraws.** `RetroHostPlaying._retroChanged` hears every
+change of the game. The launcher's state changes (`_changed`: the phones'
+library, every game's state) only when the game's phase or its problem
+changes. Anything else, a disc change or an option, is drawn again only while
+the game's menu is open, since only the menu shows it. On the
 game's screen the controller is the game's: Cross, Circle, Start and the
 D-pad reach the game, not the launcher. Only PS acts. PS, PS held, the quick
 menu shortcut, and the mouse's right or Back button open the game's menu.
@@ -481,7 +529,9 @@ ends without an error goes back to the library the same way. A game that ends
 with an error stays on its error screen ("Night Racer stopped") with the words
 for its `errorCode` (`retroHostErrorKey`; a code the launcher does not know is
 "The game stopped because of an error.", as protocol.md "Compatibility" asks),
-and Enter or Cross goes back to the library. A host that speaks another
+and Enter or Cross goes back to the library. A game with no BIOS it can use
+also offers the PS1 BIOS folder there (O or Triangle,
+`openRetroBiosFolder`, as the Settings row opens it). A host that speaks another
 protocol version shows that it needs updating, and a host that never greeted
 the launcher shows that it could not be started.
 
@@ -502,6 +552,8 @@ native memory as a real ring slot would be, so no host is started.
   covers:
   - the `start` argument;
   - the status example from the protocol's `status` section;
+  - no listener told of a status the same as the last, while loading or
+    playing, and told of one that changed;
   - input filtering, pausing on focus loss and the player's own pause;
   - an ended status, a refused `start`, a host that never says `welcome`, and
     a host failure while playing;
@@ -552,7 +604,9 @@ native memory as a real ring slot would be, so no host is started.
   - a `rumble` that comes as one controller takes another's port, and
     controls made for a game already loaded sending the port count;
   - a button kept out after the menu closed that is let go and pressed again
-    while the window has no focus.
+    while the window has no focus;
+  - a `connectedPorts` the host did not take asked again, and never twice
+    while a call waits.
 - [`retro_game_menu_test.dart`](../test/ui/retro_host/retro_game_menu_test.dart)
   builds the rows from the protocol's status example. It checks disc changes,
   option steps, volume steps and mute, volume set before `welcome`, and that
@@ -580,9 +634,19 @@ native memory as a real ring slot would be, so no host is started.
   the idle limit and when another game starts, a kept host that crashed and a
   host that crashed during a game (both replaced by a new host for the next
   game), a host still holding a game after `release` (shut down), a memory
-  card the host cannot read (said once), an error screen, a clean end, an outdated host, and a start given up.
+  card the host cannot read (said once), an error screen, a clean end, an
+  outdated host, and a start given up. It also checks the review points of
+  #161: the home screen's background and focus ring still under the game
+  (`Backdrop` pumped with no fixed time); no launcher rebuild for a status that
+  says nothing new, the open menu redrawn for one that does, and an error
+  that is the launcher's change; the host looked for once; quitting
+  (`shutDownRetroHosts`) shutting down the game's host and the kept one, and
+  not waiting past its limit for a host that does not exit; the BIOS folder
+  offered only for a missing BIOS; the Screenshot and Share toast; and the
+  loading line in English and in Turkish.
 - [`retro_host_play_golden_test.dart`](../test/ui/retro_host_play_golden_test.dart)
-  draws the loading screen, the error screen, the game's picture, the menu's
+  draws the loading screen, the error screen (no BIOS, with its folder hint),
+  the game's picture, the menu's
   first page over it, its Console page, and Settings › Emulators with the
   host's rows: the debug host's with its unchecked notice, the download offered
   before a host is installed, and the downloaded release installed and turned on.
@@ -595,13 +659,16 @@ native memory as a real ring slot would be, so no host is started.
   the row downloads, checks and installs the release and turns the setting on.
   Selecting the row again finds it up to date and downloads nothing, while a
   broken host, or one missing a file, is downloaded again at the same version.
+  A missing file is not looked for on every read: the host stays found until
+  its check before a start fails, and only then is no longer offered.
   A kept host is checked again before its next game and shut down when its
   core changed, and nothing starts while a download is installing. A download
   shuts the kept host down and waits for it before the new host goes in, and
   is refused, leaving the kept host, while a game is starting; one the
   launcher closes during is not put in place. With no release the row
   says none is published yet. A download stopped while the kept host is
-  still exiting is not put in place, and once the new host is being put in
+  still exiting is not put in place, nor is one when the launcher quits
+  meanwhile (`shutDownRetroHosts`), and once the new host is being put in
   place the row no longer offers to stop it. Nothing downloads while a game plays, and a debug
   build that runs `ANYPS5_RETRO_HOST` shows no download but says its host is
   unchecked, which the signed release's rows never say.
@@ -697,6 +764,11 @@ it, so WinLibs' `bin` folder has to be on `PATH` there.
   screen is in front.
 - **No mouse.** The mouse buttons and the wheel in a game's Controls are not
   read for a PS1 game.
+- **No default menu key.** With only a keyboard, the game's menu opens with
+  the mouse's right button, or with a key the player gave Home or Quick menu
+  in Settings › Shortcuts: neither has one by default, and Esc is Start in the
+  default Controls. A default key changes every game's shortcuts, so it is
+  left for the signed install, before release builds find a host.
 - **Graphics.** The menu does not show SwanStation's graphics options
   (`GPU_*` and `Display_*`). They are left for a Graphics page of their own,
   which comes with the host's drawing on the graphics card (not on the host's

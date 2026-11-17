@@ -150,7 +150,11 @@ void main() {
       await model.retroHostDownload.download();
       final core = model.retroHostInstall!.core;
       File(core).deleteSync();
-      expect(model.retroHostInstall, isNull);
+      expect(model.retroHostInstall?.core, core, reason: 'not looked for again on every read');
+      model.closeOverlay();
+      await model.play(launcher.game);
+      expect(model.toast, T.text('retroHostCheckFailed'));
+      expect(model.retroHostInstall, isNull, reason: 'looked for again once its check failed');
       expect(row('retro-host-download')!.title, T.text('retroHostDownload'));
       await model.retroHostDownload.download();
       expect(model.toast, T.format('retroHostReady', ['1.0.0']));
@@ -182,7 +186,7 @@ void main() {
       await launcher.start();
       await model.closeRetroGame();
       launcher.checked.single!.release();
-      launcher.session.endsOnShutdown = false;
+      launcher.session.exitsOnShutdown = false;
       final installed = File(model.retroHostInstall!.host).lastModifiedSync();
       final going = model.retroHostDownload.download();
       await until(() => launcher.session.shutdownAsked, const Duration(seconds: 10));
@@ -192,6 +196,27 @@ void main() {
       expect(model.toast, isNot(T.format('retroHostReady', ['1.0.0'])));
       expect(model.retroHostDownload.installing, isFalse);
       expect(model.retroHostDownload.downloading, isFalse);
+      expect(File(model.retroHostInstall!.host).lastModifiedSync(), installed);
+    });
+
+    test('quitting while a download waits for the kept host to exit puts no new host in place', () async {
+      github.releases.add(retroHostFixtureRelease(tag: 'v1.0.1'));
+      launcher = await Ps1Launcher.withRelease(retroHostApi: github.api);
+      final model = launcher.model..setRetroHostPs1(true);
+      model.select(model.games.indexOf(launcher.game));
+      await launcher.start();
+      await model.closeRetroGame();
+      launcher.checked.single!.release();
+      launcher.session.exitsOnShutdown = false;
+      final installed = File(model.retroHostInstall!.host).lastModifiedSync();
+      final going = model.retroHostDownload.download();
+      await until(() => launcher.session.shutdownAsked, const Duration(seconds: 10));
+      final quitting = model.shutDownRetroHosts();
+      launcher.session.endedCompleter.complete(RetroHostEnd.clean);
+      await quitting;
+      await going;
+      expect(model.toast, isNot(T.format('retroHostReady', ['1.0.0'])));
+      expect(model.retroHostDownload.placing, isFalse);
       expect(File(model.retroHostInstall!.host).lastModifiedSync(), installed);
     });
 

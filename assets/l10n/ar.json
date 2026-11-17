@@ -2455,6 +2455,7 @@
   "retroHostOutdatedDetail": "مضيف المحاكاة هذا لا يتوافق مع هذا المشغّل. يجب تحديثه.",
   "retroHostNotStartedDetail": "تعذّر تشغيل مضيف المحاكاة.",
   "retroHostCardUnreadable": "تعذّرت قراءة بطاقة الذاكرة لهذه اللعبة، لذلك لن تُحفظ تقدّماتها. يبقى ملف البطاقة كما هو.",
+  "retroHostNoCapture": "لقطات الشاشة والمقاطع غير متاحة بعد لألعاب PS1 في مضيف المحاكاة.",
   "retroMenuVolume": "مستوى الصوت",
   "retroMenuMute": "كتم الصوت",
   "retroMenuDiscInsertedDetail": "داخل الجهاز.",

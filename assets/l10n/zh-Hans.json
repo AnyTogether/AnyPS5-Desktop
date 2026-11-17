@@ -2455,6 +2455,7 @@
   "retroHostOutdatedDetail": "此模拟器宿主程序与此启动器不匹配，需要更新。",
   "retroHostNotStartedDetail": "无法启动模拟器宿主程序。",
   "retroHostCardUnreadable": "无法读取此游戏的记忆卡，因此它的存档不会被保存。记忆卡文件保持原样。",
+  "retroHostNoCapture": "模拟器宿主程序中的 PS1 游戏暂不支持截图和片段。",
   "retroMenuVolume": "音量",
   "retroMenuMute": "静音",
   "retroMenuDiscInsertedDetail": "已放入主机。",

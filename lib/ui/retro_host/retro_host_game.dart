@@ -176,6 +176,8 @@ class RetroHostGame extends ChangeNotifier {
   }
 
   /// Asks `status` once and follows it: the aspect ratio, the first frame, and the game's end.
+  /// Listeners hear of it only when the status says something new: a game that plays on with the
+  /// same status, asked twice a second, rebuilds nothing.
   Future<void> refresh() async {
     if (!_gameLive || _polling) return;
     _polling = true;
@@ -186,6 +188,7 @@ class RetroHostGame extends ChangeNotifier {
         _end(failure: 'The host has no game loaded.');
         return;
       }
+      final changed = !(_status?.sameAs(current) ?? false);
       _status = current;
       _aspect = current.aspect;
       if (current.ended) {
@@ -194,7 +197,7 @@ class RetroHostGame extends ChangeNotifier {
       }
       if (current.ready && _phase == RetroHostGamePhase.loading) {
         _setPhase(RetroHostGamePhase.playing);
-      } else {
+      } else if (changed) {
         _notify();
       }
     } on Object catch (error) {

@@ -2455,6 +2455,7 @@
   "retroHostOutdatedDetail": "此模擬器宿主程式與此啟動器不相符，需要更新。",
   "retroHostNotStartedDetail": "無法啟動模擬器宿主程式。",
   "retroHostCardUnreadable": "無法讀取此遊戲的記憶卡，因此它的存檔不會被保存。記憶卡檔案保持原樣。",
+  "retroHostNoCapture": "模擬器宿主程式中的 PS1 遊戲暫不支援截圖和片段。",
   "retroMenuVolume": "音量",
   "retroMenuMute": "靜音",
   "retroMenuDiscInsertedDetail": "已放入主機。",

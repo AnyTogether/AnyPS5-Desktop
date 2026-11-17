@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import '../../core/audio/tones.dart';
+import '../../core/retro_host/retro_host_install.dart';
 import '../../core/retro_host/retro_host_release.dart';
 import '../../core/retro_host/retro_host_store.dart';
 import '../../core/toolkit_download.dart';
@@ -15,10 +16,28 @@ import '../strings.dart';
 /// `ANYPS5_RETRO_HOST` names offers none.
 class RetroHostDownloadModel {
   RetroHostDownloadModel(this.app)
-    : store = RetroHostStore(app.paths.retroHost, keys: app.services.retroHostReleases?.signingKeys);
+    : store = RetroHostStore(app.paths.retroHost, keys: app.services.retroHostReleases?.signingKeys) {
+    _look();
+  }
 
   final AppModel app;
   final RetroHostStore store;
+
+  /// The installed host to start, as [RetroHostStore.installed] last found it; checked before each
+  /// start all the same.
+  RetroHostInstall? get installed => _installed;
+  RetroHostInstall? _installed;
+
+  /// The installed host's version, for its row.
+  RetroHostVersion? _version;
+
+  /// Reads the installed host from disk: when the model is made, and again only when its folder
+  /// may have changed (a new host put in place, or the installed one failing its check), not on
+  /// every play or Settings row.
+  void _look() {
+    _installed = store.installed();
+    _version = _installed == null ? null : store.version;
+  }
 
   /// The last look found no signed host release yet.
   bool notYet = false;
@@ -65,6 +84,7 @@ class RetroHostDownloadModel {
   /// again.
   void failedCheck(String reason) {
     broken = reason;
+    _look();
     app.refresh();
   }
 
@@ -121,7 +141,12 @@ class RetroHostDownloadModel {
       if (cancel.cancelled) throw ToolkitFailure(ToolkitFailureKind.cancelled, 'the download was stopped');
       placing = true;
       app.refresh();
-      final version = await store.putInPlace(download);
+      final RetroHostVersion version;
+      try {
+        version = await store.putInPlace(download);
+      } finally {
+        _look();
+      }
       broken = null;
       if (before == null) app.setRetroHostPs1(true);
       app.sounds.play(Cue.unlocked);
@@ -207,7 +232,7 @@ class RetroHostDownloadModel {
         ),
       ];
     }
-    final version = store.installed() == null ? null : store.version;
+    final version = _version;
     final String detail;
     if (broken != null) {
       detail = T.text('retroHostBrokenDetail');

@@ -33,6 +33,7 @@ import 'core/steam/steam_launch.dart';
 import 'core/toolkit_download.dart';
 import 'ui/app_model.dart';
 import 'ui/clip_player.dart';
+import 'ui/components.dart' show FocusRing;
 import 'ui/countries.dart';
 import 'ui/crash_model.dart';
 import 'ui/launcher.dart';
@@ -43,6 +44,7 @@ import 'ui/profile_picture.dart';
 import 'ui/sealed_photo.dart';
 import 'ui/voice_note_player.dart';
 import 'ui/sharing_model.dart';
+import 'ui/startup_intro.dart';
 import 'ui/strings.dart';
 import 'ui/together_model.dart' show launcherVersion;
 import 'ui/theme.dart';
@@ -195,6 +197,8 @@ Future<void> main(List<String> arguments) async {
       // close the launcher started after the answer (LauncherShutdown.quit) goes through.
       if (!model.allowExit()) return AppExitResponse.cancel;
       closing();
+      // A PS1 game in the emulator host is saved first: the host stops it and exits.
+      await model.shutDownRetroHosts();
       return AppExitResponse.exit;
     },
   );
@@ -245,6 +249,11 @@ Future<void> main(List<String> arguments) async {
   unawaited(model.saveSync.refreshInfo());
   unawaited(model.engine.startupCheck());
   unawaited(model.updates.startupCheck());
+  // The home screen's start animation plays in the real launcher only: previews and tests
+  // build the home screen without it.
+  StartupIntro.enabled = true;
+  // The home tiles' focus ring moves (tests leave it still).
+  FocusRing.enabled = true;
   runApp(AnyPS5App(model: model));
   // .anyps5theme files open with this launcher (the zip, the AppImage and the archive install
   // nothing that would say so); not for a development build.
