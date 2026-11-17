@@ -21,6 +21,7 @@ import 'padlock.dart';
 import 'panels.dart' show StatusDot;
 import 'profiles_view.dart' show ProfileSwitcherList, ProfileTile;
 import 'retro_folder_tile.dart';
+import 'startup_intro.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'together_model.dart';
@@ -150,9 +151,62 @@ class HomeView extends StatefulWidget {
   State<HomeView> createState() => _HomeViewState();
 }
 
-class _HomeViewState extends State<HomeView> {
+class _HomeViewState extends State<HomeView> with SingleTickerProviderStateMixin {
   /// Ties the profile list to the picture in the top bar it drops from.
   final LayerLink _profileLink = LayerLink();
+
+  /// The start animation (StartupIntro), once per run; null when it does not play. Afterwards
+  /// everything is built with a finished animation, so the widgets stay the same.
+  AnimationController? _intro;
+
+  /// The curtain is over the home screen until the animation ends.
+  bool _curtain = false;
+
+  /// Decided: played or skipped for this run's first look at the home screen.
+  bool _introDecided = false;
+
+  Animation<double> get _introAnimation => _intro ?? const AlwaysStoppedAnimation(1.0);
+
+  /// At the first build with nothing over the home screen (the launch profile picker is over it
+  /// before the first frame, and the profile's own settings come with the pick): the intro plays,
+  /// or is skipped for the run. Not with reduced motion (the profile's or the system's), nor
+  /// with a game starting or running (a Steam shortcut goes straight into it).
+  void _decideIntro(BuildContext context) {
+    final model = widget.model;
+    if (_introDecided || model.overlay != null || !StartupIntro.pending) return;
+    _introDecided = true;
+    StartupIntro.played = true;
+    if (Motion.reduced || MediaQuery.disableAnimationsOf(context)) return;
+    if (model.starting != null || model.running != null) return;
+    final intro = AnimationController(vsync: this, duration: StartupIntro.duration);
+    _intro = intro;
+    _curtain = true;
+    intro.addStatusListener((status) {
+      if (status != AnimationStatus.completed) return;
+      model.onInput = null;
+      if (mounted) setState(() => _curtain = false);
+    });
+    // A key, a button or a click finishes it at once.
+    model.onInput = _finishIntro;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _intro == intro) unawaited(intro.forward());
+    });
+  }
+
+  void _finishIntro() {
+    final intro = _intro;
+    if (intro == null || intro.isCompleted) return;
+    intro.value = 1;
+    widget.model.onInput = null;
+    if (mounted) setState(() => _curtain = false);
+  }
+
+  @override
+  void dispose() {
+    if (widget.model.onInput == _finishIntro) widget.model.onInput = null;
+    _intro?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -160,31 +214,37 @@ class _HomeViewState extends State<HomeView> {
     final now = widget.now;
     final scale = LayoutScale.of(context);
     final game = model.homePreviewGame;
+    _decideIntro(context);
     // Glass's panes on the home screen never overlap: they share one blur of the background.
-    return BackdropGroup(
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          _body(context, model, now, scale, game),
-          if (model.profileListOpen) ...[
-            // A click anywhere else closes the list, and still does what it was for.
-            Positioned.fill(
-              child: Listener(behavior: HitTestBehavior.translucent, onPointerDown: (_) => model.closeProfileList()),
-            ),
-            Positioned(
-              left: 0,
-              top: 0,
-              child: CompositedTransformFollower(
-                link: _profileLink,
-                showWhenUnlinked: false,
-                targetAnchor: Alignment.bottomCenter,
-                followerAnchor: Alignment.topCenter,
-                offset: Offset(0, 12 * scale),
-                child: ProfileSwitcherList(model: model),
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => _finishIntro(),
+      child: BackdropGroup(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _body(context, model, now, scale, game),
+            if (_curtain) IntroCurtain(animation: _intro!, deep: model.palette.deep) else const SizedBox.shrink(),
+            if (model.profileListOpen) ...[
+              // A click anywhere else closes the list, and still does what it was for.
+              Positioned.fill(
+                child: Listener(behavior: HitTestBehavior.translucent, onPointerDown: (_) => model.closeProfileList()),
               ),
-            ),
+              Positioned(
+                left: 0,
+                top: 0,
+                child: CompositedTransformFollower(
+                  link: _profileLink,
+                  showWhenUnlinked: false,
+                  targetAnchor: Alignment.bottomCenter,
+                  followerAnchor: Alignment.topCenter,
+                  offset: Offset(0, 12 * scale),
+                  child: ProfileSwitcherList(model: model),
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -195,41 +255,60 @@ class _HomeViewState extends State<HomeView> {
       children: [
         Padding(
           padding: EdgeInsets.fromLTRB(64 * scale, 34 * scale, 64 * scale, 0),
-          child: TopBar(model: model, now: now, profileLink: _profileLink),
+          child: IntroReveal(
+            animation: _introAnimation,
+            span: StartupIntro.topBar,
+            slide: const Offset(0, -0.4),
+            child: TopBar(model: model, now: now, profileLink: _profileLink),
+          ),
         ),
         if (model.games.isEmpty)
           Expanded(child: EmptyLibrary(model: model))
         else ...[
           SizedBox(height: 34 * scale),
-          TileRow(model: model),
+          TileRow(model: model, intro: _introAnimation),
           if (model.homeFolderPlatform != null) ...[
             SizedBox(height: 24 * scale),
-            TileRow(key: const ValueKey('retro-folder-games'), model: model, folderContents: true),
+            TileRow(
+              key: const ValueKey('retro-folder-games'),
+              model: model,
+              folderContents: true,
+              intro: _introAnimation,
+            ),
           ],
           const Spacer(),
           if (game != null)
-            AnimatedSwitcher(
-              layoutBuilder: uniqueSwitcherLayout(),
-              duration: Motion.layout,
-              switchInCurve: Motion.settle,
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween(begin: const Offset(0, 0.04), end: Offset.zero).animate(animation),
-                  child: child,
+            IntroReveal(
+              animation: _introAnimation,
+              span: StartupIntro.hero,
+              slide: const Offset(0, 0.06),
+              child: AnimatedSwitcher(
+                layoutBuilder: uniqueSwitcherLayout(),
+                duration: Motion.layout,
+                switchInCurve: Motion.settle,
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween(begin: const Offset(0, 0.04), end: Offset.zero).animate(animation),
+                    child: child,
+                  ),
                 ),
-              ),
-              child: Padding(
-                key: ValueKey(game.id),
-                padding: EdgeInsets.symmetric(horizontal: 72 * scale),
-                child: HeroInfo(model: model, game: game),
+                child: Padding(
+                  key: ValueKey(game.id),
+                  padding: EdgeInsets.symmetric(horizontal: 72 * scale),
+                  child: HeroInfo(model: model, game: game),
+                ),
               ),
             ),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 64 * scale, vertical: 28 * scale),
             child: Align(
               alignment: AlignmentDirectional.centerEnd,
-              child: Legible(softness: 14, child: HintBar(options: model.selectedHomeFolder == null)),
+              child: IntroReveal(
+                animation: _introAnimation,
+                span: StartupIntro.hints,
+                child: Legible(softness: 14, child: HintBar(options: model.selectedHomeFolder == null)),
+              ),
             ),
           ),
         ],
@@ -744,10 +823,18 @@ class PhoneIndicator extends StatelessWidget {
 /// console. The tiles are top-aligned and the next ones follow right after the selected one; the
 /// previous game stays visible on the left, cut by the edge.
 class TileRow extends StatelessWidget {
-  const TileRow({super.key, required this.model, this.folderContents = false});
+  const TileRow({
+    super.key,
+    required this.model,
+    this.folderContents = false,
+    this.intro = const AlwaysStoppedAnimation(1.0),
+  });
 
   final AppModel model;
   final bool folderContents;
+
+  /// The start animation (StartupIntro): each tile pops in on its turn.
+  final Animation<double> intro;
 
   @override
   Widget build(BuildContext context) {
@@ -798,42 +885,49 @@ class TileRow extends StatelessWidget {
                     top: 0,
                     width: size,
                     height: size,
-                    child: AnimatedOpacity(
-                      duration: Motion.layout,
-                      opacity: offset < 0 ? (offset == -1 ? tilePeekOpacity : 0) : 1,
-                      // A click selects at once (a GestureDetector with a double tap would wait to
-                      // see whether a second click comes); a second click plays.
-                      child: Pressable(
-                        key: ValueKey('tile-press-$id'),
-                        onHover: console != null && !selected && offset >= 0
-                            ? () {
-                                if (!model.panning && model.overlay == null) {
-                                  model.selectHomeTile(index, folderContents: folderContents);
+                    child: IntroReveal(
+                      animation: intro,
+                      span: StartupIntro.tile(index),
+                      slide: const Offset(0, 0.12),
+                      scaleFrom: 0.82,
+                      child: AnimatedOpacity(
+                        duration: Motion.layout,
+                        opacity: offset < 0 ? (offset == -1 ? tilePeekOpacity : 0) : 1,
+                        // A click selects at once (a GestureDetector with a double tap would wait to
+                        // see whether a second click comes); a second click plays.
+                        child: Pressable(
+                          key: ValueKey('tile-press-$id'),
+                          onHover: console != null && !selected && offset >= 0
+                              ? () {
+                                  if (!model.panning && model.overlay == null) {
+                                    model.selectHomeTile(index, folderContents: folderContents);
+                                  }
                                 }
-                              }
-                            : null,
-                        onTap: () {
-                          model.selectHomeTile(index, folderContents: folderContents);
-                          if (console != null) model.openSelectedHomeFolder();
-                        },
-                        onDoubleTap: console == null
-                            ? () {
-                                model.selectHomeTile(index, folderContents: folderContents);
-                                model.primaryAction(game);
-                              }
-                            : null,
-                        builder: (context, _) {
-                          final focused = selected && rowFocused && model.focus.isTiles && model.overlay == null;
-                          if (console != null) {
-                            return RetroFolderTile(
-                              console: console,
-                              size: size,
-                              focused: focused,
-                              accent: model.accentChoice.color,
-                            );
-                          }
-                          return GameTile(model: model, game: game, size: size, focused: focused);
-                        },
+                              : null,
+                          onTap: () {
+                            model.selectHomeTile(index, folderContents: folderContents);
+                            if (console != null) model.openSelectedHomeFolder();
+                          },
+                          onDoubleTap: console == null
+                              ? () {
+                                  model.selectHomeTile(index, folderContents: folderContents);
+                                  model.primaryAction(game);
+                                }
+                              : null,
+                          builder: (context, _) {
+                            final focused = selected && rowFocused && model.focus.isTiles && model.overlay == null;
+                            if (console != null) {
+                              return RetroFolderTile(
+                                console: console,
+                                size: size,
+                                focused: focused,
+                                accent: model.accentChoice.color,
+                                animated: model.homeRingMoves,
+                              );
+                            }
+                            return GameTile(model: model, game: game, size: size, focused: focused);
+                          },
+                        ),
                       ),
                     ),
                   ),
@@ -973,6 +1067,7 @@ class GameTile extends StatelessWidget {
     return FocusRing(
       focused: focused,
       radius: radius,
+      animated: model.homeRingMoves,
       child: AnimatedContainer(
         duration: Motion.focus,
         decoration: BoxDecoration(

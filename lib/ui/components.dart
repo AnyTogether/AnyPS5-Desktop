@@ -90,37 +90,124 @@ class Glass extends StatelessWidget {
   }
 }
 
-/// The white ring and glow a focused element wears. The glow is drawn around the ring only, so
-/// the element itself keeps its colors.
-class FocusRing extends StatelessWidget {
-  const FocusRing({super.key, required this.focused, required this.radius, required this.child, this.width = 3});
+/// The ring and glow a focused element wears, in the console's style: a ring that is never fainter
+/// than 90 % white with a soft halo around it. With [animated] (the home tiles only) the halo
+/// breathes slowly and a brighter glint travels around the edge; everywhere else the same ring
+/// stands still, so a ring never makes the blur behind it run again.
+///
+/// The glow is drawn around the ring only, so the element itself keeps its colors.
+class FocusRing extends StatefulWidget {
+  const FocusRing({
+    super.key,
+    required this.focused,
+    required this.radius,
+    required this.child,
+    this.width = 3,
+    this.animated = false,
+  });
+
+  /// Whether rings may move at all. main turns it on; tests leave it off (a loop that never ends
+  /// keeps a frame scheduled, and pumpAndSettle would wait for it) and flip it where they test it.
+  static bool enabled = false;
 
   final bool focused;
   final double radius;
   final double width;
+
+  /// The ring moves while focused. Only the home tiles ask for it, and only when nothing else
+  /// needs the computer (no game starting or running, no layer open, no reduced motion).
+  final bool animated;
   final Widget child;
 
   @override
+  State<FocusRing> createState() => _FocusRingState();
+}
+
+class _FocusRingState extends State<FocusRing> with SingleTickerProviderStateMixin {
+  /// One full turn of the glint around the edge; the halo breathes twice per turn.
+  static const _period = Duration(milliseconds: 4800);
+
+  late final AnimationController _loop = AnimationController(vsync: this, duration: _period);
+
+  bool _glass = false;
+
+  bool _reduced(BuildContext context) => MediaQuery.disableAnimationsOf(context) || Motion.reduced;
+
+  // Inherited widgets cannot be read in initState; this runs right after it, and when the look or
+  // the system's animation setting changes.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _glass = LookScope.isGlass(context);
+    _sync(_reduced(context));
+  }
+
+  @override
+  void didUpdateWidget(FocusRing oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _sync(_reduced(context));
+  }
+
+  /// Starts or stops the loop. Also run from build: Motion.reduced is a plain flag (reduced
+  /// motion in the settings, the low-power dimming), and a ring already moving must stop when it
+  /// turns on, which no inherited widget tells it.
+  void _sync(bool reduced) {
+    final moves = widget.focused && widget.animated && FocusRing.enabled && !_glass && !reduced;
+    if (moves) {
+      if (!_loop.isAnimating) _loop.repeat();
+    } else if (_loop.isAnimating) {
+      _loop.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _loop.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final glass = LookScope.isGlass(context);
+    final reduced = _reduced(context);
+    _sync(reduced);
+    final width = widget.width;
+    final reach = width * 1.6;
+    // The settle: the ring starts this far outside and closes in, the same distance on every
+    // side and for every size.
+    final settle = width * 2;
+    final moving = _loop.isAnimating;
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        child,
+        widget.child,
         PositionedDirectional(
-          start: -width * 1.6,
-          top: -width * 1.6,
-          end: -width * 1.6,
-          bottom: -width * 1.6,
+          start: -(reach + settle),
+          top: -(reach + settle),
+          end: -(reach + settle),
+          bottom: -(reach + settle),
           child: IgnorePointer(
             child: AnimatedOpacity(
-              opacity: focused ? 1 : 0,
+              opacity: widget.focused ? 1 : 0,
               duration: Motion.focus,
               curve: Motion.settle,
-              child: CustomPaint(
-                painter: glass
-                    ? _IceRingPainter(radius: radius + width * 1.6, width: width)
-                    : _RingPainter(radius: radius + width * 1.6, width: width),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(end: widget.focused || reduced ? 0 : settle),
+                duration: reduced ? Duration.zero : Motion.focus * 1.5,
+                curve: Motion.settle,
+                builder: (context, away, _) {
+                  final ring = CustomPaint(
+                    painter: _glass
+                        ? _IceRingPainter(radius: widget.radius + reach, width: width, inset: settle - away)
+                        : _RingPainter(
+                            radius: widget.radius + reach,
+                            width: width,
+                            inset: settle - away,
+                            phase: moving ? _loop : null,
+                          ),
+                  );
+                  // A layer of its own only while the ring repaints every frame.
+                  return moving ? RepaintBoundary(child: ring) : ring;
+                },
               ),
             ),
           ),
@@ -131,45 +218,103 @@ class FocusRing extends StatelessWidget {
 }
 
 class _RingPainter extends CustomPainter {
-  _RingPainter({required this.radius, required this.width});
+  _RingPainter({required this.radius, required this.width, required this.inset, Animation<double>? phase})
+    : _phase = phase,
+      super(repaint: phase);
   final double radius;
   final double width;
 
+  /// How far in from the painted area's edge the ring sits (the settle).
+  final double inset;
+  final Animation<double>? _phase;
+
+  /// The ring at its dimmest, in white: it is the only way to see where you are, over any picture.
+  static const _base = 0.92;
+
   @override
   void paint(Canvas canvas, Size size) {
-    final ring = RRect.fromRectAndRadius((Offset.zero & size).deflate(width / 2), Radius.circular(radius));
-    canvas
-      ..drawRRect(
+    final t = _phase?.value ?? 0; // 0..1, one turn of the glint
+    final rect = (Offset.zero & size).deflate(inset);
+    final ring = RRect.fromRectAndRadius(rect.deflate(width / 2), Radius.circular(radius));
+
+    // Breathing: only the halo's opacity swells and fades, twice per turn, never fully off.
+    // The blur stays fixed, which keeps it cheap for the GPU.
+    final breath = _phase == null ? 0.5 : 0.5 - 0.5 * math.cos(t * 2 * math.pi * 2);
+    final haloAlpha = 0.24 + 0.14 * breath;
+
+    // 1. Soft halo, outside the ring only.
+    canvas.drawRRect(
+      ring,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = width * 2.5
+        ..color = Colors.white.withValues(alpha: haloAlpha)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.outer, 9),
+    );
+
+    // 2. The ring at its full width: at least 92 % white, with the glint (full white) going around.
+    final base = Colors.white.withValues(alpha: _base);
+    final shader = _phase == null
+        ? null
+        : SweepGradient(
+            transform: GradientRotation(t * 2 * math.pi),
+            colors: [base, base, Colors.white, base, base],
+            stops: const [0.0, 0.62, 0.8, 0.98, 1.0],
+          ).createShader(rect);
+    canvas.drawRRect(
+      ring,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = width
+        ..color = base
+        ..shader = shader,
+    );
+
+    // 3. The glint also lights the halo a little where it passes (only while it travels).
+    if (_phase != null) {
+      canvas.drawRRect(
         ring,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = width * 2.5
-          ..color = Colors.white.withValues(alpha: 0.35)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.outer, 9),
-      )
-      ..drawRRect(
-        ring,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = width
-          ..color = Colors.white.withValues(alpha: 0.95),
+          ..strokeWidth = width * 2
+          ..shader = SweepGradient(
+            transform: GradientRotation(t * 2 * math.pi),
+            colors: [
+              Colors.white.withValues(alpha: 0),
+              Colors.white.withValues(alpha: 0),
+              Colors.white.withValues(alpha: 0.38),
+              Colors.white.withValues(alpha: 0),
+              Colors.white.withValues(alpha: 0),
+            ],
+            stops: const [0.0, 0.62, 0.8, 0.98, 1.0],
+          ).createShader(rect)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.outer, 6),
       );
+    }
   }
 
   @override
-  bool shouldRepaint(_RingPainter oldDelegate) => oldDelegate.radius != radius || oldDelegate.width != width;
+  bool shouldRepaint(_RingPainter oldDelegate) =>
+      oldDelegate.radius != radius ||
+      oldDelegate.width != width ||
+      oldDelegate.inset != inset ||
+      // Stopped: one more paint, with the glint put away.
+      oldDelegate._phase != _phase;
 }
 
 /// Glass's focus ring: a thinner ring of ice, white at the top and cyan below, in an icy glow.
 class _IceRingPainter extends CustomPainter {
-  _IceRingPainter({required this.radius, required this.width});
+  _IceRingPainter({required this.radius, required this.width, this.inset = 0});
   final double radius;
   final double width;
 
+  /// How far in from the painted area's edge the ring sits (the settle).
+  final double inset;
+
   @override
   void paint(Canvas canvas, Size size) {
-    final ring = RRect.fromRectAndRadius((Offset.zero & size).deflate(width / 2), Radius.circular(radius));
-    final rect = Offset.zero & size;
+    final rect = (Offset.zero & size).deflate(inset);
+    final ring = RRect.fromRectAndRadius(rect.deflate(width / 2), Radius.circular(radius));
     canvas
       ..drawRRect(
         ring,
@@ -194,7 +339,8 @@ class _IceRingPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_IceRingPainter oldDelegate) => oldDelegate.radius != radius || oldDelegate.width != width;
+  bool shouldRepaint(_IceRingPainter oldDelegate) =>
+      oldDelegate.radius != radius || oldDelegate.width != width || oldDelegate.inset != inset;
 }
 
 /// A console button: translucent until focused, then solid white.

@@ -2810,6 +2810,17 @@ class AppModel extends ChangeNotifier {
       glassFallback ||
       (backdrop.kind.seeThrough && preferences.glassTransparency == 0);
 
+  /// The home tiles' focus ring may move: only when nothing else needs the computer, as with the
+  /// background (no game starting or running, the launcher in front, no layer open) and not with
+  /// reduced motion or the low-power dimming.
+  bool get homeRingMoves =>
+      running == null &&
+      starting == null &&
+      overlay == null &&
+      !resting &&
+      !preferences.reducedMotion &&
+      !powerWatch.dimmed;
+
   WindowBackdrop get backdrop => services.backdrop ?? const NoBackdrop();
 
   /// Glass's window: see-through to the desktop where the system can, under its tint.
@@ -4941,8 +4952,12 @@ class AppModel extends ChangeNotifier {
     _changed();
   }
 
+  /// Something to do at the next key, button or click, once (the start animation finishing).
+  VoidCallback? onInput;
+
   /// Home screen, library and panels: what a command does where the user is.
   void handle(Command command) {
+    onInput?.call();
     // Mirrored screens (Arabic, Urdu): → moves to what is drawn on the right, as on the Mac.
     // Watching a share play the controller is the game's, so it stays as it is there.
     if (T.language.isRightToLeft && overlay != Layer.shareWatch) command = command.mirrored;
