@@ -7,8 +7,9 @@ control stream and shares each picture through shared memory. Both sides follow
 that repository's
 [`docs/protocol.md`](https://github.com/AnyTogether/anyps5-retro-host/blob/9052aff59c94c3ae3aa8ff63bef5df241acec713/docs/protocol.md),
 version 1, as it stands on its `main` at 9052aff. This page explains the
-launcher's side. It was written from the protocol alone, and has no UI yet:
-that is the next step.
+launcher's side. It was written from the protocol alone. The UI built on it,
+the game's picture, the controls, the in-game menu and the settings, is
+described in [The emulator host in the launcher's UI](<AnyPS5 Desktop - Emulator Host UI.md>).
 
 ## Files
 
@@ -33,6 +34,9 @@ that is the next step.
 `RetroStatus.parse` reads a `status` result by the protocol's "status" section
 and throws `RetroProtocolError` for a field outside it. Unknown fields are
 ignored.
+`RetroStatus.sameAs` says whether two statuses hold the same values, field by
+field as `toJson` writes them, options in their order; the UI uses it to
+tell no one of a status that says nothing new.
 
 - **`cardUnreadable`.** True when memory card 1's file is there but the host
   could not read it as a card, so this game's saves are not written anywhere.
@@ -63,6 +67,14 @@ caller adds variables on Windows, the native code builds the block for
   the drives' current directories (`=C:`), which `Platform.environment` leaves
   out and `CreateProcessW` does not add to a block it is given;
 - it sorts the entries by name without regard to case, as Windows requires.
+
+With `inheritEnvironment: false` the variables the caller gives are the host's
+whole environment, and nothing is inherited. The launcher does this on Linux,
+where it gives the host its own environment without what its AppImage set
+([Emulator host UI](<AnyPS5 Desktop - Emulator Host UI.md>), "The host's environment"). That
+environment cannot be empty: the native code gives the host the launcher's own
+environment when it is given no entries, so `start` refuses an empty one with
+an `ArgumentError` instead.
 
 **Windows.**
 
@@ -223,7 +235,11 @@ Every other call throws `RetroHostGone` when no game was loaded.
   pinning a newer frame of this game (the host may then write the old slot);
   in the last two cases `frame` becomes null. Read `frame` again after
   each message. A frame that was not drawn can be read only until the next
-  message.
+  message. `close()` and a third ring unmap a ring while a `PinnedFrame` from
+  it may still be held, so each frame shares its ring's `RingMapping`:
+  `FrameRing.unmap` ends it, and `PinnedFrame.copyPixels()` then gives null
+  instead of reading memory that is gone. Read pixels only through
+  `copyPixels()`.
 
 ## Which game is loaded
 
@@ -317,7 +333,8 @@ change after `close()` is ignored.
 [`test/core/retro_host/strict_json_test.dart`](../test/core/retro_host/strict_json_test.dart)
 covers the JSON rules, and
 [`test/core/retro_host/frame_ring_test.dart`](../test/core/retro_host/frame_ring_test.dart)
-covers pinning, including three tries that all miss.
+covers pinning, including three tries that all miss, and that a frame pinned
+before its ring was unmapped gives no pixels.
 
 To run the fixture test, point `ANYPS5_RETRO_HOST_CHECKOUT` at a checkout of
 the host repository. Python 3 must be on `PATH`:
@@ -347,8 +364,10 @@ when `ANYPS5_RETRO_HOST_CHECKOUT` is set.
 
 ## Not yet
 
-- **No UI.** Picking the host's files, showing frames and the player's
-  controls are the next step.
+- **Debug builds only.** A PS1 game plays through the host behind a setting
+  ([Emulator host UI](<AnyPS5 Desktop - Emulator Host UI.md>), "In the launcher"), and only debug
+  builds find a host, through `ANYPS5_RETRO_HOST`. Release builds get the
+  signed host release later.
 - **No signature checks.** The release-time file checks from the protocol's
   "Finding and checking the host" section come with signed distribution.
   Until then, the client runs the command it is given.

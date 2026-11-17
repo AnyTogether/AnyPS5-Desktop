@@ -102,6 +102,12 @@ class AppPaths {
   String get downloadedFonts => p.join(p.dirname(toolkits), 'Fonts', 'Downloaded');
   String get gameFonts => p.join(p.dirname(toolkits), 'Fonts', 'Games');
   String get backupsFolder => p.join(config, 'Backups');
+
+  /// The emulator host's PS1 BIOS folder (the core's system directory) and memory cards, where
+  /// protocol.md's `start` example keeps them.
+  String get retroSystem => p.join(config, 'retro', 'system');
+  String get retroSaves => p.join(config, 'retro', 'saves', 'ps1');
+
   String logFile(String titleId) => p.join(logs, '$titleId.log');
   String shaderCache(String slug) => p.join(cache, slug, 'shader_cache');
 }

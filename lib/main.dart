@@ -193,6 +193,8 @@ Future<void> main(List<String> arguments) async {
       // close the launcher started after the answer (LauncherShutdown.quit) goes through.
       if (!model.allowExit()) return AppExitResponse.cancel;
       closing();
+      // A PS1 game in the emulator host is saved first: the host stops it and exits.
+      await model.shutDownRetroHosts();
       return AppExitResponse.exit;
     },
   );

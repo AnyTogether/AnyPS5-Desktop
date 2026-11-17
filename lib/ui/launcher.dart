@@ -35,6 +35,7 @@ import 'profile_view.dart';
 import 'onboarding.dart';
 import 'panels.dart';
 import 'profiles_view.dart';
+import 'retro_host/retro_play_view.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'together_model.dart';
@@ -108,7 +109,7 @@ class _LauncherShellState extends State<LauncherShell> {
       _recent.add(timing.buildDuration, timing.rasterDuration);
     }
     // Only Glass's own frames count: not while a game shares the GPU, nor once it is solid.
-    if (model.look != LookStyle.glass || model.solidGlass || model.running != null || model.resting) {
+    if (model.look != LookStyle.glass || model.solidGlass || model.gamePlaying || model.resting) {
       _raster.reset();
       return;
     }
@@ -153,6 +154,8 @@ class _LauncherShellState extends State<LauncherShell> {
       _redrawAll();
     }
     widget.model.applyBackdrop();
+    // A key held when a game took the screen repeats nothing over it.
+    if (widget.model.retroInGame && _keys.heldBy != null) _keys.stop();
     if (widget.model.editingRow == null && !_focus.hasPrimaryFocus && mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && widget.model.editingRow == null && !_focus.hasPrimaryFocus) _focus.requestFocus();
@@ -213,6 +216,22 @@ class _LauncherShellState extends State<LauncherShell> {
     // The talk key, where the desktop cannot be read: only while the launcher has the keyboard.
     if (event is! KeyRepeatEvent &&
         together.talkKeyInWindow(event.physicalKey.usbHidUsage, down: event is KeyDownEvent)) {
+      return KeyEventResult.handled;
+    }
+    // A PS1 game in the emulator host reads the keyboard itself (RetroKeyboard): only the in-game
+    // shortcuts and full screen act; its error screen takes the keys as any screen does.
+    if (model.retroInGame && model.retroPlay?.problem == null) {
+      if (event is KeyUpEvent && _keys.heldBy == event.logicalKey) _keys.stop();
+      if (event is KeyDownEvent && !_modifiers.contains(event.logicalKey)) {
+        final action = model.shortcutForKey(_combo(event.logicalKey));
+        if (action != null && (action.inGame || action == LauncherAction.toggleFullscreen)) {
+          model.runKeyShortcut(action);
+        } else if (event.logicalKey == LogicalKeyboardKey.escape && model.retroPlay!.loading) {
+          // Before the game takes the keys, Esc gives the start up.
+          model.usedKeyboard();
+          model.command(Command.back);
+        }
+      }
       return KeyEventResult.handled;
     }
     if (event is KeyUpEvent) {
@@ -352,6 +371,8 @@ class _LauncherShellState extends State<LauncherShell> {
     if (model.editingRow != null || model.capturing != null) return;
     // On Home the right button opens the Options menu (Switch Profile, online or offline).
     if (model.homeRightClick()) return;
+    // Over a PS1 game in the emulator host the right button opens its menu, or leaves it.
+    if (model.retroPlay != null && model.overlay == null) return model.handle(Command.back);
     if (model.overlay == null && model.focus.isTiles && model.pairing == null) return;
     model.handle(Command.back);
   }
@@ -450,6 +471,12 @@ class _LauncherShellState extends State<LauncherShell> {
                                             ),
                                           ),
                                         ),
+                                        // A PS1 game in the emulator host: over the home screen,
+                                        // under its menu and every other layer.
+                                        if (model.retroPlay case final RetroPlay play)
+                                          RepaintBoundary(
+                                            child: RetroPlayView(key: ObjectKey(play), model: model, play: play),
+                                          ),
                                         RepaintBoundary(
                                           child: AnimatedSwitcher(
                                             layoutBuilder: uniqueSwitcherLayout(),

@@ -4,7 +4,7 @@ typedef HomeTile = ({int gameIndex, RetroPlatform? folder});
 
 extension RetroHomeFolders on AppModel {
   bool _groupsHomePlatform(RetroPlatform platform) {
-    return preferences.showRetroFolders && standaloneEmulator(platform) != null;
+    return preferences.showRetroFolders && retroPlayable(platform);
   }
 
   RetroPlatform? get activeHomeRetroFolder {
