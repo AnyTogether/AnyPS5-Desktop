@@ -477,6 +477,17 @@ abstract final class AssetDownload {
     part.renameSync(target);
   }
 
+  /// Where a redirect from [from] to [location] leads. One that leaves https is refused, so a file
+  /// asked for over https is never fetched in the clear: GitHub's release downloads redirect only
+  /// to https, and a plain http address (a test's local server) may still redirect within http.
+  static Uri redirected(Uri from, String location) {
+    final next = from.resolve(location);
+    if (from.scheme == 'https' && next.scheme != 'https') {
+      throw ToolkitFailure(ToolkitFailureKind.network, 'the download was redirected from https to ${next.scheme}');
+    }
+    return next;
+  }
+
   static Future<String> sha256Of(String file) async => (await sha256.bind(File(file).openRead()).first).toString();
 
   static Future<void> _receive(
@@ -510,7 +521,7 @@ abstract final class AssetDownload {
           final next = answer.headers.value(HttpHeaders.locationHeader);
           await answer.drain<void>();
           if (next == null) break;
-          location = location.resolve(next);
+          location = redirected(location, next);
           continue;
         }
         response = answer;

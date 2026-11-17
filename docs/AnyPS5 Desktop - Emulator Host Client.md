@@ -200,7 +200,9 @@ where the maintainers sign.
   (`RetroHostRelease.signed`) before anything else is fetched. Only then does it
   download this system's `.files` and zip, each checked against the digest the
   signed sums give it. The other systems' files and the source archive are not
-  downloaded. Files go to `RetroHost/.downloads/<tag>`, resuming as the ffmpeg
+  downloaded. A redirect from https to plain http is refused for every
+  download (`AssetDownload.redirected`); GitHub's release downloads only
+  redirect within https. Files go to `RetroHost/.downloads/<tag>`, resuming as the ffmpeg
   and toolkit downloads do. A release with no signature is "not available yet",
   and there is no way to take one unsigned. A release that has no host for
   this system is also "not available". `fetch` gives the folder with the tag,
