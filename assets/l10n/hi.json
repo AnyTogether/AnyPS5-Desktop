@@ -2428,7 +2428,7 @@
   "retroHostProgress": "%@। रोकने के लिए चुनें",
   "retroHostLooking": "सबसे नई रिलीज़ खोजी जा रही है",
   "retroHostChecking": "इसका सिग्नेचर और फ़ाइलें जाँची जा रही हैं",
-  "retroHostNotYet": "अभी तक कोई साइन किया हुआ PS1 एमुलेटर प्रकाशित नहीं हुआ है। बाद में फिर कोशिश करें",
+  "retroHostNotYet": "अभी तक कोई साइन किया हुआ PS1 एमुलेटर प्रकाशित नहीं हुआ है। बाद में फिर कोशिश करें।",
   "retroHostDownloadFailed": "PS1 एमुलेटर डाउनलोड नहीं हो सका: %@",
   "retroHostReady": "PS1 एमुलेटर %@ तैयार है",
   "retroHostUpToDate": "PS1 एमुलेटर %@ अप टू डेट है",

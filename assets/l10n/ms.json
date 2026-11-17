@@ -2428,7 +2428,7 @@
   "retroHostProgress": "%@. Pilih untuk berhenti",
   "retroHostLooking": "Mencari keluaran terbaharu",
   "retroHostChecking": "Menyemak tandatangan dan failnya",
-  "retroHostNotYet": "Belum ada emulator PS1 bertandatangan diterbitkan. Cuba lagi nanti",
+  "retroHostNotYet": "Belum ada emulator PS1 bertandatangan diterbitkan. Cuba lagi nanti.",
   "retroHostDownloadFailed": "Emulator PS1 tidak dapat dimuat turun: %@",
   "retroHostReady": "Emulator PS1 %@ sedia",
   "retroHostUpToDate": "Emulator PS1 %@ sudah terkini",

@@ -2428,7 +2428,7 @@
   "retroHostProgress": "%@. Piliin para ihinto",
   "retroHostLooking": "Hinahanap ang pinakabagong release",
   "retroHostChecking": "Sinusuri ang signature at mga file nito",
-  "retroHostNotYet": "Wala pang naka-sign na PS1 emulator na nailalabas. Subukan ulit mamaya",
+  "retroHostNotYet": "Wala pang naka-sign na PS1 emulator na nailalabas. Subukan ulit mamaya.",
   "retroHostDownloadFailed": "Hindi ma-download ang PS1 emulator: %@",
   "retroHostReady": "Handa na ang PS1 emulator %@",
   "retroHostUpToDate": "Pinakabago na ang PS1 emulator %@",

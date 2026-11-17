@@ -329,7 +329,9 @@ host that failed its check before a start, or that is missing a file, is
 downloaded again at any version. A file that cannot be written ends the
 download with its reason, and so does a release whose tag is not the version
 it is signed as: an older host published again under a higher tag is not taken
-for an update. With no signed release yet the row says so.
+for an update. With no signed release yet the row says so. In Turkish every row
+and message of the PS1 emulator addresses the player in the same informal
+form as the PS1 rows beside them ("seç", "koy", "dene", "indir").
 The download is refused while a PS1 game plays, while one is starting in the
 host (`RetroHostDownloadModel.holdForStart`, held from the checks before a
 start until the game's play is set). Before the new host is put in place, the host kept for the next game is

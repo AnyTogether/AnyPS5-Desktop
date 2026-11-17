@@ -2428,7 +2428,7 @@
   "retroHostProgress": "%@. Выберите, чтобы остановить",
   "retroHostLooking": "Поиск последнего выпуска",
   "retroHostChecking": "Проверка подписи и файлов",
-  "retroHostNotYet": "Подписанный эмулятор PS1 пока не опубликован. Повторите попытку позже",
+  "retroHostNotYet": "Подписанный эмулятор PS1 пока не опубликован. Повторите попытку позже.",
   "retroHostDownloadFailed": "Не удалось скачать эмулятор PS1: %@",
   "retroHostReady": "Эмулятор PS1 %@ готов",
   "retroHostUpToDate": "Эмулятор PS1 %@ обновлён",

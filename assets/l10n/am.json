@@ -2412,7 +2412,7 @@
   "retroHostProgress": "%@። ለማቆም ይምረጡ",
   "retroHostLooking": "አዲሱን ልቀት በመፈለግ ላይ",
   "retroHostChecking": "ፊርማውንና ፋይሎቹን በመፈተሽ ላይ",
-  "retroHostNotYet": "እስካሁን የተፈረመ የPS1 ኢሙሌተር አልታተመም። ቆይተው እንደገና ይሞክሩ",
+  "retroHostNotYet": "እስካሁን የተፈረመ የPS1 ኢሙሌተር አልታተመም። ቆይተው እንደገና ይሞክሩ።",
   "retroHostDownloadFailed": "የPS1 ኢሙሌተሩን ማውረድ አልተቻለም: %@",
   "retroHostReady": "የPS1 ኢሙሌተር %@ ዝግጁ ነው",
   "retroHostUpToDate": "የPS1 ኢሙሌተር %@ የቅርብ ጊዜው ነው",

@@ -2428,7 +2428,7 @@
   "retroHostProgress": "%@. Vyberte pro zastavení",
   "retroHostLooking": "Hledá se nejnovější vydání",
   "retroHostChecking": "Kontroluje se podpis a soubory",
-  "retroHostNotYet": "Zatím nebyl vydán žádný podepsaný emulátor PS1. Zkuste to později",
+  "retroHostNotYet": "Zatím nebyl vydán žádný podepsaný emulátor PS1. Zkuste to později.",
   "retroHostDownloadFailed": "Emulátor PS1 se nepodařilo stáhnout: %@",
   "retroHostReady": "Emulátor PS1 %@ je připraven",
   "retroHostUpToDate": "Emulátor PS1 %@ je aktuální",
