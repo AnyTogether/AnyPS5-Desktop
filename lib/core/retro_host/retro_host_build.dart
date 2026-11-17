@@ -19,9 +19,10 @@ enum RetroHostBuild {
   /// compiled program, so no setting, file or environment variable can change it.
   static const testDefined = bool.fromEnvironment(testDefine);
 
-  /// The text a test build's compiled program carries and no other build's does: [announce]
-  /// writes it only when [testDefined], and the compiler drops that code, and with it this text,
-  /// from every other build. `tool/check_release_build.dart` looks for it in a built launcher.
+  /// The text a test build's compiled program carries and no other build's does:
+  /// `RetroHostInstall.locate` writes it, where it looks for the unchecked host, only when
+  /// [testDefined], and the compiler drops that code, and with it this text, from every other
+  /// build. `tool/check_release_build.dart` looks for it in a built launcher.
   static const testMark = 'AnyPS5 launcher test build';
 
   /// The build a [debug] launcher, or one compiled with [test], is.
@@ -33,10 +34,4 @@ enum RetroHostBuild {
 
   /// Whether this build may run the host `ANYPS5_RETRO_HOST` names, without the checks.
   bool get runsUnchecked => this != RetroHostBuild.release;
-
-  /// Writes to [log], when the launcher starts, that this is a test build, which runs the host
-  /// `ANYPS5_RETRO_HOST` names without checking it. Nothing in any other build.
-  static void announce(void Function(String line) log) {
-    if (testDefined) log('$testMark: runs the PS1 host ANYPS5_RETRO_HOST names without checking it');
-  }
 }

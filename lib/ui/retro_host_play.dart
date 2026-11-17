@@ -140,12 +140,18 @@ extension RetroHostPlaying on AppModel {
   /// ([retroHostUnchecked], [RetroHostDownloadModel.installed]).
   RetroHostInstall? get retroHostInstall => retroHostUnchecked ?? retroHostDownload.installed;
 
-  /// What this launcher was compiled as: a debug build, a test build, or a release.
-  static final retroHostBuild = RetroHostBuild.of(debug: kDebugMode);
+  /// What this launcher was compiled as: a debug build, a test build, or a release, as
+  /// `RetroHostBuild.of(debug: kDebugMode)` says. A constant of the compiled program.
+  static const retroHostBuild = kDebugMode
+      ? RetroHostBuild.debug
+      : RetroHostBuild.testDefined
+      ? RetroHostBuild.test
+      : RetroHostBuild.release;
 
-  /// Whether this launcher marks a game on an unchecked host (`RetroUncheckedMark`): a debug or
-  /// test build. A constant, so a release is compiled without the mark, as without the host.
-  static const marksUnchecked = kDebugMode || RetroHostBuild.testDefined;
+  /// Whether this launcher looks for, runs and marks (`RetroUncheckedMark`) an unchecked host: a
+  /// debug or test build. A constant, so a release is compiled without the lookup
+  /// ([AppModel.retroHostUnchecked]) and without the mark, as without the host.
+  static const runsUnchecked = retroHostBuild != RetroHostBuild.release;
 
   /// Whether [platform]'s discs play in the emulator host: PS1, with the setting on and a host
   /// found. Otherwise they go to the emulator chosen in Settings › Emulators, as before.

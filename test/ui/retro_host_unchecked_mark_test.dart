@@ -74,7 +74,8 @@ void main() {
     expect(launcher.play.unchecked, isFalse);
   });
 
-  test('only a debug or test build has the mark, decided when it is compiled', () {
-    expect(RetroHostPlaying.marksUnchecked, kDebugMode || RetroHostBuild.testDefined);
+  test('only a debug or test build has the mark and the unchecked host, decided when it is compiled', () {
+    expect(RetroHostPlaying.retroHostBuild, RetroHostBuild.of(debug: kDebugMode));
+    expect(RetroHostPlaying.runsUnchecked, kDebugMode || RetroHostBuild.testDefined);
   });
 }

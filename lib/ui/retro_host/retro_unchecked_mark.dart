@@ -7,7 +7,7 @@ import '../theme.dart';
 /// The small label in the window's bottom corner while a PS1 game runs on a host that was not
 /// checked: "Unchecked PS1 emulator (test build)", over the game, its loading and error screens
 /// and every layer above them, so that no screenshot of the game passes for a release. Only a
-/// debug or test build has it (`RetroHostPlaying.marksUnchecked`); a release is compiled without.
+/// debug or test build has it (`RetroHostPlaying.runsUnchecked`); a release is compiled without.
 class RetroUncheckedMark extends StatelessWidget {
   const RetroUncheckedMark({super.key});
 

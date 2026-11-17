@@ -571,8 +571,9 @@ release.
   names. A debug or test build that plays a downloaded signed host shows no
   mark, since that host was checked.
 - **Not in a release.** The launcher draws it only under
-  `RetroHostPlaying.marksUnchecked`, a constant: `kDebugMode ||
-  RetroHostBuild.testDefined`. Both are fixed when the launcher is compiled
+  `RetroHostPlaying.runsUnchecked`, a constant: `kDebugMode ||
+  RetroHostBuild.testDefined`, which also decides whether the launcher looks
+  for the unchecked host at all. Both are fixed when the launcher is compiled
   ([Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>) "Debug
   and test builds"), so in a release the condition is `false` and the
   compiler leaves the mark out, as it leaves out the unchecked host itself.
@@ -700,8 +701,9 @@ native memory as a real ring slot would be, so no host is started.
   follows a game on the host `ANYPS5_RETRO_HOST` names through every screen
   (loading, playing, its menu, Settings over it, stopped on an error) and
   finds the mark on each, finds it on none for a game on the signed release,
-  and checks that `RetroHostPlaying.marksUnchecked` is the compile-time
-  `kDebugMode || RetroHostBuild.testDefined`.
+  and checks that `RetroHostPlaying.runsUnchecked` is the compile-time
+  `kDebugMode || RetroHostBuild.testDefined` and `retroHostBuild` the build
+  `RetroHostBuild.of(debug: kDebugMode)` gives.
 - [`retro_host_release_play_test.dart`](../test/ui/retro_host_release_play_test.dart)
   plays a PS1 disc the release way, with the recorded signed release of
   `test/fixtures/retro_host_release` and no `ANYPS5_RETRO_HOST`. The host is

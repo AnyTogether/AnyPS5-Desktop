@@ -27,7 +27,6 @@ import 'core/opened_files.dart';
 import 'core/launcher_health.dart';
 import 'core/libmpv.dart';
 import 'core/release_signing.dart';
-import 'core/retro_host/retro_host_build.dart';
 import 'core/retro_host/retro_host_store.dart';
 import 'core/steam/steam_launch.dart';
 import 'core/toolkit_download.dart';
@@ -57,7 +56,6 @@ late final AppLifecycleListener _exit;
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
-  RetroHostBuild.announce(debugPrint);
   final paths = AppPaths.forSystem(HostSystem.current);
   final relayFile = LinkRelay.fileIn(paths.config);
   // A theme file opened while a launcher already runs goes to that one (as anyps5:// links do);

@@ -25,7 +25,9 @@ described in [The emulator host in the launcher's UI](<AnyPS5 Desktop - Emulator
 | [`lib/core/retro_host/retro_host_store.dart`](../lib/core/retro_host/retro_host_store.dart) | `RetroHostStore`: the host downloaded from the host repository's signed GitHub releases into the launcher's own storage, and its check before each start. |
 | [`lib/core/retro_host/retro_host_install.dart`](../lib/core/retro_host/retro_host_install.dart) | `RetroHostInstall`: the host and SwanStation a build runs, the downloaded release's (checked) or, in a debug or test build (`RetroHostBuild`), the one `ANYPS5_RETRO_HOST` names (unchecked). |
 | [`lib/core/retro_host/retro_host_build.dart`](../lib/core/retro_host/retro_host_build.dart) | `RetroHostBuild`: whether this launcher was compiled as a release, a test build or a debug build, and the mark only a test build's compiled program carries (see "Debug and test builds"). |
-| [`tool/check_release_build.dart`](../tool/check_release_build.dart) | Run after every release and nightly `flutter build`: fails on a test build, from the defines Flutter compiled it with and from the mark in its AOT snapshot. |
+| [`tool/check_release_build.dart`](../tool/check_release_build.dart) | Run after every release and nightly `flutter build`: fails on a test build, from the defines Flutter compiled it with and from the mark in its AOT snapshot. Its `files` check, which `packaging/sign-release.sh` runs before signing, fails on any release file holding a test build, or one it cannot read. |
+| [`tool/release_files.dart`](../tool/release_files.dart) | Reads the AOT snapshot out of each release file as its packaging writes it (the zip, the .tar.gz, the .deb's `data.tar`, the AppImage's SquashFS image), and every file the Windows installer installs (its LZMA2 file data). |
+| [`packaging/sign-release.sh`](../packaging/sign-release.sh) | Signs a Stable release's files on the release Mac, after the `files` check has passed every one. |
 | [`lib/core/retro_host/checked_file.dart`](../lib/core/retro_host/checked_file.dart) | A release file held open while it is checked and started: no sharing for writing or deleting on Windows, a close-on-exec descriptor above 3 elsewhere. It hashes what it holds, never the path again. |
 
 `retro_host_client.dart` handles:
@@ -315,14 +317,19 @@ it out and check that nothing in the bundle needs the debug runtime (#156,
 README "Packages"), so a test build passes the same check.
 
 **How it is decided.** `RetroHostBuild.of(debug: kDebugMode)` gives `debug`,
-`test` or `release`. `test` comes only from `RetroHostBuild.testDefined`,
+`test` or `release`; the launcher holds the same answer as a constant,
+`RetroHostPlaying.retroHostBuild`, and `RetroHostPlaying.runsUnchecked`
+(`retroHostBuild != RetroHostBuild.release`) is a constant too. `test` comes only from `RetroHostBuild.testDefined`,
 which is `const bool.fromEnvironment('ANYPS5_UNCHECKED_RETRO_HOST_BUILD')`:
 the Dart compiler folds it into the compiled program, so it is `true` only
 when that `--dart-define` was given to `flutter build`. No setting, file,
 command-line argument or environment variable of the running launcher can
 change it (an environment variable of that name is ignored, which the tests
 check). A build without it is a `release`, and `RetroHostInstall.locate`
-returns nothing for a `release` whatever the environment holds. So
+returns nothing for a `release` whatever the environment holds. More than
+that, `AppModel.retroHostUnchecked` calls `locate` only under
+`RetroHostPlaying.runsUnchecked`, so a release is compiled without the
+lookup of the unchecked host at all. So
 everything a normal release does is unchanged: only the signed, checked host
 runs. `RetroHostBuild` is in
 [`retro_host_build.dart`](../lib/core/retro_host/retro_host_build.dart).
@@ -340,21 +347,96 @@ after `flutter build`, and fails on a test build in two ways:
   `DART_DEFINES`: each `NAME=value` base64 encoded and the list comma
   separated (flutter_tools' `encodeDartDefines`), which is what the Dart
   compiler is given. The check decodes it and fails if the test build's define
-  is there with any value, however the build step was written.
+  is there with any value, however the build step was written. flutter_tools
+  writes the line only when there are defines, but every `flutter build` gives
+  its own `FLUTTER_VERSION` define (`FlutterCommand.flutterVersionDefine`), so
+  a configuration with no `DART_DEFINES` line, or none with `FLUTTER_VERSION`,
+  is one the check cannot read, and it fails rather than pass a Flutter that
+  writes another format.
 - **What it built.** A test build writes `RetroHostBuild.testMark`
-  ("AnyPS5 launcher test build") to its log when it starts
-  (`RetroHostBuild.announce`, called by `main`). That code is under
-  `if (testDefined)`, and the Dart compiler drops it, and the text with it, from
-  every other build, as it does with code under `kDebugMode` in a release. Dart
-  keeps an ASCII string in an AOT snapshot as its bytes, so the check reads the
-  snapshot Flutter ships (`data/app.so` on Windows, `lib/libapp.so` on Linux)
-  and fails if the text is there, or if there is no snapshot.
+  ("AnyPS5 launcher test build") to its log where it looks for the unchecked
+  host, every time (`RetroHostInstall.locate`). The mark lives in that lookup,
+  not in a line `main` calls, so no test build can have the unchecked path
+  without it: taking the line out would take the lookup with it. That code is
+  under `if (testDefined)`, and the Dart compiler drops it, and the text with
+  it, from every other build, as it does with code under `kDebugMode` in a
+  release. Dart keeps an ASCII string in an AOT snapshot as its bytes, so the
+  check reads the snapshot Flutter ships (`data/app.so` on Windows,
+  `lib/libapp.so` on Linux) and fails if the text is there, or if there is no
+  snapshot.
+
+**The last step before the updater.** A Stable release, which the launcher's
+updater trusts, is signed on the release Mac by
+[`packaging/sign-release.sh`](../packaging/sign-release.sh), from files
+gathered there. It signs nothing until `dart run tool/check_release_build.dart
+files <file>...` has passed every file it was given (it needs Flutter's `dart`
+and `flutter pub get` in the launcher checkout, and says so when either is
+missing). The check tells each file by the name its packaging gives it and
+reads it as that packaging writes it, with
+[`tool/release_files.dart`](../tool/release_files.dart):
+
+- **The Windows zip** (`AnyPS5-Desktop-windows-x64.zip`, ci.yml's
+  `Compress-Archive` of the release folder): `data/app.so` at its root, written
+  with `/` or `\`, exactly once and a regular file.
+- **The Linux .tar.gz** (`AnyPS5-Desktop-linux-x64.tar.gz`, the bundle as
+  `AnyPS5-Desktop/`): `AnyPS5-Desktop/lib/libapp.so`, likewise.
+- **The .deb** ([`build-deb.sh`](../packaging/linux/build-deb.sh), the bundle in
+  `/opt/anyps5-desktop`): its `data.tar` ar member, compressed with xz (as
+  `dpkg-deb -Zxz` writes it), zstd, gzip or not at all, and in it
+  `opt/anyps5-desktop/lib/libapp.so`.
+- **The AppImage** ([`build-appimage.sh`](../packaging/linux/build-appimage.sh),
+  the bundle in `usr/lib/anyps5-desktop`): the SquashFS 4.0 image the ELF
+  runtime carries after its section headers (where the runtime itself finds
+  it), compressed with zstd (appimagetool's default, as 0.1.25's is), gzip or
+  xz, and in it `usr/lib/anyps5-desktop/lib/libapp.so`. The reader follows the
+  directory and inode tables, data blocks (stored or compressed), sparse
+  blocks and fragments.
+- **The Windows installer** (`AnyPS5-Desktop-Setup-<version>-x64.exe`, Inno
+  Setup 6 with `lzma2/ultra64` and solid compression). Inno Setup names its
+  files only in its setup header, whose records change with each Inno Setup
+  version, so the check does not look for `app.so` by name. It reads every file
+  the installer installs instead: the loader's offset table (`rDlPtS`, version
+  2, its CRC32 checked, its size the file's) gives where the file data starts,
+  and each chunk there is `zlb` 0x1a, one LZMA2 dictionary byte and raw LZMA2,
+  up to the setup header. The installer fails if any of that holds the mark, and
+  it passes only when it also holds, byte for byte, the `data/app.so` of a
+  Windows zip that passed in the same run: an installer is signed with the zip
+  built beside it (ci.yml makes both from one release folder). 0.1.25's
+  installer holds one chunk of 125,447,301 bytes, and its zip's `app.so` is in
+  it unchanged (Inno Setup's call-instruction filter is for x86 executables,
+  and `app.so` is an ELF file).
+
+Anything else fails, with the reason: a file no release publishes
+(`SHA256SUMS` included, which `sign.sh` writes), one that is missing, damaged
+or laid out otherwise (another offset table version, a compressor not listed
+here, the snapshot missing or there twice), and a test build's. CI runs the same
+check on the packages it builds, so a change to the packaging that the check
+cannot read fails there first: the Linux job on the .deb, the AppImage and the
+.tar.gz, the Windows job on the installer and the zip.
 
 [`check_release_build_test.dart`](../test/tool/check_release_build_test.dart)
 reads `DART_DEFINES` as flutter_tools writes it, refuses the define with any
-value, and compiles a program that calls `announce` with `dart compile
-aot-snapshot`, with and without the define: only the test build's snapshot
-holds the mark, and the check passes the other. A test in
+value and a configuration without `DART_DEFINES` or `FLUTTER_VERSION`, and
+compiles a program that only calls `RetroHostInstall.locate`, as the launcher
+does, with `dart compile aot-snapshot`, with and without the define: only the
+test build's snapshot holds the mark, and the check passes the other. It then
+packs each snapshot as a zip, a .tar.gz, a .deb and an installer: the release
+ones pass, every test build's one fails, and an installer that installs a test
+build's snapshot beside a release zip fails. It also refuses unknown, missing
+and damaged files, and an installer without the zip it was built with.
+[`release_files_test.dart`](../test/tool/release_files_test.dart) reads
+SquashFS images that mksquashfs 4.5 made
+([`test/fixtures/release_files`](../test/fixtures/release_files): zstd with a
+stored block, zstd and xz through fragments, gzip; an extended folder and an
+extended file inode, a link), a raw LZMA2 stream liblzma made, and archives made
+in the test, and refuses every other shape it is given;
+[`inno_installer_fixture.dart`](../test/tool/inno_installer_fixture.dart) lays
+an installer out as Inno Setup 6.7 does. The fixtures were made with
+`mksquashfs <tree> <image> -comp <zstd|gzip|xz> -noappend -all-root`
+(`-always-use-fragments` for the fragment ones) from a tree holding
+`usr/lib/anyps5-desktop/lib/libapp.so`, a hard link to it, 400 empty files
+and an `AppRun` link, and `lzma.compress(..., format=FORMAT_RAW,
+filters=[LZMA2, preset 9, 1 MiB dictionary])`. A test in
 [`retro_host_install_test.dart`](../test/core/retro_host/retro_host_install_test.dart)
 also fails if any file in `.github`, `packaging` or `tool` names the define.
 
@@ -391,7 +473,7 @@ game and over every layer above it, so a screenshot of a test build can never
 pass for a release. The review of host #14 made this a condition of test
 builds; the Settings row alone is not enough. The mark is drawn only under the
 compile-time constant `kDebugMode || RetroHostBuild.testDefined`
-(`RetroHostPlaying.marksUnchecked`), so a release does not have it at all
+(`RetroHostPlaying.runsUnchecked`), so a release does not have it at all
 ([Emulator host UI](<AnyPS5 Desktop - Emulator Host UI.md>) "The unchecked-host
 mark").
 

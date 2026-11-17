@@ -552,7 +552,7 @@ class _LauncherShellState extends State<LauncherShell> {
                                         ),
                                         // A PS1 game on an unchecked host, in a debug or test
                                         // build: marked over every layer, compiled out of a release.
-                                        if (RetroHostPlaying.marksUnchecked && (model.retroPlay?.unchecked ?? false))
+                                        if (RetroHostPlaying.runsUnchecked && (model.retroPlay?.unchecked ?? false))
                                           const RetroUncheckedMark(),
                                         if (model.starting != null) _StartingCard(model: model),
                                         if (model.together.ringing != null && model.pairing == null)
