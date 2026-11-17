@@ -874,11 +874,18 @@ draws the PS2 rows and the PS2 missing-BIOS screen.
 
 ## Not yet
 
-- **No PS2 game seen running.** LRPS2 boots nothing without a Sony BIOS, and
-  none may be used in a test, so only the missing BIOS has been seen from the
-  real core. Drawing, sound, input, pacing and memory cards of a running PS2
-  game are untested, and no signed host release ships LRPS2 yet (host
-  `docs/ps2.md` "Releases").
+- **No PS2 game seen running in the launcher.** LRPS2 boots nothing without a
+  Sony BIOS, and none may be used in a test, so the launcher's tests have only
+  the real core's missing BIOS. A manual run of the host alone (host main
+  1b57932 with LRPS2 c0d39a58 on Windows, driven over the protocol as this
+  launcher drives it, with a player's own BIOS dumps, no window) booted three
+  PS2 games with a correct picture, sound, pad input and clean stops, at full
+  speed but for one reading of 51.5 frames a second while the graphics card
+  was near full use, probably by another program. Two of them saved to the
+  memory card and loaded it after a restart; LRPS2 made each new card blank,
+  and the games offered to format it. The launcher's own window, job object
+  and Linux and macOS builds were not part of that run, and no signed host
+  release ships LRPS2 yet (host `docs/ps2.md` "Releases").
 - **No signed host release yet.** A release build offers the download, but
   the host repository has published no signed release yet, so the row says so
   ([Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>), "Not yet").
