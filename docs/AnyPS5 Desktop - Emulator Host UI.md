@@ -332,7 +332,8 @@ download with its reason, and so does a release whose tag is not the version
 it is signed as: an older host published again under a higher tag is not taken
 for an update. With no signed release yet the row says so. In Turkish every row
 and message of the PS1 emulator addresses the player in the same informal
-form as the PS1 rows beside them ("seç", "koy", "dene", "indir").
+form as the PS1 rows beside them ("seç", "koy", "dene", "indir"), and names
+the emulator "emülatör", as the rest of the launcher does, never "öykünücü".
 The download is refused while a PS1 game plays, while one is starting in the
 host (`RetroHostDownloadModel.holdForStart`, held from the checks before a
 start until the game's play is set). Before the new host is put in place, the host kept for the next game is
