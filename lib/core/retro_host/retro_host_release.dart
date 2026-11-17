@@ -14,8 +14,11 @@ import 'checked_file.dart';
 /// docs/protocol.md "Finding and checking the host"). The launcher then does not start the host and
 /// shows that the emulator needs to be downloaded again.
 class RetroHostReleaseFailure implements Exception {
-  const RetroHostReleaseFailure(this.message);
+  const RetroHostReleaseFailure(this.message, {this.file});
   final String message;
+
+  /// The file of the release that failed (the host, SwanStation or LRPS2), when one file did.
+  final String? file;
 
   @override
   String toString() => message;
@@ -28,28 +31,35 @@ class RetroHostNotReleased extends RetroHostReleaseFailure {
 }
 
 /// One system a host release is built for: `<os>-<arch>` in its file names, and the names of the
-/// host and of SwanStation inside its zip (the host repository's tools/package_release.py).
+/// host, of SwanStation and of LRPS2 inside its zip. The names must be the ones the host
+/// repository's tools/package_release.py (`SYSTEMS`) packs: a release whose LRPS2 is named
+/// otherwise is taken for one without LRPS2. A release that does not ship LRPS2 has no [ps2Core]
+/// in its zip.
 class RetroHostSystem {
-  const RetroHostSystem(this.name, {required this.executable, required this.core});
+  const RetroHostSystem(this.name, {required this.executable, required this.core, required this.ps2Core});
 
   final String name;
   final String executable;
   final String core;
+  final String ps2Core;
 
   static const windowsX64 = RetroHostSystem(
     'windows-x64',
     executable: 'anyps5-retro-host.exe',
     core: 'swanstation_libretro.dll',
+    ps2Core: 'pcsx2_libretro.dll',
   );
   static const linuxX64 = RetroHostSystem(
     'linux-x64',
     executable: 'anyps5-retro-host',
     core: 'swanstation_libretro.so',
+    ps2Core: 'pcsx2_libretro.so',
   );
   static const macosArm64 = RetroHostSystem(
     'macos-arm64',
     executable: 'anyps5-retro-host',
     core: 'swanstation_libretro.dylib',
+    ps2Core: 'pcsx2_libretro.dylib',
   );
 
   /// The system this launcher runs on, or null where no host is released.
@@ -103,6 +113,7 @@ class RetroHostChecked {
     required this.executable,
     required this.core,
     required this._files,
+    this.ps2Core,
     this.program,
   });
 
@@ -111,8 +122,13 @@ class RetroHostChecked {
   /// The host executable's path, the command's first argument.
   final String executable;
 
-  /// The SwanStation library the release ships: the only core a release launcher runs.
+  /// The SwanStation library the release ships: with [ps2Core], the only cores a release launcher
+  /// runs.
   final String core;
+
+  /// The LRPS2 library the release ships, checked with the others, or null when its `.files` lists
+  /// none: a release without PS2.
+  final String? ps2Core;
 
   /// Where the operating system takes the host from, when that is not [executable]: on Linux the
   /// checked descriptor, `/proc/self/fd/<n>`.
@@ -177,8 +193,10 @@ abstract final class RetroHostRelease {
   }
 
   /// The checks before each start: the signature, the tag kept on install against the signed
-  /// version, the `.files` against SHA256SUMS, and the host executable and SwanStation against the
-  /// `.files`, each hashed from a [CheckedFile] that stays held in the result.
+  /// version, the `.files` against SHA256SUMS, and the host executable, SwanStation and, when the
+  /// `.files` lists it, LRPS2 against the `.files`, each hashed from a [CheckedFile] that stays held
+  /// in the result. LRPS2 is checked for a PS1 game too, since one host plays the next game, PS1 or
+  /// PS2, on the cores checked when it started.
   static Future<RetroHostChecked> checkBeforeStart(
     Directory folder, {
     List<ReleaseKey>? keys,
@@ -198,20 +216,23 @@ abstract final class RetroHostRelease {
       throw RetroHostReleaseFailure('${release.filesName} does not match the signed release');
     }
     final files = parseFileList(listing);
+    final ps2 = files.containsKey(target.ps2Core);
     final held = <CheckedFile>[];
     try {
-      for (final name in [target.executable, target.core]) {
+      for (final name in [target.executable, target.core, if (ps2) target.ps2Core]) {
         final expected = files[name];
-        if (expected == null) throw RetroHostReleaseFailure('${release.filesName} does not list $name');
+        if (expected == null) {
+          throw RetroHostReleaseFailure('${release.filesName} does not list $name', file: name);
+        }
         final CheckedFile file;
         try {
           file = CheckedFile.open(p.join(folder.path, name));
         } on FileSystemException {
-          throw RetroHostReleaseFailure('$name is missing or not a file');
+          throw RetroHostReleaseFailure('$name is missing or not a file', file: name);
         }
         held.add(file);
         if (await file.sha256Hex() != expected) {
-          throw RetroHostReleaseFailure('$name does not match the signed release');
+          throw RetroHostReleaseFailure('$name does not match the signed release', file: name);
         }
       }
     } on Object {
@@ -221,12 +242,15 @@ abstract final class RetroHostRelease {
       rethrow;
     }
     if (!Platform.isWindows) {
-      held[1].close();
+      for (final core in held.skip(1)) {
+        core.close();
+      }
     }
     return RetroHostChecked(
       version: release.version,
       executable: p.join(folder.path, target.executable),
       core: p.join(folder.path, target.core),
+      ps2Core: ps2 ? p.join(folder.path, target.ps2Core) : null,
       files: held,
       program: held[0].execPath,
     );
@@ -392,7 +416,29 @@ abstract final class RetroHostRelease {
   /// system's `.files`, but only this system's is kept beside the host). Before a start
   /// [checkBeforeStart] checks it.
   static RetroHostVersion? installedVersion(Directory folder, {RetroHostSystem? system}) {
+    final match = _installedFiles(folder, system ?? RetroHostSystem.current);
+    return match == null ? null : RetroHostVersion.tryParse(match.group(1)!);
+  }
+
+  /// Whether the installed release's `.files` lists LRPS2, as [checkBeforeStart] decides it: a
+  /// `pcsx2_libretro` file in [folder] that the `.files` does not list is not the release's LRPS2.
+  /// Not checked: a listed LRPS2 is checked before each start.
+  static bool installedHasPs2Core(Directory folder, {RetroHostSystem? system}) {
     final target = system ?? RetroHostSystem.current;
+    final match = _installedFiles(folder, target);
+    if (target == null || match == null) return false;
+    try {
+      return parseFileList(File(p.join(folder.path, match.group(0)!)).readAsBytesSync()).containsKey(target.ps2Core);
+    } on FileSystemException {
+      return false;
+    } on RetroHostReleaseFailure {
+      return false;
+    }
+  }
+
+  /// The name of the installed release's `.files` for [target] that SHA256SUMS lists, matched
+  /// against [_releaseName]; null when there is none. Not checked.
+  static RegExpMatch? _installedFiles(Directory folder, RetroHostSystem? target) {
     if (target == null) return null;
     try {
       final digests = ReleaseSigning.parseSums(File(p.join(folder.path, ReleaseSigning.sumsName)).readAsBytesSync());
@@ -402,7 +448,7 @@ abstract final class RetroHostRelease {
             match.group(2) == target.name &&
             match.group(3) == 'files' &&
             File(p.join(folder.path, name)).existsSync()) {
-          return RetroHostVersion.tryParse(match.group(1)!);
+          return match;
         }
       }
     } on FileSystemException {

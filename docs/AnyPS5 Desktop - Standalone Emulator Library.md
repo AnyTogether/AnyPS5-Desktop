@@ -22,7 +22,11 @@ download from the host's releases, checked before every game (a debug build can
 run the host `ANYPS5_RETRO_HOST` names instead). Once a host is there,
 **Run PS1 games in the separate host** appears, off by default and turned on by
 the first download. With it on, a PS1 disc plays in the launcher's own window
-through that host instead of DuckStation, and needs no DuckStation. That path is
+through that host instead of DuckStation, and needs no DuckStation. Where the
+host has LRPS2, the PS2 core, beside it, **Run PS2 games in the separate host**
+and **PS2 BIOS folder** do the same for PS2 discs instead of PCSX2; a host
+without it, which every signed release is until the host ships LRPS2, shows no
+PS2 rows at all, and PS2 games stay in PCSX2. That path is
 described in [The emulator host in the launcher](<AnyPS5 Desktop - Emulator Host UI.md>).
 
 ## Discovery
@@ -30,8 +34,26 @@ described in [The emulator host in the launcher](<AnyPS5 Desktop - Emulator Host
 [Game discovery](../lib/core/game_library.dart) recognizes PS1 cue sheets
 with local tracks, PBP files and local M3U playlists, PS2 ISO images with
 a PS2 boot entry, and CHD images under a console-named PS1 or PS2 folder.
-Any cue sheet with a data track outside a PS2 folder, and any PBP (PSP ones
-included), is listed as PS1.
+Under a folder named for PS2 alone (`PS2` or `PlayStation 2`), CSO and ZSO
+images (compressed ISOs) whose header says `CISO` or `ZISO` are PS2 discs;
+outside one, a CSO or ZSO is not listed, since PSP games use them too. A cue
+sheet with its tracks there is a PS2 disc only while PS2 discs play in the
+emulator host (`hostPs2`, which the launcher passes as
+`playsInHost(RetroPlatform.ps2)` and scans again when that changes); otherwise
+it is not listed, since PCSX2 does not boot one. Any other cue sheet with a
+data track, and any PBP (PSP ones included), is listed as PS1. These are the
+PS2 disc files the emulator host takes, but `.elf`, a PS2 program rather than a
+disc, which a `retro.json` may name (with `.iso`, `.chd`, `.cso`, `.zso`, and
+`.cue` with `hostPs2`) but a scan never lists on its own.
+
+PCSX2 is started as `-nogui -- <file>`. Its source (PCSX2 master 8407746,
+`pcsx2/VMManager.cpp` and `pcsx2/CDVD/InputIsoFile.cpp`) boots each PS2 kind
+listed without the host: `.iso` and `.chd` as before, `.cso` and `.zso`
+through its `CsoFileReader` (`IsDiscFileName` lists both), and `.elf` as an
+ELF booted through the BIOS (`IsElfFileName`). `IsDiscFileName` has no `.cue`,
+and a cue sheet would be opened as a flat ISO image, which is why a PS2 cue
+sheet is kept for the host. This was read from the source, not tried with
+PCSX2.
 [PS3 disc discovery](../lib/core/ps3_disc.dart) reads the title from
 `PS3_GAME/PARAM.SFO` in an extracted disc folder. The file
 `PS3_GAME/USRDIR/EBOOT.BIN` is the RPCS3 launch target. A PS1 or PS2 game

@@ -39,6 +39,14 @@ class RetroHostDownloadModel {
     _version = _installed == null ? null : store.version;
   }
 
+  /// [_look] once the model is made: where the host gained or lost LRPS2, the library is scanned
+  /// again, as it lists PS2 cue sheets only while the host plays PS2 discs.
+  void _lookAgain() {
+    final ps2 = _installed?.ps2Core != null;
+    _look();
+    if ((_installed?.ps2Core != null) != ps2) app.rescan();
+  }
+
   /// The last look found no signed host release yet.
   bool notYet = false;
 
@@ -84,7 +92,7 @@ class RetroHostDownloadModel {
   /// again.
   void failedCheck(String reason) {
     broken = reason;
-    _look();
+    _lookAgain();
     app.refresh();
   }
 
@@ -145,7 +153,7 @@ class RetroHostDownloadModel {
       try {
         version = await store.putInPlace(download);
       } finally {
-        _look();
+        _lookAgain();
       }
       broken = null;
       if (before == null) app.setRetroHostPs1(true);

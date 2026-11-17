@@ -23,7 +23,7 @@ described in [The emulator host in the launcher's UI](<AnyPS5 Desktop - Emulator
 | [`lib/core/retro_host/retro_host_client.dart`](../lib/core/retro_host/retro_host_client.dart) | One host process, as described in the sections below. |
 | [`lib/core/retro_host/retro_host_release.dart`](../lib/core/retro_host/retro_host_release.dart) | Checks a signed host release before it is unpacked and before each start, and installs it whole or not at all (see "Finding and checking the host" below). |
 | [`lib/core/retro_host/retro_host_store.dart`](../lib/core/retro_host/retro_host_store.dart) | `RetroHostStore`: the host downloaded from the host repository's signed GitHub releases into the launcher's own storage, and its check before each start. |
-| [`lib/core/retro_host/retro_host_install.dart`](../lib/core/retro_host/retro_host_install.dart) | `RetroHostInstall`: the host and SwanStation a build runs, the downloaded release's (checked) or, in a debug or test build (`RetroHostBuild`), the one `ANYPS5_RETRO_HOST` names (unchecked). |
+| [`lib/core/retro_host/retro_host_install.dart`](../lib/core/retro_host/retro_host_install.dart) | `RetroHostInstall`: the host, SwanStation and, where it is beside them, LRPS2 a build runs, the downloaded release's (checked) or, in a debug or test build (`RetroHostBuild`), the one `ANYPS5_RETRO_HOST` names (unchecked). |
 | [`lib/core/retro_host/retro_host_build.dart`](../lib/core/retro_host/retro_host_build.dart) | `RetroHostBuild`: whether this launcher was compiled as a release, a test build or a debug build, and the mark only a test build's compiled program carries (see "Debug and test builds"). |
 | [`tool/check_release_build.dart`](../tool/check_release_build.dart) | Run after every release and nightly `flutter build`: fails on a test build, from the defines Flutter compiled it with and from the mark in its AOT snapshot. Its `files` check, which `packaging/sign-release.sh` runs before signing, fails on any release file holding a test build, or one it cannot read. |
 | [`tool/release_files.dart`](../tool/release_files.dart) | Reads the AOT snapshot out of each release file as its packaging writes it (the zip, the .tar.gz, the .deb's `data.tar`, the AppImage's SquashFS image), and every file the Windows installer installs (its LZMA2 file data). |
@@ -237,8 +237,9 @@ where the maintainers sign.
 - **Before each start** (`checkBeforeStart`, through `RetroHostStore.check`).
   The signature is checked again, then the kept tag against the signed
   version, then the `.files` against `SHA256SUMS`, then
-  the host executable and SwanStation against the `.files`. Each of the two is
-  hashed from a `CheckedFile`, on another isolate.
+  the host executable and SwanStation against the `.files`, and LRPS2 too
+  when the `.files` lists it (`RetroHostChecked.ps2Core`; see "PS2 games").
+  Each is hashed from a `CheckedFile`, on another isolate.
   - On Windows both stay open with read sharing only (no `FILE_SHARE_WRITE`
     or `FILE_SHARE_DELETE`). Nothing can write, rename or delete them, or
     rename another file onto them, until the host has exited. The host loads
@@ -255,8 +256,9 @@ where the maintainers sign.
     a time limit or a broken rule, and before `exited` completes; a start that
     fails releases them at once. It refuses a command whose program is not
     the checked executable, and for the whole life of that host it refuses
-    any `start` whose `core` is not the release's SwanStation, so a checked
-    host never loads another core. A check is good for one start: a second
+    any `start` whose `core` is not one of the release's cores (SwanStation,
+    and LRPS2 when it ships one), so a checked host never loads another
+    core. A check is good for one start: a second
     start with it, or a start after it was released, is refused, so run
     `checkBeforeStart` again before each start.
   - A kept host that plays another game is checked again before that game
@@ -284,7 +286,80 @@ where the maintainers sign.
   neither checked nor marked broken while the unchecked one is used. A release, and a profile build,
   ignore the variable and only run the downloaded release's host
   (`RetroHostStore.installed`, a `RetroHostInstall` with `checked` set), and
-  only with that release's SwanStation.
+  only with that release's cores (SwanStation, and LRPS2 when it ships one).
+
+## PS2 games
+
+A host that lists `ps2` (`RetroHostClient.canPlayPs2`) also plays PS2 games,
+on LRPS2 (host
+[`docs/protocol.md`](https://github.com/AnyTogether/anyps5-retro-host/blob/1b5793221f904743f5891b41cf436482e59241f4/docs/protocol.md)
+"Capabilities", "start" and "status", and `docs/ps2.md`, at main 1b57932).
+The protocol lines this follows:
+
+- capability `ps2`: "PS2 games: `console` in `start` and in `status`, with the
+  same methods and ports as PS1";
+- `start.console`: "`"ps1"` (the default) or `"ps2"`. Any other value is an
+  `argument` error. The launcher MUST NOT send it to a host without `ps2`";
+- `status.console`: "`"ps1"` or `"ps2"`, as the game was started. A host
+  without `ps2` sends none";
+- `system`: "LRPS2 looks for the PS2 BIOS in `pcsx2/bios` in it";
+- `bios` for a PS2 game: "LRPS2 found no file it takes as a PS2 BIOS in
+  `pcsx2/bios`, and any other failed load is `core`".
+
+What the launcher does with them:
+
+- **Which core.** `RetroHostInstall.ps2Core` is LRPS2, `pcsx2_libretro.dll`,
+  `.so` or `.dylib` (`RetroHostSystem.ps2Core`), beside the host. The names
+  must stay the ones the host's `tools/package_release.py` packs (its
+  `SYSTEMS`, on the `ps2-release` branch at 8571e68 the same three): a release
+  whose LRPS2 is named otherwise is taken for one without LRPS2.
+  `RetroHostStore.installed` names it when the installed release's `.files`
+  lists it (`RetroHostRelease.installedHasPs2Core`), as `checkBeforeStart`
+  decides it, so a stray `pcsx2_libretro` file in the host folder is neither
+  offered nor checked; `RetroHostInstall.locate` names it when it is beside an
+  unchecked host. A release that does not ship LRPS2 has none, and PS2 is then
+  not available: Settings › Emulators shows no PS2 rows.
+- **Checked like SwanStation.** `checkBeforeStart` checks LRPS2 against the
+  `.files` whenever the `.files` lists it, for a PS1 game too: one host plays
+  the next game on the cores it was checked with, PS1 or PS2, so both are
+  held for its whole life on Windows (and checked again by path on Linux
+  before a kept host's next game). A changed LRPS2 fails the check for every
+  game. A release whose `.files` lists no LRPS2 is checked for SwanStation
+  alone, and its `RetroHostChecked.ps2Core` is null. A failure names the file
+  that failed (`RetroHostReleaseFailure.file`), and the launcher's log line
+  says it, so a broken LRPS2 that stops a PS1 game is named as the cause.
+- **`start`.** `RetroHostStartRequest.console` is `ps2` for a PS2 game and
+  left out for a PS1 one, the host's default, so a PS1 start is the same on
+  every host. The client throws `StateError` before it sends a `start` that
+  names `console` to a host without `ps2`, and one for a PS2 game with
+  `initialDisc`, which the host refuses. `RetroHostGame` checks the
+  capability itself once the host has greeted the launcher, and ends a PS2
+  game it never sent with `consoleRefused`.
+- **`status.console`.** From a host that lists `ps2`, `RetroStatus.console`
+  is `ps1` or `ps2`; a status without it, or with another value, is a
+  protocol error. Another host's `console` is not read.
+- **Not read yet.** The host also lists `coreIdentity` and `gameTiming` and
+  sends `status.core` and `status.timing`; this client ignores both, as
+  unknown fields.
+
+[`test/fixtures/retro_host_ps2_recording.json`](../test/fixtures/retro_host_ps2_recording.json)
+holds every message each way, as their exact text, of a host built from
+AnyTogether/anyps5-retro-host main 1b57932 on Ubuntu 22.04 (GCC 11, Release,
+Ninja): with the real LRPS2 at `LRPS2_COMMIT` c0d39a58e with the host's patch
+(identity `anyps5-1-b1b749c1…eb5f`, the one `tools/core_identity.py
+--lrps2-commit` gives) and no BIOS, first with no BIOS file and then with 4 MiB
+of zeros in `pcsx2/bios`, both ending with `bios` before a first frame; and with
+the host's fake core in its fake-ps2 mode (a PS2 `initialDisc` refused, `bios`,
+a running PS2 game with `pcsx2_bios` and a stop, then a PS1 game on the same
+host). No BIOS of any kind was used, and paths were made generic.
+[`test/support/ps2_host_recording.dart`](../test/support/ps2_host_recording.dart)
+reads it, and
+[`test/core/retro_host/retro_status_ps2_test.dart`](../test/core/retro_host/retro_status_ps2_test.dart)
+checks the client against it: the `ps2` welcome, the launcher's `start` the
+host took, the strict `status.console`, the PS2 `bios` words and folder, and
+where LRPS2's options go. The fixture test plays the recorded LRPS2 status
+through the client against the fake host, checks the client's refusals, and
+reads the host's own `call-start-ps2.json` and `call-status-ps2-no-bios.json`.
 
 ## Debug and test builds
 

@@ -81,6 +81,8 @@ class RecordingSession implements RetroHostSession {
   @override
   Future<RetroHostEnd> get ended => client.ended;
   @override
+  bool get canPlayPs2 => client.canPlayPs2;
+  @override
   Stream<RetroRumble> get rumble => client.rumble;
   @override
   set inputFocus(bool focused) => client.inputFocus = focused;

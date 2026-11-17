@@ -156,8 +156,9 @@ class RetroHostClient implements RetroHostSession {
   /// checking the host").
   RetroHostChecked? _checked;
 
-  /// The SwanStation of the checked release: the only core `start` may name for a checked host.
-  String? _releaseCore;
+  /// The cores of the checked release, SwanStation and LRPS2 when it ships one: the only cores
+  /// `start` may name for a checked host. Null for a host that was not checked.
+  Set<String>? _releaseCores;
 
   void _releaseChecked() {
     final checked = _checked;
@@ -216,7 +217,7 @@ class RetroHostClient implements RetroHostSession {
     final envp = _strings(env);
     final program = checked?.program?.toNativeUtf8() ?? nullptr;
     client._checked = checked;
-    client._releaseCore = checked?.core;
+    client._releaseCores = checked == null ? null : {checked.core, ?checked.ps2Core};
     try {
       client._connection = retroHostStart(
         program,
@@ -288,6 +289,11 @@ class RetroHostClient implements RetroHostSession {
 
   String get hostVersion => _hostVersion;
   List<String> get capabilities => _capabilities;
+
+  /// Whether the host lists `ps2`, so it takes `start.console` and plays PS2 games on LRPS2, and
+  /// each `status` names the console.
+  @override
+  bool get canPlayPs2 => _capabilities.contains(retroCapabilityPs2);
   String? get pixelFormat => _pixelFormat;
 
   /// Each `frame` message, after its frame was pinned and checked.
@@ -335,12 +341,12 @@ class RetroHostClient implements RetroHostSession {
   }
 
   Future<Object?> _send(String method, Object? args) {
-    final core = _releaseCore;
-    if (method == 'start' && core != null && (args is! Map || args['core'] != core)) {
+    final cores = _releaseCores;
+    if (method == 'start' && cores != null && (args is! Map || !cores.contains(args['core']))) {
       return Future.error(
         RetroCallError(
           RetroCallError.argument,
-          'A release host only runs the SwanStation it was released with ($core).',
+          'A release host only runs the cores it was released with (${cores.join(', ')}).',
         ),
       );
     }
@@ -348,6 +354,12 @@ class RetroHostClient implements RetroHostSession {
     if (!_greeted) throw StateError('No call may be sent before welcome.');
     if (method != 'volume' && !_capabilities.contains(retroCapabilityPs1)) {
       throw StateError('The host does not list the ps1 capability.');
+    }
+    if (method == 'start' && args is Map && args.containsKey('console')) {
+      if (!canPlayPs2) throw StateError('The host does not list the $retroCapabilityPs2 capability.');
+      if (args['console'] == RetroConsole.ps2 && args.containsKey('initialDisc')) {
+        throw StateError('A PS2 game has no playlist (protocol.md "start").');
+      }
     }
     if (StrictJson.hasLoneSurrogate(args)) {
       return Future.error(const RetroCallError(RetroCallError.argument, 'A string cannot be sent as UTF-8.'));
@@ -386,7 +398,7 @@ class RetroHostClient implements RetroHostSession {
     if (RetroStatus.isFailureReport(map)) {
       return RetroStatus.failed(error: map['error']! as String, errorCode: map['errorCode']! as String);
     }
-    return RetroStatus.parse(map);
+    return RetroStatus.parse(map, ps2: canPlayPs2);
   }
 
   static const _stopPoll = Duration(milliseconds: 250);
@@ -653,7 +665,7 @@ class RetroHostClient implements RetroHostSession {
           _lastStatusEnded = false;
           if (afterStop) _stopDeadline = null;
         } else {
-          final status = RetroStatus.parse(_object(result, 'status'));
+          final status = RetroStatus.parse(_object(result, 'status'), ps2: canPlayPs2);
           if (status.ended && !_lastStatusEnded) _zeroRumble();
           _lastStatusEnded = status.ended;
           if (status.ended && afterStop) _stopDeadline = null;

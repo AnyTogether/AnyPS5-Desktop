@@ -101,6 +101,10 @@ class FakeRetroHostSession extends FakeFrameSource implements RetroHostSession {
   @override
   Future<RetroHostEnd> get ended => endedCompleter.future;
 
+  /// Whether the host lists `ps2`, so a PS2 game can be started on it.
+  @override
+  bool canPlayPs2 = true;
+
   @override
   Stream<RetroRumble> get rumble => _rumble.stream;
 

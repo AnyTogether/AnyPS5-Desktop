@@ -82,6 +82,28 @@ void main() {
     checked.release();
   });
 
+  test('LRPS2 is the one the release lists: a stray pcsx2_libretro file is no LRPS2, before or at a start', () async {
+    final host = store();
+    await installRetroHostFixture(host.folder, system: system);
+    final stray = File(p.join(host.folder.path, system.ps2Core))..writeAsStringSync("not the release's LRPS2");
+    expect(host.installed()!.ps2Core, isNull, reason: 'the .files does not list it');
+    final checked = await host.check();
+    expect(checked.ps2Core, isNull);
+    checked.release();
+
+    stray.deleteSync();
+    host.folder.deleteSync(recursive: true);
+    await installRetroHostFixture(host.folder, system: system, ps2: true);
+    expect(host.installed()!.ps2Core, p.join(host.folder.path, system.ps2Core));
+    File(p.join(host.folder.path, system.ps2Core)).writeAsStringSync('changed');
+    try {
+      (await host.check()).release();
+      fail('a changed LRPS2 passed the check');
+    } on RetroHostReleaseFailure catch (failure) {
+      expect(failure.file, system.ps2Core, reason: 'the log names LRPS2 as the file that failed');
+    }
+  });
+
   test('the newest signed release at or above the minimum is taken, never a pre-release', () async {
     final signedSums = retroHostFixtureFiles();
     github.releases
@@ -128,7 +150,12 @@ void main() {
 
   test('a release that names no host for this system is not available', () async {
     github.releases.add(retroHostFixtureRelease());
-    const other = RetroHostSystem('linux-arm64', executable: 'anyps5-retro-host', core: 'swanstation_libretro.so');
+    const other = RetroHostSystem(
+      'linux-arm64',
+      executable: 'anyps5-retro-host',
+      core: 'swanstation_libretro.so',
+      ps2Core: 'pcsx2_libretro.so',
+    );
     final error = await failure(store(on: other).fetch(await newest()));
     expect(error.kind, ToolkitFailureKind.notAvailable);
     expect(error.message, contains('no host for linux-arm64'));

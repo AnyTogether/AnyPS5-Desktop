@@ -10,11 +10,13 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/ps1_launcher.dart';
+import '../support/ps2_host_recording.dart';
 import '../support/ui_support.dart';
 import 'retro_host/fake_retro_host_session.dart';
 
 /// A PS1 game in the emulator host as it looks: loading, stopped on an error, its menu over the
-/// game, the mark of a game on an unchecked host, and Settings › Emulators with the host's rows.
+/// game, the mark of a game on an unchecked host, and Settings › Emulators with the host's rows; and
+/// a PS2 game's rows and its missing BIOS.
 void main() {
   late Ps1Launcher launcher;
   final shell = find.byType(LauncherShell);
@@ -140,6 +142,42 @@ void main() {
     expect(find.text('Run PS1 games in the separate host'), findsOneWidget);
     expect(find.text('PS1 BIOS folder'), findsOneWidget);
     await expectLater(shell, matchesGoldenFile('goldens/settings_emulators_host_en.png'));
+  });
+
+  testWidgets('settings: Emulators with LRPS2 beside the host, PS2 turned on, and its BIOS folder', (tester) async {
+    launcher = Ps1Launcher(ps2: true);
+    final model = launcher.model
+      ..setRetroHostPs1(true)
+      ..setRetroHostPs2(true);
+    model.open(Layer.settings);
+    model.selectCategory(model.panelCategories().indexWhere((category) => category.id == 'emulators'));
+    model.panelRow = model.panelCategories()[model.panelCategory].rows.indexWhere(
+      (row) => row.id == 'retro-host-ps2-bios',
+    );
+    await pumpLauncher(tester, model);
+    expect(find.text('Run PS2 games in the separate host'), findsOneWidget);
+    expect(find.text('PS2 BIOS folder'), findsOneWidget);
+    await tester.ensureVisible(find.text('PS2 BIOS folder'));
+    await settle(tester);
+    await expectLater(shell, matchesGoldenFile('goldens/settings_emulators_host_ps2_en.png'));
+  });
+
+  testWidgets('stopped: a PS2 game whose host found no PS2 BIOS, as the real LRPS2 said', (tester) async {
+    launcher = Ps1Launcher(ps2: true);
+    final model = launcher.model..setRetroHostPs2(true);
+    launcher.session.nextStatus = Ps2HostRecording.load().lastStatus('lrps2-no-bios-folder');
+    await tester.runAsync(() async {
+      final playing = model.play(launcher.ps2Game);
+      launcher.session.readyCompleter.complete();
+      await playing;
+      await pumpEventQueue();
+    });
+    await pumpLauncher(tester, model);
+    expect(find.byKey(const ValueKey('retro-error')), findsOneWidget);
+    expect(find.text('Sky Racer stopped'), findsOneWidget);
+    expect(find.text(T.text('retroHostPs2BiosDetail')), findsOneWidget);
+    expect(find.text(T.text('retroHostPs2BiosFolder')), findsOneWidget);
+    await expectLater(shell, matchesGoldenFile('goldens/retro_host_error_ps2_bios_en.png'));
   });
 
   testWidgets('settings: Emulators offering the PS1 emulator before one is installed', (tester) async {
