@@ -2474,7 +2474,7 @@
   "retroMenuOptionRestartOnlyDetail": "Değişiklikler oyun yeniden başlatıldığında etkili olur.",
   "retroMenuAudio": "Ses",
   "retroMenuAudioDetail": "Ses düzeyi, sessize alma ve diskin müziği.",
-  "retroMenuController": "Kumanda",
+  "retroMenuController": "Kontrolcü",
   "retroMenuControllerDetail": "Analog mod, titreşim ve çubuklar.",
   "retroMenuConsole": "Konsol",
   "retroMenuConsoleDetail": "Bölge, BIOS, hızlı açılış ve disk hızı.",
