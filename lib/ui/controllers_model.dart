@@ -151,7 +151,7 @@ class ControllersModel {
     try {
       final results = await Future.wait<Object?>([
         probe.processes(),
-        probe.services(const ['HidHide', 'ViGEmBus', 'dshidmini']),
+        probe.services(PadTroubleshooter.windowsServices),
         probe.steamPlayStationSupport(),
         probe.hidrawDenied(),
         probe.unreadableControllers(),

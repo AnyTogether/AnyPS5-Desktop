@@ -65,7 +65,8 @@ class PadFacts {
   /// Running programs' executable names, lower case ("steam.exe", "ds4windows.exe", "steam").
   final Set<String> processes;
 
-  /// Windows services and drivers installed, lower case ("hidhide", "vigembus", "dshidmini").
+  /// Windows services and drivers installed, lower case ("hidhide", "vigembus", "dshidmini",
+  /// "bthps3").
   final Set<String> services;
 
   /// Steam's "PlayStation Controller Support" (config.vdf's SteamController_PSSupport: 0 off,
@@ -97,6 +98,21 @@ abstract final class PadTroubleshooter {
   static const linuxSdlCommand = 'sudo apt install libsdl2-2.0-0   # Fedora: sudo dnf install SDL2   Arch: sudo pacman -S sdl2';
 
   static bool _running(PadFacts facts, List<String> names) => names.any(facts.processes.contains);
+
+  /// Sony's own DualShock 3 (054c:0268), not a pad that only has PS3 in its name: those are
+  /// ordinary HID pads that need nothing.
+  static bool sonyDualShock3(PadInfo pad) => pad.vendor == PadKind.sony && pad.product == 0x0268;
+
+  /// The services the troubleshooter asks Windows about: DsHidMini (the DualShock 3's driver)
+  /// and BthPS3 (its Bluetooth) beside the remappers'.
+  static const windowsServices = ['HidHide', 'ViGEmBus', 'dshidmini', 'BthPS3'];
+
+  /// Where Windows keeps a service: a kernel driver's under Services, a user-mode (UMDF) driver's
+  /// such as DsHidMini's under WUDF\Services.
+  static List<String> serviceKeys(String name) => [
+    'HKLM\\SYSTEM\\CurrentControlSet\\Services\\$name',
+    'HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\WUDF\\Services\\$name',
+  ];
 
   static List<PadFinding> diagnose(PadFacts facts) {
     final windows = facts.system == HostSystem.windows;
@@ -139,8 +155,17 @@ abstract final class PadTroubleshooter {
       if (facts.services.contains('vigembus') && !_running(facts, ['ds4windows.exe', 'dualsensex.exe', 'dsx.exe'])) {
         findings.add(const PadFinding('vigem'));
       }
+      // Windows' own drivers cannot start a DualShock 3 (SDL keeps its HIDAPI driver off there
+      // for that reason): one listed without DsHidMini has nothing to start it.
+      if (!facts.services.contains('dshidmini') && facts.pads.any(sonyDualShock3)) {
+        findings.add(const PadFinding('dualShock3Windows', problem: true));
+      }
     } else {
-      final playStationWithout = facts.pads.any((pad) => pad.kind.isPlayStation && !pad.driver.contains('HIDAPI'));
+      // A DualShock 3 is Linux's hid-sony's, read through evdev with its motors (SDL leaves its
+      // HIDAPI driver off on Linux): hidraw is no help to it.
+      final playStationWithout = facts.pads.any(
+        (pad) => pad.kind.isPlayStation && pad.kind != PadKind.dualShock3 && !pad.driver.contains('HIDAPI'),
+      );
       if (facts.hidrawDenied && (playStationWithout || none)) {
         findings.add(const PadFinding('linuxHidraw', command: linuxUdevCommand));
       }
@@ -153,10 +178,20 @@ abstract final class PadTroubleshooter {
       findings.addAll([
         const PadFinding('usbCable'),
         const PadFinding('bluetoothPairing'),
-        PadFinding(windows ? 'dualShock3Windows' : 'dualShock3Linux'),
+        ?_dualShock3Tip(facts),
       ]);
     }
     return findings;
+  }
+
+  /// With nothing connected, what a DualShock 3 needs: on Windows DsHidMini, and once it is
+  /// there BthPS3 for Bluetooth (Windows' own Bluetooth refuses the pad); on Linux nothing on its
+  /// cable.
+  static PadFinding? _dualShock3Tip(PadFacts facts) {
+    if (facts.system != HostSystem.windows) return const PadFinding('dualShock3Linux');
+    if (!facts.services.contains('dshidmini')) return const PadFinding('dualShock3Windows');
+    if (!facts.services.contains('bthps3')) return const PadFinding('dualShock3WindowsBluetooth');
+    return null;
   }
 
   /// The controller the top bar's indicator is about (one running out of battery): null when
@@ -235,8 +270,12 @@ class HostProbe implements SystemProbe {
     if (system != HostSystem.windows) return {};
     final found = <String>{};
     for (final name in names) {
-      final result = await _run('reg', ['query', 'HKLM\\SYSTEM\\CurrentControlSet\\Services\\$name']);
-      if (result?.exitCode == 0) found.add(name.toLowerCase());
+      for (final key in PadTroubleshooter.serviceKeys(name)) {
+        if ((await _run('reg', ['query', key]))?.exitCode == 0) {
+          found.add(name.toLowerCase());
+          break;
+        }
+      }
     }
     return found;
   }
