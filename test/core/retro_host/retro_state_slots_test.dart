@@ -116,6 +116,7 @@ void main() {
     File(p.join(temp.path, 'Other Game.1.state')).writeAsBytesSync([5]);
     final png = Uint8List.fromList([137, 80, 78, 71]);
     await folder.keepPicture(2, png);
+    File(folder.picturePath(2)).setLastModifiedSync(at.add(const Duration(seconds: 1)));
     File(folder.picturePath(5)).writeAsBytesSync(Uint8List(RetroStateFolder.pictureLimit + 1));
 
     final slots = await folder.read();
@@ -133,6 +134,19 @@ void main() {
     expect(slots[5].picture, isNull, reason: 'a picture far larger than one the launcher writes is left out');
     expect(p.basename(folder.statePath(2)), 'Night Racer.2.state');
     expect(p.basename(folder.picturePath(2)), 'Night Racer.2.png');
+  });
+
+  test('a picture older than its state is of a state before, and is not shown', () async {
+    final folder = RetroStateFolder(folder: temp.path, disc: 'game.cue');
+    File(folder.picturePath(3))
+      ..writeAsBytesSync([9])
+      ..setLastModifiedSync(DateTime(2026, 11, 1));
+    File(folder.statePath(3))
+      ..writeAsBytesSync([1])
+      ..setLastModifiedSync(DateTime(2026, 11, 2));
+    final slot = (await folder.read())[3];
+    expect(slot.empty, isFalse);
+    expect(slot.picture, isNull, reason: 'a picture a failed save could not take away stays out of sight');
   });
 
   test('a picture is put in place whole, and a save without one takes the old one away', () async {

@@ -421,8 +421,11 @@ What the launcher does with them:
   was; any other save that did not work takes the slot's picture away too:
   after `fileError` a late write may still reach its rename, as protocol.md
   allows, and a host that went away after writing answers `false`, as one that
-  never ran does. A picture never shows a moment its slot may no longer hold;
-  the slot then shows its time without one. The
+  never ran does. A picture older than its state's file is not shown either,
+  since the launcher writes a picture only after its state: one a failed save
+  could not delete (a file another program holds) belongs to a state before.
+  A picture never shows a moment its slot may no longer hold; the slot then
+  shows its time without one. The
   host writes no other file there and reads none.
 - **Outcomes.** `RetroStateOutcome` is the result for the UI: `done`,
   `notNow` (`false`), one value per error code, and `failed` for an `argument`

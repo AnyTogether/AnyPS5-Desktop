@@ -160,6 +160,7 @@ void main() {
           await Future<void>.delayed(const Duration(milliseconds: 20));
         }
         File(folder.statePath(slot)).setLastModifiedSync(at.add(Duration(minutes: slot)));
+        File(folder.picturePath(slot)).setLastModifiedSync(at.add(Duration(minutes: slot, seconds: 1)));
       });
       expect(File(folder.picturePath(slot)).existsSync(), isTrue, reason: 'slot $slot kept its picture');
     }

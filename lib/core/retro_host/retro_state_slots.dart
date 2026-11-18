@@ -111,8 +111,10 @@ class RetroStateFolder {
     }
   }
 
-  /// Every slot as the folder holds it now. A slot whose state cannot be read is empty; a picture
-  /// that cannot be read, or is far larger than one the launcher writes, is left out.
+  /// Every slot as the folder holds it now. A slot whose state cannot be read is empty. A picture is
+  /// left out when it cannot be read, is far larger than one the launcher writes, or is older than
+  /// its state: the launcher writes a slot's picture only after its state was saved, so an older one
+  /// is of a state before (one a failed save could not take away), not of the one there now.
   Future<List<RetroStateSlot>> read() async => [for (var slot = 0; slot < slots; slot++) await _read(slot)];
 
   Future<RetroStateSlot> _read(int slot) async {
@@ -121,7 +123,10 @@ class RetroStateFolder {
     Uint8List? picture;
     try {
       final file = File(picturePath(slot));
-      if (await file.length() <= pictureLimit) picture = await file.readAsBytes();
+      final kept = await file.stat();
+      if (kept.type == FileSystemEntityType.file && !kept.modified.isBefore(savedAt) && kept.size <= pictureLimit) {
+        picture = await file.readAsBytes();
+      }
     } on FileSystemException {
       picture = null;
     }
