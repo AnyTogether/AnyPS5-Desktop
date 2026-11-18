@@ -214,9 +214,11 @@ class RetroGraphicsChoice {
   /// a host that does not list the setting's option.
   ///
   /// A value is offered only when the host lists every option it sets with that value among the
-  /// option's `values`, so the host's own limits hold. The value chosen is the offer whose value of
-  /// the setting's option is chosen; a chosen value no offer has is shown too, with the host's
-  /// label, so the row always shows what the game has.
+  /// option's `values`, so the host's own limits hold. The value chosen is the offer whose every
+  /// option has its value chosen. When none has (a value the launcher does not offer, or
+  /// widescreen's hack without its aspect ratio), the setting's option is shown with the host's
+  /// label, so the row never claims a value the game does not have, and choosing an offer sets it
+  /// whole.
   static RetroGraphicsChoice? of(RetroStatus? status, RetroGraphicsSetting setting) {
     if (status == null || (status.console == RetroConsole.ps2) != setting.ps2) return null;
     if (setting.needsGpu && !status.hardware) return null;
@@ -224,13 +226,16 @@ class RetroGraphicsChoice {
     if (option == null) return null;
     bool listed(RetroGraphicsOffer offer) =>
         offer.options.entries.every((entry) => status.options[entry.key]?.values.contains(entry.value) ?? false);
-    final chosen = option.values[option.selected];
     final values = [
       for (final offer in setting.offers)
         if (listed(offer))
           RetroGraphicsValue(offer: offer, label: option.labels[option.values.indexOf(offer.options[setting.key]!)]),
     ];
-    var selected = values.indexWhere((value) => value.offer!.options[setting.key] == chosen);
+    bool chosenWhole(RetroGraphicsOffer offer) => offer.options.entries.every((entry) {
+      final option = status.options[entry.key]!;
+      return option.values[option.selected] == entry.value;
+    });
+    var selected = values.indexWhere((value) => chosenWhole(value.offer!));
     if (selected < 0) {
       selected = values.length;
       values.add(RetroGraphicsValue(offer: null, label: option.labels[option.selected]));

@@ -104,12 +104,11 @@ void main() {
     final halfway = ps1({
       'swanstation_GPU_WidescreenHack': {'selected': 0, 'activeValue': 'true'},
     });
-    final on = RetroGraphicsChoice.of(halfway, retroWidescreenPs1)!;
-    expect(on.selected, 1, reason: 'the hack is on, though the aspect ratio is still 4:3');
-    expect(on.changesFor(halfway, 0), {'swanstation_GPU_WidescreenHack': 'false'}, reason: '4:3 already');
-    expect(on.changesFor(halfway, 1), {
-      'swanstation_Display_AspectRatio': '16:9',
-    }, reason: 'the value shown is set whole again');
+    final half = RetroGraphicsChoice.of(halfway, retroWidescreenPs1)!;
+    expect(levels(half), ['off', 'on', 'Enabled'], reason: 'the hack is on at 4:3: neither Off nor On');
+    expect(half.selected, 2);
+    expect(half.changesFor(halfway, 0), {'swanstation_GPU_WidescreenHack': 'false'}, reason: '4:3 already');
+    expect(half.changesFor(halfway, 1), {'swanstation_Display_AspectRatio': '16:9'}, reason: 'On, set whole');
   });
 
   test('the note: in a moment while a chosen value is not in effect yet', () {

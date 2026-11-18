@@ -425,6 +425,26 @@ void main() {
     ], reason: 'the hack is set back to what the host had');
     expect(model.preferences.retroHostOptions, isEmpty);
 
+    session.callResults['option'] = false;
+    session.onCall = (method, args) {
+      if (method == 'option' && (args! as Map)['key'] == 'swanstation_GPU_WidescreenHack') {
+        session.callResults['option'] = (args as Map)['value'] == 'true';
+      } else if (method == 'option') {
+        session.callResults['option'] = false;
+      }
+    };
+    (launcher.row('widescreen').kind as ChoiceRow).set(1);
+    await pumpEventQueue();
+    expect(options().last, {'key': 'swanstation_GPU_WidescreenHack', 'value': 'false'}, reason: 'asked back');
+    session.nextStatus = recordedStatus(selected: {'swanstation_GPU_WidescreenHack': 0});
+    await launcher.play.host.refresh();
+    final half = launcher.row('widescreen').kind as ChoiceRow;
+    expect(half.options.last, 'Enabled', reason: 'the host refused that too: the row claims neither Off nor On');
+    expect(half.selected, 2);
+    expect(model.preferences.retroHostOptions, isEmpty);
+    session.nextStatus = recordedStatus();
+    await launcher.play.host.refresh();
+
     session.onCall = null;
     session.callResults['option'] = true;
     final gate = session.callGate = Completer<void>();

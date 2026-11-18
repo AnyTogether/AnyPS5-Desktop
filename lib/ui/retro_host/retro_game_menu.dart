@@ -205,8 +205,9 @@ class RetroGameMenu extends ChangeNotifier {
   /// Chooses the value at [index] of [setting]'s row: the options it sets that differ from the
   /// host's are sent, in order. One choice at a time: another made while one is sent is not taken,
   /// so two choices never leave a setting's options half of each. When the host refuses one, those
-  /// it took are set back to what the host had, so widescreen's hack never stays without its
-  /// aspect ratio. Every option the value sets, to keep together, once the host took them all;
+  /// it took are asked back to what the host had; should the host refuse that too, the row shows
+  /// the half-set value with the host's label ([RetroGraphicsChoice.of]) until the player chooses
+  /// again. Every option the value sets, to keep together, once the host took them all;
   /// null when the row does not offer that value now, it already has it, a choice is being sent,
   /// or the host refused one.
   Future<Map<String, String>?> chooseGraphics(RetroGraphicsSetting setting, int index) async {

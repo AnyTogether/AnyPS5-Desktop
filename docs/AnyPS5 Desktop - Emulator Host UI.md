@@ -440,7 +440,8 @@ draws with the GPU (smooth textures, fix wobbly 3D, sharper textures) only
 while `status.hardware` is true. A value is offered only when the host lists
 every option it sets with that value among the option's `values`, so a host
 that offers fewer keeps its limits. The chosen value is the offer whose value
-of the first option is chosen; a value no offer has (`JINC2`, say) is shown
+of every option is chosen; when none matches whole (`JINC2`, say, or the
+widescreen hack without its aspect ratio) the first option's value is shown
 with the host's label until another is chosen.
 
 **What a row says** (`RetroGraphicsNote`): what the setting does while its
@@ -454,8 +455,11 @@ the game is started again.".
 of the value that differs from the host's, in order, one choice at a time: a
 choice made while another is still being sent is not taken, so two choices
 never leave widescreen's hack from one and its aspect ratio from the other.
-When the host refuses an option, those it took are set back to what the host
-had. Once the host took them all, every option of that value is kept in
+When the host refuses an option, those it took are asked back to what the
+host had. Should the host refuse that too, the row claims neither value: a
+setting whose options match no offer whole (the hack on at 4:3) shows its
+first option with the host's label until the player chooses Off or On, which
+sets every option of that value. Once the host took them all, every option of that value is kept in
 `Preferences.retroHostOptions`, so the launcher keeps and sends widescreen's
 hack and aspect ratio together. The words of every Graphics row (titles, the
 line under each, the values' labels) are in
