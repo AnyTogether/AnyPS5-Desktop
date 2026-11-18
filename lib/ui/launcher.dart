@@ -535,12 +535,13 @@ class _LauncherShellState extends State<LauncherShell> {
                                                   child: LeaderboardView(model: model),
                                                 ),
                                                 // A plain yes or no: Quit AnyPS5?, Close the game?,
-                                                // Delete the game?
+                                                // Delete the game?, Overwrite the save state?
                                                 Layer.confirmQuit ||
                                                 Layer.confirmCancelUnlock ||
                                                 Layer.confirmQuitUnlocks ||
                                                 Layer.closeGame ||
-                                                Layer.confirmDeleteGame => ConfirmCard(model: model),
+                                                Layer.confirmDeleteGame ||
+                                                Layer.retroOverwriteState => ConfirmCard(model: model),
                                                 Layer.challenge => WithBackPill(
                                                   onBack: () => model.handle(Command.back),
                                                   child: ChallengeDetailView(model: model),

@@ -109,6 +109,18 @@ class FakeRetroHostSession extends FakeFrameSource implements RetroHostSession {
   @override
   bool limitsPs2Resolution = false;
 
+  /// Whether the host lists `saveStates`, so a game can be started with a states folder; false, as
+  /// for the signed host v1.0.0, unless a test says.
+  @override
+  bool canSaveStates = false;
+
+  /// The `error` reply a call gets, by method, instead of its result.
+  final callErrors = <String, RetroCallError>{};
+
+  /// Runs as each call is taken, before it is answered: what the host does meanwhile (writes a
+  /// state's file).
+  void Function(String method, Object? args)? onCall;
+
   @override
   Stream<RetroRumble> get rumble => _rumble.stream;
 
@@ -131,8 +143,10 @@ class FakeRetroHostSession extends FakeFrameSource implements RetroHostSession {
   @override
   Future<Object?> call(String method, [Object? args]) async {
     calls.add((method, args));
+    onCall?.call(method, args);
     await callGate?.future;
     if (method == 'release' && (nextStatus?.ended ?? true)) nextStatus = null;
+    if (callErrors[method] case final error?) throw error;
     return callResults[method];
   }
 

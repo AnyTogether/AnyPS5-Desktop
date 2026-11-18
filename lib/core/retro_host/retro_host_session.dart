@@ -48,6 +48,10 @@ abstract interface class RetroHostSession implements RetroFrameSource {
   /// by the host and may be sent to it.
   bool get limitsPs2Resolution;
 
+  /// Whether the host lists `saveStates`, so a game can be started with a states folder
+  /// ([RetroHostStartRequest.states]) and saved and loaded with `saveState` and `loadState`.
+  bool get canSaveStates;
+
   /// Asks the host to stop its game and exit.
   void shutdown();
 
@@ -65,6 +69,7 @@ class RetroHostStartRequest {
     this.options = const {},
     this.initialDisc,
     this.console,
+    this.states,
   });
 
   /// The SwanStation library the launcher checked, or for a PS2 game the LRPS2 library.
@@ -90,6 +95,10 @@ class RetroHostStartRequest {
   /// game, the host's default, so a PS1 start is the same on every host.
   final String? console;
 
+  /// The folder for this game's save states, which only a host that lists `saveStates` takes; null
+  /// for a game without save states.
+  final String? states;
+
   /// This request without the option at [key], for a host that must not be sent it.
   RetroHostStartRequest withoutOption(String key) => RetroHostStartRequest(
     core: core,
@@ -97,6 +106,18 @@ class RetroHostStartRequest {
     system: system,
     saves: saves,
     options: {...options}..remove(key),
+    initialDisc: initialDisc,
+    console: console,
+    states: states,
+  );
+
+  /// The same start without [states], for a host that does not list `saveStates`.
+  RetroHostStartRequest withoutStates() => RetroHostStartRequest(
+    core: core,
+    disc: disc,
+    system: system,
+    saves: saves,
+    options: options,
     initialDisc: initialDisc,
     console: console,
   );
@@ -109,5 +130,6 @@ class RetroHostStartRequest {
     'saves': saves,
     if (options.isNotEmpty) 'options': options,
     'initialDisc': ?initialDisc,
+    'states': ?states,
   };
 }

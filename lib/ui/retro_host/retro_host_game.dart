@@ -6,6 +6,7 @@ import '../../core/retro_host/retro_host_client.dart';
 import '../../core/retro_host/retro_host_protocol.dart';
 import '../../core/retro_host/retro_host_session.dart';
 import '../../core/retro_host/retro_resolution.dart';
+import '../../core/retro_host/retro_state_slots.dart';
 import 'retro_frame_image.dart';
 
 /// Where one game in an emulator host stands.
@@ -138,6 +139,12 @@ class RetroHostGame extends ChangeNotifier {
   /// may offer it. False until the host has greeted the launcher.
   bool get limitsPs2Resolution => session.limitsPs2Resolution;
 
+  /// Whether the game was started with a states folder on a host that lists `saveStates`, so
+  /// [saveState] and [loadState] can be asked for. A start with a folder on an older host leaves the
+  /// folder out, and the game plays without save states.
+  bool get savesStates => _savesStates;
+  bool _savesStates = false;
+
   /// How the host's connection ended; null while it is open. [RetroHostEnd.unsupported] means
   /// the host speaks no protocol version this launcher does: the emulator needs updating.
   RetroHostEnd? get hostEnd => _hostEnd;
@@ -148,9 +155,40 @@ class RetroHostGame extends ChangeNotifier {
   bool _disposed = false;
   bool _hostEnded = false;
   bool _detached = false;
+
+  /// [stop] has begun: the client's `stop` asks `status` until the game has ended, without waiting
+  /// for a state call, so no `saveState` or `loadState` is sent from then on.
+  bool _stopping = false;
   Future<void>? _closing;
   Future<bool>? _detaching;
   Future<void>? _starting;
+
+  /// A `saveState` or `loadState` under way, until its reply: protocol.md "saveState and
+  /// loadState" says a launcher MUST NOT send another call after one until that reply has come, as
+  /// a call queued behind it in the host could otherwise be answered more than 5 seconds after it
+  /// was sent. Every other call of this game waits for it ([_afterStateCall]); pings go on.
+  Future<void>? _stateCallDone;
+
+  /// Sends [send] once no `saveState` or `loadState` is under way. The last check and the send are
+  /// one step, with no wait between them, so a state call that started meanwhile, even one asked
+  /// after this call, is always seen and waited for too.
+  Future<T> _afterStateCall<T>(Future<T> Function() send) async {
+    for (var done = _stateCallDone; done != null; done = _stateCallDone) {
+      await done;
+    }
+    return send();
+  }
+
+  /// How many `saveState` and `loadState` calls have been answered.
+  int get stateReplies => _stateReplies;
+  int _stateReplies = 0;
+
+  /// Whether a status asked once [replies] state calls had been answered said the game had not
+  /// ended. A load that the core began but did not finish ends the game before the host replies
+  /// `false` (the host's `Game::AwaitStateWork`), so after a `loadState` answered `false` this says
+  /// the load left the game untouched and it plays on.
+  bool playingAfter(int replies) => _playingAfterReplies >= replies;
+  int _playingAfterReplies = -1;
 
   bool get _gameLive => _phase == RetroHostGamePhase.loading || _phase == RetroHostGamePhase.playing;
 
@@ -172,10 +210,12 @@ class RetroHostGame extends ChangeNotifier {
         _end(failure: 'The host does not list the $retroCapabilityPs2 capability.');
         return;
       }
-      final sent = request.console == RetroConsole.ps2 && !session.limitsPs2Resolution
+      final resolution = request.console == RetroConsole.ps2 && !session.limitsPs2Resolution
           ? request.withoutOption(retroResolutionKeyPs2)
           : request;
-      await session.startGame(sent.toArgs());
+      final states = request.states != null && session.canSaveStates;
+      await session.startGame((states ? resolution : resolution.withoutStates()).toArgs());
+      _savesStates = states;
     } on Object catch (error) {
       if (_phase == RetroHostGamePhase.starting) _end(failure: '$error');
       return;
@@ -201,7 +241,11 @@ class RetroHostGame extends ChangeNotifier {
     if (!_gameLive || _polling) return;
     _polling = true;
     try {
-      final current = await session.status();
+      var asked = 0;
+      final current = await _afterStateCall(() {
+        asked = _stateReplies;
+        return session.status();
+      });
       if (!_gameLive) return;
       if (current == null) {
         _end(failure: 'The host has no game loaded.');
@@ -214,6 +258,7 @@ class RetroHostGame extends ChangeNotifier {
         _end();
         return;
       }
+      if (asked > _playingAfterReplies) _playingAfterReplies = asked;
       if (current.ready && _phase == RetroHostGamePhase.loading) {
         _setPhase(RetroHostGamePhase.playing);
       } else if (changed) {
@@ -258,6 +303,37 @@ class RetroHostGame extends ChangeNotifier {
     return taken;
   }
 
+  /// `saveState`: saves the game's state into [slot], 0 to 7, of the states folder it was started
+  /// with ([savesStates]). The host writes it between two frames, also while paused.
+  Future<RetroStateOutcome> saveState(int slot) => _stateCall('saveState', slot);
+
+  /// `loadState`: loads the state in [slot], 0 to 7, back into the game; a paused game shows it
+  /// with its next frame once resumed. A state of another game or core build is refused
+  /// ([RetroStateOutcome.otherGame], [RetroStateOutcome.otherCore]) and the game runs on.
+  Future<RetroStateOutcome> loadState(int slot) => _stateCall('loadState', slot);
+
+  Future<RetroStateOutcome> _stateCall(String method, int slot) async {
+    if (slot < 0 || slot >= RetroStateFolder.slots) throw RangeError.range(slot, 0, RetroStateFolder.slots - 1, 'slot');
+    if (!_gameLive || !_savesStates || _stopping) return RetroStateOutcome.notNow;
+    return _afterStateCall(() async {
+      if (!_gameLive || _stopping) return RetroStateOutcome.notNow;
+      final done = Completer<void>();
+      _stateCallDone = done.future;
+      try {
+        final result = await session.call(method, {'slot': slot});
+        return result is Map ? RetroStateOutcome.done : RetroStateOutcome.notNow;
+      } on RetroCallError catch (error) {
+        return RetroStateOutcome.ofError(error.code);
+      } on Object {
+        return RetroStateOutcome.failed;
+      } finally {
+        _stateReplies++;
+        _stateCallDone = null;
+        done.complete();
+      }
+    });
+  }
+
   /// `volume`: the host's output volume for this and every later game. Sent once the host has
   /// greeted the launcher; only kept when the host has ended or never greeted it.
   Future<void> setVolume({double? level, bool? muted}) async {
@@ -268,7 +344,7 @@ class RetroHostGame extends ChangeNotifier {
     try {
       await session.ready;
       if (_hostEnded || _phase == RetroHostGamePhase.closed) return;
-      await session.call('volume', {'level': _level, 'muted': _isMuted});
+      await _afterStateCall(() => session.call('volume', {'level': _level, 'muted': _isMuted}));
     } on Object {
       return;
     }
@@ -277,7 +353,7 @@ class RetroHostGame extends ChangeNotifier {
   Future<bool> _gameCall(String method, Object? args) async {
     if (!_gameLive) return false;
     try {
-      return await session.call(method, args) == true;
+      return await _afterStateCall(() => session.call(method, args)) == true;
     } on Object {
       return false;
     }
@@ -322,7 +398,7 @@ class RetroHostGame extends ChangeNotifier {
     _notify();
     if (now == wasPaused) return;
     try {
-      await session.call('pause', now);
+      await _afterStateCall(() => session.call('pause', now));
     } on Object catch (error) {
       if (_gameLive) _end(failure: '$error');
     }
@@ -340,6 +416,7 @@ class RetroHostGame extends ChangeNotifier {
     if (!_gameLive) return endStatus;
     _poll?.cancel();
     picture.accepting = false;
+    _stopping = true;
     final ended = await _stopAndRelease();
     if (_phase == RetroHostGamePhase.closed) return ended;
     if (ended != null) _status = ended;
@@ -349,8 +426,8 @@ class RetroHostGame extends ChangeNotifier {
 
   Future<RetroStatus?> _stopAndRelease() async {
     try {
-      final ended = await session.stopGame();
-      await session.call('release');
+      final ended = await _afterStateCall(session.stopGame);
+      await _afterStateCall(() => session.call('release'));
       return ended;
     } on Object catch (error) {
       _failure = '$error';
@@ -378,8 +455,8 @@ class RetroHostGame extends ChangeNotifier {
     var free = false;
     if (!_hostEnded && _closing == null) {
       try {
-        await session.call('release');
-        free = await session.status() == null && !_hostEnded && _closing == null;
+        await _afterStateCall(() => session.call('release'));
+        free = await _afterStateCall(session.status) == null && !_hostEnded && _closing == null;
       } on Object catch (error) {
         _failure ??= '$error';
       }

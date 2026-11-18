@@ -300,6 +300,11 @@ class RetroHostClient implements RetroHostSession {
   /// and may be sent one, in `start.options` or with `option`.
   @override
   bool get limitsPs2Resolution => _capabilities.contains(retroCapabilityPs2ResolutionLimits);
+
+  /// Whether the host lists `saveStates`, so it takes `start.states` and the methods `saveState`
+  /// and `loadState`.
+  @override
+  bool get canSaveStates => _capabilities.contains(retroCapabilitySaveStates);
   String? get pixelFormat => _pixelFormat;
 
   /// Each `frame` message, after its frame was pinned and checked.
@@ -369,6 +374,13 @@ class RetroHostClient implements RetroHostSession {
     }
     if (!limitsPs2Resolution && _sendsPs2Resolution(method, args)) {
       throw StateError('The host does not list the $retroCapabilityPs2ResolutionLimits capability.');
+    }
+    final states =
+        method == 'saveState' ||
+        method == 'loadState' ||
+        (method == 'start' && args is Map && args.containsKey('states'));
+    if (states && !canSaveStates) {
+      throw StateError('The host does not list the $retroCapabilitySaveStates capability.');
     }
     if (StrictJson.hasLoneSurrogate(args)) {
       return Future.error(const RetroCallError(RetroCallError.argument, 'A string cannot be sent as UTF-8.'));
@@ -498,7 +510,7 @@ class RetroHostClient implements RetroHostSession {
         _failedStatus = null;
         _gameLoaded = false;
         return null;
-      case 'connectedPorts' || 'changeDisc' || 'option':
+      case 'connectedPorts' || 'changeDisc' || 'option' || 'saveState' || 'loadState':
         return false;
       case 'pause' || 'stop' || 'volume':
         return null;
@@ -697,6 +709,14 @@ class RetroHostClient implements RetroHostSession {
       case 'connectedPorts' || 'changeDisc' || 'option':
         if (result is! bool) throw RetroProtocolError('The result of $method must be a boolean.');
         if (method == 'connectedPorts' && result && args is int) _ports = args;
+      case 'saveState' || 'loadState':
+        if (result == false) break;
+        if (result is! Map<String, Object?>) {
+          throw RetroProtocolError('The result of $method must be false or an object.');
+        }
+        final done = RetroFields(result, method);
+        done.integer('bytes', 0, RetroFields.maxSafeInteger);
+        done.integer('micros', 0, RetroFields.maxSafeInteger);
       case 'pause':
         _expectNull(method, result);
         if (_gameLoaded && args is bool) _paused = args;

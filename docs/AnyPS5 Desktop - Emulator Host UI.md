@@ -24,6 +24,8 @@ default, see "In the launcher" and "PS2 games").
 | [`lib/ui/retro_host/retro_host_controls.dart`](../lib/ui/retro_host/retro_host_controls.dart) | `RetroHostControls`: plays a `RetroHostGame` with the launcher's controllers, connects port 2 and forwards vibration. `RetroPadReader` is how it reads the controllers. |
 | [`lib/ui/retro_host/retro_game_menu.dart`](../lib/ui/retro_host/retro_game_menu.dart) | `RetroGameMenu`: the in-game menu's rows (discs, core options, volume) and what choosing them does. |
 | [`lib/core/retro_host/retro_resolution.dart`](../lib/core/retro_host/retro_resolution.dart) | `RetroResolutionChoice`: the internal resolution the menu offers for a status, each console's option key, and what the row says under it (see "Internal resolution"). |
+| [`lib/ui/retro_host/retro_save_states.dart`](../lib/ui/retro_host/retro_save_states.dart) | `RetroSaveStates`: a game's save state slots as its states folder holds them, and saving into one (with a picture of the moment) and loading one, one at a time. |
+| [`lib/ui/retro_host/retro_state_picture.dart`](../lib/ui/retro_host/retro_state_picture.dart) | `retroStatePicture`: the small PNG of the game's picture kept beside a saved state. |
 | [`lib/ui/retro_host/retro_option_sections.dart`](../lib/ui/retro_host/retro_option_sections.dart) | `RetroOptionSection` and `retroOptionSection`: which section of the menu each SwanStation option belongs to, which options are graphics options the menu leaves out, and which options are not shown. |
 | [`lib/core/retro_host/retro_host_install.dart`](../lib/core/retro_host/retro_host_install.dart) | `RetroHostInstall`: the host and SwanStation library a build runs, and whether it is checked before each start. |
 | [`lib/ui/retro_host/retro_host_download_model.dart`](../lib/ui/retro_host/retro_host_download_model.dart) | `RetroHostDownloadModel`: Settings › Emulators' row that downloads, updates and repairs the signed host, and what a failed check before a start leaves it saying. |
@@ -633,8 +635,11 @@ While the game loads, PS or Esc gives the start up.
 **The menu.** `Layer.retroMenu` is a panel styled as the quick menu
 ("Paused", the game's icon and name), as tall as its rows. Its first page:
 Resume, each disc of a multi-disc game ("In the console." under the inserted
-one), a row for each section that has rows (Audio, Controller, Console,
-Advanced, each with a line saying what is in it), and Close game. Choosing a
+one), Save state and Load state where the host saves states (see "Save
+states"), a row for each section that has rows (Audio, Controller, Console,
+Advanced, each with a line saying what is in it) with Internal resolution
+after Audio where the menu offers it (see "Internal resolution"), and Close
+game. Choosing a
 section shows its page, headed with its name: its SwanStation options as
 choices of their labels, and in Audio, Volume (a bar in tenths) and Mute
 first. An option that takes effect only when the game starts again says so
@@ -668,6 +673,106 @@ also offers the PS1 BIOS folder there (O or Triangle,
 `openRetroBiosFolder`, as the Settings row opens it). A host that speaks another
 protocol version shows that it needs updating, and a host that never greeted
 the launcher shows that it could not be started.
+
+## Save states
+
+On a host that lists `saveStates` ([Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>)
+"Save states"), a game's menu has **Save state** and **Load state** on its
+first page, after the discs and before the sections, in sentence case like
+every other row. They show once the game has shown its first frame
+(`RetroHostGamePhase.playing`, the host's `status.ready`), since the host
+answers `false` to a save or load before that; a row in focus while they
+appear stays in focus (`_keepRetroMenuRow`). They are an offline feature for
+one player, and nothing online uses them. On a host without the capability,
+such as the signed host v1.0.0, the game starts without a states folder and
+neither row shows.
+
+How the standard emulators do it shaped this: RetroArch's Quick Menu has Save
+State and Load State on a numbered slot of each game, with a picture of the
+moment beside each state; DuckStation's pause menu lists each game's slots
+with that picture and the date and time, and refuses a state its build cannot
+read. Here the launcher shows the host's eight slots of a game as Slot 1 to 8.
+
+- **The model.** `RetroPlay.states` is a `RetroSaveStates` over the game and
+  its `RetroStateFolder` (`retro/states/<console>/<Game.titleId>`,
+  `AppPaths.retroStates`), built from the same normalized disc path the
+  host's `start.disc` gets, so the slot names cannot drift from the host's. It
+  reads the slots when the game starts, after every save, and after a load
+  that found its slot empty. Only two things change the folder while the game
+  plays: the launcher's own saves, and a host's late write after a save that
+  answered `fileError` (protocol.md: a save that late is still put in place if
+  it had reached its rename). That late write is why a failed save takes the
+  slot's picture away (below), and the slot's date shows it from the next
+  read, after the next save or the next start. One save or load runs at a
+  time (`RetroSaveStates.busy`); while it runs its slot says **Saving…** or
+  **Loading…** (`RetroSaveStates.running`), which can take up to 4.5 seconds
+  on a `fileError`, and any row chosen meanwhile does nothing.
+- **One folder per game.** The host names a slot `<disc stem>.<slot>.state`
+  and checks a state's game only by the console and that stem (protocol.md
+  `otherGame`), so two games whose discs have the same file name (two
+  "Disc 1.cue" in different folders) would share slots in one console folder,
+  and one game's state would load into the other. protocol.md lets the
+  launcher name any `start.states` folder, so each game gets its own, named by
+  its `Game.titleId` with hyphens kept: the retro.json title ID for a game
+  that has one, so its states stay when its folder moves, and otherwise the
+  hash of its path and size the library names it by (a disc without a
+  retro.json that is moved or renamed starts with no states, as with any other
+  per-game record of it). Two games whose retro.json give the same title ID
+  share their states. The memory cards stay shared by disc name in `saves`,
+  as on main. No release ever wrote the per-console folder, so nothing is
+  moved.
+- **Save state's page.** Every slot, with the date and time its state was
+  saved (`retroStateTime`, "2026-11-18 14:03", as the cloud saves show theirs)
+  or Empty, and the picture kept beside it at the game's shape
+  (`PanelRow.pictureAspect`, which also keeps an empty slot's place so the
+  titles line up). An empty slot is saved into at once. A slot that holds a
+  state asks **Overwrite slot N?** first (`Layer.retroOverwriteState`, a
+  `ConfirmCard` with the game's icon): Cancel first, where the focus starts,
+  then Overwrite, which says when the state it replaces was saved. Back, PS
+  and Options on the question go back to Save state on that slot; held PS
+  goes back to the game. A save that works says "Saved in slot N" and goes
+  back to the game; one that does not says it could not be saved and stays on
+  the page.
+- **The picture.** `RetroSaveStates.save` takes a clone of the frame shown when
+  the slot is chosen, which is the paused game's while the menu is open, and
+  once the host has saved, `retroStatePicture` draws it 240 pixels wide at the
+  game's display aspect and encodes it as PNG, kept beside the state. A save
+  with no frame, or whose picture cannot be made or written, keeps no picture:
+  the log says why, and the save still counts. A save that did not work takes
+  the slot's picture away, since the new state may still land in it (a late
+  write after `fileError`, or a host that went away after writing), unless the
+  core refused it, which leaves the slot as it was. A game closed while its
+  picture is being made writes none, since the next game may already be saving
+  into that slot.
+- **Late answers.** A save or load goes back to the game only if the menu still
+  shows the page of the visit it was asked in (`RetroPlay.menuVisits`): one
+  that answers after the player left the menu and opened it again leaves the
+  new visit alone.
+- **Load state's page.** The same slots; only a slot that holds a state can be
+  chosen, and the focus starts on the first one. With nothing saved yet the
+  first page's Load state cannot be chosen and says so. For a PS1 game its
+  line says that the memory card goes back to that moment too, as the host's
+  protocol.md says a PS1 state holds memory card 1. A load that works says
+  "Slot N loaded" and goes back to the game, which goes on from the state. A
+  load the host refused says why in plain words and stays on the page: a state
+  of another version of the emulator (`otherCore`, a host release whose core
+  build changed), of another game (`otherGame`), or a damaged file or one from
+  a newer emulator (`badState`); anything else says only that it could not be
+  loaded (`retroStateProblem`).
+- **Rows that come and go.** The first page gains rows as the status changes:
+  Save state and Load state at the first frame, and the discs and sections
+  once the status lists them. `RetroPlay.firstPageRows` keeps the ids of the
+  page last built, and `_keepRetroMenuRow` puts the focus back on the row it
+  was on, wherever that row now is.
+- **The game ending.** A game that ends while the menu or the question is open
+  closes both (`retroMenuShown`), and the menu always opens on its first page.
+  A PS1 game that ends with `errorCode` `other` right after a load the host
+  answered `false` also says that its memory card may already be back at that
+  moment (`retroStateCardAfterEnd`), since protocol.md says such a load may
+  still have replaced card 1, also when the player closed the game while that
+  load ran. Once a status asked after that reply says the game has not ended,
+  the load left it untouched and it plays on, so a later `other` ending says
+  nothing of the card (`RetroSaveStates.loadAnsweredFalse`).
 
 ## The unchecked-host mark
 
@@ -952,6 +1057,27 @@ started from the checked files, two games in one host, files let go after the
 host exited. The host runs with the test's own environment, as the launcher starts
 it, so WinLibs' `bin` folder has to be on `PATH` there.
 
+Save states have tests of their own, replaying the recorded host of
+[Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>) "Save states":
+[`test/ui/retro_host/retro_save_states_test.dart`](../test/ui/retro_host/retro_save_states_test.dart)
+gives each recorded `saveState` and `loadState` reply to `RetroHostGame` and
+checks the outcome the menu acts on, the start without `states` on a host
+without the capability, the picture kept, one call at a time, no other call
+of the game sent until a state call's reply, and a slot found empty. [`test/ui/retro_host_save_states_test.dart`](../test/ui/retro_host_save_states_test.dart)
+plays them through the launcher: each game's own states folder (also for two
+games whose discs have the same name) and the PS2 one, the rows only with the
+capability and only from the first frame on (the focus kept as they appear),
+saving into an empty and a used slot (Overwrite slot N?, with Cancel, Back, PS
+and Options on it), Saving… and Loading… on the slot while a call runs, a
+failed save, loading with each recorded refusal and its words, a slot found
+empty, the game ending under the question, and a PS1 game ending with
+`other` after a load answered `false`.
+[`retro_host_play_golden_test.dart`](../test/ui/retro_host_play_golden_test.dart)
+draws the menu with Save state and Load state (and Internal resolution
+after Audio), Save state's slots with two
+pictures saved from the game's frame through the real path, and Overwrite slot
+1?.
+
 PS2 has tests of its own, with no BIOS of any kind:
 [`test/ui/retro_host_ps2_test.dart`](../test/ui/retro_host_ps2_test.dart)
 covers the PS2 rows with and without LRPS2 beside the host, the folder they
@@ -974,6 +1100,14 @@ draws the PS2 rows and the PS2 missing-BIOS screen.
 
 ## Not yet
 
+- **Save states wait for the host.** Save state and Load state show only with
+  a host that lists `saveStates`, which no signed host release does yet. No
+  real game was saved or loaded through the launcher: the host's own test of
+  that branch saved and loaded Spyro on SwanStation and Jak and Daxter on
+  LRPS2, and the launcher was tested against that host's recorded replies.
+- **No resume state, no deleting a slot.** RetroArch's and DuckStation's
+  resume state on quit (the host takes it as a `path` state) and a way to
+  delete a slot are not in this menu yet.
 - **No PS2 game seen running in the launcher.** LRPS2 boots nothing without a
   Sony BIOS, and none may be used in a test, so the launcher's tests have only
   the real core's missing BIOS. A manual run of the host alone (host main

@@ -82,6 +82,9 @@ class RecordingSession implements RetroHostSession {
   Future<RetroHostEnd> get ended => client.ended;
   @override
   bool get canPlayPs2 => client.canPlayPs2;
+
+  @override
+  bool get canSaveStates => client.canSaveStates;
   @override
   bool get limitsPs2Resolution => client.limitsPs2Resolution;
   @override
