@@ -54,7 +54,7 @@ Future<int> padCheck({
       : await () async {
           final results = await Future.wait<Object?>([
             probe.processes(),
-            probe.services(const ['HidHide', 'ViGEmBus', 'dshidmini']),
+            probe.services(PadTroubleshooter.windowsServices),
             probe.steamPlayStationSupport(),
             probe.hidrawDenied(),
             probe.unreadableControllers(),
@@ -74,7 +74,7 @@ Future<int> padCheck({
           );
         }();
   out.writeln('steam PlayStation support: ${facts.steamPlayStationSupport ?? 'not found'}');
-  out.writeln('drivers: ${facts.services.isEmpty ? 'none of HidHide, ViGEmBus, DsHidMini' : (facts.services.toList()..sort()).join(', ')}');
+  out.writeln('drivers: ${facts.services.isEmpty ? 'none of HidHide, ViGEmBus, DsHidMini, BthPS3' : (facts.services.toList()..sort()).join(', ')}');
   final findings = PadTroubleshooter.diagnose(
     probe == null ? PadFacts(system: system, pads: roster.pads, sdlLoaded: sdl != null, sdlFailure: failure, unmapped: unmapped) : facts,
   );
