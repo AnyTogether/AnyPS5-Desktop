@@ -159,6 +159,36 @@ void main() {
     ),
     timeout: const Timeout(Duration(seconds: 90)),
   );
+  test("the host's own save-state message fixtures: start with states, a save, a load and two refusals", () {
+    final welcome = _messageFixture(checkout, 'welcome.json')['message']! as Map<String, Object?>;
+    final start = _messageFixture(checkout, 'call-start-states.json')['message']! as Map<String, Object?>;
+    final args = (start['args']! as Map<String, Object?>).cast<String, String>();
+    final ours = RetroHostStartRequest(
+      core: args['core']!,
+      disc: args['disc']!,
+      system: args['system']!,
+      saves: args['saves']!,
+      states: args['states'],
+    ).toArgs();
+    expect(ours, args, reason: "the launcher's start is the one the fixture shows");
+    return _playOwn(
+      checkout,
+      python,
+      "The host's call-start-states, call-save-state, call-load-state, call-load-state-no-state and "
+          'call-save-state-in-lockstep fixtures, each with the id of its call here, then shutdown.',
+      'clean',
+      [
+        ..._hostStateSteps(checkout),
+        {
+          'from': 'launcher',
+          'message': {'type': 'shutdown'},
+        },
+        {'hostExits': 0},
+      ],
+      capabilities: welcome['capabilities']! as List<Object?>,
+      afterReady: (client) async => expect(client.canSaveStates, isTrue),
+    );
+  }, timeout: const Timeout(Duration(seconds: 90)));
   test(
     'start.states, saveState and loadState go only to a host that lists saveStates',
     () => _playOwn(
@@ -971,6 +1001,43 @@ List<Map<String, Object?>> _saveStatesSteps() {
     }
   }
   return steps;
+}
+
+/// The host repository's message fixture [name], from `fixtures/v1/messages` of [checkout].
+Map<String, Object?> _messageFixture(String checkout, String name) =>
+    jsonDecode(File(p.join(checkout, 'fixtures', 'v1', 'messages', name)).readAsStringSync()) as Map<String, Object?>;
+
+/// The host's own save-state message fixtures in the order a game sends them: `start` with a states
+/// folder, then each `saveState` and `loadState` and its reply, with the id of its call here and
+/// what the fixture leaves open still open.
+List<Map<String, Object?>> _hostStateSteps(String checkout) {
+  var id = 1;
+  return [
+    for (final name in const [
+      'call-start-states.json',
+      'call-save-state.json',
+      'call-load-state.json',
+      'call-load-state-no-state.json',
+      'call-save-state-in-lockstep.json',
+    ])
+      ...() {
+        final fixture = _messageFixture(checkout, name);
+        final open = [...?(fixture['anyValueFor'] as List<Object?>?)?.cast<String>()];
+        id++;
+        return [
+          {
+            'from': 'launcher',
+            'message': {...fixture['message']! as Map<String, Object?>, 'id': id},
+            'anyValueFor': ['id'],
+          },
+          {
+            'from': 'host',
+            'message': {...fixture['reply']! as Map<String, Object?>, 'id': id},
+            'anyValueFor': ['id', ...open],
+          },
+        ];
+      }(),
+  ];
 }
 
 /// A PS2 game's `start` and the replies a host built from anyps5-retro-host main 1b57932 sent with

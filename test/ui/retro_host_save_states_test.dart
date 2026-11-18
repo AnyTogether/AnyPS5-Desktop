@@ -405,6 +405,43 @@ void main() {
     expect(model.toast, T.text('retroStateCardAfterEnd'));
   });
 
+  test(
+    'a PS1 load answered false that left the game playing says nothing of the card at a later other ending',
+    () async {
+      launcher = Ps1Launcher();
+      launcher.session.canSaveStates = true;
+      File(folder().statePath(0))
+        ..createSync(recursive: true)
+        ..writeAsBytesSync([1]);
+      final model = launcher.model..setRetroHostPs1(true);
+      await launcher.start();
+      await settleFiles();
+      launcher.session.callResults['loadState'] = false;
+      model.openRetroMenu();
+      await settleFiles();
+      (launcher.row('loadState').kind as ActionRow).run();
+      (launcher.row('state-0').kind as ActionRow).run();
+      await settleFiles();
+      expect(model.toast, T.text('retroStateLoadFailed'));
+      expect(launcher.play.states.loadAnsweredFalse, isTrue);
+      await launcher.play.host.refresh();
+      expect(
+        launcher.play.states.loadAnsweredFalse,
+        isFalse,
+        reason: 'a status after the reply says the game plays on',
+      );
+      model.resumeRetroGame();
+      await settleFiles();
+      await launcher.play.host.refresh();
+      launcher.session.nextStatus = fakeStatus(ended: true, errorCode: RetroErrorCode.other);
+      await launcher.play.host.refresh();
+      await pumpEventQueue();
+      expect(launcher.play.host.phase, RetroHostGamePhase.ended);
+      expect(launcher.play.loadCardWarned, isFalse);
+      expect(model.toast, isNot(T.text('retroStateCardAfterEnd')), reason: "that ending is not the load's");
+    },
+  );
+
   test('closing a PS1 game while a load runs that then ends it with other still says so', () async {
     launcher = Ps1Launcher();
     launcher.session.canSaveStates = true;

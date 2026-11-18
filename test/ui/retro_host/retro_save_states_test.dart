@@ -120,6 +120,61 @@ void main() {
     expect(refreshed, isTrue);
   });
 
+  test('a call asked behind a second saveState or loadState waits for that one too', () async {
+    await started();
+    session.callResults['saveState'] = recording.calls('slots', 'saveState').first.reply['result'];
+    session.callResults['loadState'] = recording.calls('slots', 'loadState')[1].reply['result'];
+    session.callResults['option'] = true;
+    final first = session.callGate = Completer<void>();
+    final saving = game.saveState(1);
+    await pumpEventQueue();
+    final loading = game.loadState(2);
+    final option = game.setOption('k', 'v');
+    final second = Completer<void>();
+    session.onCall = (method, _) {
+      if (method == 'loadState') session.callGate = second;
+    };
+    first.complete();
+    expect(await saving, RetroStateOutcome.done);
+    await pumpEventQueue();
+    expect(session.calls.last.$1, 'loadState', reason: 'the option waits for the load it was asked behind');
+    second.complete();
+    expect(await loading, RetroStateOutcome.done);
+    expect(await option, isTrue);
+    expect(
+      [for (final call in session.calls.skip(session.calls.length - 3)) call.$1],
+      ['saveState', 'loadState', 'option'],
+    );
+  });
+
+  test('a load answered false counts until a status asked after its reply says the game plays on', () async {
+    await started();
+    final states = RetroSaveStates(game, RetroStateFolder(folder: p.join(temp.path, 'states'), disc: request().disc));
+    addTearDown(states.dispose);
+    session.callResults['loadState'] = false;
+    expect(await states.load(1), RetroStateOutcome.notNow);
+    expect(states.loadAnsweredFalse, isTrue, reason: 'the status before the load says nothing of it');
+    await game.refresh();
+    expect(states.loadAnsweredFalse, isFalse, reason: 'a status asked after the reply says the game plays on');
+
+    final gate = session.callGate = Completer<void>();
+    final loading = states.load(1);
+    await pumpEventQueue();
+    session.callGate = null;
+    final polled = game.refresh();
+    gate.complete();
+    expect(await loading, RetroStateOutcome.notNow);
+    await polled;
+    expect(states.loadAnsweredFalse, isFalse, reason: 'a status held behind the load is asked after its reply');
+
+    expect(await states.load(1), RetroStateOutcome.notNow);
+    expect(states.loadAnsweredFalse, isTrue, reason: 'a later load answered false counts again');
+    session.nextStatus = fakeStatus(ended: true, errorCode: RetroErrorCode.other);
+    await game.refresh();
+    expect(game.phase, RetroHostGamePhase.ended);
+    expect(states.loadAnsweredFalse, isTrue, reason: 'the load ended the game');
+  });
+
   test('no game loaded is notNow, without a call', () async {
     expect(await game.saveState(0), RetroStateOutcome.notNow);
     expect(session.calls, isEmpty);

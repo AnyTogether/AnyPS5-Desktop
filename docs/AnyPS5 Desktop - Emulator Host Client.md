@@ -365,12 +365,12 @@ reads the host's own `call-start-ps2.json` and `call-status-ps2-no-bios.json`.
 ## Save states
 
 A host that lists `saveStates` (`RetroHostClient.canSaveStates`) saves and
-loads a game's state for one player. That capability is on the save states
-branch of the host, B-Howell/anyps5-retro-host-upstream `save-states` (host
-PR AnyTogether/anyps5-retro-host#24, not merged yet, so no host commit on
-`main` can be named here), whose protocol.md section "saveState and
-loadState" this follows at d4c0da5. The recording below was made at 3576e38;
-what the branch changed after it (a checksum in the file's header, a load
+loads a game's state for one player. That capability is on the host's
+`main` since AnyTogether/anyps5-retro-host#24 merged as
+[1e5c278](https://github.com/AnyTogether/anyps5-retro-host/blob/1e5c278ff2c9d936c0d252734c3551d7bbed8efa/docs/protocol.md),
+whose protocol.md section "saveState and loadState" this follows (the same
+text as the pull request's d4c0da5). The recording below was made at 3576e38
+on that pull request's branch; what the branch changed after it (a checksum in the file's header, a load
 handed to the core only within 3.5 seconds, Windows file names refused as
 `argument`, a save the file cannot hold as `coreRefused`) changes no message
 the launcher reads, only `bytes` by the 8 of the checksum. These states are an offline feature of one
@@ -419,7 +419,9 @@ What the launcher does with them:
   the game's `Game.titleId` as it is, hyphens kept (not `Game.slug`, which
   drops them, so `A-BC` and `AB-C` would meet): `PS1-` or `PS2-` and its
   retro.json title ID when it has one, otherwise the hash of its path and
-  size the library names it by. Its letters are only `A-Z`, `0-9` and `-`,
+  size the library names it by. Only a game with a retro.json keeps its states
+  when its folder moves or is renamed: a loose disc without one is named by
+  that hash, so its states stay under its old name. Its letters are only `A-Z`, `0-9` and `-`,
   with the console first, so it is a safe file name everywhere and never a
   Windows device name. Two games whose retro.json give the same title ID are
   one game to the launcher and share their states, as they would on a
@@ -462,14 +464,31 @@ What the launcher does with them:
   `saveState` or `loadState` it sent has been answered
   (`RetroHostGame._afterStateCall`); the client's pings go on. A call asked
   meanwhile is sent after the reply, at most 4.5 seconds later, in the order
-  it was asked, and its own 5-second limit starts when it is sent.
+  it was asked, and its own 5-second limit starts when it is sent. Each call
+  waits in a loop right before it is sent, and the last check and the send
+  are one step with nothing awaited between them, so a second state call that
+  starts while it waits (a direct caller of `RetroHostGame.saveState` or
+  `loadState`; through the menu `RetroSaveStates.busy` lets only one run) is
+  waited for too.
 - **A load that ended the game.** After a PS1 load answered `false`
   (`RetroSaveStates.loadAnsweredFalse`), a game that then ends with
-  `errorCode` `other` shows "The game stopped while the state was loading, so
+  `errorCode` `other`, with no status between that said it plays on, shows "The game stopped while the state was loading, so
   the memory card may already be back at that moment." beside the usual
   problem, once per game (`_warnRetroCardAfterLoad`). That holds too when the
   player chose Close game while the load ran: the stop waits for the load's
-  reply, and the status it ends with reports `other`.
+  reply, and the status it ends with reports `other`. A `false` also comes
+  from a load not given to the core within 3.5 seconds, which protocol.md
+  says leaves the game untouched, and that game plays on. The host ends a game
+  that a late load ended before it replies (`Game::AwaitStateWork` calls
+  `Fail` before it returns `false`), so the first status asked after the reply
+  tells the two apart: `RetroHostGame` counts the state calls answered
+  (`stateReplies`) and notes, for each status that has not ended, how many had
+  been answered when it was asked (`playingAfter`). A status asked after the
+  load's reply that has not ended clears the flag, so an `other` ending much
+  later, for another reason, says nothing of the card. A status asked before
+  the reply never clears it, whatever order the replies are handled in. The
+  status poll runs while the menu is open too, so the flag clears within half
+  a second, before the player goes back to the game.
 
 [`test/fixtures/retro_host_save_states_recording.json`](../test/fixtures/retro_host_save_states_recording.json)
 holds every message each way, as its exact text (frames left out), of a host
@@ -491,7 +510,12 @@ checks the launcher's `start` against the one the host took, its slot names
 against the files the host wrote, every recorded error code's outcome, and the
 folder's reading and pictures. The fixture test plays the recorded `start`,
 saves, loads and refusals through the client against the fake host, checks
-that nothing about states goes to a host without `saveStates`, and that a
+that nothing about states goes to a host without `saveStates`, plays the
+host's own save-state message fixtures at `RETRO_HOST_COMMIT`
+(`call-start-states.json`, `call-save-state.json`, `call-load-state.json`,
+`call-load-state-no-state.json`, `call-save-state-in-lockstep.json`) through
+the client the same way, after checking that the launcher's `start` is the
+one `call-start-states.json` shows, and that a
 `saveState` result of `true`, one whose `bytes` is `1.5`, and a `loadState`
 result without `micros` are each a protocol error.
 
@@ -992,8 +1016,9 @@ named in `.github/workflows/ci.yml`:
   and the ring's `DuplicateHandle`, `MapViewOfFile` and `VirtualQuery` checks.
   The sessions that are only for Linux and macOS skip themselves there.
 
-That commit is the host repository's `main` with its fake host merged
-(AnyTogether/anyps5-retro-host#10).
+That commit is the host repository's `main` with save states merged
+(AnyTogether/anyps5-retro-host#24, 1e5c278), which also holds its fake host
+(#10) and PS2 (#18).
 
 [`test/core/retro_host/retro_status_test.dart`](../test/core/retro_host/retro_status_test.dart)
 covers how a `status` is read, and reads every status the fixture sessions send
@@ -1001,12 +1026,14 @@ when `ANYPS5_RETRO_HOST_CHECKOUT` is set.
 
 ## Not yet
 
-- **Save states wait for the host.** `saveStates` is on the host's
-  `save-states` branch, not on its `main` or in a signed release, so CI's
-  fixture checkout (`RETRO_HOST_COMMIT`, host main 1b57932) has no session of
-  it: the client is checked against the recorded host instead ("Save states"
-  above). Once the host merges it, a later `RETRO_HOST_COMMIT` brings its own
-  fixtures.
+- **Save states wait for a signed host.** `saveStates` is on the host's
+  `main` (1e5c278, #24) but in no signed release yet, so a player's signed
+  host v1.0.0 has no save states and the menu has no Save state or Load
+  state. The host's save-state session fixture (`save-state-slots.json`) is
+  for the host's own tests only (`"tests": ["host"]`), so the launcher's
+  fixture test plays its message fixtures instead ("Save states" above). The
+  recording stays the one made at 3576e38: what the branch changed after it
+  changes only `bytes`.
 - **protocol.md names debug builds only.** The host repository's protocol.md
   at 9052aff, "Finding and checking the host", says "Debug builds of the
   launcher MAY run the host named by the environment variable

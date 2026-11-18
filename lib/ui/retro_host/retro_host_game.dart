@@ -160,11 +160,26 @@ class RetroHostGame extends ChangeNotifier {
   /// was sent. Every other call of this game waits for it ([_afterStateCall]); pings go on.
   Future<void>? _stateCallDone;
 
-  Future<void> _afterStateCall() async {
+  /// Sends [send] once no `saveState` or `loadState` is under way. The last check and the send are
+  /// one step, with no wait between them, so a state call that started meanwhile, even one asked
+  /// after this call, is always seen and waited for too.
+  Future<T> _afterStateCall<T>(Future<T> Function() send) async {
     for (var done = _stateCallDone; done != null; done = _stateCallDone) {
       await done;
     }
+    return send();
   }
+
+  /// How many `saveState` and `loadState` calls have been answered.
+  int get stateReplies => _stateReplies;
+  int _stateReplies = 0;
+
+  /// Whether a status asked once [replies] state calls had been answered said the game had not
+  /// ended. A load that the core began but did not finish ends the game before the host replies
+  /// `false` (the host's `Game::AwaitStateWork`), so after a `loadState` answered `false` this says
+  /// the load left the game untouched and it plays on.
+  bool playingAfter(int replies) => _playingAfterReplies >= replies;
+  int _playingAfterReplies = -1;
 
   bool get _gameLive => _phase == RetroHostGamePhase.loading || _phase == RetroHostGamePhase.playing;
 
@@ -213,8 +228,11 @@ class RetroHostGame extends ChangeNotifier {
     if (!_gameLive || _polling) return;
     _polling = true;
     try {
-      if (_stateCallDone != null) await _afterStateCall();
-      final current = await session.status();
+      var asked = 0;
+      final current = await _afterStateCall(() {
+        asked = _stateReplies;
+        return session.status();
+      });
       if (!_gameLive) return;
       if (current == null) {
         _end(failure: 'The host has no game loaded.');
@@ -227,6 +245,7 @@ class RetroHostGame extends ChangeNotifier {
         _end();
         return;
       }
+      if (asked > _playingAfterReplies) _playingAfterReplies = asked;
       if (current.ready && _phase == RetroHostGamePhase.loading) {
         _setPhase(RetroHostGamePhase.playing);
       } else if (changed) {
@@ -283,21 +302,23 @@ class RetroHostGame extends ChangeNotifier {
   Future<RetroStateOutcome> _stateCall(String method, int slot) async {
     if (slot < 0 || slot >= RetroStateFolder.slots) throw RangeError.range(slot, 0, RetroStateFolder.slots - 1, 'slot');
     if (!_gameLive || !_savesStates) return RetroStateOutcome.notNow;
-    if (_stateCallDone != null) await _afterStateCall();
-    if (!_gameLive) return RetroStateOutcome.notNow;
-    final done = Completer<void>();
-    _stateCallDone = done.future;
-    try {
-      final result = await session.call(method, {'slot': slot});
-      return result is Map ? RetroStateOutcome.done : RetroStateOutcome.notNow;
-    } on RetroCallError catch (error) {
-      return RetroStateOutcome.ofError(error.code);
-    } on Object {
-      return RetroStateOutcome.failed;
-    } finally {
-      _stateCallDone = null;
-      done.complete();
-    }
+    return _afterStateCall(() async {
+      if (!_gameLive) return RetroStateOutcome.notNow;
+      final done = Completer<void>();
+      _stateCallDone = done.future;
+      try {
+        final result = await session.call(method, {'slot': slot});
+        return result is Map ? RetroStateOutcome.done : RetroStateOutcome.notNow;
+      } on RetroCallError catch (error) {
+        return RetroStateOutcome.ofError(error.code);
+      } on Object {
+        return RetroStateOutcome.failed;
+      } finally {
+        _stateReplies++;
+        _stateCallDone = null;
+        done.complete();
+      }
+    });
   }
 
   /// `volume`: the host's output volume for this and every later game. Sent once the host has
@@ -310,8 +331,7 @@ class RetroHostGame extends ChangeNotifier {
     try {
       await session.ready;
       if (_hostEnded || _phase == RetroHostGamePhase.closed) return;
-      if (_stateCallDone != null) await _afterStateCall();
-      await session.call('volume', {'level': _level, 'muted': _isMuted});
+      await _afterStateCall(() => session.call('volume', {'level': _level, 'muted': _isMuted}));
     } on Object {
       return;
     }
@@ -320,8 +340,7 @@ class RetroHostGame extends ChangeNotifier {
   Future<bool> _gameCall(String method, Object? args) async {
     if (!_gameLive) return false;
     try {
-      if (_stateCallDone != null) await _afterStateCall();
-      return await session.call(method, args) == true;
+      return await _afterStateCall(() => session.call(method, args)) == true;
     } on Object {
       return false;
     }
@@ -366,8 +385,7 @@ class RetroHostGame extends ChangeNotifier {
     _notify();
     if (now == wasPaused) return;
     try {
-      if (_stateCallDone != null) await _afterStateCall();
-      await session.call('pause', now);
+      await _afterStateCall(() => session.call('pause', now));
     } on Object catch (error) {
       if (_gameLive) _end(failure: '$error');
     }
@@ -394,9 +412,8 @@ class RetroHostGame extends ChangeNotifier {
 
   Future<RetroStatus?> _stopAndRelease() async {
     try {
-      if (_stateCallDone != null) await _afterStateCall();
-      final ended = await session.stopGame();
-      await session.call('release');
+      final ended = await _afterStateCall(session.stopGame);
+      await _afterStateCall(() => session.call('release'));
       return ended;
     } on Object catch (error) {
       _failure = '$error';
@@ -424,9 +441,8 @@ class RetroHostGame extends ChangeNotifier {
     var free = false;
     if (!_hostEnded && _closing == null) {
       try {
-        if (_stateCallDone != null) await _afterStateCall();
-        await session.call('release');
-        free = await session.status() == null && !_hostEnded && _closing == null;
+        await _afterStateCall(() => session.call('release'));
+        free = await _afterStateCall(session.status) == null && !_hostEnded && _closing == null;
       } on Object catch (error) {
         _failure ??= '$error';
       }

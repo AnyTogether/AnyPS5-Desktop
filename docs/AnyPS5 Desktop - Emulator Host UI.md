@@ -693,7 +693,9 @@ read. Here the launcher shows the host's eight slots of a game as Slot 1 to 8.
   answered `false` also says that its memory card may already be back at that
   moment (`retroStateCardAfterEnd`), since protocol.md says such a load may
   still have replaced card 1, also when the player closed the game while that
-  load ran.
+  load ran. Once a status asked after that reply says the game has not ended,
+  the load left it untouched and it plays on, so a later `other` ending says
+  nothing of the card (`RetroSaveStates.loadAnsweredFalse`).
 
 ## The unchecked-host mark
 
