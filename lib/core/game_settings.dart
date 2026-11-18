@@ -34,7 +34,7 @@ enum Upscaler { bilinear, fsr1 }
 /// Settings › Display, Window Size and Vertical Sync left at Default). The built-in values are
 /// the ones every game started with before there were defaults.
 class DisplayDefaults {
-  const DisplayDefaults({this.fullscreen = false, this.windowSize = 75, this.vsync = true, this.startAnimation = true});
+  const DisplayDefaults({this.fullscreen = true, this.windowSize = 75, this.vsync = true, this.startAnimation = true});
 
   /// A value missing or of the wrong kind is the built-in one.
   factory DisplayDefaults.fromJson(Object? json) {
@@ -155,7 +155,9 @@ class GameSettings {
       // is the old built-in one was most likely never chosen, so it follows the defaults (which
       // start as those same values: nothing changes until they do). Windowed with a size of its
       // own was chosen, though.
-      const builtIn = DisplayDefaults();
+      // Files written before display defaults used Window as their built-in value.
+      // Treat that legacy value as unset so the new Full Screen default can take effect.
+      const builtIn = DisplayDefaults(fullscreen: false);
       if (windowSize == builtIn.windowSize) windowSize = null;
       if (fullscreen == builtIn.fullscreen && windowSize == null) fullscreen = null;
       if (vsync == builtIn.vsync) vsync = null;
