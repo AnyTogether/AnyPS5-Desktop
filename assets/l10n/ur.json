@@ -2500,5 +2500,10 @@
   "retroStateOtherGame": "یہ اسٹیٹ کسی دوسرے گیم سے محفوظ ہوئی تھی، اس لیے اسے لوڈ نہیں کیا جا سکتا۔",
   "retroStateBad": "یہ اسٹیٹ فائل خراب ہے یا کسی نئے ایمولیٹر سے بنی ہے، اس لیے اسے لوڈ نہیں کیا جا سکتا۔",
   "retroStateLoadFailed": "اسٹیٹ لوڈ نہیں ہو سکی۔",
-  "retroStateSaveFailed": "اسٹیٹ محفوظ نہیں ہو سکی۔"
+  "retroStateSaveFailed": "اسٹیٹ محفوظ نہیں ہو سکی۔",
+  "retroResolution": "اندرونی ریزولوشن",
+  "retroResolutionDetail": "گیم کو زیادہ واضح بناتا ہے۔ زیادہ قدروں کے لیے تیز گرافکس کارڈ چاہیے۔",
+  "retroResolutionNative": "اصل",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "ایمولیٹر محفوظ کردہ ریزولوشن نہیں دکھا سکتا، اس لیے گیم %@ استعمال کرتا ہے۔"
 }

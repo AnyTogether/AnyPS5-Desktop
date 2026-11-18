@@ -2500,5 +2500,10 @@
   "retroStateOtherGame": "Dieser Zustand stammt aus einem anderen Spiel und kann daher nicht geladen werden.",
   "retroStateBad": "Diese Zustandsdatei ist beschädigt oder stammt von einem neueren Emulator und kann daher nicht geladen werden.",
   "retroStateLoadFailed": "Der Zustand konnte nicht geladen werden.",
-  "retroStateSaveFailed": "Der Zustand konnte nicht gespeichert werden."
+  "retroStateSaveFailed": "Der Zustand konnte nicht gespeichert werden.",
+  "retroResolution": "Interne Auflösung",
+  "retroResolutionDetail": "Zeichnet das Spiel schärfer. Höhere Werte brauchen eine schnellere Grafikkarte.",
+  "retroResolutionNative": "Nativ",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Der Emulator kann die gespeicherte Auflösung nicht anzeigen, daher nutzt das Spiel %@."
 }

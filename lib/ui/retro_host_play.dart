@@ -62,6 +62,9 @@ class RetroPlay {
   /// The section of the menu shown, or null for the menu's first page.
   RetroOptionSection? menuSection;
 
+  /// The host's last `resolutionError` the log was given, so each one is logged once.
+  String resolutionErrorLogged = '';
+
   /// The menu's Save state or Load state page shown, or null.
   RetroStatePage? statePage;
 
@@ -178,6 +181,25 @@ String? retroHostErrorKey(String errorCode, {bool ps2 = false}) => switch (error
   _ => 'retroHostOtherDetail',
 };
 
+/// The words of an internal resolution value: Native, 2x, 3x, 4x, or the host's own label for a
+/// value the launcher does not offer.
+String retroResolutionLabel(RetroResolutionValue value) => switch (value.scale) {
+  null => value.label,
+  1 => T.text('retroResolutionNative'),
+  final scale => T.format('retroResolutionScale', ['$scale']),
+};
+
+/// The words under the internal resolution row ([RetroResolutionNote]). A refusal is said in the
+/// launcher's words, naming the value the game uses; the host's English `resolutionError` goes to
+/// the log.
+String retroResolutionDetail(RetroResolutionChoice choice) => switch (choice.note) {
+  RetroResolutionNote.none => T.text('retroResolutionDetail'),
+  RetroResolutionNote.applying => T.text('retroMenuOptionPendingDetail'),
+  RetroResolutionNote.nextStart => T.text('retroMenuOptionRestartDetail'),
+  RetroResolutionNote.changesAtNextStart => T.text('retroMenuOptionRestartOnlyDetail'),
+  RetroResolutionNote.refused => T.format('retroResolutionRefusedDetail', [retroResolutionLabel(choice.active)]),
+};
+
 /// Starts one emulator host for PS1 and PS2 games, with the player's volume: [checked] is the check of a
 /// signed release's host ([RetroHostInstall.checked]), whose files the host holds until it exits.
 typedef RetroHostOpener = RetroHostSession Function(
@@ -189,7 +211,8 @@ typedef RetroHostOpener = RetroHostSession Function(
 
 /// The menu's sections, in the order its first page lists them, each with the words of its row
 /// and heading and of the row's detail. Graphics is not among them: its options are left for a
-/// Graphics page of their own ([RetroOptionSection.graphics]).
+/// Graphics page of their own ([RetroOptionSection.graphics]), but for the internal resolution,
+/// a row of its own after Audio.
 const retroMenuSections = {
   RetroOptionSection.audio: ('retroMenuAudio', 'retroMenuAudioDetail'),
   RetroOptionSection.controller: ('retroMenuController', 'retroMenuControllerDetail'),
@@ -507,6 +530,11 @@ extension RetroHostPlaying on AppModel {
   void _retroChanged() {
     final play = retroPlay;
     if (play == null || _disposed) return;
+    final refusal = play.host.status?.resolutionError ?? '';
+    if (refusal != play.resolutionErrorLogged) {
+      play.resolutionErrorLogged = refusal;
+      if (refusal.isNotEmpty) _padLog?.call('emulator host: $refusal');
+    }
     if (!play.cardWarned && play.host.status?.cardUnreadable == true) {
       play.cardWarned = true;
       show(T.text('retroHostCardUnreadable'));
@@ -658,10 +686,10 @@ extension RetroHostPlaying on AppModel {
   }
 
   /// The game's menu. Its first page: Resume, the discs of a multi-disc game, Save state and Load
-  /// State where its host saves states, a row for each section ([retroMenuSections]) that has rows,
-  /// and Close Game. A section's page: its options in the order the host lists them, with Volume
-  /// and Mute first in Audio. Save state's and Load state's pages: the game's slots. Back on a page
-  /// goes back to the first page.
+  /// state where its host saves states, a row for each section ([retroMenuSections]) that has rows
+  /// with the internal resolution after Audio's, and Close Game. A section's page: its options in
+  /// the order the host lists them, with Volume and Mute first in Audio. Save state's and Load
+  /// state's pages: the game's slots. Back on a page goes back to the first page.
   List<PanelCategory> _retroMenuCategories() {
     final play = retroPlay;
     if (play == null) return const [];
@@ -703,7 +731,7 @@ extension RetroHostPlaying on AppModel {
           kind: ActionRow(() => unawaited(menu.chooseDisc(disc))),
         ),
       ..._retroStateMenuRows(play),
-      for (final MapEntry(key: section, value: (title, detail)) in retroMenuSections.entries)
+      for (final MapEntry(key: section, value: (title, detail)) in retroMenuSections.entries) ...[
         if (_retroSectionRows(play, section).isNotEmpty)
           PanelRow(
             id: 'section-${section.name}',
@@ -711,12 +739,42 @@ extension RetroHostPlaying on AppModel {
             detail: T.text(detail),
             kind: ActionRow(() => _openRetroMenuSection(play, section)),
           ),
+        if (section == RetroOptionSection.audio) ?_retroResolutionRow(play),
+      ],
       PanelRow(
         id: 'closeGame',
         title: T.text('quickCloseGame'),
         kind: ActionRow(() => unawaited(closeRetroGame()), destructive: true),
       ),
     ];
+  }
+
+  /// The first page's Internal resolution row: the values the launcher offers that the host lists
+  /// ([RetroResolutionChoice.of]), or null when the menu offers none.
+  PanelRow? _retroResolutionRow(RetroPlay play) {
+    final choice = play.menu.resolution;
+    if (choice == null) return null;
+    return PanelRow(
+      id: 'resolution',
+      title: T.text('retroResolution'),
+      detail: retroResolutionDetail(choice),
+      kind: ChoiceRow(
+        [for (final value in choice.values) retroResolutionLabel(value)],
+        choice.selected,
+        (index) => unawaited(_chooseRetroResolution(play, choice.values[index].value)),
+      ),
+    );
+  }
+
+  /// An internal resolution chosen in the menu: sent to the game, and kept for every later game of
+  /// its console once the host took it. A PS1 game draws at it in a moment, a PS2 game from its
+  /// next start.
+  Future<void> _chooseRetroResolution(RetroPlay play, String value) async {
+    final key = play.menu.resolution?.key;
+    if (key == null || !await play.menu.chooseResolution(value) || _disposed) return;
+    preferences.retroHostOptions[key] = value;
+    savePreferences();
+    _changed();
   }
 
   /// The rows of one section's page: Volume and Mute first in Audio, then the section's options.

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:anyps5_desktop/core/retro_host/retro_host_protocol.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_session.dart';
+import 'package:anyps5_desktop/core/retro_host/retro_resolution.dart';
 import 'package:anyps5_desktop/ui/retro_host/retro_game_menu.dart';
 import 'package:anyps5_desktop/ui/retro_host/retro_host_controls.dart';
 import 'package:anyps5_desktop/ui/retro_host/retro_host_game.dart';
@@ -116,6 +117,25 @@ void main() {
     expect(option.choice, '2x');
     expect(option.pending, isTrue);
     expect(await menu.stepOption('unknown', 1), isFalse);
+  });
+
+  test('the internal resolution: the values the host lists, chosen with option', () async {
+    expect(menu.resolution, isNull, reason: 'no status yet');
+    await started();
+    final choice = menu.resolution!;
+    expect([for (final value in choice.values) value.value], ['1', '2', '4']);
+    expect(choice.selected, 2);
+    session.callResults['option'] = true;
+    expect(await menu.chooseResolution('4'), isFalse, reason: 'already chosen');
+    expect(await menu.chooseResolution('8'), isFalse, reason: 'not listed');
+    expect(session.calls, isEmpty);
+    session.nextStatus = _status(selected: 0);
+    expect(await menu.chooseResolution('1'), isTrue);
+    expect(session.calls.single.$1, 'option');
+    expect(session.calls.single.$2, {'key': 'swanstation_GPU_ResolutionScale', 'value': '1'});
+    expect(menu.resolution!.note, RetroResolutionNote.applying, reason: '4 is still the value in effect');
+    session.callResults['option'] = false;
+    expect(await menu.chooseResolution('2'), isFalse, reason: 'the host refused');
   });
 
   test('volume steps by tenths, turning it up unmutes, and mute toggles', () async {

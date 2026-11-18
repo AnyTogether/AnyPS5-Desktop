@@ -2486,5 +2486,10 @@
   "retroStateOtherGame": "ສະຖານະນີ້ຖືກບັນທຶກຈາກເກມອື່ນ ດັ່ງນັ້ນຈຶ່ງໂຫຼດບໍ່ໄດ້.",
   "retroStateBad": "ໄຟລ໌ສະຖານະນີ້ເສຍຫາຍ ຫຼື ຖືກສ້າງໂດຍອີມູເລເຕີທີ່ໃໝ່ກວ່າ ດັ່ງນັ້ນຈຶ່ງໂຫຼດບໍ່ໄດ້.",
   "retroStateLoadFailed": "ບໍ່ສາມາດໂຫຼດສະຖານະໄດ້.",
-  "retroStateSaveFailed": "ບໍ່ສາມາດບັນທຶກສະຖານະໄດ້."
+  "retroStateSaveFailed": "ບໍ່ສາມາດບັນທຶກສະຖານະໄດ້.",
+  "retroResolution": "ຄວາມລະອຽດພາຍໃນ",
+  "retroResolutionDetail": "ແຕ້ມເກມໃຫ້ຄົມຊັດຂຶ້ນ. ຄ່າທີ່ສູງຂຶ້ນຕ້ອງການກາດກຣາຟິກທີ່ໄວກວ່າ.",
+  "retroResolutionNative": "ດັ້ງເດີມ",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "ອີມູເລເຕີບໍ່ສາມາດສະແດງຄວາມລະອຽດທີ່ບັນທຶກໄວ້ໄດ້, ສະນັ້ນເກມຈຶ່ງໃຊ້ %@."
 }

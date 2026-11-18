@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../core/retro_host/retro_host_protocol.dart';
+import '../../core/retro_host/retro_resolution.dart';
 import 'retro_host_controls.dart';
 import 'retro_host_game.dart';
 import 'retro_option_sections.dart';
@@ -127,6 +128,10 @@ class RetroGameMenu extends ChangeNotifier {
       if (row.section == section) row,
   ];
 
+  /// The game's internal resolution as the menu offers it, or null when it offers none
+  /// ([RetroResolutionChoice.of]).
+  RetroResolutionChoice? get resolution => RetroResolutionChoice.of(game.status, limitsPs2: game.limitsPs2Resolution);
+
   /// The rows for [status] (null before the first one) and the volume.
   static List<RetroMenuRow> rowsFor(RetroStatus? status, {required double volume, required bool muted}) {
     final discs = status?.discs;
@@ -179,6 +184,15 @@ class RetroGameMenu extends ChangeNotifier {
     final next = (option.selected + steps).clamp(0, option.values.length - 1);
     if (next == option.selected) return false;
     return game.setOption(key, option.values[next]);
+  }
+
+  /// Chooses the internal resolution [value]; false when the menu does not offer it now, it is
+  /// already chosen, or the host refused.
+  Future<bool> chooseResolution(String value) async {
+    final choice = resolution;
+    if (choice == null || !choice.values.any((entry) => entry.value == value)) return false;
+    if (choice.values[choice.selected].value == value) return false;
+    return game.setOption(choice.key, value);
   }
 
   /// Moves the volume [steps] of [volumeStep] up (down when negative), from 0 to 1. Turning it up

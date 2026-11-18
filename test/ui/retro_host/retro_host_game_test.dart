@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:anyps5_desktop/core/retro_host/retro_host_client.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_protocol.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_session.dart';
+import 'package:anyps5_desktop/core/retro_host/retro_resolution.dart';
 import 'package:anyps5_desktop/ui/retro_host/retro_host_game.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -62,6 +63,32 @@ void main() {
       'initialDisc': 1,
     });
     expect(game.phase, RetroHostGamePhase.loading);
+  });
+
+  test("a PS2 game's internal resolution goes only to a host that lists ps2ResolutionLimits", () async {
+    const ps2 = RetroHostStartRequest(
+      console: RetroConsole.ps2,
+      core: '/cores/pcsx2_libretro.so',
+      disc: '/games/Jak.iso',
+      system: '/retro/system',
+      saves: '/retro/saves/ps2',
+      options: {retroResolutionKeyPs2: '4x', 'pcsx2_fastboot': 'enabled'},
+    );
+    session.readyCompleter.complete();
+    session.nextStatus = fakeStatus(ready: false);
+    expect(session.limitsPs2Resolution, isFalse);
+    await game.start(ps2);
+    expect(session.startArgs!['options'], {'pcsx2_fastboot': 'enabled'}, reason: 'an older ps2 host');
+    expect(ps2.options, contains(retroResolutionKeyPs2), reason: 'the request itself is unchanged');
+
+    final limiting = FakeRetroHostSession()..limitsPs2Resolution = true;
+    final next = RetroHostGame(limiting, statusEvery: const Duration(hours: 1));
+    addTearDown(next.dispose);
+    limiting.readyCompleter.complete();
+    limiting.nextStatus = fakeStatus(ready: false);
+    await next.start(ps2);
+    expect(next.limitsPs2Resolution, isTrue);
+    expect(limiting.startArgs!['options'], {retroResolutionKeyPs2: '4x', 'pcsx2_fastboot': 'enabled'});
   });
 
   test('a request without options or a playlist entry leaves both out', () {

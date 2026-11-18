@@ -50,7 +50,7 @@ void main() {
     expect((refused['error']! as Map)['code'], RetroCallError.argument);
   });
 
-  test("LRPS2's options are listed with no BIOS: each one goes to PS2 games only, under Advanced", () {
+  test("LRPS2's options are listed with no BIOS: each one goes to PS2 games only, under Advanced, but VR", () {
     final options = recording.lastStatus('lrps2-no-bios-folder').options;
     expect(options, isNotEmpty);
     expect(options.keys.every((key) => key.startsWith('pcsx2_')), isTrue);
@@ -69,7 +69,13 @@ void main() {
       reason: 'the host fixes those itself',
     );
     expect(options, contains('pcsx2_upscale_multiplier'));
-    for (final key in options.keys.where((key) => key != 'pcsx2_upscale_multiplier')) {
+    final vr = options.keys.where((key) => key.startsWith('pcsx2_vr_')).toList();
+    expect(vr, ['pcsx2_vr_mode', 'pcsx2_vr_depth']);
+    for (final key in vr) {
+      expect(retroOptionSection(key), isNull, reason: '$key: AnyPS5 has no VR');
+      expect(retroOptionSent(key, ps2: true), isFalse, reason: key);
+    }
+    for (final key in options.keys.where((key) => key != 'pcsx2_upscale_multiplier' && !vr.contains(key))) {
       expect(retroOptionSection(key), RetroOptionSection.advanced, reason: key);
       expect(retroOptionSent(key, ps2: true), isTrue, reason: key);
       expect(retroOptionSent(key), isFalse, reason: '$key is no PS1 option');
@@ -77,9 +83,10 @@ void main() {
     expect(retroOptionSection('pcsx2_upscale_multiplier'), RetroOptionSection.graphics);
     expect(
       retroOptionSent('pcsx2_upscale_multiplier', ps2: true),
-      isFalse,
-      reason: "held back like SwanStation's graphics: the host's resolution limits do not cover it yet",
+      isTrue,
+      reason: 'the menu offers it; RetroHostGame keeps it from a host without ps2ResolutionLimits',
     );
+    expect(retroOptionSent('pcsx2_upscale_multiplier'), isFalse, reason: 'no PS1 option');
     expect(retroOptionSent('swanstation_Console_Region', ps2: true), isFalse);
     expect(retroOptionSent('swanstation_Console_Region'), isTrue);
   });

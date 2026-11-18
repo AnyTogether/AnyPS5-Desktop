@@ -13,6 +13,7 @@ import 'retro_host_native.dart';
 import 'retro_host_protocol.dart';
 import 'retro_host_release.dart';
 import 'retro_host_session.dart';
+import 'retro_resolution.dart';
 import 'strict_json.dart';
 
 /// How a connection to the emulator host ended (anyps5-retro-host docs/protocol.md "Fixtures",
@@ -295,6 +296,11 @@ class RetroHostClient implements RetroHostSession {
   @override
   bool get canPlayPs2 => _capabilities.contains(retroCapabilityPs2);
 
+  /// Whether the host lists `ps2ResolutionLimits`, so it limits a PS2 game's internal resolution
+  /// and may be sent one, in `start.options` or with `option`.
+  @override
+  bool get limitsPs2Resolution => _capabilities.contains(retroCapabilityPs2ResolutionLimits);
+
   /// Whether the host lists `saveStates`, so it takes `start.states` and the methods `saveState`
   /// and `loadState`.
   @override
@@ -366,6 +372,9 @@ class RetroHostClient implements RetroHostSession {
         throw StateError('A PS2 game has no playlist (protocol.md "start").');
       }
     }
+    if (!limitsPs2Resolution && _sendsPs2Resolution(method, args)) {
+      throw StateError('The host does not list the $retroCapabilityPs2ResolutionLimits capability.');
+    }
     final states =
         method == 'saveState' ||
         method == 'loadState' ||
@@ -394,6 +403,14 @@ class RetroHostClient implements RetroHostSession {
     _write(body);
     return pending.completer.future;
   }
+
+  /// Whether a call gives the host a PS2 internal resolution: `start` with it in `options`, or
+  /// `option` for it.
+  static bool _sendsPs2Resolution(String method, Object? args) => switch ((method, args)) {
+    ('start', {'options': final Map<Object?, Object?> options}) => options.containsKey(retroResolutionKeyPs2),
+    ('option', {'key': retroResolutionKeyPs2}) => true,
+    _ => false,
+  };
 
   /// `start`: loads a game and gives its epoch. Once the connection has ended it throws
   /// [RetroHostGone], also while a failed game is still reported: the next game needs a new host.

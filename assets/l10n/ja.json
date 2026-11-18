@@ -2500,5 +2500,10 @@
   "retroStateOtherGame": "このステートは別のゲームで保存されたため、ロードできません。",
   "retroStateBad": "このステートファイルは壊れているか、新しいエミュレーターで作られたため、ロードできません。",
   "retroStateLoadFailed": "ステートをロードできませんでした。",
-  "retroStateSaveFailed": "ステートを保存できませんでした。"
+  "retroStateSaveFailed": "ステートを保存できませんでした。",
+  "retroResolution": "内部解像度",
+  "retroResolutionDetail": "ゲームをより鮮明に描画します。高い値ほど高速なグラフィックカードが必要です。",
+  "retroResolutionNative": "ネイティブ",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "エミュレーターが保存した解像度を表示できないため、ゲームは %@ を使います。"
 }

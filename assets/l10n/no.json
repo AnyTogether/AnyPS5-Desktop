@@ -2500,5 +2500,10 @@
   "retroStateOtherGame": "Denne tilstanden ble lagret fra et annet spill, så den kan ikke lastes inn.",
   "retroStateBad": "Denne tilstandsfilen er skadet eller laget av en nyere emulator, så den kan ikke lastes inn.",
   "retroStateLoadFailed": "Tilstanden kunne ikke lastes inn.",
-  "retroStateSaveFailed": "Tilstanden kunne ikke lagres."
+  "retroStateSaveFailed": "Tilstanden kunne ikke lagres.",
+  "retroResolution": "Intern oppløsning",
+  "retroResolutionDetail": "Tegner spillet skarpere. Høyere verdier krever et raskere grafikkort.",
+  "retroResolutionNative": "Opprinnelig",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Emulatoren kan ikke vise den lagrede oppløsningen, så spillet bruker %@."
 }

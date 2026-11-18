@@ -2500,5 +2500,10 @@
   "retroStateOtherGame": "Keadaan ini disimpan daripada permainan lain, jadi ia tidak dapat dimuatkan.",
   "retroStateBad": "Fail keadaan ini rosak atau dibuat oleh emulator yang lebih baharu, jadi ia tidak dapat dimuatkan.",
   "retroStateLoadFailed": "Keadaan tidak dapat dimuatkan.",
-  "retroStateSaveFailed": "Keadaan tidak dapat disimpan."
+  "retroStateSaveFailed": "Keadaan tidak dapat disimpan.",
+  "retroResolution": "Resolusi Dalaman",
+  "retroResolutionDetail": "Melukis permainan dengan lebih tajam. Nilai lebih tinggi memerlukan kad grafik yang lebih pantas.",
+  "retroResolutionNative": "Asal",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Emulator tidak dapat memaparkan resolusi yang disimpan, jadi permainan menggunakan %@."
 }

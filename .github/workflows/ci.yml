@@ -39,11 +39,13 @@ env:
   FLUTTER_VERSION: 3.47.1
   # The emulator host's fixture sessions and fake host, which test/core/retro_host plays against
   # the launcher's client (anyps5-retro-host docs/protocol.md "Fixtures"). The commit is
-  # AnyTogether/anyps5-retro-host main with save states (#24) merged, whose messages show a start
-  # with states, a save, a load and two refusals; it holds PS2 (#18) too, whose sessions list ps2
-  # and send status.console, and whose messages show a PS2 start and LRPS2's missing BIOS.
+  # AnyTogether/anyps5-retro-host main with PS2 resolution limits (#25) merged, whose sessions list
+  # ps2ResolutionLimits and whose messages hold the real LRPS2 status the launcher's PS2
+  # resolution fixture copies; it holds save states (#24) too, whose messages show a start with
+  # states, a save, a load and two refusals, and PS2 (#18), whose sessions list ps2 and send
+  # status.console, and whose messages show a PS2 start and LRPS2's missing BIOS.
   RETRO_HOST_REPOSITORY: https://github.com/AnyTogether/anyps5-retro-host.git
-  RETRO_HOST_COMMIT: 1e5c278ff2c9d936c0d252734c3551d7bbed8efa
+  RETRO_HOST_COMMIT: 44060c080daa514049df228f1827f1dced925f6a
   # libpulse-dev: flutter_webrtc's Linux loopback capture (share play's Opus track) builds only
   # with it; the bundle then needs libpulse0, which PulseAudio and PipeWire systems have.
   LINUX_PACKAGES: clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libsdl2-2.0-0 libpulse-dev file

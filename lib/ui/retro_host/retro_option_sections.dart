@@ -1,10 +1,12 @@
+import '../../core/retro_host/retro_resolution.dart';
+
 /// Where a SwanStation option is shown. The host lists every option SwanStation lets the player
 /// change now (about fifty for a PS1 game, in SwanStation's order); the launcher groups them.
 enum RetroOptionSection {
   /// The picture: SwanStation's `GPU`, `Display` and `TextureReplacements` options, and LRPS2's
-  /// resolution scale (`pcsx2_upscale_multiplier`), which the host's resolution limits do not
-  /// cover yet (anyps5-retro-host docs/ps2.md "Drawing"). The in-game menu does not show them:
-  /// they are left for a Graphics page of their own.
+  /// resolution scale (`pcsx2_upscale_multiplier`). The in-game menu shows none of them as a
+  /// section: they are left for a Graphics page of their own. Only each console's internal
+  /// resolution has a row of its own on the menu's first page ([retroResolutionKey]).
   graphics,
 
   /// The sound: SwanStation's `Audio` options and Mute CD Audio. The menu adds the host's volume.
@@ -35,14 +37,18 @@ enum RetroOptionSection {
 /// - the development console's 8 MB of RAM (`Console_Enable8MBRAM`), which no game sold uses;
 /// - the CPU recompiler's debugging switches (`CPU_RecompilerICache`,
 ///   `CPU_RecompilerBlockLinking`, `CPU_FastmemMode`);
-/// - the light gun crosshair (`Controller_ShowCrosshair`): the host plugs in only DualShocks.
+/// - the light gun crosshair (`Controller_ShowCrosshair`): the host plugs in only DualShocks;
+/// - LRPS2's VR (every `pcsx2_vr_...` key: `pcsx2_vr_mode` and its `pcsx2_vr_depth`), whose stereo
+///   mode draws a picture for each eye side by side for a VR headset or a 3D display. AnyPS5 has
+///   no VR, and SwanStation no stereo option.
 ///
 /// Keys are `swanstation_<Group>_<Name>`; a key of another form is [RetroOptionSection.advanced], as
-/// every LRPS2 option of a PS2 game is (`pcsx2_...`), its BIOS (`pcsx2_bios`) included, but its
-/// resolution scale, which is [RetroOptionSection.graphics].
+/// every other LRPS2 option of a PS2 game is (`pcsx2_...`), its BIOS (`pcsx2_bios`) included, but
+/// its resolution scale, which is [RetroOptionSection.graphics].
 RetroOptionSection? retroOptionSection(String key) {
   const prefix = 'swanstation_';
-  if (key == 'pcsx2_upscale_multiplier') return RetroOptionSection.graphics;
+  if (key == retroResolutionKeyPs2) return RetroOptionSection.graphics;
+  if (key.startsWith(_ps2Vr)) return null;
   if (!key.startsWith(prefix)) return RetroOptionSection.advanced;
   final name = key.substring(prefix.length);
   if (_hidden.contains(name) || name.startsWith('TextureReplacements_')) return null;
@@ -61,11 +67,14 @@ RetroOptionSection? retroOptionSection(String key) {
 bool retroOptionShown(String key) => retroOptionSection(key) != null;
 
 /// Whether a value kept for [key] goes to a game's `start`: one the in-game menu shows. A graphics
-/// option is kept back too, since the launcher has no page yet where the player could see or
-/// change it. The two cores' options share one list of values the player chose, so LRPS2's
-/// (`pcsx2_...`) go to a [ps2] game only and every other to a PS1 game only.
+/// option is kept back, since the launcher has no page yet where the player could see or change
+/// it, but for the console's internal resolution, which the menu's first page offers
+/// ([retroResolutionKey]). The two cores' options share one list of values the player chose, so
+/// LRPS2's (`pcsx2_...`) go to a [ps2] game only and every other to a PS1 game only. A PS2
+/// internal resolution still goes only to a host that limits it (`RetroHostGame.start`).
 bool retroOptionSent(String key, {bool ps2 = false}) {
   if (key.startsWith('pcsx2_') != ps2) return false;
+  if (key == retroResolutionKey(ps2: ps2)) return true;
   final section = retroOptionSection(key);
   return section != null && section != RetroOptionSection.graphics;
 }
@@ -92,5 +101,7 @@ const _hidden = {
   'CPU_FastmemMode',
   'Controller_ShowCrosshair',
 };
+
+const _ps2Vr = 'pcsx2_vr_';
 
 const _console = {'CDROM_RegionCheck', 'CDROM_ReadSpeedup', 'CDROM_SeekSpeedup', 'CPU_Overclock'};

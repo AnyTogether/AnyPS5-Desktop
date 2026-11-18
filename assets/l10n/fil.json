@@ -2500,5 +2500,10 @@
   "retroStateOtherGame": "Na-save ang state na ito mula sa ibang laro, kaya hindi ito ma-load.",
   "retroStateBad": "Sira ang file ng state na ito o gawa ito ng mas bagong emulator, kaya hindi ito ma-load.",
   "retroStateLoadFailed": "Hindi ma-load ang state.",
-  "retroStateSaveFailed": "Hindi ma-save ang state."
+  "retroStateSaveFailed": "Hindi ma-save ang state.",
+  "retroResolution": "Internal na Resolusyon",
+  "retroResolutionDetail": "Mas malinaw na iginuguhit ang laro. Kailangan ng mas mabilis na graphics card para sa mas matataas na value.",
+  "retroResolutionNative": "Native",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Hindi maipakita ng emulator ang na-save na resolusyon, kaya %@ ang ginagamit ng laro."
 }

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:anyps5_desktop/core/game_library.dart';
@@ -5,6 +6,7 @@ import 'package:anyps5_desktop/core/host.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_install.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_protocol.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_release.dart';
+import 'package:anyps5_desktop/core/retro_host/retro_resolution.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_store.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/retro_host/retro_host_game.dart';
@@ -165,6 +167,7 @@ void main() {
       expect(model.panelCategories().single.title, 'Sky Racer');
       final first = [for (final row in model.panelCategories().single.rows) row.id];
       expect(first, containsAllInOrder(['resume', 'section-audio', 'section-advanced', 'closeGame']));
+      expect(first, isNot(contains('resolution')), reason: 'a host without ps2ResolutionLimits');
       (launcher.row('section-advanced').kind as ActionRow).run();
       final bios = launcher.row('option-pcsx2_bios');
       expect(bios.detail, T.text('retroMenuOptionRestartOnlyDetail'), reason: 'LRPS2 reads it only at a start');
@@ -175,6 +178,82 @@ void main() {
       expect(model.overlay, isNull, reason: 'back to the game');
     },
   );
+
+  group('the internal resolution, from the real LRPS2 on a host with ps2ResolutionLimits', () {
+    RetroStatus recorded() => RetroStatus.parse(
+      ((jsonDecode(File('test/fixtures/retro-host-ps2-resolution-status.json').readAsStringSync()) as Map)['reply']
+              as Map)['result']
+          as Map<String, Object?>,
+      ps2: true,
+    );
+
+    test('a saved 8x in stereo: the game uses 4x, the row offers Native, 2x and 4x and says why', () async {
+      launcher = Ps1Launcher(ps2: true);
+      final model = launcher.model..setRetroHostPs2(true);
+      model.preferences.retroHostOptions[retroResolutionKeyPs2] = '8x';
+      launcher.session.limitsPs2Resolution = true;
+      await startPs2(recorded());
+      expect(
+        (launcher.session.startArgs!['options']! as Map)[retroResolutionKeyPs2],
+        '8x',
+        reason: 'the host judges it',
+      );
+      model.openRetroMenu();
+      await pumpEventQueue();
+      final first = [for (final row in model.panelCategories().single.rows) row.id];
+      expect(first, containsAllInOrder(['section-audio', 'resolution']));
+      expect(
+        first,
+        isNot(contains('section-advanced')),
+        reason: "LRPS2's VR, the recording's other option, is not shown",
+      );
+      final row = launcher.row('resolution');
+      expect(row.detail, T.format('retroResolutionRefusedDetail', ['4x']));
+      final choice = row.kind as ChoiceRow;
+      expect(choice.options, ['Native', '2x', '4x']);
+      expect(choice.selected, 2);
+
+      launcher.session.callResults['option'] = true;
+      final chosen = recorded().toJson();
+      ((chosen['options']! as Map)[retroResolutionKeyPs2] as Map)['selected'] = 1;
+      launcher.session.nextStatus = RetroStatus.parse({...chosen, 'resolutionError': ''}, ps2: true);
+      choice.set(1);
+      await pumpEventQueue();
+      expect(launcher.session.calls.last.$1, 'option');
+      expect(launcher.session.calls.last.$2, {'key': retroResolutionKeyPs2, 'value': '2x'});
+      expect(model.preferences.retroHostOptions[retroResolutionKeyPs2], '2x');
+      expect(
+        launcher.row('resolution').detail,
+        T.text('retroMenuOptionRestartDetail'),
+        reason: 'LRPS2 reads it at a start',
+      );
+    });
+
+    test("LRPS2's VR kept from before is not sent: AnyPS5 has no VR, and the host would judge stereo", () async {
+      launcher = Ps1Launcher(ps2: true);
+      final model = launcher.model..setRetroHostPs2(true);
+      model.preferences.retroHostOptions.addAll({
+        retroResolutionKeyPs2: '4x',
+        'pcsx2_vr_mode': 'stereoscopic',
+        'pcsx2_vr_depth': '75%',
+        'pcsx2_fastboot': 'disabled',
+      });
+      launcher.session.limitsPs2Resolution = true;
+      await startPs2(recorded());
+      expect(launcher.session.startArgs!['options'], {retroResolutionKeyPs2: '4x', 'pcsx2_fastboot': 'disabled'});
+    });
+
+    test('a host without ps2ResolutionLimits is neither offered nor sent a PS2 resolution', () async {
+      launcher = Ps1Launcher(ps2: true);
+      final model = launcher.model..setRetroHostPs2(true);
+      model.preferences.retroHostOptions.addAll({retroResolutionKeyPs2: '4x', 'pcsx2_fastboot': 'disabled'});
+      await startPs2(recorded());
+      expect(launcher.session.startArgs!['options'], {'pcsx2_fastboot': 'disabled'});
+      model.openRetroMenu();
+      await pumpEventQueue();
+      expect([for (final row in model.panelCategories().single.rows) row.id], isNot(contains('resolution')));
+    });
+  });
 
   group('the signed release', () {
     test('one without LRPS2 shows no PS2 rows, and is checked for SwanStation alone', () async {

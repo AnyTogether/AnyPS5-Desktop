@@ -44,6 +44,10 @@ abstract interface class RetroHostSession implements RetroFrameSource {
   /// Whether the host lists `ps2`, so a PS2 game can be started on it ([RetroHostStartRequest.console]).
   bool get canPlayPs2;
 
+  /// Whether the host lists `ps2ResolutionLimits`, so a PS2 game's internal resolution is limited
+  /// by the host and may be sent to it.
+  bool get limitsPs2Resolution;
+
   /// Whether the host lists `saveStates`, so a game can be started with a states folder
   /// ([RetroHostStartRequest.states]) and saved and loaded with `saveState` and `loadState`.
   bool get canSaveStates;
@@ -94,6 +98,18 @@ class RetroHostStartRequest {
   /// The folder for this game's save states, which only a host that lists `saveStates` takes; null
   /// for a game without save states.
   final String? states;
+
+  /// This request without the option at [key], for a host that must not be sent it.
+  RetroHostStartRequest withoutOption(String key) => RetroHostStartRequest(
+    core: core,
+    disc: disc,
+    system: system,
+    saves: saves,
+    options: {...options}..remove(key),
+    initialDisc: initialDisc,
+    console: console,
+    states: states,
+  );
 
   /// The same start without [states], for a host that does not list `saveStates`.
   RetroHostStartRequest withoutStates() => RetroHostStartRequest(

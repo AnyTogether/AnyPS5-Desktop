@@ -2484,5 +2484,10 @@
   "retroStateOtherGame": "ይህ ሁኔታ ከሌላ ጨዋታ ተቀምጧል፣ ስለዚህ ሊጫን አይችልም።",
   "retroStateBad": "ይህ የሁኔታ ፋይል ተበላሽቷል ወይም በአዲስ ኢሙሌተር ተሰርቷል፣ ስለዚህ ሊጫን አይችልም።",
   "retroStateLoadFailed": "ሁኔታው ሊጫን አልቻለም።",
-  "retroStateSaveFailed": "ሁኔታው ሊቀመጥ አልቻለም።"
+  "retroStateSaveFailed": "ሁኔታው ሊቀመጥ አልቻለም።",
+  "retroResolution": "የውስጥ ጥራት",
+  "retroResolutionDetail": "ጨዋታውን በበለጠ ጥራት ይስላል። ከፍ ያሉ እሴቶች ፈጣን የግራፊክስ ካርድ ይፈልጋሉ።",
+  "retroResolutionNative": "መደበኛ",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "ኢሙሌተሩ ያስቀመጡትን ጥራት ማሳየት አይችልም፣ ስለዚህ ጨዋታው %@ ይጠቀማል።"
 }
