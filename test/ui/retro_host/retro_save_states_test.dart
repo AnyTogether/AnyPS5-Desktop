@@ -121,7 +121,7 @@ void main() {
     expect(states.anySaved, isTrue);
   });
 
-  test('a save whose end is not known takes the picture away; one the core refused leaves it', () async {
+  test('a save that did not work takes the picture away, unless the core refused it', () async {
     await started();
     final states = RetroSaveStates(game, RetroStateFolder(folder: p.join(temp.path, 'states'), disc: request().disc));
     addTearDown(states.dispose);
@@ -142,16 +142,21 @@ void main() {
     expect(await states.save(2), RetroStateOutcome.coreRefused);
     expect(picture.readAsBytesSync(), [9], reason: 'the core gave no state: the slot is as it was');
 
-    session.callErrors.clear();
-    session.callResults['saveState'] = false;
-    expect(await states.save(2), RetroStateOutcome.notNow);
-    expect(picture.existsSync(), isTrue, reason: 'a save that never ran changes nothing');
-
-    session.callResults.clear();
     session.callErrors['saveState'] = recorded(RetroCallError.fileError);
     expect(await states.save(2), RetroStateOutcome.fileError);
     expect(picture.existsSync(), isFalse, reason: 'a late write may still put the new state in the slot');
     expect(states.slot(2).empty, isFalse);
+
+    picture.writeAsBytesSync([9]);
+    session.callErrors.clear();
+    session.callResults['saveState'] = false;
+    session.onCall = (method, args) => File(states.folder.statePath(2)).writeAsBytesSync([2]);
+    expect(await states.save(2), RetroStateOutcome.notNow);
+    expect(
+      picture.existsSync(),
+      isFalse,
+      reason: 'a host that wrote the state and went away answers false, as the client reports a host failure',
+    );
   });
 
   test('one save or load at a time; a slot found empty is read again', () async {

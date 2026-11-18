@@ -53,11 +53,12 @@ class RetroSaveStates extends ChangeNotifier {
   }
 
   /// Saves the game's state into [slot], replacing the one it held, with a picture of the frame
-  /// shown; the slots are read again after. A save whose end is not known takes the slot's picture
-  /// away: after a `fileError` the host's late write may still put the new state in place
-  /// (protocol.md "saveState and loadState"), and a host that went away may have done so, so no
-  /// picture is better than one of a moment the slot may no longer hold. A save the core refused,
-  /// or that never ran (`false`), leaves the slot and its picture as they were.
+  /// shown; the slots are read again after. Only a save the core refused (it gave no state, so the
+  /// host wrote nothing) is sure to have left the slot as it was, and keeps its picture. Any other
+  /// save that did not work takes the picture away: after a `fileError` the host's late write may
+  /// still put the new state in place (protocol.md "saveState and loadState"), and a host that went
+  /// away after writing it answers `false` as one that never ran does, so no picture is better than
+  /// one of a moment the slot may no longer hold.
   Future<RetroStateOutcome> save(int slot) => _run(() async {
     final shown = game.picture.value?.clone();
     try {
@@ -65,10 +66,10 @@ class RetroSaveStates extends ChangeNotifier {
       switch (outcome) {
         case RetroStateOutcome.done:
           await _keepPicture(slot, shown);
-        case RetroStateOutcome.fileError || RetroStateOutcome.failed:
-          await _keepPicture(slot, null);
-        default:
+        case RetroStateOutcome.coreRefused:
           break;
+        default:
+          await _keepPicture(slot, null);
       }
       await refresh();
       return outcome;
