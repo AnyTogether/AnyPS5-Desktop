@@ -11,6 +11,49 @@ section is copied into the release.
 
 Nothing yet.
 
+## 0.1.26
+
+- **Settings › Emulators can download the PS1 emulator.** With emulator games turned on, a new row
+  downloads the AnyPS5 emulator host with SwanStation from its signed releases, so PS1 games can
+  play in the launcher's own window. Nothing is downloaded until you select it. The download's
+  signature and every file are checked before it is installed, and the files are checked again
+  before every game. A host that fails is not started and is offered again. Thanks to B-Howell, who
+  built this.
+- **PS1 games can play in the launcher's own window.** Once the PS1 emulator is downloaded in
+  Settings › Emulators, a new switch shows beside it, Run PS1 games in the separate host, and the
+  first successful download turns it on. Then a PS1 disc from the emulator library plays inside the
+  launcher through the AnyPS5 emulator host and SwanStation, and DuckStation is not needed. The
+  picture keeps the game's shape, and the game pauses while the launcher's window is not in front.
+  Two controllers play ports 1 and 2, the keyboard plays port 1, and each controller vibrates for
+  its own port. The PS button opens the game's menu: Resume, the discs of a multi-disc game, Audio
+  (volume and mute), Controller, Console and Advanced, then Close game. A PS1 BIOS goes in the
+  folder a new row in Settings › Emulators opens, and a game that cannot start says why (no BIOS, a
+  disc that cannot be read, an emulator that stopped). Screenshots, clips and Remote Play's phone
+  pad do not cover these games yet. With the switch off, or before the emulator is downloaded, PS1
+  discs start in DuckStation as before. Thanks to B-Howell, who built this.
+- **Closing AnyPS5 on Windows no longer leaves it running in the background, and the programs it
+  started end with it.** ffmpeg (the replay buffer, Remote Play, a broadcast), the relinker and the
+  engine's build end when the launcher closes. A game still playing is first asked to close and has
+  a few seconds to save. Installing Git with Install now and moving a game to the Trash are left to
+  finish. Thanks to Lenny4250gh, who found and fixed it.
+- **A game starts from its cover.** While a game loads, the launcher shows its artwork with its name
+  and the moving line. Once the game is ready the cover goes away, and it never stays while you
+  play. In full screen on Windows, the cover waits until the game's window has opened and settled,
+  then fades out over the game. On Linux it fades out in the launcher. In a window the cover stays
+  on the launcher's home screen and fades out there, with nothing over the game. Turn it off in
+  Settings › Default display › Start animation, or per game in Game settings › Start animation. With
+  reduced motion the fade is very short. Thanks to Lenny4250gh, who built this.
+- **The emulator library lists more PS2 discs.** CSO and ZSO images (compressed ISOs) are listed
+  when they are in a folder named PS2, and a game's retro.json can name a PS2 CSO, ZSO or ELF file.
+  They start in PCSX2, as PS2 ISOs and CHDs do. PS2 games cannot play in the launcher's own window
+  yet. That comes once the AnyPS5 emulator host ships a PS2 emulator, and until then Settings ›
+  Emulators shows nothing new for PS2. Thanks to B-Howell, who built this.
+- **With upstream's engine, full screen presses F11 only when needed.** The launcher still opens
+  upstream's game in full screen by sending F11 once the game window is up, but it skips that key if
+  the window is already full screen (whole monitor, no frame). F11 toggles, so pressing it again
+  would have left the game in a window. The AnyPS5-ARM engine is unchanged: it reads the full-screen
+  setting itself. Thanks to Lenny4250gh, who fixed it.
+
 ## 0.1.25
 
 - **The focus ring on the home tiles now has the console's glint and halo.** A brighter glint
