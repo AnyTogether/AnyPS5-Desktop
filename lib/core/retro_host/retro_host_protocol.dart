@@ -29,6 +29,25 @@ class RetroCallError implements Exception {
   static const start = 'start';
   static const tooLarge = 'tooLarge';
 
+  /// `loadState`: the slot or file holds no state (protocol.md "saveState and loadState").
+  static const noState = 'noState';
+
+  /// `loadState`: not a state file of a version the host reads, or one whose header does not
+  /// match its size.
+  static const badState = 'badState';
+
+  /// `loadState`: the state was saved from another game (another console or disc name).
+  static const otherGame = 'otherGame';
+
+  /// `loadState`: the state was saved by another core or core build (`status.core` differs).
+  static const otherCore = 'otherCore';
+
+  /// The core gave no state, or refused the one in the file; the game runs on.
+  static const coreRefused = 'coreRefused';
+
+  /// The state file could not be written or read, or not in time.
+  static const fileError = 'fileError';
+
   @override
   String toString() => 'RetroCallError($code): $message';
 }
@@ -50,6 +69,10 @@ const retroCapabilityPs1 = 'ps1';
 /// The capability that plays PS2 games on LRPS2: `start.console` and `status.console`
 /// (protocol.md "Capabilities", anyps5-retro-host docs/ps2.md).
 const retroCapabilityPs2 = 'ps2';
+
+/// The capability that saves and loads a game's state for one player: `start.states` and the
+/// methods `saveState` and `loadState` (protocol.md "saveState and loadState").
+const retroCapabilitySaveStates = 'saveStates';
 
 /// The consoles `start.console` names and `status.console` gives (capability [retroCapabilityPs2]).
 abstract final class RetroConsole {
@@ -84,6 +107,9 @@ class RetroFields {
 
   static const maxId = 2147483647;
   static const maxUint32 = 4294967295;
+
+  /// The largest integer a JSON number holds exactly (protocol.md "Values").
+  static const maxSafeInteger = 9007199254740991;
 
   Never _bad(String key, String rule) => throw RetroProtocolError('$where.$key $rule.');
 

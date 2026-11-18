@@ -8,9 +8,9 @@ import 'profiles_view.dart';
 import 'strings.dart';
 import 'theme.dart';
 
-/// A plain yes or no (Quit AnyPS5?, Close the game?, Delete the game?): a small card, the
-/// question, a line when there is more to know (for a game to delete: where it is, how much it
-/// takes, what goes and what stays), and the two answers side by side as pills. The way back on the left,
+/// A plain yes or no (Quit AnyPS5?, Close the game?, Delete the game?, Overwrite a save state?): a
+/// small card, the question, a line when there is more to know (for a game to delete: where it is,
+/// how much it takes, what goes and what stays), and the two answers side by side as pills. The way back on the left,
 /// the one that cannot be undone on the right in red. ← and → move between them, Esc and Circle
 /// are the way back, as on the Mac.
 class ConfirmCard extends StatelessWidget {
@@ -36,7 +36,11 @@ class ConfirmCard extends StatelessWidget {
     final detail = destructive?.detail;
     final quitting = model.overlay == Layer.confirmQuit || model.overlay == Layer.confirmQuitUnlocks;
     final deleting = model.overlay == Layer.confirmDeleteGame ? model.deletion.ask : null;
-    final icon = model.overlay == Layer.closeGame ? model.running?.$1.icon : deleting?.game.icon;
+    final icon = switch (model.overlay) {
+      Layer.closeGame => model.running?.$1.icon,
+      Layer.retroOverwriteState => model.retroPlay?.game.icon,
+      _ => deleting?.game.icon,
+    };
     final profile = model.currentProfile;
     return LayerScrim(
       opacity: 0.55,
@@ -108,6 +112,8 @@ class ConfirmCard extends StatelessWidget {
                               back: !_destructive(rows[index]),
                               symbol: quitting
                                   ? Icons.power_settings_new_rounded
+                                  : model.overlay == Layer.retroOverwriteState
+                                  ? Icons.save_rounded
                                   : deleting == null
                                   ? Icons.close_rounded
                                   : deleting.permanent

@@ -66,6 +66,7 @@ import '../core/retro_host/retro_host_protocol.dart' show RetroConsole, RetroErr
 import '../core/retro_host/retro_host_release.dart' show RetroHostChecked, RetroHostReleaseFailure;
 import '../core/retro_host/retro_host_session.dart' show RetroHostSession, RetroHostStartRequest;
 import '../core/retro_host/retro_keyboard.dart';
+import '../core/retro_host/retro_state_slots.dart' show RetroStateFolder, RetroStateOutcome, RetroStateSlot;
 import '../core/remote/adb_tunnel.dart';
 import '../core/remote/assist.dart';
 import '../core/remote/mdns.dart';
@@ -117,6 +118,7 @@ import 'retro_host/retro_host_download_model.dart';
 import 'retro_host/retro_host_game.dart';
 import 'retro_host/retro_host_keeper.dart';
 import 'retro_host/retro_option_sections.dart';
+import 'retro_host/retro_save_states.dart';
 import 'share_play_model.dart';
 import 'game_delete_model.dart';
 import 'game_files_model.dart';
@@ -931,6 +933,9 @@ enum Layer {
   /// Resume, its discs, its options, the volume and Close Game.
   retroMenu,
 
+  /// Save state in that menu on a slot that holds a state: Overwrite slot N? (Cancel first).
+  retroOverwriteState,
+
   /// A friend's share play watched full screen (share_play_model.dart): the controller is the
   /// game's, PS leaves.
   shareWatch,
@@ -1038,6 +1043,7 @@ class PanelRow {
     this.level,
     this.icon,
     this.picture,
+    this.pictureAspect,
     this.meter,
     this.wraps = false,
   });
@@ -1068,6 +1074,10 @@ class PanelRow {
 
   /// A picture (a game's icon) drawn before the title in the sign's place.
   final Uint8List? picture;
+
+  /// The picture's width to its height when it is not square (a save state's picture of the game);
+  /// a row with one and no [picture] holds the picture's place empty, so a list of them lines up.
+  final double? pictureAspect;
 
   bool get focusable => kind is! InfoRow;
 }
@@ -5332,6 +5342,7 @@ class AppModel extends ChangeNotifier {
           Layer.family ||
           Layer.quickMenu ||
           Layer.retroMenu ||
+          Layer.retroOverwriteState ||
           Layer.closeGame ||
           Layer.homeMenu ||
           Layer.confirmQuit ||
@@ -5511,7 +5522,7 @@ class AppModel extends ChangeNotifier {
   void homeHeld() {
     if (!preferences.onboarded) return;
     // A PS1 game in the emulator host: held PS is its menu, or back to the game from it.
-    if (retroPlay != null && (overlay == null || overlay == Layer.retroMenu)) {
+    if (retroPlay != null && (overlay == null || retroMenuShown)) {
       return overlay == null ? openRetroMenu() : resumeRetroGame();
     }
     if (overlay == Layer.profilePicker && profileFlow.atLaunch) return;
@@ -5550,6 +5561,7 @@ class AppModel extends ChangeNotifier {
     Layer.confirmQuitUnlocks,
     Layer.closeGame,
     Layer.confirmDeleteGame,
+    Layer.retroOverwriteState,
   };
 
   bool get twoChoice => twoChoiceLayers.contains(overlay);
@@ -6228,6 +6240,8 @@ class AppModel extends ChangeNotifier {
         ];
       case Layer.retroMenu:
         return _retroMenuCategories();
+      case Layer.retroOverwriteState:
+        return _retroOverwriteCategories();
       case Layer.quickMenu when running != null:
         return [
           PanelCategory(

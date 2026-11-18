@@ -11,6 +11,7 @@ import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 import '../../support/ps2_host_recording.dart';
+import '../../support/save_states_host_recording.dart';
 
 /// The launcher's conformance test (anyps5-retro-host docs/protocol.md "Fixtures"): every session
 /// whose `tests` includes `launcher` is played by the host repository's fake host, which the client
@@ -136,6 +137,124 @@ void main() {
     ),
     timeout: const Timeout(Duration(seconds: 90)),
   );
+  test(
+    "a game with save states: the recorded host's start, saves, loads and refusals pass the client's checks",
+    () => _playOwn(
+      checkout,
+      python,
+      'A host that lists saveStates, with the capabilities the host built from the save-states branch '
+          'listed: start with states, then the saveState and loadState replies it sent, each refusal '
+          'included, then shutdown.',
+      'clean',
+      [
+        ..._saveStatesSteps(),
+        {
+          'from': 'launcher',
+          'message': {'type': 'shutdown'},
+        },
+        {'hostExits': 0},
+      ],
+      capabilities: _statesRecording.welcome('welcome')['capabilities']! as List<Object?>,
+      afterReady: (client) async => expect(client.canSaveStates, isTrue),
+    ),
+    timeout: const Timeout(Duration(seconds: 90)),
+  );
+  test("the host's own save-state message fixtures: start with states, a save, a load and two refusals", () {
+    final welcome = _messageFixture(checkout, 'welcome.json')['message']! as Map<String, Object?>;
+    final start = _messageFixture(checkout, 'call-start-states.json')['message']! as Map<String, Object?>;
+    final args = (start['args']! as Map<String, Object?>).cast<String, String>();
+    final ours = RetroHostStartRequest(
+      core: args['core']!,
+      disc: args['disc']!,
+      system: args['system']!,
+      saves: args['saves']!,
+      states: args['states'],
+    ).toArgs();
+    expect(ours, args, reason: "the launcher's start is the one the fixture shows");
+    return _playOwn(
+      checkout,
+      python,
+      "The host's call-start-states, call-save-state, call-load-state, call-load-state-no-state and "
+          'call-save-state-in-lockstep fixtures, each with the id of its call here, then shutdown.',
+      'clean',
+      [
+        ..._hostStateSteps(checkout),
+        {
+          'from': 'launcher',
+          'message': {'type': 'shutdown'},
+        },
+        {'hostExits': 0},
+      ],
+      capabilities: welcome['capabilities']! as List<Object?>,
+      afterReady: (client) async => expect(client.canSaveStates, isTrue),
+    );
+  }, timeout: const Timeout(Duration(seconds: 90)));
+  test(
+    'start.states, saveState and loadState go only to a host that lists saveStates',
+    () => _playOwn(
+      checkout,
+      python,
+      'A host without saveStates is sent no states folder and no state call: the client refuses them '
+          'before they are sent, and the next call is answered in order.',
+      'clean',
+      [
+        {
+          'from': 'launcher',
+          'message': {'type': 'call', 'id': 2, 'method': 'status', 'args': null},
+          'anyValueFor': ['id'],
+        },
+        {
+          'from': 'host',
+          'message': {'type': 'reply', 'id': 2, 'result': null},
+          'anyValueFor': ['id'],
+        },
+      ],
+      capabilities: const [retroCapabilityPs1, retroCapabilityPs2],
+      afterReady: (client) async {
+        expect(client.canSaveStates, isFalse);
+        final start = {'core': 'c', 'disc': 'd.cue', 'system': 's', 'saves': 'v', 'states': 't'};
+        expect(() => client.call('start', start), throwsStateError);
+        expect(() => client.call('saveState', {'slot': 0}), throwsStateError);
+        expect(() => client.call('loadState', {'slot': 0}), throwsStateError);
+      },
+    ),
+    timeout: const Timeout(Duration(seconds: 90)),
+  );
+  for (final (method, result, why) in <(String, Object?, String)>[
+    ('saveState', true, 'neither false nor an object'),
+    ('saveState', {'bytes': 1.5, 'micros': 3}, 'an object whose bytes is not an integer'),
+    ('loadState', {'bytes': 4096}, 'an object without micros'),
+  ]) {
+    test(
+      'a $method result that is $why is a protocol error',
+      () => _playOwn(
+        checkout,
+        python,
+        'The host answers $method with ${jsonEncode(result)}.',
+        'protocolError',
+        [
+          {
+            'from': 'launcher',
+            'message': {
+              'type': 'call',
+              'id': 2,
+              'method': method,
+              'args': {'slot': 0},
+            },
+            'anyValueFor': ['id'],
+          },
+          {
+            'from': 'host',
+            'message': {'type': 'reply', 'id': 2, 'result': result},
+            'anyValueFor': ['id'],
+            'invalid': '$method returns false or an object of integers bytes and micros',
+          },
+        ],
+        capabilities: const [retroCapabilityPs1, retroCapabilitySaveStates],
+      ),
+      timeout: const Timeout(Duration(seconds: 90)),
+    );
+  }
   test(
     'a frame of another game takes away the frame shown',
     () => _playOwn(checkout, python, 'A drawn frame, then a frame of another epoch in the same ring.', 'clean', [
@@ -841,6 +960,86 @@ Future<void> _playOwn(
 
 final _ps2Recording = Ps2HostRecording.load();
 
+final _statesRecording = SaveStatesHostRecording.load();
+
+/// The recorded host's `start` with a states folder, then every `saveState` and `loadState` it
+/// answered for that game (`slots`, then `refused`), each reply as it was sent but with the step's
+/// call id and its file's size and time taken left open.
+List<Map<String, Object?>> _saveStatesSteps() {
+  var id = 1;
+  Map<String, Object?> step(String from, Map<String, Object?> message, [List<String> open = const []]) => {
+    'from': from,
+    'message': message,
+    'anyValueFor': ['id', ...open],
+  };
+  final start = _statesRecording.calls('slots', 'start').single;
+  final steps = [
+    step('launcher', {
+      'type': 'call',
+      'id': ++id,
+      'method': 'start',
+      'args': {
+        'core': r'${core}',
+        'disc': r'${disc}',
+        'system': r'${system}',
+        'saves': r'${saves}',
+        'states': r'${states}',
+      },
+    }),
+    step('host', {...start.reply, 'id': id}),
+  ];
+  for (final scenario in const ['slots', 'refused']) {
+    for (final exchange in _statesRecording.messages(scenario)) {
+      final message = exchange.message;
+      final method = message['method'];
+      if (exchange.from != 'launcher' || (method != 'saveState' && method != 'loadState')) continue;
+      final reply = _statesRecording
+          .calls(scenario, method! as String)
+          .firstWhere((c) => c.call['id'] == message['id']);
+      steps.add(step('launcher', {...message, 'id': ++id}));
+      steps.add(step('host', {...reply.reply, 'id': id}, ['result.bytes', 'result.micros']));
+    }
+  }
+  return steps;
+}
+
+/// The host repository's message fixture [name], from `fixtures/v1/messages` of [checkout].
+Map<String, Object?> _messageFixture(String checkout, String name) =>
+    jsonDecode(File(p.join(checkout, 'fixtures', 'v1', 'messages', name)).readAsStringSync()) as Map<String, Object?>;
+
+/// The host's own save-state message fixtures in the order a game sends them: `start` with a states
+/// folder, then each `saveState` and `loadState` and its reply, with the id of its call here and
+/// what the fixture leaves open still open.
+List<Map<String, Object?>> _hostStateSteps(String checkout) {
+  var id = 1;
+  return [
+    for (final name in const [
+      'call-start-states.json',
+      'call-save-state.json',
+      'call-load-state.json',
+      'call-load-state-no-state.json',
+      'call-save-state-in-lockstep.json',
+    ])
+      ...() {
+        final fixture = _messageFixture(checkout, name);
+        final open = [...?(fixture['anyValueFor'] as List<Object?>?)?.cast<String>()];
+        id++;
+        return [
+          {
+            'from': 'launcher',
+            'message': {...fixture['message']! as Map<String, Object?>, 'id': id},
+            'anyValueFor': ['id'],
+          },
+          {
+            'from': 'host',
+            'message': {...fixture['reply']! as Map<String, Object?>, 'id': id},
+            'anyValueFor': ['id', ...open],
+          },
+        ];
+      }(),
+  ];
+}
+
 /// A PS2 game's `start` and the replies a host built from anyps5-retro-host main 1b57932 sent with
 /// the real LRPS2 core and no BIOS ([Ps2HostRecording], `lrps2-no-bios-folder`): its reply, the
 /// `status` of the game that ended with `bios`, and `release`, each with the id of its call here.
@@ -1048,7 +1247,7 @@ class _Session {
       };
       made[name] = (File(p.join(work.path, '$name$extension'))..writeAsStringSync('')).absolute.path;
     }
-    for (final name in ['system', 'saves']) {
+    for (final name in ['system', 'saves', 'states']) {
       made[name] = (Directory(p.join(work.path, name))..createSync()).absolute.path;
     }
     return made;
