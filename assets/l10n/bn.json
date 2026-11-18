@@ -2505,5 +2505,20 @@
   "retroResolutionDetail": "গেমটি আরও স্পষ্ট করে আঁকে। বেশি মানের জন্য দ্রুততর গ্রাফিক্স কার্ড লাগে।",
   "retroResolutionNative": "নেটিভ",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "এমুলেটর আপনার সংরক্ষিত রেজোলিউশন দেখাতে পারে না, তাই গেমটি %@ ব্যবহার করে।"
+  "retroResolutionRefusedDetail": "এমুলেটর আপনার সংরক্ষিত রেজোলিউশন দেখাতে পারে না, তাই গেমটি %@ ব্যবহার করে।",
+  "retroMenuGraphics": "গ্রাফিক্স",
+  "retroMenuGraphicsDetail": "রেজোলিউশন, টেক্সচার এবং ওয়াইডস্ক্রিন।",
+  "retroGraphicsValueOff": "বন্ধ",
+  "retroGraphicsValueOn": "চালু",
+  "retroGraphicsValueSmooth": "মসৃণ",
+  "retroGraphicsValueExtraSmooth": "অতি মসৃণ",
+  "retroSmoothTextures": "মসৃণ টেক্সচার",
+  "retroSmoothTexturesDetail": "3D বস্তুর খসখসে টেক্সচার মসৃণ করে।",
+  "retroFixWobbly3d": "কাঁপা 3D ঠিক করুন",
+  "retroFixWobbly3dDetail": "3D আকার ও তাদের টেক্সচার কাঁপতে দেয় না।",
+  "retroWidescreen": "ওয়াইডস্ক্রিন",
+  "retroWidescreenPs1Detail": "3D গেমের আরও বেশি অংশ 16:9-এ দেখায়। 2D গেম ও আঁকা পটভূমি ভুল দেখাতে পারে।",
+  "retroWidescreenPs2Detail": "গেমটি সমর্থন করলে 16:9-এ দেখায়।",
+  "retroSharperTextures": "আরও স্পষ্ট টেক্সচার",
+  "retroSharperTexturesDetail": "কোণ থেকে দেখা পৃষ্ঠে টেক্সচার স্পষ্ট রাখে।"
 }

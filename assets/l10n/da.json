@@ -2505,5 +2505,20 @@
   "retroResolutionDetail": "Tegner spillet skarpere. Højere værdier kræver et hurtigere grafikkort.",
   "retroResolutionNative": "Oprindelig",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "Emulatoren kan ikke vise den gemte opløsning, så spillet bruger %@."
+  "retroResolutionRefusedDetail": "Emulatoren kan ikke vise den gemte opløsning, så spillet bruger %@.",
+  "retroMenuGraphics": "Grafik",
+  "retroMenuGraphicsDetail": "Opløsning, teksturer og widescreen.",
+  "retroGraphicsValueOff": "Fra",
+  "retroGraphicsValueOn": "Til",
+  "retroGraphicsValueSmooth": "Glat",
+  "retroGraphicsValueExtraSmooth": "Ekstra glat",
+  "retroSmoothTextures": "Glatte teksturer",
+  "retroSmoothTexturesDetail": "Udglatter de kantede teksturer på 3D-objekter.",
+  "retroFixWobbly3d": "Ret vaklende 3D",
+  "retroFixWobbly3dDetail": "Forhindrer 3D-former og deres teksturer i at vakle.",
+  "retroWidescreen": "Widescreen",
+  "retroWidescreenPs1Detail": "Viser mere af et 3D-spil i 16:9. 2D-spil og tegnede baggrunde kan se forkerte ud.",
+  "retroWidescreenPs2Detail": "Viser spillet i 16:9, hvis spillet understøtter det.",
+  "retroSharperTextures": "Skarpere teksturer",
+  "retroSharperTexturesDetail": "Holder teksturer skarpe på flader, der ses fra en vinkel."
 }

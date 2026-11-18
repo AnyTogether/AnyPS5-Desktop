@@ -2505,5 +2505,20 @@
   "retroResolutionDetail": "Élesebben rajzolja a játékot. A nagyobb értékekhez gyorsabb videokártya kell.",
   "retroResolutionNative": "Natív",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "Az emulátor nem tudja megjeleníteni a mentett felbontást, ezért a játék ezt használja: %@."
+  "retroResolutionRefusedDetail": "Az emulátor nem tudja megjeleníteni a mentett felbontást, ezért a játék ezt használja: %@.",
+  "retroMenuGraphics": "Grafika",
+  "retroMenuGraphicsDetail": "Felbontás, textúrák és szélesvászon.",
+  "retroGraphicsValueOff": "Ki",
+  "retroGraphicsValueOn": "Be",
+  "retroGraphicsValueSmooth": "Sima",
+  "retroGraphicsValueExtraSmooth": "Extra sima",
+  "retroSmoothTextures": "Sima textúrák",
+  "retroSmoothTexturesDetail": "Kisimítja a 3D-s tárgyak kockás textúráit.",
+  "retroFixWobbly3d": "Remegő 3D javítása",
+  "retroFixWobbly3dDetail": "Megakadályozza, hogy a 3D-s formák és textúráik remegjenek.",
+  "retroWidescreen": "Szélesvászon",
+  "retroWidescreenPs1Detail": "Többet mutat egy 3D-s játékból 16:9 arányban. A 2D-s játékok és a rajzolt hátterek hibásan nézhetnek ki.",
+  "retroWidescreenPs2Detail": "16:9 arányban mutatja a játékot, ha a játék támogatja.",
+  "retroSharperTextures": "Élesebb textúrák",
+  "retroSharperTexturesDetail": "Élesen tartja a textúrákat a ferdén látott felületeken."
 }

@@ -2505,5 +2505,20 @@
   "retroResolutionDetail": "Menggambar game lebih tajam. Nilai lebih tinggi butuh kartu grafis yang lebih cepat.",
   "retroResolutionNative": "Asli",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "Emulator tidak dapat menampilkan resolusi yang disimpan, jadi game memakai %@."
+  "retroResolutionRefusedDetail": "Emulator tidak dapat menampilkan resolusi yang disimpan, jadi game memakai %@.",
+  "retroMenuGraphics": "Grafis",
+  "retroMenuGraphicsDetail": "Resolusi, tekstur, dan layar lebar.",
+  "retroGraphicsValueOff": "Mati",
+  "retroGraphicsValueOn": "Aktif",
+  "retroGraphicsValueSmooth": "Halus",
+  "retroGraphicsValueExtraSmooth": "Ekstra halus",
+  "retroSmoothTextures": "Tekstur halus",
+  "retroSmoothTexturesDetail": "Menghaluskan tekstur kotak-kotak pada objek 3D.",
+  "retroFixWobbly3d": "Perbaiki 3D yang goyang",
+  "retroFixWobbly3dDetail": "Mencegah bentuk 3D dan teksturnya bergoyang.",
+  "retroWidescreen": "Layar lebar",
+  "retroWidescreenPs1Detail": "Menampilkan lebih banyak bagian game 3D dalam 16:9. Game 2D dan latar yang digambar bisa terlihat salah.",
+  "retroWidescreenPs2Detail": "Menampilkan game dalam 16:9 jika game mendukungnya.",
+  "retroSharperTextures": "Tekstur lebih tajam",
+  "retroSharperTexturesDetail": "Menjaga tekstur tetap tajam pada permukaan yang terlihat miring."
 }

@@ -3,6 +3,7 @@
 /// host's `status` says of them (anyps5-retro-host docs/protocol.md "status").
 library;
 
+import 'retro_graphics.dart';
 import 'retro_host_protocol.dart';
 
 /// SwanStation's internal resolution, whose values are whole scales (`"1"` to `"16"`). Every host
@@ -25,26 +26,6 @@ const _offered = {
   false: {'1': 1, '2': 2, '3': 3, '4': 4},
   true: {'1x (Native)': 1, '2x': 2, '4x': 4},
 };
-
-/// What the row says under the internal resolution.
-enum RetroResolutionNote {
-  /// Nothing to say: the value chosen is the one the game draws at.
-  none,
-
-  /// The value chosen is being applied and shows in a moment (a PS1 game).
-  applying,
-
-  /// The value chosen takes effect when the game is started again (a PS2 game).
-  nextStart,
-
-  /// The game draws at the value it started with, and any change takes effect at its next start
-  /// (a PS2 game).
-  changesAtNextStart,
-
-  /// The host could not use the value saved and draws at the largest it can
-  /// (`status.resolutionError`).
-  refused,
-}
 
 /// One value the row offers.
 class RetroResolutionValue {
@@ -123,13 +104,13 @@ class RetroResolutionChoice {
     );
   }
 
-  static RetroResolutionNote _note(RetroStatus status, RetroOption option, String chosen) {
-    if (status.resolutionError.isNotEmpty) return RetroResolutionNote.refused;
+  static RetroGraphicsNote _note(RetroStatus status, RetroOption option, String chosen) {
+    if (status.resolutionError.isNotEmpty) return RetroGraphicsNote.refused;
     if (option.restart) {
-      return chosen == option.activeValue ? RetroResolutionNote.changesAtNextStart : RetroResolutionNote.nextStart;
+      return chosen == option.activeValue ? RetroGraphicsNote.changesAtNextStart : RetroGraphicsNote.nextStart;
     }
-    if (chosen != option.activeValue || status.graphicsPending) return RetroResolutionNote.applying;
-    return RetroResolutionNote.none;
+    if (chosen != option.activeValue || status.graphicsPending) return RetroGraphicsNote.applying;
+    return RetroGraphicsNote.none;
   }
 
   /// The option's key ([retroResolutionKey]).
@@ -144,7 +125,7 @@ class RetroResolutionChoice {
   /// The value the game draws at now (`activeValue`), which the refusal names.
   final RetroResolutionValue active;
 
-  final RetroResolutionNote note;
+  final RetroGraphicsNote note;
 
   @override
   String toString() => 'RetroResolutionChoice($key, $values, selected: $selected, ${note.name})';

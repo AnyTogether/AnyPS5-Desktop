@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../core/retro_host/retro_graphics.dart';
 import '../../core/retro_host/retro_host_protocol.dart';
 import '../../core/retro_host/retro_resolution.dart';
 import 'retro_host_controls.dart';
@@ -132,6 +133,12 @@ class RetroGameMenu extends ChangeNotifier {
   /// ([RetroResolutionChoice.of]).
   RetroResolutionChoice? get resolution => RetroResolutionChoice.of(game.status, limitsPs2: game.limitsPs2Resolution);
 
+  /// The game's other graphics settings as the Graphics page offers them, in its order: those of
+  /// the game's console the host lists ([RetroGraphicsChoice.of]).
+  List<RetroGraphicsChoice> get graphics => [
+    for (final setting in retroGraphicsSettings) ?RetroGraphicsChoice.of(game.status, setting),
+  ];
+
   /// The rows for [status] (null before the first one) and the volume.
   static List<RetroMenuRow> rowsFor(RetroStatus? status, {required double volume, required bool muted}) {
     final discs = status?.discs;
@@ -193,6 +200,22 @@ class RetroGameMenu extends ChangeNotifier {
     if (choice == null || !choice.values.any((entry) => entry.value == value)) return false;
     if (choice.values[choice.selected].value == value) return false;
     return game.setOption(choice.key, value);
+  }
+
+  /// Chooses the value at [index] of [setting]'s row: the options it sets that differ from the
+  /// host's are sent, in order, stopping at the first the host refuses. Every option the value
+  /// sets, to keep together, once the host took those sent; null when the row does not offer that
+  /// value now, it is already chosen, or the host refused one.
+  Future<Map<String, String>?> chooseGraphics(RetroGraphicsSetting setting, int index) async {
+    final status = game.status;
+    final choice = RetroGraphicsChoice.of(status, setting);
+    if (status == null || choice == null || index < 0 || index >= choice.values.length) return null;
+    final changes = choice.changesFor(status, index);
+    if (changes.isEmpty) return null;
+    for (final MapEntry(:key, :value) in changes.entries) {
+      if (!await game.setOption(key, value)) return null;
+    }
+    return choice.values[index].offer!.options;
   }
 
   /// Moves the volume [steps] of [volumeStep] up (down when negative), from 0 to 1. Turning it up

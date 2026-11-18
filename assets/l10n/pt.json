@@ -2505,5 +2505,20 @@
   "retroResolutionDetail": "Desenha o jogo com mais nitidez. Valores mais altos precisam de uma placa de vídeo mais rápida.",
   "retroResolutionNative": "Nativa",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "O emulador não consegue mostrar a resolução salva, então o jogo usa %@."
+  "retroResolutionRefusedDetail": "O emulador não consegue mostrar a resolução salva, então o jogo usa %@.",
+  "retroMenuGraphics": "Gráficos",
+  "retroMenuGraphicsDetail": "Resolução, texturas e tela larga.",
+  "retroGraphicsValueOff": "Desativado",
+  "retroGraphicsValueOn": "Ativado",
+  "retroGraphicsValueSmooth": "Suave",
+  "retroGraphicsValueExtraSmooth": "Muito suave",
+  "retroSmoothTextures": "Texturas suaves",
+  "retroSmoothTexturesDetail": "Suaviza as texturas serrilhadas dos objetos 3D.",
+  "retroFixWobbly3d": "Corrigir 3D tremido",
+  "retroFixWobbly3dDetail": "Impede que as formas 3D e suas texturas tremam.",
+  "retroWidescreen": "Tela larga",
+  "retroWidescreenPs1Detail": "Mostra mais de um jogo 3D em 16:9. Jogos 2D e fundos desenhados podem ficar errados.",
+  "retroWidescreenPs2Detail": "Mostra o jogo em 16:9 se o jogo tiver suporte.",
+  "retroSharperTextures": "Texturas mais nítidas",
+  "retroSharperTexturesDetail": "Mantém as texturas nítidas em superfícies vistas em ângulo."
 }

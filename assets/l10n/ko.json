@@ -2505,5 +2505,20 @@
   "retroResolutionDetail": "게임을 더 선명하게 그립니다. 높은 값일수록 더 빠른 그래픽 카드가 필요합니다.",
   "retroResolutionNative": "기본",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "에뮬레이터가 저장된 해상도를 표시할 수 없어 게임이 %@ 해상도를 사용합니다."
+  "retroResolutionRefusedDetail": "에뮬레이터가 저장된 해상도를 표시할 수 없어 게임이 %@ 해상도를 사용합니다.",
+  "retroMenuGraphics": "그래픽",
+  "retroMenuGraphicsDetail": "해상도, 텍스처, 와이드스크린.",
+  "retroGraphicsValueOff": "끄기",
+  "retroGraphicsValueOn": "켜기",
+  "retroGraphicsValueSmooth": "부드럽게",
+  "retroGraphicsValueExtraSmooth": "더 부드럽게",
+  "retroSmoothTextures": "부드러운 텍스처",
+  "retroSmoothTexturesDetail": "3D 물체의 각진 텍스처를 부드럽게 합니다.",
+  "retroFixWobbly3d": "흔들리는 3D 보정",
+  "retroFixWobbly3dDetail": "3D 모양과 텍스처가 흔들리지 않게 합니다.",
+  "retroWidescreen": "와이드스크린",
+  "retroWidescreenPs1Detail": "3D 게임을 16:9로 더 넓게 보여 줍니다. 2D 게임과 그려진 배경은 잘못 보일 수 있습니다.",
+  "retroWidescreenPs2Detail": "게임이 지원하면 16:9로 보여 줍니다.",
+  "retroSharperTextures": "선명한 텍스처",
+  "retroSharperTexturesDetail": "비스듬히 보이는 표면의 텍스처를 선명하게 유지합니다."
 }

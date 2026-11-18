@@ -2505,5 +2505,20 @@
   "retroResolutionDetail": "گیم کو زیادہ واضح بناتا ہے۔ زیادہ قدروں کے لیے تیز گرافکس کارڈ چاہیے۔",
   "retroResolutionNative": "اصل",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "ایمولیٹر محفوظ کردہ ریزولوشن نہیں دکھا سکتا، اس لیے گیم %@ استعمال کرتا ہے۔"
+  "retroResolutionRefusedDetail": "ایمولیٹر محفوظ کردہ ریزولوشن نہیں دکھا سکتا، اس لیے گیم %@ استعمال کرتا ہے۔",
+  "retroMenuGraphics": "گرافکس",
+  "retroMenuGraphicsDetail": "ریزولوشن، ٹیکسچر اور وائیڈ اسکرین۔",
+  "retroGraphicsValueOff": "بند",
+  "retroGraphicsValueOn": "چالو",
+  "retroGraphicsValueSmooth": "ہموار",
+  "retroGraphicsValueExtraSmooth": "بہت ہموار",
+  "retroSmoothTextures": "ہموار ٹیکسچر",
+  "retroSmoothTexturesDetail": "3D چیزوں کے کھردرے ٹیکسچر کو ہموار کرتا ہے۔",
+  "retroFixWobbly3d": "ہلتا 3D ٹھیک کریں",
+  "retroFixWobbly3dDetail": "3D شکلوں اور ان کے ٹیکسچر کو ہلنے سے روکتا ہے۔",
+  "retroWidescreen": "وائیڈ اسکرین",
+  "retroWidescreenPs1Detail": "3D گیم کا زیادہ حصہ 16:9 میں دکھاتا ہے۔ 2D گیمز اور بنائے گئے پس منظر غلط دکھ سکتے ہیں۔",
+  "retroWidescreenPs2Detail": "اگر گیم سپورٹ کرے تو اسے 16:9 میں دکھاتا ہے۔",
+  "retroSharperTextures": "زیادہ صاف ٹیکسچر",
+  "retroSharperTexturesDetail": "ترچھی نظر آنے والی سطحوں پر ٹیکسچر صاف رکھتا ہے۔"
 }

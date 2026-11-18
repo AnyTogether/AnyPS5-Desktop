@@ -2489,5 +2489,20 @@
   "retroResolutionDetail": "ጨዋታውን በበለጠ ጥራት ይስላል። ከፍ ያሉ እሴቶች ፈጣን የግራፊክስ ካርድ ይፈልጋሉ።",
   "retroResolutionNative": "መደበኛ",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "ኢሙሌተሩ ያስቀመጡትን ጥራት ማሳየት አይችልም፣ ስለዚህ ጨዋታው %@ ይጠቀማል።"
+  "retroResolutionRefusedDetail": "ኢሙሌተሩ ያስቀመጡትን ጥራት ማሳየት አይችልም፣ ስለዚህ ጨዋታው %@ ይጠቀማል።",
+  "retroMenuGraphics": "ግራፊክስ",
+  "retroMenuGraphicsDetail": "ጥራት፣ ቴክስቸሮች እና ሰፊ ማያ።",
+  "retroGraphicsValueOff": "ጠፍቷል",
+  "retroGraphicsValueOn": "በርቷል",
+  "retroGraphicsValueSmooth": "ለስላሳ",
+  "retroGraphicsValueExtraSmooth": "በጣም ለስላሳ",
+  "retroSmoothTextures": "ለስላሳ ቴክስቸሮች",
+  "retroSmoothTexturesDetail": "የ3D ነገሮችን ሻካራ ቴክስቸሮች ያለሰልሳል።",
+  "retroFixWobbly3d": "የሚንቀጠቀጥ 3D አስተካክል",
+  "retroFixWobbly3dDetail": "የ3D ቅርጾችና ቴክስቸሮቻቸው እንዳይንቀጠቀጡ ያደርጋል።",
+  "retroWidescreen": "ሰፊ ማያ",
+  "retroWidescreenPs1Detail": "የ3D ጨዋታን በ16:9 የበለጠ ያሳያል። 2D ጨዋታዎችና የተሳሉ ዳራዎች የተሳሳቱ ሊመስሉ ይችላሉ።",
+  "retroWidescreenPs2Detail": "ጨዋታው የሚደግፈው ከሆነ በ16:9 ያሳያል።",
+  "retroSharperTextures": "የጠሩ ቴክስቸሮች",
+  "retroSharperTexturesDetail": "በማዕዘን በሚታዩ ገጽታዎች ላይ ቴክስቸሮችን ጥርት ያደርጋል።"
 }

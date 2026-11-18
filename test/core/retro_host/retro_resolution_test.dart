@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:anyps5_desktop/core/retro_host/retro_host_protocol.dart';
+import 'package:anyps5_desktop/core/retro_host/retro_graphics.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_resolution.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -46,7 +47,7 @@ void main() {
       expect(valuesOf(choice), ['1', '2', '3', '4']);
       expect([for (final value in choice.values) value.scale], [1, 2, 3, 4]);
       expect(choice.values[2].label, '3x (for 720p)', reason: "the host's label, kept for the log");
-      expect((choice.selected, choice.active.value, choice.note), (0, '1', RetroResolutionNote.none));
+      expect((choice.selected, choice.active.value, choice.note), (0, '1', RetroGraphicsNote.none));
     });
 
     test('only values the host lists are offered', () {
@@ -78,14 +79,14 @@ void main() {
     test('a change applies in a moment: chosen but not active, or graphicsPending', () {
       expect(
         RetroResolutionChoice.of(edited(ps1Status(), retroResolutionKeyPs1, selected: 3), limitsPs2: false)!.note,
-        RetroResolutionNote.applying,
+        RetroGraphicsNote.applying,
       );
       expect(
         RetroResolutionChoice.of(
           edited(ps1Status(), retroResolutionKeyPs1, fields: {'graphicsPending': true}),
           limitsPs2: false,
         )!.note,
-        RetroResolutionNote.applying,
+        RetroGraphicsNote.applying,
       );
     });
 
@@ -100,7 +101,7 @@ void main() {
         ),
         limitsPs2: false,
       )!;
-      expect(choice.note, RetroResolutionNote.refused);
+      expect(choice.note, RetroGraphicsNote.refused);
       expect((choice.active.value, choice.active.scale), ('4', 4));
     });
 
@@ -125,7 +126,7 @@ void main() {
       expect([for (final value in choice.values) value.scale], [1, 2, 4]);
       expect(choice.selected, 2);
       expect((choice.active.value, choice.active.scale), ('4x', 4));
-      expect(choice.note, RetroResolutionNote.refused);
+      expect(choice.note, RetroGraphicsNote.refused);
     });
 
     test('a host without ps2ResolutionLimits is offered nothing', () {
@@ -134,10 +135,10 @@ void main() {
 
     test('a PS2 change takes effect at the next start', () {
       final started = edited(ps2Status(), retroResolutionKeyPs2, fields: {'resolutionError': ''});
-      expect(RetroResolutionChoice.of(started, limitsPs2: true)!.note, RetroResolutionNote.changesAtNextStart);
+      expect(RetroResolutionChoice.of(started, limitsPs2: true)!.note, RetroGraphicsNote.changesAtNextStart);
       final chosen = edited(ps2Status(), retroResolutionKeyPs2, selected: 1, fields: {'resolutionError': ''});
       final choice = RetroResolutionChoice.of(chosen, limitsPs2: true)!;
-      expect((choice.selected, choice.active.value, choice.note), (1, '4x', RetroResolutionNote.nextStart));
+      expect((choice.selected, choice.active.value, choice.note), (1, '4x', RetroGraphicsNote.nextStart));
     });
 
     test('a PS1 option in a PS2 status is not the PS2 resolution', () {
