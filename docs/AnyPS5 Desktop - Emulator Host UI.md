@@ -692,7 +692,8 @@ read. Here the launcher shows the host's eight slots of a game as Slot 1 to 8.
   A PS1 game that ends with `errorCode` `other` right after a load the host
   answered `false` also says that its memory card may already be back at that
   moment (`retroStateCardAfterEnd`), since protocol.md says such a load may
-  still have replaced card 1.
+  still have replaced card 1, also when the player closed the game while that
+  load ran.
 
 ## The unchecked-host mark
 

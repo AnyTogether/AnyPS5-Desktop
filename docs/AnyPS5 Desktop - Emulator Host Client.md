@@ -467,7 +467,9 @@ What the launcher does with them:
   (`RetroSaveStates.loadAnsweredFalse`), a game that then ends with
   `errorCode` `other` shows "The game stopped while the state was loading, so
   the memory card may already be back at that moment." beside the usual
-  problem.
+  problem, once per game (`_warnRetroCardAfterLoad`). That holds too when the
+  player chose Close game while the load ran: the stop waits for the load's
+  reply, and the status it ends with reports `other`.
 
 [`test/fixtures/retro_host_save_states_recording.json`](../test/fixtures/retro_host_save_states_recording.json)
 holds every message each way, as its exact text (frames left out), of a host

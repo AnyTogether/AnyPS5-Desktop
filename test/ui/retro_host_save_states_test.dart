@@ -405,6 +405,34 @@ void main() {
     expect(model.toast, T.text('retroStateCardAfterEnd'));
   });
 
+  test('closing a PS1 game while a load runs that then ends it with other still says so', () async {
+    launcher = Ps1Launcher();
+    launcher.session.canSaveStates = true;
+    File(folder().statePath(0))
+      ..createSync(recursive: true)
+      ..writeAsBytesSync([1]);
+    final model = launcher.model..setRetroHostPs1(true);
+    await launcher.start();
+    await settleFiles();
+    launcher.session.callResults['loadState'] = false;
+    model.openRetroMenu();
+    await settleFiles();
+    (launcher.row('loadState').kind as ActionRow).run();
+    final gate = launcher.session.callGate = Completer<void>();
+    (launcher.row('state-0').kind as ActionRow).run();
+    await pumpEventQueue();
+    final closing = model.closeRetroGame();
+    await pumpEventQueue();
+    expect(launcher.session.calls.where((call) => call.$1 == 'stop'), isEmpty, reason: 'stop waits for the reply');
+    launcher.session.callGate = null;
+    launcher.session.stopStatus = fakeStatus(ended: true, errorCode: RetroErrorCode.other);
+    gate.complete();
+    await closing;
+    await settleFiles();
+    expect(model.retroPlay, isNull);
+    expect(model.toast, T.text('retroStateCardAfterEnd'));
+  });
+
   test('the words for a state that did not work', () {
     launcher = Ps1Launcher();
     expect(retroStateProblem(RetroStateOutcome.otherCore, saving: false), 'retroStateOtherCore');

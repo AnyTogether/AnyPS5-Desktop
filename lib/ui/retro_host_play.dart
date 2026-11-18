@@ -55,6 +55,10 @@ class RetroPlay {
   /// ([RetroStatus.cardUnreadable]); once per game.
   bool cardWarned = false;
 
+  /// The player was told the memory card may be back at a state's moment after a load that ended
+  /// the game ([RetroHostPlaying._warnRetroCardAfterLoad]); once per game.
+  bool loadCardWarned = false;
+
   /// The section of the menu shown, or null for the menu's first page.
   RetroOptionSection? menuSection;
 
@@ -525,9 +529,7 @@ extension RetroHostPlaying on AppModel {
         _leaveRetroPages(play);
         unawaited(play.menu.close());
       }
-      if (!play.ps2 && play.states.loadAnsweredFalse && play.host.endStatus?.errorCode == RetroErrorCode.other) {
-        show(T.text('retroStateCardAfterEnd'));
-      }
+      _warnRetroCardAfterLoad(play);
       final problem = play.problem;
       _padLog?.call('emulator host: the game ended (${play.host.endStatus?.error ?? play.host.failure ?? 'no error'})');
       if (problem == null) {
@@ -536,6 +538,19 @@ extension RetroHostPlaying on AppModel {
       }
     }
     _changed();
+  }
+
+  /// A PS1 game that ended with `errorCode` `other` after a load the host answered `false`: the
+  /// core may have finished that load after the reply, and the host writes the card when the game
+  /// ends, so protocol.md "The memory card" asks the launcher to say the card may now be the
+  /// state's. Also when the player closed the game while that load ran, as Close game waits for its
+  /// reply and its stop then reports that ending.
+  void _warnRetroCardAfterLoad(RetroPlay play) {
+    final status = play.host.status;
+    if (play.ps2 || play.loadCardWarned || !play.states.loadAnsweredFalse) return;
+    if (status == null || !status.ended || status.errorCode != RetroErrorCode.other) return;
+    play.loadCardWarned = true;
+    show(T.text('retroStateCardAfterEnd'));
   }
 
   /// PS in the game: its menu, the game paused and the controllers kept out of it.
@@ -589,6 +604,7 @@ extension RetroHostPlaying on AppModel {
         _padLog?.call('emulator host: kept for the next game');
       }
     } finally {
+      if (!_disposed) _warnRetroCardAfterLoad(play);
       play.release(_retroChanged);
       if (identical(retroPlay, play)) retroPlay = null;
       if (retroMenuShown) overlay = null;
