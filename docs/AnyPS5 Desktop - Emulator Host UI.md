@@ -1067,8 +1067,8 @@ screen.
   release ships LRPS2 yet (host `docs/ps2.md` "Releases"). The PS2
   emulator's download was tested only against the recorded 1.1.0 fixture
   from host PR #22's packer, not a published release.
-- **No signed host release yet.** A release build offers the download, but
-  the host repository has published no signed release yet, so the row says so
+- **Only host 1.0.0 is published.** A release build downloads it, and it
+  offers neither save states nor the PS2 emulator
   ([Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>), "Not yet").
 - **No phone pad.** A phone or browser pad (Remote Play's) does not play a
   PS1 game in the host, and does not move the launcher while the game's own

@@ -332,6 +332,26 @@ void main() {
         expect(model.retroHostInstall!.ps2Core, isNull);
       });
 
+      test('the PS2 emulator is not removed while a game plays, nor a host started while it is', () async {
+        github.releases.add(retroHostFixtureRelease(ps2: true));
+        launcher = Ps1Launcher(hostFound: false, retroHostApi: github.api);
+        final model = launcher.model;
+        await model.retroHostDownload.download();
+        await model.retroHostDownload.ps2.add();
+        final ps2Core = model.retroHostInstall!.ps2Core!;
+        model.closeOverlay();
+        await launcher.start();
+        await model.retroHostDownload.ps2.remove();
+        expect(model.toast, T.text('retroHostPs2CloseGame'));
+        expect(File(ps2Core).existsSync(), isTrue);
+        await model.closeRetroGame();
+
+        model.retroHostDownload.installing = true;
+        await model.play(launcher.game);
+        expect(model.toast, T.text('retroHostUpdating'), reason: 'no start while the PS2 emulator changes');
+        model.retroHostDownload.installing = false;
+      });
+
       test('without the release of its host on GitHub, the PS2 emulator is not available', () async {
         launcher = await Ps1Launcher.withRelease(ps2: true, addPs2: false, retroHostApi: github.api);
         final model = launcher.model;

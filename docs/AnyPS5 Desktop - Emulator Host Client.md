@@ -1144,13 +1144,11 @@ when `ANYPS5_RETRO_HOST_CHECKOUT` is set.
   ("Debug and test builds" above) is compiled in release mode but is no
   release and is never published. A host pull request of its own, separate
   from the host's release packaging, adds test builds to that text.
-- **No signed release yet.** The download reads the host repository's
-  GitHub releases, and none is published there yet: until the maintainers
-  sign and publish one (that repository's `docs/host.md` "Releases"), a
-  release build says no signed PS1 emulator has been published yet, and has no
-  host to run. The whole path was tested with a real release that the host
-  repository's release workflow packed, signed with the test key
-  ([Emulator host UI](<AnyPS5 Desktop - Emulator Host UI.md>), "Against the real host").
+- **Only 1.0.0 is published.** The host repository's one signed release,
+  v1.0.0, holds the host and SwanStation: no save states and no LRPS2. A
+  release build downloads it; before it, the path was tested with a real
+  release that the host repository's release workflow packed, signed with the
+  test key ([Emulator host UI](<AnyPS5 Desktop - Emulator Host UI.md>), "Against the real host").
 - **The protocol's storage sentence.** protocol.md at 9052aff still says the
   host lives in the launcher's own directory; the launcher keeps a downloaded
   host in its data folder (above), since an AppImage's directory is read-only.
