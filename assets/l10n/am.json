@@ -2470,6 +2470,8 @@
   "retroMenuNoStatesDetail": "የዚህ ጨዋታ ምንም ሁኔታ ገና አልተቀመጠም።",
   "retroStateSlot": "ቦታ %@",
   "retroStateEmpty": "ባዶ",
+  "retroStateSaving": "እያስቀመጠ ነው…",
+  "retroStateLoading": "እየጫነ ነው…",
   "retroStateOverwriteTitle": "ቦታ %@ን ይተካ?",
   "retroStateOverwrite": "ተካ",
   "retroStateOverwriteDetail": "በ%@ የተቀመጠው ሁኔታ በዚህ ቅጽበት ይተካል።",

@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "Wala pang naka-save na state ng larong ito.",
   "retroStateSlot": "Slot %@",
   "retroStateEmpty": "Walang laman",
+  "retroStateSaving": "Sine-save…",
+  "retroStateLoading": "Naglo-load…",
   "retroStateOverwriteTitle": "Palitan ang slot %@?",
   "retroStateOverwrite": "Palitan",
   "retroStateOverwriteDetail": "Papalitan ng sandaling ito ang state na na-save noong %@.",

@@ -931,7 +931,7 @@ enum Layer {
   /// Resume, its discs, its options, the volume and Close Game.
   retroMenu,
 
-  /// Save State in that menu on a slot that holds a state: Overwrite slot N? (Cancel first).
+  /// Save state in that menu on a slot that holds a state: Overwrite slot N? (Cancel first).
   retroOverwriteState,
 
   /// A friend's share play watched full screen (share_play_model.dart): the controller is the

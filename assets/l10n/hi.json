@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "इस गेम का कोई स्टेट अभी तक सेव नहीं है।",
   "retroStateSlot": "स्लॉट %@",
   "retroStateEmpty": "खाली",
+  "retroStateSaving": "सेव हो रहा है…",
+  "retroStateLoading": "लोड हो रहा है…",
   "retroStateOverwriteTitle": "स्लॉट %@ बदलें?",
   "retroStateOverwrite": "बदलें",
   "retroStateOverwriteDetail": "%@ को सेव किए गए स्टेट की जगह यह पल ले लेगा।",

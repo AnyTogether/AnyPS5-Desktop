@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "Todavía no hay ningún estado guardado de este juego.",
   "retroStateSlot": "Ranura %@",
   "retroStateEmpty": "Vacía",
+  "retroStateSaving": "Guardando…",
+  "retroStateLoading": "Cargando…",
   "retroStateOverwriteTitle": "¿Sobrescribir la ranura %@?",
   "retroStateOverwrite": "Sobrescribir",
   "retroStateOverwriteDetail": "El estado guardado el %@ se sustituye por este momento.",

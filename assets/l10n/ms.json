@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "Belum ada keadaan permainan ini yang disimpan.",
   "retroStateSlot": "Slot %@",
   "retroStateEmpty": "Kosong",
+  "retroStateSaving": "Sedang menyimpan…",
+  "retroStateLoading": "Sedang memuatkan…",
   "retroStateOverwriteTitle": "Tulis ganti slot %@?",
   "retroStateOverwrite": "Tulis ganti",
   "retroStateOverwriteDetail": "Keadaan yang disimpan pada %@ digantikan dengan detik ini.",

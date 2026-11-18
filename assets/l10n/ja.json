@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "このゲームのステートはまだ保存されていません。",
   "retroStateSlot": "スロット %@",
   "retroStateEmpty": "空き",
+  "retroStateSaving": "セーブ中…",
+  "retroStateLoading": "ロード中…",
   "retroStateOverwriteTitle": "スロット %@ を上書きしますか?",
   "retroStateOverwrite": "上書き",
   "retroStateOverwriteDetail": "%@ に保存したステートがこの瞬間に置き換わります。",

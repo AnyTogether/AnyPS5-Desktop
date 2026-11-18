@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "이 게임에 저장된 상태가 아직 없습니다.",
   "retroStateSlot": "슬롯 %@",
   "retroStateEmpty": "비어 있음",
+  "retroStateSaving": "저장 중…",
+  "retroStateLoading": "불러오는 중…",
   "retroStateOverwriteTitle": "슬롯 %@에 덮어쓰시겠습니까?",
   "retroStateOverwrite": "덮어쓰기",
   "retroStateOverwriteDetail": "%@에 저장한 상태가 이 순간으로 바뀝니다.",

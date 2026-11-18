@@ -141,7 +141,10 @@ void main() {
   Future<RetroStateFolder> saved(WidgetTester tester, List<int> slots, DateTime at) async {
     final recording = SaveStatesHostRecording.load();
     final model = launcher.model;
-    final folder = RetroStateFolder(folder: p.normalize(model.paths.retroStates()), disc: launcher.disc);
+    final folder = RetroStateFolder(
+      folder: p.normalize(model.paths.retroStates(launcher.game.slug)),
+      disc: p.normalize(launcher.disc),
+    );
     launcher.session
       ..callResults['saveState'] = recording.calls('slots', 'saveState').first.reply['result']
       ..onCall = (method, args) {
@@ -169,7 +172,7 @@ void main() {
     return folder;
   }
 
-  testWidgets('the menu with save states: Save State, and Load State once one is saved', (tester) async {
+  testWidgets('the menu with save states: Save state, and Load state once one is saved', (tester) async {
     await playing(tester, status: recordedStatus(), saveStates: true);
     await saved(tester, [0], DateTime(2026, 11, 18, 14, 3));
     launcher.model.openRetroMenu();
@@ -180,7 +183,7 @@ void main() {
     await expectLater(shell, matchesGoldenFile('goldens/retro_host_menu_states_en.png'));
   });
 
-  testWidgets("Save State: the game's slots, with when each state was saved and its picture", (tester) async {
+  testWidgets("Save state: the game's slots, with when each state was saved and its picture", (tester) async {
     await playing(tester, status: recordedStatus(), saveStates: true);
     await saved(tester, [0, 2], DateTime(2026, 11, 18, 14, 3));
     final model = launcher.model..openRetroMenu();

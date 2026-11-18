@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "Для этой игры пока нет сохранённых состояний.",
   "retroStateSlot": "Слот %@",
   "retroStateEmpty": "Пусто",
+  "retroStateSaving": "Сохранение…",
+  "retroStateLoading": "Загрузка…",
   "retroStateOverwriteTitle": "Перезаписать слот %@?",
   "retroStateOverwrite": "Перезаписать",
   "retroStateOverwriteDetail": "Состояние, сохранённое %@, будет заменено этим моментом.",

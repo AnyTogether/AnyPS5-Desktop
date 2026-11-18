@@ -117,10 +117,11 @@ class AppPaths {
   String get retroPs2Bios => p.join(retroSystem, 'pcsx2', 'bios');
   String get retroPs2Saves => p.join(config, 'retro', 'saves', 'ps2');
 
-  /// Where the emulator host keeps a PS1 game's save states, or with [ps2] a PS2 game's, beside
-  /// their memory cards: the folder `start.states` names (anyps5-retro-host docs/protocol.md
-  /// "saveState and loadState"), one per console, each game's slots named after its disc.
-  String retroStates({bool ps2 = false}) => p.join(config, 'retro', 'states', ps2 ? 'ps2' : 'ps1');
+  /// Where the emulator host keeps the save states of the PS1 game whose `Game.slug` is [game], or
+  /// with [ps2] the PS2 game's, beside their memory cards: the folder `start.states` names
+  /// (anyps5-retro-host docs/protocol.md "saveState and loadState"), one per game, as the host
+  /// names a slot only after its disc and checks a state's game only by that name.
+  String retroStates(String game, {bool ps2 = false}) => p.join(config, 'retro', 'states', ps2 ? 'ps2' : 'ps1', game);
 
   String logFile(String titleId) => p.join(logs, '$titleId.log');
   String shaderCache(String slug) => p.join(cache, slug, 'shader_cache');

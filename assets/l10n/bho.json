@@ -2469,6 +2469,8 @@
   "retroMenuNoStatesDetail": "एह गेम के कवनो स्टेट अबहीं ले सेव नइखे।",
   "retroStateSlot": "स्लॉट %@",
   "retroStateEmpty": "खाली",
+  "retroStateSaving": "सेव हो रहल बा…",
+  "retroStateLoading": "लोड हो रहल बा…",
   "retroStateOverwriteTitle": "स्लॉट %@ बदल दीं?",
   "retroStateOverwrite": "बदल दीं",
   "retroStateOverwriteDetail": "%@ के सेव कइल स्टेट के जगह ई पल आ जाई।",

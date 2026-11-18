@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "اس گیم کی کوئی اسٹیٹ ابھی تک محفوظ نہیں ہے۔",
   "retroStateSlot": "سلاٹ %@",
   "retroStateEmpty": "خالی",
+  "retroStateSaving": "محفوظ ہو رہا ہے…",
+  "retroStateLoading": "لوڈ ہو رہا ہے…",
   "retroStateOverwriteTitle": "سلاٹ %@ بدل دیں؟",
   "retroStateOverwrite": "بدل دیں",
   "retroStateOverwriteDetail": "%@ کو محفوظ کی گئی اسٹیٹ کی جگہ یہ لمحہ لے لے گا۔",

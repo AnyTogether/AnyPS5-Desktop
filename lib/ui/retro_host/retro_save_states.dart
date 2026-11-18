@@ -40,8 +40,11 @@ class RetroSaveStates extends ChangeNotifier {
   RetroStateSlot slot(int slot) => _slots[slot];
 
   /// Whether a save or a load is under way.
-  bool get busy => _busy;
-  bool _busy = false;
+  bool get busy => _running != null;
+
+  /// The slot a save or a load is under way in, and whether it is a save; null when none is.
+  ({int slot, bool saving})? get running => _running;
+  ({int slot, bool saving})? _running;
   bool _disposed = false;
 
   /// Reads the slots from the folder again.
@@ -59,7 +62,7 @@ class RetroSaveStates extends ChangeNotifier {
   /// still put the new state in place (protocol.md "saveState and loadState"), and a host that went
   /// away after writing it answers `false` as one that never ran does, so no picture is better than
   /// one of a moment the slot may no longer hold.
-  Future<RetroStateOutcome> save(int slot) => _run(() async {
+  Future<RetroStateOutcome> save(int slot) => _run(slot, saving: true, () async {
     final shown = game.picture.value?.clone();
     try {
       final outcome = await game.saveState(slot);
@@ -80,20 +83,20 @@ class RetroSaveStates extends ChangeNotifier {
 
   /// Loads the state in [slot] back into the game. A slot found empty is read again, so it shows
   /// as such.
-  Future<RetroStateOutcome> load(int slot) => _run(() async {
+  Future<RetroStateOutcome> load(int slot) => _run(slot, saving: false, () async {
     final outcome = await game.loadState(slot);
     if (outcome == RetroStateOutcome.noState) await refresh();
     return outcome;
   });
 
-  Future<RetroStateOutcome> _run(Future<RetroStateOutcome> Function() work) async {
-    if (_busy || !available) return RetroStateOutcome.notNow;
-    _busy = true;
+  Future<RetroStateOutcome> _run(int slot, Future<RetroStateOutcome> Function() work, {required bool saving}) async {
+    if (busy || !available) return RetroStateOutcome.notNow;
+    _running = (slot: slot, saving: saving);
     _notify();
     try {
       return await work();
     } finally {
-      _busy = false;
+      _running = null;
       _notify();
     }
   }

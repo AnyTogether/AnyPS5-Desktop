@@ -190,35 +190,41 @@ void main() {
     ),
     timeout: const Timeout(Duration(seconds: 90)),
   );
-  test(
-    'a saveState result that is neither false nor an object is a protocol error',
-    () => _playOwn(
-      checkout,
-      python,
-      'The host answers saveState with true.',
-      'protocolError',
-      [
-        {
-          'from': 'launcher',
-          'message': {
-            'type': 'call',
-            'id': 2,
-            'method': 'saveState',
-            'args': {'slot': 0},
+  for (final (method, result, why) in <(String, Object?, String)>[
+    ('saveState', true, 'neither false nor an object'),
+    ('saveState', {'bytes': 1.5, 'micros': 3}, 'an object whose bytes is not an integer'),
+    ('loadState', {'bytes': 4096}, 'an object without micros'),
+  ]) {
+    test(
+      'a $method result that is $why is a protocol error',
+      () => _playOwn(
+        checkout,
+        python,
+        'The host answers $method with ${jsonEncode(result)}.',
+        'protocolError',
+        [
+          {
+            'from': 'launcher',
+            'message': {
+              'type': 'call',
+              'id': 2,
+              'method': method,
+              'args': {'slot': 0},
+            },
+            'anyValueFor': ['id'],
           },
-          'anyValueFor': ['id'],
-        },
-        {
-          'from': 'host',
-          'message': {'type': 'reply', 'id': 2, 'result': true},
-          'anyValueFor': ['id'],
-          'invalid': 'saveState returns false or an object',
-        },
-      ],
-      capabilities: const [retroCapabilityPs1, retroCapabilitySaveStates],
-    ),
-    timeout: const Timeout(Duration(seconds: 90)),
-  );
+          {
+            'from': 'host',
+            'message': {'type': 'reply', 'id': 2, 'result': result},
+            'anyValueFor': ['id'],
+            'invalid': '$method returns false or an object of integers bytes and micros',
+          },
+        ],
+        capabilities: const [retroCapabilityPs1, retroCapabilitySaveStates],
+      ),
+      timeout: const Timeout(Duration(seconds: 90)),
+    );
+  }
   test(
     'a frame of another game takes away the frame shown',
     () => _playOwn(checkout, python, 'A drawn frame, then a frame of another epoch in the same ring.', 'clean', [

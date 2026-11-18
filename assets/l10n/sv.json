@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "Inget läge för det här spelet är sparat ännu.",
   "retroStateSlot": "Plats %@",
   "retroStateEmpty": "Tom",
+  "retroStateSaving": "Sparar…",
+  "retroStateLoading": "Läser in…",
   "retroStateOverwriteTitle": "Skriva över plats %@?",
   "retroStateOverwrite": "Skriv över",
   "retroStateOverwriteDetail": "Läget som sparades %@ ersätts av det här ögonblicket.",

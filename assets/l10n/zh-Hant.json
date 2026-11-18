@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "此遊戲還沒有儲存即時存檔。",
   "retroStateSlot": "存檔位 %@",
   "retroStateEmpty": "空",
+  "retroStateSaving": "正在儲存…",
+  "retroStateLoading": "正在讀取…",
   "retroStateOverwriteTitle": "覆寫存檔位 %@？",
   "retroStateOverwrite": "覆寫",
   "retroStateOverwriteDetail": "%@ 儲存的即時存檔將被這一刻取代。",

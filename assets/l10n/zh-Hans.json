@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "此游戏还没有保存即时存档。",
   "retroStateSlot": "存档位 %@",
   "retroStateEmpty": "空",
+  "retroStateSaving": "正在保存…",
+  "retroStateLoading": "正在读取…",
   "retroStateOverwriteTitle": "覆盖存档位 %@？",
   "retroStateOverwrite": "覆盖",
   "retroStateOverwriteDetail": "%@ 保存的即时存档将被这一刻替换。",

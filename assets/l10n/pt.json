@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "Ainda não há nenhum estado guardado deste jogo.",
   "retroStateSlot": "Espaço %@",
   "retroStateEmpty": "Vazio",
+  "retroStateSaving": "Salvando…",
+  "retroStateLoading": "Carregando…",
   "retroStateOverwriteTitle": "Substituir o espaço %@?",
   "retroStateOverwrite": "Substituir",
   "retroStateOverwriteDetail": "O estado guardado em %@ é substituído por este momento.",

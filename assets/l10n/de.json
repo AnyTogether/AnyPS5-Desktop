@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "Für dieses Spiel ist noch kein Zustand gespeichert.",
   "retroStateSlot": "Platz %@",
   "retroStateEmpty": "Leer",
+  "retroStateSaving": "Wird gespeichert…",
+  "retroStateLoading": "Wird geladen…",
   "retroStateOverwriteTitle": "Platz %@ überschreiben?",
   "retroStateOverwrite": "Überschreiben",
   "retroStateOverwriteDetail": "Der am %@ gespeicherte Zustand wird durch diesen Moment ersetzt.",

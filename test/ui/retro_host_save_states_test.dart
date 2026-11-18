@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:anyps5_desktop/core/game_library.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_protocol.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_state_slots.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
+import 'package:anyps5_desktop/ui/retro_host/retro_host_game.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -13,7 +16,7 @@ import '../support/ps1_launcher.dart';
 import '../support/save_states_host_recording.dart';
 import 'retro_host/fake_retro_host_session.dart';
 
-/// Save State and Load State in the menu of a game in the emulator host, which a host that lists
+/// Save state and Load state in the menu of a game in the emulator host, which a host that lists
 /// `saveStates` (the save-states branch, recorded) answers.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -35,8 +38,9 @@ void main() {
   List<String> rowIds(AppModel model) => [for (final row in model.panelCategories().single.rows) row.id];
 
   /// The game's states folder, as the launcher keeps it.
+  String statesOf(Game game, {bool ps2 = false}) => p.normalize(launcher.model.paths.retroStates(game.slug, ps2: ps2));
   RetroStateFolder folder({bool ps2 = false}) => RetroStateFolder(
-    folder: p.normalize(launcher.model.paths.retroStates(ps2: ps2)),
+    folder: statesOf(ps2 ? launcher.ps2Game : launcher.game, ps2: ps2),
     disc: ps2 ? launcher.ps2Disc! : launcher.disc,
   );
 
@@ -65,9 +69,12 @@ void main() {
     return model;
   }
 
-  test("a game starts with its console's states folder, and its menu has Save State and Load State", () async {
+  test('a game starts with its own states folder, and its menu has Save state and Load state', () async {
     final model = await playing();
-    expect(launcher.session.startArgs?['states'], p.normalize(model.paths.retroStates()));
+    expect(launcher.session.startArgs?['states'], statesOf(launcher.game));
+    expect(p.basename(statesOf(launcher.game)), 'ps1slus00001', reason: "named by the game's title ID");
+    expect(T.text('retroMenuSaveState'), 'Save state', reason: 'sentence case, as every row');
+    expect(T.text('retroMenuLoadState'), 'Load state');
     model.openRetroMenu();
     await settleFiles();
     expect(rowIds(model), [
@@ -83,12 +90,33 @@ void main() {
   });
 
   test("a PS2 game's states are kept apart from PS1 games'", () async {
-    final model = await playing(ps2: true);
-    expect(launcher.session.startArgs?['states'], p.normalize(model.paths.retroStates(ps2: true)));
-    expect(model.paths.retroStates(ps2: true), isNot(model.paths.retroStates()));
+    await playing(ps2: true);
+    expect(launcher.session.startArgs?['states'], statesOf(launcher.ps2Game, ps2: true));
+    expect(p.dirname(statesOf(launcher.ps2Game, ps2: true)), isNot(p.dirname(statesOf(launcher.game))));
   });
 
-  test('a host without saveStates is sent no states folder, and the menu has no Save State', () async {
+  test('two games whose discs have the same name keep their states apart', () async {
+    launcher = Ps1Launcher();
+    final other = Directory(p.join(launcher.model.root!, 'Day Racer'))..createSync();
+    File(p.join(other.path, 'game.cue')).createSync();
+    File(p.join(other.path, 'retro.json')).writeAsStringSync(
+      jsonEncode({'platform': 'ps1', 'titleId': 'SLUS00002', 'name': 'Day Racer', 'disc': 'game.cue'}),
+    );
+    launcher.model.rescan();
+    await settleFiles();
+    final day = launcher.model.games.singleWhere((game) => game.name == 'Day Racer');
+    final night = launcher.model.games.singleWhere((game) => game.name == 'Night Racer');
+    final dayStates = RetroStateFolder(folder: statesOf(day), disc: day.retro!.path);
+    final nightStates = RetroStateFolder(folder: statesOf(night), disc: night.retro!.path);
+    expect(
+      p.basename(dayStates.statePath(0)),
+      p.basename(nightStates.statePath(0)),
+      reason: 'the host names both alike',
+    );
+    expect(dayStates.statePath(0), isNot(nightStates.statePath(0)));
+  });
+
+  test('a host without saveStates is sent no states folder, and the menu has no Save state', () async {
     launcher = Ps1Launcher();
     final model = launcher.model..setRetroHostPs1(true);
     await launcher.start();
@@ -98,7 +126,7 @@ void main() {
     expect(rowIds(model), isNot(contains('loadState')));
   });
 
-  test('Save State: an empty slot saves at once and the game goes on; a used one asks first', () async {
+  test('Save state: an empty slot saves at once and the game goes on; a used one asks first', () async {
     final model = await playing();
     hostWritesStates();
     launcher.session.callResults['saveState'] = saved;
@@ -135,7 +163,7 @@ void main() {
     expect(model.panelRow, 0);
 
     model.handle(Command.back);
-    expect(model.overlay, Layer.retroMenu, reason: 'Back goes back to Save State');
+    expect(model.overlay, Layer.retroMenu, reason: 'Back goes back to Save state');
     expect(model.panelCategories().single.id, 'retroMenu-save');
     expect(launcher.session.calls.where((call) => call.$1 == 'saveState'), hasLength(1));
     expect(launcher.play.menu.isOpen, isTrue, reason: 'the game stays paused');
@@ -150,10 +178,62 @@ void main() {
     (launcher.row('saveState').kind as ActionRow).run();
     model.handle(Command.back);
     expect(model.panelCategories().single.id, 'retroMenu');
-    expect(model.panelRow, 1, reason: 'on the Save State row');
+    expect(model.panelRow, 1, reason: 'on the Save state row');
   });
 
-  test('a save that does not work says so and stays on Save State', () async {
+  test('Save state and Load state show once the game has shown its first frame, keeping the focus', () async {
+    launcher = Ps1Launcher();
+    launcher.session.canSaveStates = true;
+    final model = launcher.model..setRetroHostPs1(true);
+    await launcher.start(status: fakeStatus(ready: false));
+    await settleFiles();
+    expect(launcher.play.host.phase, RetroHostGamePhase.loading);
+    model.openRetroMenu();
+    expect(rowIds(model), ['resume', 'section-audio', 'closeGame'], reason: 'the host saves nothing yet');
+    model.panelRow = rowIds(model).indexOf('closeGame');
+    launcher.session.nextStatus = fakeStatus();
+    await launcher.play.host.refresh();
+    await pumpEventQueue();
+    expect(launcher.play.host.phase, RetroHostGamePhase.playing);
+    expect(rowIds(model), ['resume', 'saveState', 'loadState', 'section-audio', 'closeGame']);
+    expect(rowIds(model)[model.panelRow], 'closeGame', reason: 'the focus stays on the row it was on');
+  });
+
+  test('a slot says Saving… or Loading… while its call runs, and nothing else starts meanwhile', () async {
+    final model = await playing();
+    hostWritesStates();
+    launcher.session
+      ..callResults['saveState'] = saved
+      ..callResults['loadState'] = loaded;
+    model.openRetroMenu();
+    (launcher.row('saveState').kind as ActionRow).run();
+    final gate = launcher.session.callGate = Completer<void>();
+    (launcher.row('state-2').kind as ActionRow).run();
+    await pumpEventQueue();
+    expect(launcher.row('state-2').detail, T.text('retroStateSaving'));
+    expect(T.text('retroStateSaving'), 'Saving…');
+    expect(launcher.row('state-3').detail, T.text('retroStateEmpty'));
+    (launcher.row('state-3').kind as ActionRow).run();
+    await pumpEventQueue();
+    expect(launcher.session.calls.where((call) => call.$1 == 'saveState'), hasLength(1));
+    launcher.session.callGate = null;
+    gate.complete();
+    await settleFiles();
+    expect(model.overlay, isNull);
+
+    model.openRetroMenu();
+    (launcher.row('loadState').kind as ActionRow).run();
+    final loading = launcher.session.callGate = Completer<void>();
+    (launcher.row('state-2').kind as ActionRow).run();
+    await pumpEventQueue();
+    expect(launcher.row('state-2').detail, T.text('retroStateLoading'));
+    launcher.session.callGate = null;
+    loading.complete();
+    await settleFiles();
+    expect(model.toast, 'Slot 3 loaded');
+  });
+
+  test('a save that does not work says so and stays on Save state', () async {
     final model = await playing();
     launcher.session.callErrors['saveState'] = const RetroCallError(RetroCallError.fileError, 'not written');
     model.openRetroMenu();
@@ -165,7 +245,7 @@ void main() {
     expect(model.panelCategories().single.id, 'retroMenu-save');
   });
 
-  test('Load State: a saved slot loads and the game goes on; a refused one says why in plain words', () async {
+  test('Load state: a saved slot loads and the game goes on; a refused one says why in plain words', () async {
     launcher = Ps1Launcher();
     launcher.session.canSaveStates = true;
     final states = folder();
@@ -201,7 +281,7 @@ void main() {
       (launcher.row('state-1').kind as ActionRow).run();
       await settleFiles();
       expect(model.toast, T.text(words), reason: code);
-      expect(model.overlay, Layer.retroMenu, reason: '$code: still on Load State');
+      expect(model.overlay, Layer.retroMenu, reason: '$code: still on Load state');
       expect(model.panelCategories().single.id, 'retroMenu-load');
     }
 
@@ -260,7 +340,7 @@ void main() {
     expect(launcher.row('state-2').kind, isA<InfoRow>());
   });
 
-  test('PS on Overwrite slot N? goes back to Save State, and the game ending closes both', () async {
+  test('PS on Overwrite slot N? goes back to Save state, and the game ending closes both', () async {
     launcher = Ps1Launcher();
     launcher.session.canSaveStates = true;
     File(folder().statePath(0))
@@ -279,6 +359,12 @@ void main() {
     model.handle(Command.home);
     expect(model.overlay, Layer.retroMenu);
     expect(model.panelCategories().single.id, 'retroMenu-save');
+    (launcher.row('state-0').kind as ActionRow).run();
+    model.handle(Command.options);
+    expect(model.overlay, Layer.retroMenu, reason: 'Options goes back to Save state too');
+    expect(model.panelCategories().single.id, 'retroMenu-save');
+    expect(model.panelRow, 0, reason: 'on that slot');
+    expect(launcher.session.calls.where((call) => call.$1 == 'saveState'), isEmpty);
     (launcher.row('state-0').kind as ActionRow).run();
     model.homeHeld();
     await pumpEventQueue();

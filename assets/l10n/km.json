@@ -2472,6 +2472,8 @@
   "retroMenuNoStatesDetail": "មិនទាន់មានស្ថានភាពនៃហ្គេមនេះត្រូវបានរក្សាទុកនៅឡើយទេ។",
   "retroStateSlot": "រន្ធ %@",
   "retroStateEmpty": "ទទេ",
+  "retroStateSaving": "កំពុងរក្សាទុក…",
+  "retroStateLoading": "កំពុងផ្ទុក…",
   "retroStateOverwriteTitle": "សរសេរជាន់លើរន្ធ %@ មែនទេ?",
   "retroStateOverwrite": "សរសេរជាន់លើ",
   "retroStateOverwriteDetail": "ស្ថានភាពដែលបានរក្សាទុកនៅ %@ ត្រូវបានជំនួសដោយពេលនេះ។",

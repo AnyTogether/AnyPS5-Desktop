@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "Aucun état de ce jeu n’est encore sauvegardé.",
   "retroStateSlot": "Emplacement %@",
   "retroStateEmpty": "Vide",
+  "retroStateSaving": "Sauvegarde en cours…",
+  "retroStateLoading": "Chargement en cours…",
   "retroStateOverwriteTitle": "Remplacer l’emplacement %@ ?",
   "retroStateOverwrite": "Remplacer",
   "retroStateOverwriteDetail": "L’état sauvegardé le %@ est remplacé par ce moment.",

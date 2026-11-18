@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "Nicio stare a acestui joc nu este salvată încă.",
   "retroStateSlot": "Slotul %@",
   "retroStateEmpty": "Gol",
+  "retroStateSaving": "Se salvează…",
+  "retroStateLoading": "Se încarcă…",
   "retroStateOverwriteTitle": "Suprascrii slotul %@?",
   "retroStateOverwrite": "Suprascrie",
   "retroStateOverwriteDetail": "Starea salvată pe %@ este înlocuită de acest moment.",

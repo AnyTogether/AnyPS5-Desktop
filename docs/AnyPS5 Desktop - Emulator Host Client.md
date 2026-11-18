@@ -401,15 +401,22 @@ What the launcher does with them:
   object with integers `bytes` and `micros`, 0 or more; anything else is a
   protocol error. After a host failure both give `false`, as the other
   methods that return a boolean do.
-- **Where states live.** `start.states` is `retro/states/ps1` or
-  `retro/states/ps2` in the launcher's data folder (`AppPaths.retroStates`),
-  next to `retro/saves/<console>`, one folder per console as memory cards are
-  kept. The host names each game's slots after its disc, as it names its
-  memory card, so the launcher reads them by the same name
-  (`RetroStateFolder.discName`, the host's `Stem`: the last part of the path,
-  after `/` or on Windows also `\`, without what follows its last dot unless
-  that dot is its first letter). Two discs with the same name in different
-  folders share their slots, as they share their memory card.
+- **Where states live.** `start.states` is `retro/states/ps1/<game>` or
+  `retro/states/ps2/<game>` in the launcher's data folder
+  (`AppPaths.retroStates`), next to `retro/saves/<console>`, where `<game>` is
+  the game's `Game.slug`: its retro.json title ID when it has one, otherwise
+  the hash of its path and size the library names it by. The host names each
+  slot after the disc and checks a state's game only by the console and that
+  name (`otherGame`), so with one folder per console two discs with the same
+  name in different folders would share slots, and one game's state would
+  load into the other. protocol.md lets the launcher name any `start.states`
+  folder, so each game has its own. The memory cards are still kept by disc
+  name in one folder per console, as the host names them. No release ever
+  wrote the per-console folder, so nothing is moved. The launcher reads the
+  slots by the host's own name (`RetroStateFolder.discName`, the host's
+  `Stem`: the last part of the path, after `/` or on Windows also `\`,
+  without what follows its last dot unless that dot is its first letter),
+  from the same normalized path it sends as `start.disc`.
 - **What the launcher reads.** Only each slot's file: whether it is there and
   when it was written, its date and time in the menu. The header the host
   writes is the host's to check: a state of another game, core or core build
@@ -452,7 +459,8 @@ against the files the host wrote, every recorded error code's outcome, and the
 folder's reading and pictures. The fixture test plays the recorded `start`,
 saves, loads and refusals through the client against the fake host, checks
 that nothing about states goes to a host without `saveStates`, and that a
-`saveState` result of `true` is a protocol error.
+`saveState` result of `true`, one whose `bytes` is `1.5`, and a `loadState`
+result without `micros` are each a protocol error.
 
 ## Debug and test builds
 

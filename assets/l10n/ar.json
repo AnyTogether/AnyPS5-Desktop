@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "لم تُحفظ أي حالة لهذه اللعبة بعد.",
   "retroStateSlot": "الخانة %@",
   "retroStateEmpty": "فارغة",
+  "retroStateSaving": "جارٍ الحفظ…",
+  "retroStateLoading": "جارٍ التحميل…",
   "retroStateOverwriteTitle": "هل تريد استبدال الخانة %@؟",
   "retroStateOverwrite": "استبدال",
   "retroStateOverwriteDetail": "تُستبدل الحالة المحفوظة في %@ بهذه اللحظة.",

@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "Belum ada state game ini yang disimpan.",
   "retroStateSlot": "Slot %@",
   "retroStateEmpty": "Kosong",
+  "retroStateSaving": "Menyimpan…",
+  "retroStateLoading": "Memuat…",
   "retroStateOverwriteTitle": "Timpa slot %@?",
   "retroStateOverwrite": "Timpa",
   "retroStateOverwriteDetail": "State yang disimpan pada %@ diganti dengan momen ini.",

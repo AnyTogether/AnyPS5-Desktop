@@ -2472,6 +2472,8 @@
   "retroMenuNoStatesDetail": "ຍັງບໍ່ມີສະຖານະຂອງເກມນີ້ຖືກບັນທຶກໄວ້.",
   "retroStateSlot": "ຊ່ອງ %@",
   "retroStateEmpty": "ວ່າງ",
+  "retroStateSaving": "ກຳລັງບັນທຶກ…",
+  "retroStateLoading": "ກຳລັງໂຫຼດ…",
   "retroStateOverwriteTitle": "ຂຽນທັບຊ່ອງ %@ ບໍ່?",
   "retroStateOverwrite": "ຂຽນທັບ",
   "retroStateOverwriteDetail": "ສະຖານະທີ່ບັນທຶກໄວ້ເມື່ອ %@ ຈະຖືກແທນທີ່ດ້ວຍຊ່ວງເວລານີ້.",

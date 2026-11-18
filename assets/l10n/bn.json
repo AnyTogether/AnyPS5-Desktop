@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "এই গেমের কোনো স্টেট এখনো সেভ করা হয়নি।",
   "retroStateSlot": "স্লট %@",
   "retroStateEmpty": "খালি",
+  "retroStateSaving": "সেভ হচ্ছে…",
+  "retroStateLoading": "লোড হচ্ছে…",
   "retroStateOverwriteTitle": "স্লট %@ প্রতিস্থাপন করবেন?",
   "retroStateOverwrite": "প্রতিস্থাপন করুন",
   "retroStateOverwriteDetail": "%@-এ সেভ করা স্টেটের জায়গায় এই মুহূর্তটি রাখা হবে।",

@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "Ennek a játéknak még nincs mentett állapota.",
   "retroStateSlot": "%@. hely",
   "retroStateEmpty": "Üres",
+  "retroStateSaving": "Mentés…",
+  "retroStateLoading": "Betöltés…",
   "retroStateOverwriteTitle": "Felülírja a(z) %@. helyet?",
   "retroStateOverwrite": "Felülírás",
   "retroStateOverwriteDetail": "A(z) %@ időpontban mentett állapot helyére ez a pillanat kerül.",

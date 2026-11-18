@@ -34,7 +34,7 @@ class RetroPlay {
   final RetroGameMenu menu;
   final DateTime started;
 
-  /// The game's save states, in its menu's Save State and Load State where its host saves states
+  /// The game's save states, in its menu's Save state and Load state where its host saves states
   /// ([RetroSaveStates.available]).
   final RetroSaveStates states;
 
@@ -58,7 +58,7 @@ class RetroPlay {
   /// The section of the menu shown, or null for the menu's first page.
   RetroOptionSection? menuSection;
 
-  /// The menu's Save State or Load State page shown, or null.
+  /// The menu's Save state or Load state page shown, or null.
   RetroStatePage? statePage;
 
   /// The slot Overwrite slot N? asks about ([Layer.retroOverwriteState]).
@@ -413,10 +413,11 @@ extension RetroHostPlaying on AppModel {
           ..deadzonePercent = preferences.stickDeadzone
           ..vibration = preferences.controllerVibration;
     final menu = RetroGameMenu(host, controls: controls);
-    final states = p.normalize(paths.retroStates(ps2: ps2));
+    final discPath = p.normalize(disc.path);
+    final states = p.normalize(paths.retroStates(game.slug, ps2: ps2));
     final saveStates = RetroSaveStates(
       host,
-      RetroStateFolder(folder: states, disc: disc.path),
+      RetroStateFolder(folder: states, disc: discPath),
       log: _padLog,
     );
     final play = RetroPlay(
@@ -445,7 +446,7 @@ extension RetroHostPlaying on AppModel {
       RetroHostStartRequest(
         console: ps2 ? RetroConsole.ps2 : null,
         core: core,
-        disc: p.normalize(disc.path),
+        disc: discPath,
         system: p.normalize(paths.retroSystem),
         saves: p.normalize(ps2 ? paths.retroPs2Saves : paths.retroSaves),
         states: states,
@@ -507,7 +508,11 @@ extension RetroHostPlaying on AppModel {
       if (retroMenuShown) _redraw();
       return;
     }
+    final before = play._seen?.$1;
     play._seen = seen;
+    if (before == RetroHostGamePhase.loading && play.host.phase == RetroHostGamePhase.playing) {
+      _keepRetroMenuRow(play);
+    }
     if (play.host.phase == RetroHostGamePhase.ended && !play.closing) {
       if (!play.over) {
         play.endedAt = DateTime.now();
@@ -631,10 +636,10 @@ extension RetroHostPlaying on AppModel {
     return true;
   }
 
-  /// The game's menu. Its first page: Resume, the discs of a multi-disc game, Save State and Load
+  /// The game's menu. Its first page: Resume, the discs of a multi-disc game, Save state and Load
   /// State where its host saves states, a row for each section ([retroMenuSections]) that has rows,
   /// and Close Game. A section's page: its options in the order the host lists them, with Volume
-  /// and Mute first in Audio. Save State's and Load State's pages: the game's slots. Back on a page
+  /// and Mute first in Audio. Save state's and Load state's pages: the game's slots. Back on a page
   /// goes back to the first page.
   List<PanelCategory> _retroMenuCategories() {
     final play = retroPlay;
@@ -766,12 +771,21 @@ extension RetroHostPlaying on AppModel {
     play.overwriting = null;
   }
 
-  /// Save State and Load State on the menu's first page, where the game's host saves states: Load
-  /// State says what a load takes back with it (a PS1 game's memory card), or that nothing is saved
-  /// yet, when it cannot be chosen.
+  /// The first frame is up, so Save state and Load state join the menu's first page: the row in
+  /// focus stays the one it was on, below them.
+  void _keepRetroMenuRow(RetroPlay play) {
+    if (overlay != Layer.retroMenu || play.menuSection != null || play.statePage != null) return;
+    final at = _retroMenuCategories().single.rows.indexWhere((row) => row.id == 'saveState');
+    if (at >= 0 && panelRow >= at) panelRow += 2;
+  }
+
+  /// Save state and Load state on the menu's first page, where the game's host saves states and
+  /// once the game has shown its first frame (`status.ready`), before which the host saves and
+  /// loads nothing. Load state says what a load takes back with it (a PS1 game's memory card), or
+  /// that nothing is saved yet, when it cannot be chosen.
   List<PanelRow> _retroStateMenuRows(RetroPlay play) {
     final states = play.states;
-    if (!states.available) return const [];
+    if (!states.available || play.host.phase != RetroHostGamePhase.playing) return const [];
     return [
       PanelRow(
         id: 'saveState',
@@ -792,15 +806,18 @@ extension RetroHostPlaying on AppModel {
     ];
   }
 
-  /// A state page's rows: every slot, from 1, with when its state was saved and its picture. On
-  /// Save State each slot can be chosen; on Load State only a slot that holds a state.
+  /// A state page's rows: every slot, from 1, with when its state was saved and its picture, or
+  /// Saving… or Loading… while that is under way. On Save state each slot can be chosen; on Load
+  /// state only a slot that holds a state.
   List<PanelRow> _retroStateRows(RetroPlay play, RetroStatePage page) {
+    final running = play.states.running;
     return [
       for (final slot in play.states.slots)
         PanelRow(
           id: 'state-${slot.slot}',
           title: T.format('retroStateSlot', ['${slot.slot + 1}']),
           detail: switch (slot.savedAt) {
+            _ when running?.slot == slot.slot => T.text(running!.saving ? 'retroStateSaving' : 'retroStateLoading'),
             final savedAt? => retroStateTime(savedAt),
             null => T.text('retroStateEmpty'),
           },
@@ -826,7 +843,7 @@ extension RetroHostPlaying on AppModel {
     _changed();
   }
 
-  /// A slot chosen on Save State: an empty one is saved into at once; one that holds a state asks
+  /// A slot chosen on Save state: an empty one is saved into at once; one that holds a state asks
   /// Overwrite slot N? first.
   Future<void> _chooseRetroSaveSlot(RetroPlay play, RetroStateSlot slot) async {
     if (play.states.busy || !identical(retroPlay, play)) return;
@@ -860,7 +877,7 @@ extension RetroHostPlaying on AppModel {
     ];
   }
 
-  /// Back from Overwrite slot N? to Save State, on that slot.
+  /// Back from Overwrite slot N? to Save state, on that slot.
   void _cancelRetroOverwrite(RetroPlay play) {
     final slot = play.overwriting;
     play.overwriting = null;
@@ -897,7 +914,7 @@ extension RetroHostPlaying on AppModel {
     if (_onRetroStatePage(play, RetroStatePage.save, visit)) resumeRetroGame();
   }
 
-  /// Loads the state in [slot]: back to the game, which goes on from it; still on Load State when
+  /// Loads the state in [slot]: back to the game, which goes on from it; still on Load state when
   /// the host refused it (a state of another emulator build or game, or a damaged file), which is
   /// said.
   Future<void> _loadRetroState(RetroPlay play, int slot) async {

@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "Ingen tilstand for dette spillet er lagret ennå.",
   "retroStateSlot": "Plass %@",
   "retroStateEmpty": "Tom",
+  "retroStateSaving": "Lagrer …",
+  "retroStateLoading": "Laster inn …",
   "retroStateOverwriteTitle": "Overskrive plass %@?",
   "retroStateOverwrite": "Overskriv",
   "retroStateOverwriteDetail": "Tilstanden lagret %@ erstattes av dette øyeblikket.",

@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "Žádný stav této hry zatím není uložen.",
   "retroStateSlot": "Pozice %@",
   "retroStateEmpty": "Prázdná",
+  "retroStateSaving": "Ukládání…",
+  "retroStateLoading": "Načítání…",
   "retroStateOverwriteTitle": "Přepsat pozici %@?",
   "retroStateOverwrite": "Přepsat",
   "retroStateOverwriteDetail": "Stav uložený %@ nahradí tento okamžik.",

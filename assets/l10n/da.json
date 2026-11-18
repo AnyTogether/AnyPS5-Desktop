@@ -2486,6 +2486,8 @@
   "retroMenuNoStatesDetail": "Der er endnu ikke gemt nogen tilstand for dette spil.",
   "retroStateSlot": "Plads %@",
   "retroStateEmpty": "Tom",
+  "retroStateSaving": "Gemmer…",
+  "retroStateLoading": "Indlæser…",
   "retroStateOverwriteTitle": "Overskriv plads %@?",
   "retroStateOverwrite": "Overskriv",
   "retroStateOverwriteDetail": "Tilstanden gemt %@ erstattes af dette øjeblik.",
