@@ -147,6 +147,15 @@ void main() {
     );
   });
 
+  test('a state call asked once stop has begun is notNow, without a call', () async {
+    await started();
+    final stopping = game.stop();
+    expect(await game.saveState(0), RetroStateOutcome.notNow);
+    expect(await game.loadState(0), RetroStateOutcome.notNow);
+    await stopping;
+    expect(session.calls.map((call) => call.$1), isNot(anyOf(contains('saveState'), contains('loadState'))));
+  });
+
   test('a load answered false counts until a status asked after its reply says the game plays on', () async {
     await started();
     final states = RetroSaveStates(game, RetroStateFolder(folder: p.join(temp.path, 'states'), disc: request().disc));

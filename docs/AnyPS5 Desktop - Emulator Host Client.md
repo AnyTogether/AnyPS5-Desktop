@@ -463,13 +463,16 @@ What the launcher does with them:
   `changeDisc`, `connectedPorts`, `stop`, `release`) only once a
   `saveState` or `loadState` it sent has been answered
   (`RetroHostGame._afterStateCall`); the client's pings go on. A call asked
-  meanwhile is sent after the reply, at most 4.5 seconds later, in the order
-  it was asked, and its own 5-second limit starts when it is sent. Each call
+  meanwhile is sent after the reply (4.5 seconds after the state call at
+  most, or later when it waits behind more than one), in the order it was
+  asked, and its own 5-second limit starts when it is sent. Each call
   waits in a loop right before it is sent, and the last check and the send
   are one step with nothing awaited between them, so a second state call that
   starts while it waits (a direct caller of `RetroHostGame.saveState` or
   `loadState`; through the menu `RetroSaveStates.busy` lets only one run) is
-  waited for too.
+  waited for too. Once `stop` has begun no state call is sent
+  (`RetroHostGame._stopping`): the client's `stop` asks `status` until the
+  game has ended, and those polls do not wait for one.
 - **A load that ended the game.** After a PS1 load answered `false`
   (`RetroSaveStates.loadAnsweredFalse`), a game that then ends with
   `errorCode` `other`, with no status between that said it plays on, shows "The game stopped while the state was loading, so
@@ -487,8 +490,8 @@ What the launcher does with them:
   load's reply that has not ended clears the flag, so an `other` ending much
   later, for another reason, says nothing of the card. A status asked before
   the reply never clears it, whatever order the replies are handled in. The
-  status poll runs while the menu is open too, so the flag clears within half
-  a second, before the player goes back to the game.
+  status poll runs every half second while the menu is open too, so the flag
+  usually clears with the next poll, even while the game is still paused.
 
 [`test/fixtures/retro_host_save_states_recording.json`](../test/fixtures/retro_host_save_states_recording.json)
 holds every message each way, as its exact text (frames left out), of a host

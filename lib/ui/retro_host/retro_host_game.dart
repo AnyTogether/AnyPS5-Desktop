@@ -150,6 +150,10 @@ class RetroHostGame extends ChangeNotifier {
   bool _disposed = false;
   bool _hostEnded = false;
   bool _detached = false;
+
+  /// [stop] has begun: the client's `stop` asks `status` until the game has ended, without waiting
+  /// for a state call, so no `saveState` or `loadState` is sent from then on.
+  bool _stopping = false;
   Future<void>? _closing;
   Future<bool>? _detaching;
   Future<void>? _starting;
@@ -301,9 +305,9 @@ class RetroHostGame extends ChangeNotifier {
 
   Future<RetroStateOutcome> _stateCall(String method, int slot) async {
     if (slot < 0 || slot >= RetroStateFolder.slots) throw RangeError.range(slot, 0, RetroStateFolder.slots - 1, 'slot');
-    if (!_gameLive || !_savesStates) return RetroStateOutcome.notNow;
+    if (!_gameLive || !_savesStates || _stopping) return RetroStateOutcome.notNow;
     return _afterStateCall(() async {
-      if (!_gameLive) return RetroStateOutcome.notNow;
+      if (!_gameLive || _stopping) return RetroStateOutcome.notNow;
       final done = Completer<void>();
       _stateCallDone = done.future;
       try {
@@ -403,6 +407,7 @@ class RetroHostGame extends ChangeNotifier {
     if (!_gameLive) return endStatus;
     _poll?.cancel();
     picture.accepting = false;
+    _stopping = true;
     final ended = await _stopAndRelease();
     if (_phase == RetroHostGamePhase.closed) return ended;
     if (ended != null) _status = ended;
