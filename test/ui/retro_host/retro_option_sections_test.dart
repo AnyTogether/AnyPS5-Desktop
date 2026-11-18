@@ -87,7 +87,16 @@ void main() {
     expect(retroOptionShown('swanstation_Console_Region'), isTrue);
     expect(retroOptionSent('swanstation_Console_Region'), isTrue);
     expect(retroOptionSent('swanstation_Console_Enable8MBRAM'), isFalse);
-    expect(retroOptionSent('swanstation_GPU_ResolutionScale'), isFalse, reason: 'no Graphics page yet');
+    expect(retroOptionSent('swanstation_GPU_ResolutionScale'), isTrue, reason: 'the menu offers the resolution');
+    expect(retroOptionSent('swanstation_GPU_ResolutionScale', ps2: true), isFalse, reason: 'no PS2 option');
+    for (final key in [
+      'swanstation_GPU_TextureFilter',
+      'swanstation_GPU_PGXPEnable',
+      'swanstation_Display_AspectRatio',
+    ]) {
+      expect(retroOptionSection(key), RetroOptionSection.graphics, reason: key);
+      expect(retroOptionSent(key), isFalse, reason: '$key waits for a Graphics page');
+    }
   });
 
   test('SwanStation\'s own (Restart) leaves the title, since the menu says it under each such option', () {

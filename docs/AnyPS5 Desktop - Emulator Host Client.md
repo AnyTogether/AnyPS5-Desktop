@@ -338,6 +338,15 @@ What the launcher does with them:
 - **`status.console`.** From a host that lists `ps2`, `RetroStatus.console`
   is `ps1` or `ps2`; a status without it, or with another value, is a
   protocol error. Another host's `console` is not read.
+- **PS2 internal resolution.** A host that lists `ps2ResolutionLimits`
+  (`RetroHostClient.limitsPs2Resolution`, host branch `ps2-resolution-limits`
+  at 9a06327, protocol.md "Capabilities": "A launcher offers a PS2 internal
+  resolution only to a host that lists it") limits `pcsx2_upscale_multiplier`
+  as every host limits SwanStation's. The client throws `StateError` before it
+  sends that key to any other host, in `start.options` or as an `option`
+  call's `key`. `RetroHostGame` leaves it out of `start` on such a host, and
+  the menu offers it only on a host that lists the capability ([Emulator host
+  UI](<AnyPS5 Desktop - Emulator Host UI.md>), "Internal resolution").
 - **Not read yet.** The host also lists `coreIdentity` and `gameTiming` and
   sends `status.core` and `status.timing`; this client ignores both, as
   unknown fields.
@@ -360,6 +369,9 @@ host took, the strict `status.console`, the PS2 `bios` words and folder, and
 where LRPS2's options go. The fixture test plays the recorded LRPS2 status
 through the client against the fake host, checks the client's refusals, and
 reads the host's own `call-start-ps2.json` and `call-status-ps2-no-bios.json`.
+Two more fixture tests give the client the `ps2` welcome without and with
+`ps2ResolutionLimits`: without it, a `start` or `option` with
+`pcsx2_upscale_multiplier` throws before it is sent.
 
 ## Debug and test builds
 

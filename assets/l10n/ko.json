@@ -2479,5 +2479,10 @@
   "retroMenuConsole": "본체",
   "retroMenuConsoleDetail": "지역, BIOS, 빠른 부팅, 디스크 속도.",
   "retroMenuAdvanced": "고급",
-  "retroMenuAdvancedDetail": "에뮬레이터가 게임을 실행하는 방식입니다. 문제를 해결할 때만 변경하세요."
+  "retroMenuAdvancedDetail": "에뮬레이터가 게임을 실행하는 방식입니다. 문제를 해결할 때만 변경하세요.",
+  "retroResolution": "내부 해상도",
+  "retroResolutionDetail": "게임을 더 선명하게 그립니다. 높은 값일수록 더 빠른 그래픽 카드가 필요합니다.",
+  "retroResolutionNative": "기본",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "그래픽 카드가 저장된 해상도를 그릴 수 없어 게임이 %@ 해상도를 사용합니다."
 }

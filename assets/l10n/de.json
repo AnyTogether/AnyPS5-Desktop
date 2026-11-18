@@ -2479,5 +2479,10 @@
   "retroMenuConsole": "Konsole",
   "retroMenuConsoleDetail": "Region, BIOS, Schnellstart und Disc-Geschwindigkeit.",
   "retroMenuAdvanced": "Erweitert",
-  "retroMenuAdvancedDetail": "Wie der Emulator das Spiel ausführt. Ändere das nur, um ein Problem zu beheben."
+  "retroMenuAdvancedDetail": "Wie der Emulator das Spiel ausführt. Ändere das nur, um ein Problem zu beheben.",
+  "retroResolution": "Interne Auflösung",
+  "retroResolutionDetail": "Zeichnet das Spiel schärfer. Höhere Werte brauchen eine schnellere Grafikkarte.",
+  "retroResolutionNative": "Nativ",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Deine Grafikkarte kann die gespeicherte Auflösung nicht zeichnen, daher nutzt das Spiel %@."
 }

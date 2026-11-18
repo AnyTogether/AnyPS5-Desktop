@@ -2479,5 +2479,10 @@
   "retroMenuConsole": "Konsol",
   "retroMenuConsoleDetail": "Wilayah, BIOS, boot cepat, dan kecepatan disk.",
   "retroMenuAdvanced": "Lanjutan",
-  "retroMenuAdvancedDetail": "Cara emulator menjalankan game. Ubah ini hanya untuk memperbaiki masalah."
+  "retroMenuAdvancedDetail": "Cara emulator menjalankan game. Ubah ini hanya untuk memperbaiki masalah.",
+  "retroResolution": "Resolusi Internal",
+  "retroResolutionDetail": "Menggambar game lebih tajam. Nilai lebih tinggi butuh kartu grafis yang lebih cepat.",
+  "retroResolutionNative": "Asli",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Kartu grafis Anda tidak dapat menggambar resolusi yang disimpan, jadi game memakai %@."
 }

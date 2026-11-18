@@ -23,6 +23,7 @@ default, see "In the launcher" and "PS2 games").
 | [`lib/core/retro_host/retro_seats.dart`](../lib/core/retro_host/retro_seats.dart) | `RetroSeats`: which controller sits at each of the PS1's two ports. |
 | [`lib/ui/retro_host/retro_host_controls.dart`](../lib/ui/retro_host/retro_host_controls.dart) | `RetroHostControls`: plays a `RetroHostGame` with the launcher's controllers, connects port 2 and forwards vibration. `RetroPadReader` is how it reads the controllers. |
 | [`lib/ui/retro_host/retro_game_menu.dart`](../lib/ui/retro_host/retro_game_menu.dart) | `RetroGameMenu`: the in-game menu's rows (discs, core options, volume) and what choosing them does. |
+| [`lib/core/retro_host/retro_resolution.dart`](../lib/core/retro_host/retro_resolution.dart) | `RetroResolutionChoice`: the internal resolution the menu offers for a status, each console's option key, and what the row says under it (see "Internal resolution"). |
 | [`lib/ui/retro_host/retro_option_sections.dart`](../lib/ui/retro_host/retro_option_sections.dart) | `RetroOptionSection` and `retroOptionSection`: which section of the menu each SwanStation option belongs to, which options are graphics options the menu leaves out, and which options are not shown. |
 | [`lib/core/retro_host/retro_host_install.dart`](../lib/core/retro_host/retro_host_install.dart) | `RetroHostInstall`: the host and SwanStation library a build runs, and whether it is checked before each start. |
 | [`lib/ui/retro_host/retro_host_download_model.dart`](../lib/ui/retro_host/retro_host_download_model.dart) | `RetroHostDownloadModel`: Settings › Emulators' row that downloads, updates and repairs the signed host, and what a failed check before a start leaves it saying. |
@@ -286,7 +287,7 @@ finds its place:
 
 | Section | SwanStation options |
 | --- | --- |
-| Graphics (not in the menu, see "Not yet") | `GPU_*` and `Display_*`; LRPS2's `pcsx2_upscale_multiplier` |
+| Graphics (not in the menu, see "Not yet"; only the internal resolution has a row of its own) | `GPU_*` and `Display_*`; LRPS2's `pcsx2_upscale_multiplier` |
 | Audio | `Audio_*` and Mute CD Audio (`CDROM_MuteCDAudio`) |
 | Controller | `Controller*` (`Controller_`, `Controller1_`, `Controller2_`, `ControllerPorts_`) |
 | Console | `Console_*`, `BIOS_*`, CD-ROM Region Check, Read Speedup and Seek Speedup, CPU Overclocking |
@@ -301,7 +302,8 @@ debugging switches, and the light gun crosshair (the host plugs in only
 DualShocks). A value kept for one of them from before is not sent in `start`,
 so nobody is left with a setting they can no longer change. For the same
 reason a value kept for a graphics option is not sent either until the
-Graphics page exists (`retroOptionSent`).
+Graphics page exists (`retroOptionSent`), except each console's internal
+resolution, which the menu's first page offers (see "Internal resolution").
 
 `open()` pauses the game (`pause` with `true`, the same as the player's own
 pause) and sets the controls' `suspended`, so presses in the menu never reach
@@ -311,6 +313,77 @@ resumes the game. Neither does anything after waiting for the host, so
 opening the menu again while a close still waits for its reply keeps the
 controllers out. A menu disposed while open closes the same way. A game that
 is not loaded has no menu to open.
+
+## Internal resolution
+
+The menu's first page has an **Internal resolution** row after Audio: the
+scale the game is drawn at. It is the one graphics option the menu shows; the
+others wait for a Graphics page ("Not yet").
+
+**Which option, and when it shows.** The row is
+`swanstation_GPU_ResolutionScale` for a PS1 game and
+`pcsx2_upscale_multiplier` for a PS2 game (`retroResolutionKey`), told apart
+by the status's own `console`. It shows only while the host limits that
+option to what it can pass on, as host `docs/protocol.md` "status" says:
+
+> For the internal resolution (`swanstation_GPU_ResolutionScale`), while
+> `hardware` is `true`, `values` lists only the whole-number scales whose
+> largest frame the host can pass on
+
+and, for PS2, only with the capability the host's
+`ps2-resolution-limits` branch adds (fork B-Howell/anyps5-retro-host-upstream
+at 9a06327, not yet on the host's `main`):
+
+> | `ps2ResolutionLimits` | A PS2 game's internal resolution (`pcsx2_upscale_multiplier`) is limited to what the host can pass on, as PS1's is ([`status`](#status)). A launcher offers a PS2 internal resolution only to a host that lists it |
+
+So `RetroResolutionChoice.of(status, limitsPs2:)` gives nothing before the
+first status, while `status.hardware` is false (the host then lists every
+value and limits none), when the core lists no such option, or for a PS2
+game on a host without `ps2ResolutionLimits` (`RetroHostGame.limitsPs2Resolution`,
+from `welcome`).
+
+**Which values.** The launcher offers Native, 2x, 3x and 4x for PS1 (`"1"`
+to `"4"`) and Native, 2x and 4x for PS2 (`"1x (Native)"`, `"2x"`, `"4x"`;
+LRPS2 has no 3x), and of those only the ones the host lists, in the host's
+order. The value the game has is always shown, also one the launcher does not
+offer, with the host's label, so the row never claims a value the game does
+not use. 5x and above are not offered: on a 1080p or 1440p display most of
+the gain is at 2x to 4x, and PS2 games at 8x ran at 26 to 40 frames a second
+on an RTX 4080 SUPER in the host's own measurement (host `docs/ps2.md`
+"Drawing"), while the host still offers 8x where it fits. The labels are the
+launcher's (`retroResolutionNative`, `retroResolutionScale` "%@x"), not the
+cores', which disagree ("3x (for 720p)" in SwanStation).
+
+**What the row says** (`RetroResolutionNote`, worded by
+`retroResolutionDetail`):
+
+- the host could not use the value saved (`status.resolutionError` not
+  empty): "Your graphics card can't draw the resolution you saved, so the game
+  uses 4x.", naming `activeValue`. The host's English sentence goes only to
+  the launcher's log, once per change;
+- a PS1 value chosen and not yet drawn (`selected` is not `activeValue`, or
+  `graphicsPending`): "Takes effect in a moment.";
+- a PS2 value chosen: "Takes effect when the game is started again.", since
+  LRPS2 reads it only while the game loads (`restart` is `true`);
+- a PS2 game otherwise: "Changes take effect when the game is started again.";
+- a PS1 game otherwise: "Draws the game sharper. Higher values need a faster
+  graphics card."
+
+**Choosing.** `RetroGameMenu.chooseResolution` sends `option` with the
+value, only one the row offers and not the one already chosen. Once the host
+takes it, `AppModel` keeps it in `Preferences.retroHostOptions`, as any
+option, and `retroOptionSent` sends it in the next game's `start` of that
+console. The host judges a kept value again at every start, so a value that
+no longer fits (another graphics card) starts the game at the largest that
+does, with `resolutionError`. `RetroHostGame.start` leaves a kept PS2 value
+out of `start` on a host without `ps2ResolutionLimits`, and the client throws
+`StateError` before it sends one to such a host, in `start` or `option`.
+
+**Not in Settings yet.** Settings › Emulators has no resolution rows. A
+preference chosen there would be a value no host has judged, and whether a
+host limits PS2 is known only once it has greeted the launcher; the row in
+the game's menu needs neither. A Settings row, the Graphics page and an
+automatic choice by graphics card come later.
 
 ## In the launcher
 
@@ -422,11 +495,10 @@ found** with the PS2 BIOS folder offered on the options key
 (`retroBiosFolderOf`), as the PS1 error screen offers the PS1 folder. The
 in-game menu is the PS1 one: LRPS2's options are all under Advanced
 (`retroOptionSection`), with their own titles, but its resolution scale
-(`pcsx2_upscale_multiplier`), which is a graphics option, left out of the menu
-and not sent, as SwanStation's are, until the host's resolution limits cover
-LRPS2 (host `docs/ps2.md` "Drawing" knows only SwanStation's). A host test ran
-one PS2 game at 2x at full speed on a fast graphics card, which says nothing
-about a slower one. `pcsx2_bios`, the BIOS file
+(`pcsx2_upscale_multiplier`), which is a graphics option, is not under
+Advanced: it is the Internal resolution row (see "Internal resolution"), and
+only on a host that lists `ps2ResolutionLimits`; to any other host it is
+neither shown nor sent. `pcsx2_bios`, the BIOS file
 LRPS2 starts with when the folder holds more than one, says it takes effect at
 the next start. The kept host stays for the next game while the game selected
 plays in the host, PS1 or PS2. Online play stays PS1-only and is not touched.
@@ -455,7 +527,8 @@ updated"). Then it sends `start` with:
   settings folder, where protocol.md's `start` example keeps it;
 - `saves`: `AppPaths.retroSaves`, `retro/saves/ps1` beside it;
 - `options`: the SwanStation options the player chose in the menu before
-  (`Preferences.retroHostOptions`).
+  (`Preferences.retroHostOptions`), the internal resolution among them, and
+  for a PS2 game LRPS2's (`retroOptionSent`).
 
 The family play-time watcher follows the game as it follows any game
 (`FamilyGate.followGame`), and a family limit that closes games closes it
@@ -669,7 +742,20 @@ native memory as a real ring slot would be, so no host is started.
 - [`retro_option_sections_test.dart`](../test/ui/retro_host/retro_option_sections_test.dart)
   sorts the fifty options of the recorded real status into their sections and
   the ten not shown, checks keys the recording lacks (port 2, multitap, a
-  group SwanStation may add, another core's key), and the " (Restart)" titles.
+  group SwanStation may add, another core's key), and the " (Restart)" titles;
+  the internal resolution is sent and the other graphics options are not.
+- [`retro_resolution_words_test.dart`](../test/ui/retro_host/retro_resolution_words_test.dart)
+  checks the row's labels (Native, the scale, the host's own label for a
+  value the launcher does not offer) and the line under it for each note.
+- [`test/core/retro_host/retro_resolution_test.dart`](../test/core/retro_host/retro_resolution_test.dart)
+  reads the recorded SwanStation status (eight scales, the menu offers four),
+  and [`test/fixtures/retro-host-ps2-resolution-status.json`](../test/fixtures/retro-host-ps2-resolution-status.json),
+  the host's `call-status-ps2-resolution.json` from the `ps2-resolution-limits`
+  branch at 9a06327, recorded with the real LRPS2 and Jak and Daxter started
+  at 8x in stereo on an RTX 4080 SUPER: 1x to 4x listed, 4x in use and
+  `resolutionError` set. It checks the notes, a value the launcher does not
+  offer, and that nothing is offered without the GPU, without the option, or
+  for PS2 on a host without `ps2ResolutionLimits`.
 - [`retro_host_launch_environment_test.dart`](../test/ui/retro_host/retro_host_launch_environment_test.dart)
   starts `AppModel.openRetroHost` on Linux with a host that writes the
   environment it got: the AppImage's variables are gone, `XDG_DATA_DIRS` has
@@ -708,7 +794,8 @@ native memory as a real ring slot would be, so no host is started.
   option steps, volume steps and mute, volume set before `welcome`, and that
   opening the menu pauses the game and suspends the controls, also when it is
   opened again while closing still waits for the host, and that a menu
-  disposed while open gives the controllers back.
+  disposed while open gives the controllers back. `chooseResolution` sends
+  `option` only for a value the row offers and not already chosen.
 - [`retro_pad_test.dart`](../test/core/retro_host/retro_pad_test.dart) checks
   every button against the protocol's bit table, the triggers, both ends of
   the stick range and the dead zone.
@@ -724,8 +811,10 @@ native memory as a real ring slot would be, so no host is started.
   player's paths, volume and options, the controller kept from the launcher
   on the game's screen, PS opening and closing the menu, the menu's first page
   and each section's page against the recorded real status (Back to the first
-  page on the section's row, the restart marks, what is kept), options not
-  shown and not sent, Close game keeping the host and the next game starting
+  page on the section's row, the restart marks, what is kept), the Internal
+  resolution row (Native to 4x of the eight scales the host lists, a refused
+  `option` not kept, a taken one kept and sent at the next start, no row while
+  the host draws without the GPU), options not shown and not sent, Close game keeping the host and the next game starting
   on it, the kept host shut down when the player leaves the PS1 games, after
   the idle limit and when another game starts, a kept host that crashed and a
   host that crashed during a game (both replaced by a new host for the next
@@ -743,7 +832,9 @@ native memory as a real ring slot would be, so no host is started.
 - [`retro_host_play_golden_test.dart`](../test/ui/retro_host_play_golden_test.dart)
   draws the loading screen, the error screen (no BIOS, with its folder hint),
   the game's picture, the menu's
-  first page over it, its Console page, the game on an unchecked host with
+  first page over it (with the Internal resolution row after Audio), a PS2
+  game's menu on that row with a saved 8x refused (the recorded LRPS2 status),
+  its Console page, the game on an unchecked host with
   its mark in the corner, and Settings › Emulators with the
   host's rows: the debug host's with its unchecked notice, the download offered
   before a host is installed, and the downloaded release installed and turned on.
@@ -864,8 +955,10 @@ PS2 has tests of its own, with no BIOS of any kind:
 [`test/ui/retro_host_ps2_test.dart`](../test/ui/retro_host_ps2_test.dart)
 covers the PS2 rows with and without LRPS2 beside the host, the folder they
 open, a PS2 disc's `start`, a PS1 disc on the same host, a host without `ps2`,
-the real LRPS2's `bios` and its folder, a running PS2 game's menu, and the
-signed release with LRPS2
+the real LRPS2's `bios` and its folder, a running PS2 game's menu, the
+internal resolution from the recorded LRPS2 status (offered, chosen and kept
+on a host with `ps2ResolutionLimits`; neither offered nor sent on one
+without), and the signed release with LRPS2
 ([`test/fixtures/retro_host_release_ps2`](../test/fixtures/retro_host_release_ps2/SHA256SUMS))
 and without it. It also downloads both from a fake GitHub, one after the other,
 and checks that a PS2 cue sheet (`Ps1Launcher.addPs2CueSheet` in
@@ -905,11 +998,14 @@ draws the PS2 rows and the PS2 missing-BIOS screen.
   in Settings › Shortcuts: neither has one by default, and Esc is Start in the
   default Controls. A default key changes every game's shortcuts, so it is
   left for the signed install, before release builds find a host.
-- **Graphics.** The menu does not show SwanStation's graphics options
-  (`GPU_*` and `Display_*`). They are left for a Graphics page of their own,
-  which comes with the host's drawing on the graphics card (not on the host's
-  `main` at 9052aff); `RetroGameMenu.optionsIn(RetroOptionSection.graphics)`
-  already gives them in the host's order for that page.
+- **Graphics.** The menu shows only the internal resolution. SwanStation's
+  other graphics options (`GPU_*` and `Display_*`) and LRPS2's other video
+  options are left for a Graphics page of their own;
+  `RetroGameMenu.optionsIn(RetroOptionSection.graphics)` already gives them in
+  the host's order for that page. There is no internal resolution row in
+  Settings › Emulators and no automatic choice by graphics card or display
+  yet. How long a PS1 change takes to show, and the row on a real game through
+  the launcher, have not been seen: the tests use recorded statuses.
 - **One copy per frame.** Each frame is copied once and uploaded through
   `decodeImageFromPixels`. A texture that shares the ring with the GPU would
   avoid the copy. That is worth doing only if a trace shows the copy costs

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/retro_host/retro_host_client.dart';
 import '../../core/retro_host/retro_host_protocol.dart';
 import '../../core/retro_host/retro_host_session.dart';
+import '../../core/retro_host/retro_resolution.dart';
 import 'retro_frame_image.dart';
 
 /// Where one game in an emulator host stands.
@@ -133,6 +134,10 @@ class RetroHostGame extends ChangeNotifier {
   bool get consoleRefused => _consoleRefused;
   bool _consoleRefused = false;
 
+  /// Whether the host limits a PS2 game's internal resolution (`ps2ResolutionLimits`), so the menu
+  /// may offer it. False until the host has greeted the launcher.
+  bool get limitsPs2Resolution => session.limitsPs2Resolution;
+
   /// How the host's connection ended; null while it is open. [RetroHostEnd.unsupported] means
   /// the host speaks no protocol version this launcher does: the emulator needs updating.
   RetroHostEnd? get hostEnd => _hostEnd;
@@ -150,7 +155,8 @@ class RetroHostGame extends ChangeNotifier {
   bool get _gameLive => _phase == RetroHostGamePhase.loading || _phase == RetroHostGamePhase.playing;
 
   /// Waits for the host's greeting, then starts the game. Throws [StateError] when a game was
-  /// already started on this host.
+  /// already started on this host. A PS2 game's internal resolution goes only to a host that
+  /// limits it ([limitsPs2Resolution]); an older host starts the game at LRPS2's own default.
   Future<void> start(RetroHostStartRequest request) {
     if (_phase != RetroHostGamePhase.idle) throw StateError('A game was already started on this host.');
     _setPhase(RetroHostGamePhase.starting);
@@ -166,7 +172,10 @@ class RetroHostGame extends ChangeNotifier {
         _end(failure: 'The host does not list the $retroCapabilityPs2 capability.');
         return;
       }
-      await session.startGame(request.toArgs());
+      final sent = request.console == RetroConsole.ps2 && !session.limitsPs2Resolution
+          ? request.withoutOption(retroResolutionKeyPs2)
+          : request;
+      await session.startGame(sent.toArgs());
     } on Object catch (error) {
       if (_phase == RetroHostGamePhase.starting) _end(failure: '$error');
       return;

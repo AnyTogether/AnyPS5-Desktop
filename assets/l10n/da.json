@@ -2479,5 +2479,10 @@
   "retroMenuConsole": "Konsol",
   "retroMenuConsoleDetail": "Region, BIOS, hurtig opstart og diskhastighed.",
   "retroMenuAdvanced": "Avanceret",
-  "retroMenuAdvancedDetail": "Hvordan emulatoren kører spillet. Skift kun dette for at løse et problem."
+  "retroMenuAdvancedDetail": "Hvordan emulatoren kører spillet. Skift kun dette for at løse et problem.",
+  "retroResolution": "Intern opløsning",
+  "retroResolutionDetail": "Tegner spillet skarpere. Højere værdier kræver et hurtigere grafikkort.",
+  "retroResolutionNative": "Oprindelig",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Dit grafikkort kan ikke tegne den gemte opløsning, så spillet bruger %@."
 }

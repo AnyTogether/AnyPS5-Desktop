@@ -72,6 +72,7 @@ void main() {
       ..preferences.retroHostOptions.addAll({
         'swanstation_CDROM_ReadSpeedup': '2',
         'swanstation_GPU_ResolutionScale': '2',
+        'swanstation_GPU_TextureFilter': 'Bilinear',
       });
     expect(model.stateOf(launcher.game), isA<Installed>(), reason: 'no DuckStation needed');
     expect(launcher.emulatorSettings().rows.map((row) => row.id), contains('retro-host-bios'));
@@ -94,8 +95,8 @@ void main() {
       'disc': p.normalize(launcher.disc),
       'system': p.normalize(model.paths.retroSystem),
       'saves': p.normalize(model.paths.retroSaves),
-      'options': {'swanstation_CDROM_ReadSpeedup': '2'},
-    }, reason: 'a graphics option has no page yet, so it is kept back');
+      'options': {'swanstation_CDROM_ReadSpeedup': '2', 'swanstation_GPU_ResolutionScale': '2'},
+    }, reason: 'the internal resolution is sent; another graphics option has no page yet, so it is kept back');
     expect(Directory(model.paths.retroSystem).existsSync(), isTrue);
     expect(model.preferences.lastPlayed[launcher.game.id], isNotNull);
 
@@ -180,12 +181,13 @@ void main() {
         'disc-0',
         'disc-1',
         'section-audio',
+        'resolution',
         'section-controller',
         'section-console',
         'section-advanced',
         'closeGame',
       ],
-      reason: 'Graphics is not in the menu; a section shows only with rows',
+      reason: 'Graphics is not in the menu but for the internal resolution; a section shows only with rows',
     );
     expect(launcher.row('disc-0').detail, 'In the console.');
     expect(launcher.row('section-console').title, T.text('retroMenuConsole'));
@@ -238,7 +240,7 @@ void main() {
     model.handle(Command.back);
     expect(model.overlay, Layer.retroMenu, reason: 'Back on a section goes back to the first page');
     expect(model.panelCategories().single.id, 'retroMenu');
-    expect(model.panelRow, 5, reason: 'on the Console row');
+    expect(model.panelRow, 6, reason: 'on the Console row');
     expect(launcher.play.menu.isOpen, isTrue);
 
     (launcher.row('section-advanced').kind as ActionRow).run();
@@ -293,6 +295,46 @@ void main() {
     (launcher.row('resume').kind as ActionRow).run();
     await pumpEventQueue();
     expect(model.overlay, isNull);
+  });
+
+  test('the internal resolution after Audio: Native to 4x of what the host lists, kept for later games', () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model..setRetroHostPs1(true);
+    await launcher.start(status: recordedStatus());
+    final session = launcher.session;
+    model.openRetroMenu();
+    await pumpEventQueue();
+    final row = launcher.row('resolution');
+    expect(row.title, T.text('retroResolution'));
+    expect(row.detail, T.text('retroResolutionDetail'));
+    final choice = row.kind as ChoiceRow;
+    expect(choice.options, ['Native', '2x', '3x', '4x'], reason: 'the host lists 1 to 8; 5x to 8x are not offered');
+    expect(choice.selected, 0);
+
+    session.callResults['option'] = false;
+    choice.set(3);
+    await pumpEventQueue();
+    expect(session.calls.last.$1, 'option');
+    expect(session.calls.last.$2, {'key': 'swanstation_GPU_ResolutionScale', 'value': '4'});
+    expect(model.preferences.retroHostOptions, isNot(contains('swanstation_GPU_ResolutionScale')), reason: 'refused');
+
+    session.callResults['option'] = true;
+    session.nextStatus = recordedStatus(selected: {'swanstation_GPU_ResolutionScale': 3});
+    choice.set(3);
+    await pumpEventQueue();
+    expect(model.preferences.retroHostOptions['swanstation_GPU_ResolutionScale'], '4');
+    expect((launcher.row('resolution').kind as ChoiceRow).selected, 3);
+    expect(model.overlay, Layer.retroMenu, reason: 'the menu stays open on its first page');
+  });
+
+  test('no internal resolution row while the host draws without the GPU', () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model..setRetroHostPs1(true);
+    final software = RetroStatus.parse({...recordedStatus().toJson(), 'hardware': false});
+    await launcher.start(status: software);
+    model.openRetroMenu();
+    await pumpEventQueue();
+    expect([for (final row in model.panelCategories().single.rows) row.id], isNot(contains('resolution')));
   });
 
   test('an option a player has no use for is neither shown nor sent, though it was kept', () async {

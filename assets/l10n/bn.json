@@ -2479,5 +2479,10 @@
   "retroMenuConsole": "কনসোল",
   "retroMenuConsoleDetail": "অঞ্চল, BIOS, দ্রুত বুট এবং ডিস্কের গতি।",
   "retroMenuAdvanced": "উন্নত",
-  "retroMenuAdvancedDetail": "এমুলেটর কীভাবে গেম চালায়। শুধু কোনো সমস্যা ঠিক করতে এগুলো বদলান।"
+  "retroMenuAdvancedDetail": "এমুলেটর কীভাবে গেম চালায়। শুধু কোনো সমস্যা ঠিক করতে এগুলো বদলান।",
+  "retroResolution": "অভ্যন্তরীণ রেজোলিউশন",
+  "retroResolutionDetail": "গেমটি আরও স্পষ্ট করে আঁকে। বেশি মানের জন্য দ্রুততর গ্রাফিক্স কার্ড লাগে।",
+  "retroResolutionNative": "নেটিভ",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "আপনার গ্রাফিক্স কার্ড সংরক্ষিত রেজোলিউশন আঁকতে পারে না, তাই গেমটি %@ ব্যবহার করে।"
 }

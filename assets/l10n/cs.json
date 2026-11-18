@@ -2479,5 +2479,10 @@
   "retroMenuConsole": "Konzole",
   "retroMenuConsoleDetail": "Region, BIOS, rychlý start a rychlost disku.",
   "retroMenuAdvanced": "Pokročilé",
-  "retroMenuAdvancedDetail": "Jak emulátor hru spouští. Měňte to jen při řešení problému."
+  "retroMenuAdvancedDetail": "Jak emulátor hru spouští. Měňte to jen při řešení problému.",
+  "retroResolution": "Vnitřní rozlišení",
+  "retroResolutionDetail": "Vykreslí hru ostřeji. Vyšší hodnoty potřebují rychlejší grafickou kartu.",
+  "retroResolutionNative": "Nativní",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Vaše grafická karta nezvládne uložené rozlišení, takže hra používá %@."
 }

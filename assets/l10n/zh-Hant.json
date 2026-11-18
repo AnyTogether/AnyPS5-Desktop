@@ -2479,5 +2479,10 @@
   "retroMenuConsole": "主機",
   "retroMenuConsoleDetail": "地區、BIOS、快速開機和光碟機速度。",
   "retroMenuAdvanced": "進階",
-  "retroMenuAdvancedDetail": "模擬器執行遊戲的方式。僅在需要解決問題時變更。"
+  "retroMenuAdvancedDetail": "模擬器執行遊戲的方式。僅在需要解決問題時變更。",
+  "retroResolution": "內部解析度",
+  "retroResolutionDetail": "讓遊戲畫面更清晰。數值越高，需要的顯示卡越快。",
+  "retroResolutionNative": "原生",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "你的顯示卡無法繪製儲存的解析度，因此遊戲使用 %@。"
 }

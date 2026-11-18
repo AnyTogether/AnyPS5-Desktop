@@ -2462,5 +2462,10 @@
   "retroMenuConsole": "कंसोल",
   "retroMenuConsoleDetail": "इलाका, BIOS, तेज़ बूट आ डिस्क के रफ्तार।",
   "retroMenuAdvanced": "उन्नत",
-  "retroMenuAdvancedDetail": "एमुलेटर गेम के कइसे चलावेला। एकरा के खाली कवनो दिक्कत ठीक करे खातिर बदलीं।"
+  "retroMenuAdvancedDetail": "एमुलेटर गेम के कइसे चलावेला। एकरा के खाली कवनो दिक्कत ठीक करे खातिर बदलीं।",
+  "retroResolution": "भीतरी रिजॉल्यूशन",
+  "retroResolutionDetail": "गेम के अउरी साफ बनावेला। बड़ मान खातिर तेज ग्राफिक्स कार्ड चाहीं।",
+  "retroResolutionNative": "मूल",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "रउआ ग्राफिक्स कार्ड सेव कइल रिजॉल्यूशन ना बना सकेला, एह से गेम %@ इस्तेमाल करेला।"
 }

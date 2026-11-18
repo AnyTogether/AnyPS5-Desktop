@@ -2479,5 +2479,10 @@
   "retroMenuConsole": "本体",
   "retroMenuConsoleDetail": "地域、BIOS、高速起動、ディスク速度。",
   "retroMenuAdvanced": "詳細",
-  "retroMenuAdvancedDetail": "エミュレーターがゲームを実行する方法です。問題を解決するときだけ変更してください。"
+  "retroMenuAdvancedDetail": "エミュレーターがゲームを実行する方法です。問題を解決するときだけ変更してください。",
+  "retroResolution": "内部解像度",
+  "retroResolutionDetail": "ゲームをより鮮明に描画します。高い値ほど高速なグラフィックカードが必要です。",
+  "retroResolutionNative": "ネイティブ",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "グラフィックカードが保存した解像度を描画できないため、ゲームは %@ を使います。"
 }

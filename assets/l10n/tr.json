@@ -2479,5 +2479,10 @@
   "retroMenuConsole": "Konsol",
   "retroMenuConsoleDetail": "Bölge, BIOS, hızlı açılış ve disk hızı.",
   "retroMenuAdvanced": "Gelişmiş",
-  "retroMenuAdvancedDetail": "Emülatörün oyunu nasıl çalıştırdığı. Yalnızca bir sorunu gidermek için değiştir."
+  "retroMenuAdvancedDetail": "Emülatörün oyunu nasıl çalıştırdığı. Yalnızca bir sorunu gidermek için değiştir.",
+  "retroResolution": "Dahili çözünürlük",
+  "retroResolutionDetail": "Oyunu daha keskin çizer. Yüksek değerler daha hızlı bir ekran kartı gerektirir.",
+  "retroResolutionNative": "Yerel",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Ekran kartın kaydedilen çözünürlüğü çizemiyor, bu yüzden oyun %@ kullanıyor."
 }

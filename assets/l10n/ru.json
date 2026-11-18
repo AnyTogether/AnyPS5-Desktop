@@ -2479,5 +2479,10 @@
   "retroMenuConsole": "Консоль",
   "retroMenuConsoleDetail": "Регион, BIOS, быстрая загрузка и скорость диска.",
   "retroMenuAdvanced": "Дополнительно",
-  "retroMenuAdvancedDetail": "Как эмулятор запускает игру. Меняйте это, только чтобы устранить проблему."
+  "retroMenuAdvancedDetail": "Как эмулятор запускает игру. Меняйте это, только чтобы устранить проблему.",
+  "retroResolution": "Внутреннее разрешение",
+  "retroResolutionDetail": "Рисует игру чётче. Для больших значений нужна более быстрая видеокарта.",
+  "retroResolutionNative": "Исходное",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Ваша видеокарта не может отрисовать сохранённое разрешение, поэтому игра использует %@."
 }

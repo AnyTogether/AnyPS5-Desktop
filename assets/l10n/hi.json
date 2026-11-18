@@ -2479,5 +2479,10 @@
   "retroMenuConsole": "कंसोल",
   "retroMenuConsoleDetail": "क्षेत्र, BIOS, तेज़ बूट और डिस्क की गति।",
   "retroMenuAdvanced": "उन्नत",
-  "retroMenuAdvancedDetail": "एमुलेटर गेम को कैसे चलाता है। इन्हें केवल किसी समस्या को ठीक करने के लिए बदलें।"
+  "retroMenuAdvancedDetail": "एमुलेटर गेम को कैसे चलाता है। इन्हें केवल किसी समस्या को ठीक करने के लिए बदलें।",
+  "retroResolution": "आंतरिक रिज़ॉल्यूशन",
+  "retroResolutionDetail": "गेम को और साफ़ बनाता है। ऊँचे मानों के लिए तेज़ ग्राफ़िक्स कार्ड चाहिए।",
+  "retroResolutionNative": "मूल",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "आपका ग्राफ़िक्स कार्ड सहेजा गया रिज़ॉल्यूशन नहीं बना सकता, इसलिए गेम %@ का उपयोग करता है।"
 }

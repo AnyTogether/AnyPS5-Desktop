@@ -2479,5 +2479,10 @@
   "retroMenuConsole": "کنسول",
   "retroMenuConsoleDetail": "علاقہ، BIOS، تیز بوٹ اور ڈسک کی رفتار۔",
   "retroMenuAdvanced": "اعلی درجے کی",
-  "retroMenuAdvancedDetail": "ایمولیٹر گیم کو کیسے چلاتا ہے۔ انہیں صرف کوئی مسئلہ حل کرنے کے لیے بدلیں۔"
+  "retroMenuAdvancedDetail": "ایمولیٹر گیم کو کیسے چلاتا ہے۔ انہیں صرف کوئی مسئلہ حل کرنے کے لیے بدلیں۔",
+  "retroResolution": "اندرونی ریزولوشن",
+  "retroResolutionDetail": "گیم کو زیادہ واضح بناتا ہے۔ زیادہ قدروں کے لیے تیز گرافکس کارڈ چاہیے۔",
+  "retroResolutionNative": "اصل",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "آپ کا گرافکس کارڈ محفوظ کردہ ریزولوشن نہیں بنا سکتا، اس لیے گیم %@ استعمال کرتا ہے۔"
 }

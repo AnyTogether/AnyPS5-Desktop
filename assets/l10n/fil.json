@@ -2479,5 +2479,10 @@
   "retroMenuConsole": "Console",
   "retroMenuConsoleDetail": "Rehiyon, BIOS, mabilis na boot at bilis ng disc.",
   "retroMenuAdvanced": "Advanced",
-  "retroMenuAdvancedDetail": "Kung paano pinapatakbo ng emulator ang laro. Baguhin lang ang mga ito para ayusin ang isang problema."
+  "retroMenuAdvancedDetail": "Kung paano pinapatakbo ng emulator ang laro. Baguhin lang ang mga ito para ayusin ang isang problema.",
+  "retroResolution": "Internal na Resolusyon",
+  "retroResolutionDetail": "Mas malinaw na iginuguhit ang laro. Kailangan ng mas mabilis na graphics card para sa mas matataas na value.",
+  "retroResolutionNative": "Native",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Hindi kaya ng iyong graphics card ang na-save na resolusyon, kaya %@ ang ginagamit ng laro."
 }

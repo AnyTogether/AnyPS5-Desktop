@@ -66,6 +66,7 @@ import '../core/retro_host/retro_host_protocol.dart' show RetroConsole, RetroErr
 import '../core/retro_host/retro_host_release.dart' show RetroHostChecked, RetroHostReleaseFailure;
 import '../core/retro_host/retro_host_session.dart' show RetroHostSession, RetroHostStartRequest;
 import '../core/retro_host/retro_keyboard.dart';
+import '../core/retro_host/retro_resolution.dart';
 import '../core/remote/adb_tunnel.dart';
 import '../core/remote/assist.dart';
 import '../core/remote/mdns.dart';

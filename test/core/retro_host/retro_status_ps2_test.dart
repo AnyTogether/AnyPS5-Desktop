@@ -77,9 +77,10 @@ void main() {
     expect(retroOptionSection('pcsx2_upscale_multiplier'), RetroOptionSection.graphics);
     expect(
       retroOptionSent('pcsx2_upscale_multiplier', ps2: true),
-      isFalse,
-      reason: "held back like SwanStation's graphics: the host's resolution limits do not cover it yet",
+      isTrue,
+      reason: 'the menu offers it; RetroHostGame keeps it from a host without ps2ResolutionLimits',
     );
+    expect(retroOptionSent('pcsx2_upscale_multiplier'), isFalse, reason: 'no PS1 option');
     expect(retroOptionSent('swanstation_Console_Region', ps2: true), isFalse);
     expect(retroOptionSent('swanstation_Console_Region'), isTrue);
   });

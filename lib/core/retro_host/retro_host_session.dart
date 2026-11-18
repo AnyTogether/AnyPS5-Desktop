@@ -44,6 +44,10 @@ abstract interface class RetroHostSession implements RetroFrameSource {
   /// Whether the host lists `ps2`, so a PS2 game can be started on it ([RetroHostStartRequest.console]).
   bool get canPlayPs2;
 
+  /// Whether the host lists `ps2ResolutionLimits`, so a PS2 game's internal resolution is limited
+  /// by the host and may be sent to it.
+  bool get limitsPs2Resolution;
+
   /// Asks the host to stop its game and exit.
   void shutdown();
 
@@ -85,6 +89,17 @@ class RetroHostStartRequest {
   /// [RetroConsole.ps2] for a PS2 game, which only a host that lists `ps2` takes; null for a PS1
   /// game, the host's default, so a PS1 start is the same on every host.
   final String? console;
+
+  /// This request without the option at [key], for a host that must not be sent it.
+  RetroHostStartRequest withoutOption(String key) => RetroHostStartRequest(
+    core: core,
+    disc: disc,
+    system: system,
+    saves: saves,
+    options: {...options}..remove(key),
+    initialDisc: initialDisc,
+    console: console,
+  );
 
   Map<String, Object?> toArgs() => {
     'console': ?console,

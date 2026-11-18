@@ -2479,5 +2479,10 @@
   "retroMenuConsole": "Konzol",
   "retroMenuConsoleDetail": "Régió, BIOS, gyorsindítás és lemezsebesség.",
   "retroMenuAdvanced": "Speciális",
-  "retroMenuAdvancedDetail": "Hogyan futtatja az emulátor a játékot. Csak egy hiba elhárításához módosítsd."
+  "retroMenuAdvancedDetail": "Hogyan futtatja az emulátor a játékot. Csak egy hiba elhárításához módosítsd.",
+  "retroResolution": "Belső felbontás",
+  "retroResolutionDetail": "Élesebben rajzolja a játékot. A nagyobb értékekhez gyorsabb videokártya kell.",
+  "retroResolutionNative": "Natív",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "A videokártyád nem tudja megrajzolni a mentett felbontást, ezért a játék ezt használja: %@."
 }

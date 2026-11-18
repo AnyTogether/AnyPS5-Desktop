@@ -2479,5 +2479,10 @@
   "retroMenuConsole": "Konsol",
   "retroMenuConsoleDetail": "Rantau, BIOS, but pantas dan kelajuan cakera.",
   "retroMenuAdvanced": "Lanjutan",
-  "retroMenuAdvancedDetail": "Cara emulator menjalankan permainan. Ubah ini hanya untuk membetulkan masalah."
+  "retroMenuAdvancedDetail": "Cara emulator menjalankan permainan. Ubah ini hanya untuk membetulkan masalah.",
+  "retroResolution": "Resolusi Dalaman",
+  "retroResolutionDetail": "Melukis permainan dengan lebih tajam. Nilai lebih tinggi memerlukan kad grafik yang lebih pantas.",
+  "retroResolutionNative": "Asal",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Kad grafik anda tidak dapat melukis resolusi yang disimpan, jadi permainan menggunakan %@."
 }

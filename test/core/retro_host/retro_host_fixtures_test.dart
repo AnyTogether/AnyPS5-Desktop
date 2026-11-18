@@ -7,6 +7,7 @@ import 'package:anyps5_desktop/core/retro_host/retro_host_client.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_protocol.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_release.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_session.dart';
+import 'package:anyps5_desktop/core/retro_host/retro_resolution.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
@@ -130,8 +131,37 @@ void main() {
       capabilities: _ps2Recording.welcome('lrps2-welcome')['capabilities']! as List<Object?>,
       afterReady: (client) async {
         expect(client.canPlayPs2, isTrue);
+        expect(client.limitsPs2Resolution, isFalse);
         final ps2 = {'console': RetroConsole.ps2, 'core': 'c', 'disc': 'd.iso', 'system': 's', 'saves': 'v'};
         expect(() => client.call('start', {...ps2, 'initialDisc': 0}), throwsStateError);
+        expect(
+          () => client.call('start', {
+            ...ps2,
+            'options': {retroResolutionKeyPs2: '2x'},
+          }),
+          throwsStateError,
+          reason: 'a PS2 internal resolution only to a host that limits it',
+        );
+        expect(() => client.call('option', {'key': retroResolutionKeyPs2, 'value': '2x'}), throwsStateError);
+      },
+    ),
+    timeout: const Timeout(Duration(seconds: 90)),
+  );
+  test(
+    'a host that lists ps2ResolutionLimits says so, and its PS2 game plays as before',
+    () => _playOwn(
+      checkout,
+      python,
+      'A host that lists ps2 and ps2ResolutionLimits: start with console ps2, the status that host sent '
+          'with the real LRPS2 and no BIOS, then release.',
+      'clean',
+      _ps2NoBiosSteps(),
+      capabilities: [
+        ..._ps2Recording.welcome('lrps2-welcome')['capabilities']! as List<Object?>,
+        retroCapabilityPs2ResolutionLimits,
+      ],
+      afterReady: (client) async {
+        expect(client.limitsPs2Resolution, isTrue);
       },
     ),
     timeout: const Timeout(Duration(seconds: 90)),

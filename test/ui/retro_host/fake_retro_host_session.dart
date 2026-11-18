@@ -105,6 +105,10 @@ class FakeRetroHostSession extends FakeFrameSource implements RetroHostSession {
   @override
   bool canPlayPs2 = true;
 
+  /// Whether the host lists `ps2ResolutionLimits`; false, as a host before it.
+  @override
+  bool limitsPs2Resolution = false;
+
   @override
   Stream<RetroRumble> get rumble => _rumble.stream;
 

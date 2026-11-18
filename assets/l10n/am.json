@@ -2463,5 +2463,10 @@
   "retroMenuConsole": "ኮንሶል",
   "retroMenuConsoleDetail": "ክልል፣ BIOS፣ ፈጣን ጅምር እና የዲስክ ፍጥነት።",
   "retroMenuAdvanced": "የላቀ",
-  "retroMenuAdvancedDetail": "ኢሙሌተሩ ጨዋታውን እንዴት እንደሚያሄድ። ችግር ለማስተካከል ብቻ ይቀይሯቸው።"
+  "retroMenuAdvancedDetail": "ኢሙሌተሩ ጨዋታውን እንዴት እንደሚያሄድ። ችግር ለማስተካከል ብቻ ይቀይሯቸው።",
+  "retroResolution": "የውስጥ ጥራት",
+  "retroResolutionDetail": "ጨዋታውን በበለጠ ጥራት ይስላል። ከፍ ያሉ እሴቶች ፈጣን የግራፊክስ ካርድ ይፈልጋሉ።",
+  "retroResolutionNative": "መደበኛ",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "የግራፊክስ ካርድዎ ያስቀመጡትን ጥራት መሳል አይችልም፣ ስለዚህ ጨዋታው %@ ይጠቀማል።"
 }

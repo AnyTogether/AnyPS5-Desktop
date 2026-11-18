@@ -2479,5 +2479,10 @@
   "retroMenuConsole": "Consolă",
   "retroMenuConsoleDetail": "Regiune, BIOS, pornire rapidă și viteza discului.",
   "retroMenuAdvanced": "Avansat",
-  "retroMenuAdvancedDetail": "Cum rulează emulatorul jocul. Schimbă aceste setări doar pentru a rezolva o problemă."
+  "retroMenuAdvancedDetail": "Cum rulează emulatorul jocul. Schimbă aceste setări doar pentru a rezolva o problemă.",
+  "retroResolution": "Rezoluție internă",
+  "retroResolutionDetail": "Desenează jocul mai clar. Valorile mai mari au nevoie de o placă video mai rapidă.",
+  "retroResolutionNative": "Nativă",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Placa ta video nu poate desena rezoluția salvată, așa că jocul folosește %@."
 }

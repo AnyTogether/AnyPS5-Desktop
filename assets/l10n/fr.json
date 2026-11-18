@@ -2479,5 +2479,10 @@
   "retroMenuConsole": "Console",
   "retroMenuConsoleDetail": "Région, BIOS, démarrage rapide et vitesse du disque.",
   "retroMenuAdvanced": "Avancé",
-  "retroMenuAdvancedDetail": "La façon dont l’émulateur exécute le jeu. Ne modifiez ces réglages que pour résoudre un problème."
+  "retroMenuAdvancedDetail": "La façon dont l’émulateur exécute le jeu. Ne modifiez ces réglages que pour résoudre un problème.",
+  "retroResolution": "Résolution interne",
+  "retroResolutionDetail": "Affiche le jeu plus net. Les valeurs élevées demandent une carte graphique plus rapide.",
+  "retroResolutionNative": "Native",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Votre carte graphique ne peut pas afficher la résolution enregistrée, le jeu utilise donc %@."
 }

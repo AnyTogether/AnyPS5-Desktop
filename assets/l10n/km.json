@@ -2465,5 +2465,10 @@
   "retroMenuConsole": "ម៉ាស៊ីនហ្គេម",
   "retroMenuConsoleDetail": "តំបន់ BIOS ការចាប់ផ្ដើមរហ័ស និងល្បឿនឌីស។",
   "retroMenuAdvanced": "កម្រិតខ្ពស់",
-  "retroMenuAdvancedDetail": "របៀបដែលកម្មវិធីត្រាប់ដំណើរការហ្គេម។ ប្ដូរវាតែនៅពេលដោះស្រាយបញ្ហាប៉ុណ្ណោះ។"
+  "retroMenuAdvancedDetail": "របៀបដែលកម្មវិធីត្រាប់ដំណើរការហ្គេម។ ប្ដូរវាតែនៅពេលដោះស្រាយបញ្ហាប៉ុណ្ណោះ។",
+  "retroResolution": "គុណភាពបង្ហាញខាងក្នុង",
+  "retroResolutionDetail": "គូរហ្គេមឱ្យច្បាស់ជាងមុន។ តម្លៃខ្ពស់ត្រូវការកាតក្រាហ្វិកលឿនជាង។",
+  "retroResolutionNative": "ដើម",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "កាតក្រាហ្វិករបស់អ្នកមិនអាចគូរគុណភាពបង្ហាញដែលបានរក្សាទុកបានទេ ដូច្នេះហ្គេមប្រើ %@។"
 }

@@ -2465,5 +2465,10 @@
   "retroMenuConsole": "ເຄື່ອງເກມ",
   "retroMenuConsoleDetail": "ພາກພື້ນ, BIOS, ການບູດໄວ ແລະ ຄວາມໄວແຜ່ນ.",
   "retroMenuAdvanced": "ຂັ້ນສູງ",
-  "retroMenuAdvancedDetail": "ວິທີທີ່ອີມູເລເຕີແລ່ນເກມ. ປ່ຽນສິ່ງເຫຼົ່ານີ້ເພື່ອແກ້ໄຂບັນຫາເທົ່ານັ້ນ."
+  "retroMenuAdvancedDetail": "ວິທີທີ່ອີມູເລເຕີແລ່ນເກມ. ປ່ຽນສິ່ງເຫຼົ່ານີ້ເພື່ອແກ້ໄຂບັນຫາເທົ່ານັ້ນ.",
+  "retroResolution": "ຄວາມລະອຽດພາຍໃນ",
+  "retroResolutionDetail": "ແຕ້ມເກມໃຫ້ຄົມຊັດຂຶ້ນ. ຄ່າທີ່ສູງຂຶ້ນຕ້ອງການກາດກຣາຟິກທີ່ໄວກວ່າ.",
+  "retroResolutionNative": "ດັ້ງເດີມ",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "ກາດກຣາຟິກຂອງທ່ານບໍ່ສາມາດແຕ້ມຄວາມລະອຽດທີ່ບັນທຶກໄວ້ໄດ້, ສະນັ້ນເກມຈຶ່ງໃຊ້ %@."
 }

@@ -2479,5 +2479,10 @@
   "retroMenuConsole": "Consola",
   "retroMenuConsoleDetail": "Región, BIOS, arranque rápido y velocidad del disco.",
   "retroMenuAdvanced": "Avanzado",
-  "retroMenuAdvancedDetail": "Cómo ejecuta el emulador el juego. Cámbialo solo para resolver un problema."
+  "retroMenuAdvancedDetail": "Cómo ejecuta el emulador el juego. Cámbialo solo para resolver un problema.",
+  "retroResolution": "Resolución interna",
+  "retroResolutionDetail": "Dibuja el juego con más nitidez. Los valores más altos necesitan una tarjeta gráfica más rápida.",
+  "retroResolutionNative": "Nativa",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Tu tarjeta gráfica no puede dibujar la resolución guardada, así que el juego usa %@."
 }

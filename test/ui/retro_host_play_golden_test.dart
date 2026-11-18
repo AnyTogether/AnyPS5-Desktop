@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:ffi';
+import 'dart:io';
 
 import 'package:anyps5_desktop/core/retro_host/retro_host_protocol.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
@@ -117,9 +119,30 @@ void main() {
     for (final key in ['retroMenuAudio', 'retroMenuController', 'retroMenuConsole', 'retroMenuAdvanced']) {
       expect(find.text(T.text(key)), findsOneWidget, reason: key);
     }
-    expect(find.text('Internal Resolution Scale'), findsNothing, reason: 'graphics is not in the menu');
+    expect(find.text('Internal Resolution Scale'), findsNothing, reason: "SwanStation's own title is not shown");
+    expect(find.text(T.text('retroResolution')), findsOneWidget, reason: 'the internal resolution after Audio');
     expect(find.text(T.text('quickCloseGame')), findsOneWidget);
     await expectLater(shell, matchesGoldenFile('goldens/retro_host_menu_en.png'));
+  });
+
+  testWidgets("a PS2 game's menu on the internal resolution: a saved 8x refused, the game at 4x", (tester) async {
+    launcher = Ps1Launcher(ps2: true);
+    final model = launcher.model..setRetroHostPs2(true);
+    launcher.session.limitsPs2Resolution = true;
+    final file = jsonDecode(File('test/fixtures/retro-host-ps2-resolution-status.json').readAsStringSync()) as Map;
+    final recorded = RetroStatus.parse((file['reply'] as Map)['result'] as Map<String, Object?>, ps2: true);
+    await tester.runAsync(() => launcher.start(status: recorded, ps2: true));
+    await pumpLauncher(tester, model);
+    launcher.session.send(picture().pin());
+    for (var turn = 0; turn < 20 && launcher.play.host.picture.value == null; turn++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+    }
+    model.openRetroMenu();
+    model.panelRow = model.panelCategories().single.rows.indexWhere((row) => row.id == 'resolution');
+    await settle(tester);
+    expect(find.text(T.text('retroResolution')), findsOneWidget);
+    expect(find.text(T.format('retroResolutionRefusedDetail', ['4x'])), findsOneWidget);
+    await expectLater(shell, matchesGoldenFile('goldens/retro_host_menu_resolution_ps2_en.png'));
   });
 
   testWidgets('a section of the menu: Console, with the options that need a restart marked', (tester) async {
