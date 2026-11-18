@@ -2513,5 +2513,10 @@
   "retroStateOtherGame": "Ezt az állapotot egy másik játékból mentették, ezért nem tölthető be.",
   "retroStateBad": "Ez az állapotfájl sérült, vagy egy újabb emulátor készítette, ezért nem tölthető be.",
   "retroStateLoadFailed": "Az állapotot nem sikerült betölteni.",
-  "retroStateSaveFailed": "Az állapotot nem sikerült menteni."
+  "retroStateSaveFailed": "Az állapotot nem sikerült menteni.",
+  "retroResolution": "Belső felbontás",
+  "retroResolutionDetail": "Élesebben rajzolja a játékot. A nagyobb értékekhez gyorsabb videokártya kell.",
+  "retroResolutionNative": "Natív",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Az emulátor nem tudja megjeleníteni a mentett felbontást, ezért a játék ezt használja: %@."
 }

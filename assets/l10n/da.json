@@ -2513,5 +2513,10 @@
   "retroStateOtherGame": "Denne tilstand blev gemt fra et andet spil, så den kan ikke indlæses.",
   "retroStateBad": "Denne tilstandsfil er beskadiget eller lavet af en nyere emulator, så den kan ikke indlæses.",
   "retroStateLoadFailed": "Tilstanden kunne ikke indlæses.",
-  "retroStateSaveFailed": "Tilstanden kunne ikke gemmes."
+  "retroStateSaveFailed": "Tilstanden kunne ikke gemmes.",
+  "retroResolution": "Intern opløsning",
+  "retroResolutionDetail": "Tegner spillet skarpere. Højere værdier kræver et hurtigere grafikkort.",
+  "retroResolutionNative": "Oprindelig",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Emulatoren kan ikke vise den gemte opløsning, så spillet bruger %@."
 }

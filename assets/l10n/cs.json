@@ -2513,5 +2513,10 @@
   "retroStateOtherGame": "Tento stav byl uložen v jiné hře, proto jej nelze načíst.",
   "retroStateBad": "Tento soubor stavu je poškozený nebo jej vytvořil novější emulátor, proto jej nelze načíst.",
   "retroStateLoadFailed": "Stav se nepodařilo načíst.",
-  "retroStateSaveFailed": "Stav se nepodařilo uložit."
+  "retroStateSaveFailed": "Stav se nepodařilo uložit.",
+  "retroResolution": "Vnitřní rozlišení",
+  "retroResolutionDetail": "Vykreslí hru ostřeji. Vyšší hodnoty potřebují rychlejší grafickou kartu.",
+  "retroResolutionNative": "Nativní",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Emulátor nedokáže zobrazit uložené rozlišení, takže hra používá %@."
 }

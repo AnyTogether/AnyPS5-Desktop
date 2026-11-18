@@ -105,6 +105,10 @@ class FakeRetroHostSession extends FakeFrameSource implements RetroHostSession {
   @override
   bool canPlayPs2 = true;
 
+  /// Whether the host lists `ps2ResolutionLimits`; false, as a host before it.
+  @override
+  bool limitsPs2Resolution = false;
+
   /// Whether the host lists `saveStates`, so a game can be started with a states folder; false, as
   /// for the signed host v1.0.0, unless a test says.
   @override

@@ -2513,5 +2513,10 @@
   "retroStateOtherGame": "حُفظت هذه الحالة من لعبة أخرى، لذلك لا يمكن تحميلها.",
   "retroStateBad": "ملف الحالة هذا تالف أو صنعه محاكٍ أحدث، لذلك لا يمكن تحميله.",
   "retroStateLoadFailed": "تعذّر تحميل الحالة.",
-  "retroStateSaveFailed": "تعذّر حفظ الحالة."
+  "retroStateSaveFailed": "تعذّر حفظ الحالة.",
+  "retroResolution": "الدقة الداخلية",
+  "retroResolutionDetail": "يرسم اللعبة بوضوح أكبر. القيم الأعلى تحتاج إلى بطاقة رسوميات أسرع.",
+  "retroResolutionNative": "الأصلية",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "لا يستطيع المحاكي عرض الدقة التي حفظتها، لذا تستخدم اللعبة %@."
 }

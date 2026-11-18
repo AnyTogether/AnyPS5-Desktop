@@ -2513,5 +2513,10 @@
   "retroStateOtherGame": "Det här läget sparades från ett annat spel, så det kan inte läsas in.",
   "retroStateBad": "Den här lägesfilen är skadad eller gjordes av en nyare emulator, så den kan inte läsas in.",
   "retroStateLoadFailed": "Läget kunde inte läsas in.",
-  "retroStateSaveFailed": "Läget kunde inte sparas."
+  "retroStateSaveFailed": "Läget kunde inte sparas.",
+  "retroResolution": "Intern upplösning",
+  "retroResolutionDetail": "Ritar spelet skarpare. Högre värden kräver ett snabbare grafikkort.",
+  "retroResolutionNative": "Ursprunglig",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "Emulatorn kan inte visa den sparade upplösningen, så spelet använder %@."
 }

@@ -2513,5 +2513,10 @@
   "retroStateOtherGame": "Este estado se guardó en otro juego, así que no se puede cargar.",
   "retroStateBad": "Este archivo de estado está dañado o lo creó un emulador más nuevo, así que no se puede cargar.",
   "retroStateLoadFailed": "No se pudo cargar el estado.",
-  "retroStateSaveFailed": "No se pudo guardar el estado."
+  "retroStateSaveFailed": "No se pudo guardar el estado.",
+  "retroResolution": "Resolución interna",
+  "retroResolutionDetail": "Dibuja el juego con más nitidez. Los valores más altos necesitan una tarjeta gráfica más rápida.",
+  "retroResolutionNative": "Nativa",
+  "retroResolutionScale": "%@x",
+  "retroResolutionRefusedDetail": "El emulador no puede mostrar la resolución guardada, así que el juego usa %@."
 }

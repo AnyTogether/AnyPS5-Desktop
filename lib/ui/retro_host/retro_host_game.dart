@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/retro_host/retro_host_client.dart';
 import '../../core/retro_host/retro_host_protocol.dart';
 import '../../core/retro_host/retro_host_session.dart';
+import '../../core/retro_host/retro_resolution.dart';
 import '../../core/retro_host/retro_state_slots.dart';
 import 'retro_frame_image.dart';
 
@@ -134,6 +135,10 @@ class RetroHostGame extends ChangeNotifier {
   bool get consoleRefused => _consoleRefused;
   bool _consoleRefused = false;
 
+  /// Whether the host limits a PS2 game's internal resolution (`ps2ResolutionLimits`), so the menu
+  /// may offer it. False until the host has greeted the launcher.
+  bool get limitsPs2Resolution => session.limitsPs2Resolution;
+
   /// Whether the game was started with a states folder on a host that lists `saveStates`, so
   /// [saveState] and [loadState] can be asked for. A start with a folder on an older host leaves the
   /// folder out, and the game plays without save states.
@@ -188,7 +193,8 @@ class RetroHostGame extends ChangeNotifier {
   bool get _gameLive => _phase == RetroHostGamePhase.loading || _phase == RetroHostGamePhase.playing;
 
   /// Waits for the host's greeting, then starts the game. Throws [StateError] when a game was
-  /// already started on this host.
+  /// already started on this host. A PS2 game's internal resolution goes only to a host that
+  /// limits it ([limitsPs2Resolution]); an older host starts the game at LRPS2's own default.
   Future<void> start(RetroHostStartRequest request) {
     if (_phase != RetroHostGamePhase.idle) throw StateError('A game was already started on this host.');
     _setPhase(RetroHostGamePhase.starting);
@@ -204,8 +210,11 @@ class RetroHostGame extends ChangeNotifier {
         _end(failure: 'The host does not list the $retroCapabilityPs2 capability.');
         return;
       }
+      final resolution = request.console == RetroConsole.ps2 && !session.limitsPs2Resolution
+          ? request.withoutOption(retroResolutionKeyPs2)
+          : request;
       final states = request.states != null && session.canSaveStates;
-      await session.startGame((states ? request : request.withoutStates()).toArgs());
+      await session.startGame((states ? resolution : resolution.withoutStates()).toArgs());
       _savesStates = states;
     } on Object catch (error) {
       if (_phase == RetroHostGamePhase.starting) _end(failure: '$error');

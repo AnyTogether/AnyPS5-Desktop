@@ -70,6 +70,12 @@ const retroCapabilityPs1 = 'ps1';
 /// (protocol.md "Capabilities", anyps5-retro-host docs/ps2.md).
 const retroCapabilityPs2 = 'ps2';
 
+/// The capability that says the host limits a PS2 game's internal resolution
+/// (`pcsx2_upscale_multiplier`) to what it can pass on, as it limits PS1's (protocol.md
+/// "Capabilities" and "status"). A launcher offers and sends a PS2 internal resolution only to a
+/// host that lists it: a `ps2` host without it gives LRPS2 the value as given.
+const retroCapabilityPs2ResolutionLimits = 'ps2ResolutionLimits';
+
 /// The capability that saves and loads a game's state for one player: `start.states` and the
 /// methods `saveState` and `loadState` (protocol.md "saveState and loadState").
 const retroCapabilitySaveStates = 'saveStates';
