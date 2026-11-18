@@ -340,8 +340,9 @@ What the launcher does with them:
   is `ps1` or `ps2`; a status without it, or with another value, is a
   protocol error. Another host's `console` is not read.
 - **PS2 internal resolution.** A host that lists `ps2ResolutionLimits`
-  (`RetroHostClient.limitsPs2Resolution`, host branch `ps2-resolution-limits`
-  at 9a06327, protocol.md "Capabilities": "A launcher offers a PS2 internal
+  (`RetroHostClient.limitsPs2Resolution`, on the host's `main` since
+  AnyTogether/anyps5-retro-host#25 merged as [44060c0](https://github.com/AnyTogether/anyps5-retro-host/blob/44060c080daa514049df228f1827f1dced925f6a/docs/protocol.md),
+  protocol.md "Capabilities": "A launcher offers a PS2 internal
   resolution only to a host that lists it") limits `pcsx2_upscale_multiplier`
   as every host limits SwanStation's. The client throws `StateError` before it
   sends that key to any other host, in `start.options` or as an `option`

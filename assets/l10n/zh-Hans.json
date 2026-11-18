@@ -2505,5 +2505,5 @@
   "retroResolutionDetail": "让游戏画面更清晰。数值越高，需要的显卡越快。",
   "retroResolutionNative": "原生",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "你的显卡无法绘制保存的分辨率，因此游戏使用 %@。"
+  "retroResolutionRefusedDetail": "模拟器无法显示你保存的分辨率，因此游戏使用 %@。"
 }

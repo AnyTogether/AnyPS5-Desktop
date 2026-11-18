@@ -2505,5 +2505,5 @@
   "retroResolutionDetail": "Tegner spillet skarpere. Høyere verdier krever et raskere grafikkort.",
   "retroResolutionNative": "Opprinnelig",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "Grafikkortet ditt kan ikke tegne den lagrede oppløsningen, så spillet bruker %@."
+  "retroResolutionRefusedDetail": "Emulatoren kan ikke vise den lagrede oppløsningen, så spillet bruker %@."
 }

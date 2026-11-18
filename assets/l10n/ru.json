@@ -2505,5 +2505,5 @@
   "retroResolutionDetail": "Рисует игру чётче. Для больших значений нужна более быстрая видеокарта.",
   "retroResolutionNative": "Исходное",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "Ваша видеокарта не может отрисовать сохранённое разрешение, поэтому игра использует %@."
+  "retroResolutionRefusedDetail": "Эмулятор не может показать сохранённое разрешение, поэтому игра использует %@."
 }

@@ -201,7 +201,12 @@ void main() {
       model.openRetroMenu();
       await pumpEventQueue();
       final first = [for (final row in model.panelCategories().single.rows) row.id];
-      expect(first, containsAllInOrder(['section-audio', 'resolution', 'section-advanced']));
+      expect(first, containsAllInOrder(['section-audio', 'resolution']));
+      expect(
+        first,
+        isNot(contains('section-advanced')),
+        reason: "LRPS2's VR, the recording's other option, is not shown",
+      );
       final row = launcher.row('resolution');
       expect(row.detail, T.format('retroResolutionRefusedDetail', ['4x']));
       final choice = row.kind as ChoiceRow;
@@ -222,6 +227,20 @@ void main() {
         T.text('retroMenuOptionRestartDetail'),
         reason: 'LRPS2 reads it at a start',
       );
+    });
+
+    test("LRPS2's VR kept from before is not sent: AnyPS5 has no VR, and the host would judge stereo", () async {
+      launcher = Ps1Launcher(ps2: true);
+      final model = launcher.model..setRetroHostPs2(true);
+      model.preferences.retroHostOptions.addAll({
+        retroResolutionKeyPs2: '4x',
+        'pcsx2_vr_mode': 'stereoscopic',
+        'pcsx2_vr_depth': '75%',
+        'pcsx2_fastboot': 'disabled',
+      });
+      launcher.session.limitsPs2Resolution = true;
+      await startPs2(recorded());
+      expect(launcher.session.startArgs!['options'], {retroResolutionKeyPs2: '4x', 'pcsx2_fastboot': 'disabled'});
     });
 
     test('a host without ps2ResolutionLimits is neither offered nor sent a PS2 resolution', () async {

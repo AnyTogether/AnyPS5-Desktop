@@ -2505,5 +2505,5 @@
   "retroResolutionDetail": "گیم کو زیادہ واضح بناتا ہے۔ زیادہ قدروں کے لیے تیز گرافکس کارڈ چاہیے۔",
   "retroResolutionNative": "اصل",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "آپ کا گرافکس کارڈ محفوظ کردہ ریزولوشن نہیں بنا سکتا، اس لیے گیم %@ استعمال کرتا ہے۔"
+  "retroResolutionRefusedDetail": "ایمولیٹر محفوظ کردہ ریزولوشن نہیں دکھا سکتا، اس لیے گیم %@ استعمال کرتا ہے۔"
 }

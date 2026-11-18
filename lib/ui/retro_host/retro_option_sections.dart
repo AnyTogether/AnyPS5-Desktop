@@ -37,14 +37,18 @@ enum RetroOptionSection {
 /// - the development console's 8 MB of RAM (`Console_Enable8MBRAM`), which no game sold uses;
 /// - the CPU recompiler's debugging switches (`CPU_RecompilerICache`,
 ///   `CPU_RecompilerBlockLinking`, `CPU_FastmemMode`);
-/// - the light gun crosshair (`Controller_ShowCrosshair`): the host plugs in only DualShocks.
+/// - the light gun crosshair (`Controller_ShowCrosshair`): the host plugs in only DualShocks;
+/// - LRPS2's VR (every `pcsx2_vr_...` key: `pcsx2_vr_mode` and its `pcsx2_vr_depth`), whose stereo
+///   mode draws a picture for each eye side by side for a VR headset or a 3D display. AnyPS5 has
+///   no VR, and SwanStation no stereo option.
 ///
 /// Keys are `swanstation_<Group>_<Name>`; a key of another form is [RetroOptionSection.advanced], as
-/// every LRPS2 option of a PS2 game is (`pcsx2_...`), its BIOS (`pcsx2_bios`) included, but its
-/// resolution scale, which is [RetroOptionSection.graphics].
+/// every other LRPS2 option of a PS2 game is (`pcsx2_...`), its BIOS (`pcsx2_bios`) included, but
+/// its resolution scale, which is [RetroOptionSection.graphics].
 RetroOptionSection? retroOptionSection(String key) {
   const prefix = 'swanstation_';
   if (key == retroResolutionKeyPs2) return RetroOptionSection.graphics;
+  if (key.startsWith(_ps2Vr)) return null;
   if (!key.startsWith(prefix)) return RetroOptionSection.advanced;
   final name = key.substring(prefix.length);
   if (_hidden.contains(name) || name.startsWith('TextureReplacements_')) return null;
@@ -97,5 +101,7 @@ const _hidden = {
   'CPU_FastmemMode',
   'Controller_ShowCrosshair',
 };
+
+const _ps2Vr = 'pcsx2_vr_';
 
 const _console = {'CDROM_RegionCheck', 'CDROM_ReadSpeedup', 'CDROM_SeekSpeedup', 'CPU_Overclock'};

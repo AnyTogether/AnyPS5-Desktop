@@ -2505,5 +2505,5 @@
   "retroResolutionDetail": "Desenează jocul mai clar. Valorile mai mari au nevoie de o placă video mai rapidă.",
   "retroResolutionNative": "Nativă",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "Placa ta video nu poate desena rezoluția salvată, așa că jocul folosește %@."
+  "retroResolutionRefusedDetail": "Emulatorul nu poate afișa rezoluția salvată, așa că jocul folosește %@."
 }

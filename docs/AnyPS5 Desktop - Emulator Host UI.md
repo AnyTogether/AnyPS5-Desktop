@@ -307,6 +307,16 @@ reason a value kept for a graphics option is not sent either until the
 Graphics page exists (`retroOptionSent`), except each console's internal
 resolution, which the menu's first page offers (see "Internal resolution").
 
+LRPS2's VR is not shown either. Its stereo mode (`pcsx2_vr_mode`
+`stereoscopic`) puts a picture for each eye side by side for a VR headset or a
+3D display, AnyPS5 has neither, and its depth (`pcsx2_vr_depth`) only tunes
+that mode. `retroOptionSection` leaves out every `pcsx2_vr_` key, so a stereo
+mode kept from before is not sent in `start` either. That also keeps out of
+the menu the host's refusal of a stereo frame too wide for it (host
+`docs/protocol.md` "status": "`option` refuses `pcsx2_vr_mode`
+`"stereoscopic"` [...] when the doubled frame would not fit"), where the row
+only snapped back. SwanStation has no stereo option at the pinned commit.
+
 `open()` pauses the game (`pause` with `true`, the same as the player's own
 pause) and sets the controls' `suspended`, so presses in the menu never reach
 the game. `close()` gives the controllers back at once, so a button still
@@ -333,9 +343,8 @@ option to what it can pass on, as host `docs/protocol.md` "status" says:
 > `hardware` is `true`, `values` lists only the whole-number scales whose
 > largest frame the host can pass on
 
-and, for PS2, only with the capability the host's
-`ps2-resolution-limits` branch adds (fork B-Howell/anyps5-retro-host-upstream
-at 9a06327, not yet on the host's `main`):
+and, for PS2, only with the capability AnyTogether/anyps5-retro-host#25
+added, on the host's `main` since it merged as [44060c0](https://github.com/AnyTogether/anyps5-retro-host/blob/44060c080daa514049df228f1827f1dced925f6a/docs/protocol.md):
 
 > | `ps2ResolutionLimits` | A PS2 game's internal resolution (`pcsx2_upscale_multiplier`) is limited to what the host can pass on, as PS1's is ([`status`](#status)). A launcher offers a PS2 internal resolution only to a host that lists it |
 
@@ -361,9 +370,12 @@ cores', which disagree ("3x (for 720p)" in SwanStation).
 `retroResolutionDetail`):
 
 - the host could not use the value saved (`status.resolutionError` not
-  empty): "Your graphics card can't draw the resolution you saved, so the game
-  uses 4x.", naming `activeValue`. The host's English sentence goes only to
-  the launcher's log, once per change;
+  empty): "The emulator can't show the resolution you saved, so the game uses
+  4x.", naming `activeValue`. It names the emulator, not the graphics card:
+  the host limits a scale both for the largest texture the card's OpenGL
+  context allows and for its own 8192 × 8192 frame, and the recorded refusal
+  below is the second, on a card that could draw it. The host's English
+  sentence goes only to the launcher's log, once per change;
 - a PS1 value chosen and not yet drawn (`selected` is not `activeValue`, or
   `graphicsPending`): "Takes effect in a moment.";
 - a PS2 value chosen: "Takes effect when the game is started again.", since
@@ -849,15 +861,16 @@ native memory as a real ring slot would be, so no host is started.
   sorts the fifty options of the recorded real status into their sections and
   the ten not shown, checks keys the recording lacks (port 2, multitap, a
   group SwanStation may add, another core's key), and the " (Restart)" titles;
-  the internal resolution is sent and the other graphics options are not.
+  the internal resolution is sent and the other graphics options are not, and
+  LRPS2's `pcsx2_vr_` keys are neither shown nor sent.
 - [`retro_resolution_words_test.dart`](../test/ui/retro_host/retro_resolution_words_test.dart)
   checks the row's labels (Native, the scale, the host's own label for a
   value the launcher does not offer) and the line under it for each note.
 - [`test/core/retro_host/retro_resolution_test.dart`](../test/core/retro_host/retro_resolution_test.dart)
   reads the recorded SwanStation status (eight scales, the menu offers four),
   and [`test/fixtures/retro-host-ps2-resolution-status.json`](../test/fixtures/retro-host-ps2-resolution-status.json),
-  the host's `call-status-ps2-resolution.json` from the `ps2-resolution-limits`
-  branch at 9a06327, recorded with the real LRPS2 and Jak and Daxter started
+  the host's `call-status-ps2-resolution.json` at `RETRO_HOST_COMMIT` (44060c0,
+  #25 merged) byte for byte, recorded with the real LRPS2 and Jak and Daxter started
   at 8x in stereo on an RTX 4080 SUPER: 1x to 4x listed, 4x in use and
   `resolutionError` set. It checks the notes, a value the launcher does not
   offer, and that nothing is offered without the GPU, without the option, or
@@ -1085,7 +1098,8 @@ open, a PS2 disc's `start`, a PS1 disc on the same host, a host without `ps2`,
 the real LRPS2's `bios` and its folder, a running PS2 game's menu, the
 internal resolution from the recorded LRPS2 status (offered, chosen and kept
 on a host with `ps2ResolutionLimits`; neither offered nor sent on one
-without), and the signed release with LRPS2
+without), a stereo VR and its depth kept from before left out of `start`, and
+the signed release with LRPS2
 ([`test/fixtures/retro_host_release_ps2`](../test/fixtures/retro_host_release_ps2/SHA256SUMS))
 and without it. It also downloads both from a fake GitHub, one after the other,
 and checks that a PS2 cue sheet (`Ps1Launcher.addPs2CueSheet` in
@@ -1138,8 +1152,9 @@ draws the PS2 rows and the PS2 missing-BIOS screen.
   are left for a Graphics page of their own;
   `RetroGameMenu.optionsIn(RetroOptionSection.graphics)` already gives them in
   the host's order for that page. LRPS2's other options titled "Video > …"
-  (VR among them) stay under Advanced, as #171 left them; this change does not
-  move them. There is no internal resolution row in
+  stay under Advanced, as #171 left them, but for its VR (`pcsx2_vr_mode`,
+  `pcsx2_vr_depth`), which is not shown at all (see "Sections"). There is no
+  internal resolution row in
   Settings › Emulators and no automatic choice by graphics card or display
   yet. How long a PS1 change takes to show, and the row on a real game through
   the launcher, have not been seen: the tests use recorded statuses.

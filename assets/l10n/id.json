@@ -2505,5 +2505,5 @@
   "retroResolutionDetail": "Menggambar game lebih tajam. Nilai lebih tinggi butuh kartu grafis yang lebih cepat.",
   "retroResolutionNative": "Asli",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "Kartu grafis Anda tidak dapat menggambar resolusi yang disimpan, jadi game memakai %@."
+  "retroResolutionRefusedDetail": "Emulator tidak dapat menampilkan resolusi yang disimpan, jadi game memakai %@."
 }

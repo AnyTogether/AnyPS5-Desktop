@@ -83,6 +83,11 @@ void main() {
     expect(retroOptionSection('swanstation_NewGroup_NewOption'), RetroOptionSection.advanced);
     expect(retroOptionSection('swanstation_Lonely'), RetroOptionSection.advanced);
     expect(retroOptionSection('other_core_option'), RetroOptionSection.advanced);
+    for (final key in ['pcsx2_vr_mode', 'pcsx2_vr_depth', 'pcsx2_vr_other']) {
+      expect(retroOptionSection(key), isNull, reason: '$key: AnyPS5 has no VR');
+      expect(retroOptionSent(key, ps2: true), isFalse, reason: key);
+    }
+    expect(retroOptionSection('pcsx2_vu0_softfloat'), RetroOptionSection.advanced);
     expect(retroOptionShown('swanstation_Console_Enable8MBRAM'), isFalse);
     expect(retroOptionShown('swanstation_Console_Region'), isTrue);
     expect(retroOptionSent('swanstation_Console_Region'), isTrue);

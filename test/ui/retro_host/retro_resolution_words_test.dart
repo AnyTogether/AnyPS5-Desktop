@@ -24,7 +24,7 @@ void main() {
     );
     expect(
       retroResolutionDetail(choice(RetroResolutionNote.refused)),
-      "Your graphics card can't draw the resolution you saved, so the game uses 4x.",
+      "The emulator can't show the resolution you saved, so the game uses 4x.",
     );
   });
 }

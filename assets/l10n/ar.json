@@ -2505,5 +2505,5 @@
   "retroResolutionDetail": "يرسم اللعبة بوضوح أكبر. القيم الأعلى تحتاج إلى بطاقة رسوميات أسرع.",
   "retroResolutionNative": "الأصلية",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "لا تستطيع بطاقة الرسوميات رسم الدقة التي حفظتها، لذا تستخدم اللعبة %@."
+  "retroResolutionRefusedDetail": "لا يستطيع المحاكي عرض الدقة التي حفظتها، لذا تستخدم اللعبة %@."
 }

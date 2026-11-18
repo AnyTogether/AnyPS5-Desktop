@@ -2505,5 +2505,5 @@
   "retroResolutionDetail": "Vykreslí hru ostřeji. Vyšší hodnoty potřebují rychlejší grafickou kartu.",
   "retroResolutionNative": "Nativní",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "Vaše grafická karta nezvládne uložené rozlišení, takže hra používá %@."
+  "retroResolutionRefusedDetail": "Emulátor nedokáže zobrazit uložené rozlišení, takže hra používá %@."
 }

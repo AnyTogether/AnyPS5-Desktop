@@ -2505,5 +2505,5 @@
   "retroResolutionDetail": "讓遊戲畫面更清晰。數值越高，需要的顯示卡越快。",
   "retroResolutionNative": "原生",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "你的顯示卡無法繪製儲存的解析度，因此遊戲使用 %@。"
+  "retroResolutionRefusedDetail": "模擬器無法顯示你儲存的解析度，因此遊戲使用 %@。"
 }

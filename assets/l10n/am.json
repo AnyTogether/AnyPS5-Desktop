@@ -2489,5 +2489,5 @@
   "retroResolutionDetail": "ጨዋታውን በበለጠ ጥራት ይስላል። ከፍ ያሉ እሴቶች ፈጣን የግራፊክስ ካርድ ይፈልጋሉ።",
   "retroResolutionNative": "መደበኛ",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "የግራፊክስ ካርድዎ ያስቀመጡትን ጥራት መሳል አይችልም፣ ስለዚህ ጨዋታው %@ ይጠቀማል።"
+  "retroResolutionRefusedDetail": "ኢሙሌተሩ ያስቀመጡትን ጥራት ማሳየት አይችልም፣ ስለዚህ ጨዋታው %@ ይጠቀማል።"
 }

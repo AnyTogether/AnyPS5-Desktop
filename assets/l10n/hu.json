@@ -2505,5 +2505,5 @@
   "retroResolutionDetail": "Élesebben rajzolja a játékot. A nagyobb értékekhez gyorsabb videokártya kell.",
   "retroResolutionNative": "Natív",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "A videokártyád nem tudja megrajzolni a mentett felbontást, ezért a játék ezt használja: %@."
+  "retroResolutionRefusedDetail": "Az emulátor nem tudja megjeleníteni a mentett felbontást, ezért a játék ezt használja: %@."
 }

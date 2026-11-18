@@ -2505,5 +2505,5 @@
   "retroResolutionDetail": "গেমটি আরও স্পষ্ট করে আঁকে। বেশি মানের জন্য দ্রুততর গ্রাফিক্স কার্ড লাগে।",
   "retroResolutionNative": "নেটিভ",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "আপনার গ্রাফিক্স কার্ড সংরক্ষিত রেজোলিউশন আঁকতে পারে না, তাই গেমটি %@ ব্যবহার করে।"
+  "retroResolutionRefusedDetail": "এমুলেটর আপনার সংরক্ষিত রেজোলিউশন দেখাতে পারে না, তাই গেমটি %@ ব্যবহার করে।"
 }

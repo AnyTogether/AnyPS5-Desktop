@@ -2505,5 +2505,5 @@
   "retroResolutionDetail": "Zeichnet das Spiel schärfer. Höhere Werte brauchen eine schnellere Grafikkarte.",
   "retroResolutionNative": "Nativ",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "Deine Grafikkarte kann die gespeicherte Auflösung nicht zeichnen, daher nutzt das Spiel %@."
+  "retroResolutionRefusedDetail": "Der Emulator kann die gespeicherte Auflösung nicht anzeigen, daher nutzt das Spiel %@."
 }

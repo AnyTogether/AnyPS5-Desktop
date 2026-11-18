@@ -2491,5 +2491,5 @@
   "retroResolutionDetail": "គូរហ្គេមឱ្យច្បាស់ជាងមុន។ តម្លៃខ្ពស់ត្រូវការកាតក្រាហ្វិកលឿនជាង។",
   "retroResolutionNative": "ដើម",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "កាតក្រាហ្វិករបស់អ្នកមិនអាចគូរគុណភាពបង្ហាញដែលបានរក្សាទុកបានទេ ដូច្នេះហ្គេមប្រើ %@។"
+  "retroResolutionRefusedDetail": "កម្មវិធីត្រាប់មិនអាចបង្ហាញគុណភាពបង្ហាញដែលបានរក្សាទុកបានទេ ដូច្នេះហ្គេមប្រើ %@។"
 }
