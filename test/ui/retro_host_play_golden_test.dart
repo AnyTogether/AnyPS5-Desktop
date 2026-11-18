@@ -181,7 +181,11 @@ void main() {
       (model.panelCategories().single.rows.singleWhere((row) => row.id == 'saveState').kind as ActionRow).run();
       await tester.runAsync(() async {
         (model.panelCategories().single.rows[slot].kind as ActionRow).run();
-        for (var turn = 0; turn < 50 && !File(folder.picturePath(slot)).existsSync(); turn++) {
+        for (
+          var turn = 0;
+          turn < 250 && (!File(folder.picturePath(slot)).existsSync() || model.retroMenuShown);
+          turn++
+        ) {
           await Future<void>.delayed(const Duration(milliseconds: 20));
         }
         File(folder.statePath(slot)).setLastModifiedSync(at.add(Duration(minutes: slot)));
