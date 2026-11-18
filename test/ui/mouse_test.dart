@@ -35,6 +35,7 @@ void main() {
 
   Game orbit() => model.games.firstWhere((game) => game.titleId == 'PPSA01001');
   GameSettings settings() => model.currentSettings(orbit());
+  bool fullscreen() => settings().ownFullscreen ?? model.preferences.displayDefaults.fullscreen;
 
   Future<void> openGameSettings(WidgetTester tester) async {
     // These tests exercise the Window option and its size stepper.
@@ -46,16 +47,16 @@ void main() {
 
   testWidgets('← on a choice goes to the option before, even on a row of two; → to the next', (tester) async {
     await openGameSettings(tester);
-    expect(settings().fullscreen, isFalse);
+    expect(fullscreen(), isFalse);
     await press(tester, LogicalKeyboardKey.arrowLeft);
-    expect(settings().fullscreen, isFalse, reason: 'already at the first option: ← stays');
+    expect(fullscreen(), isFalse, reason: 'already at the first option: ← stays');
     expect(settings().ownFullscreen, isNull, reason: 'at the first option, Default');
     await press(tester, LogicalKeyboardKey.arrowRight);
     expect(settings().ownFullscreen, isFalse, reason: 'Window');
     await press(tester, LogicalKeyboardKey.arrowRight);
-    expect(settings().fullscreen, isTrue);
+    expect(fullscreen(), isTrue);
     await press(tester, LogicalKeyboardKey.arrowLeft);
-    expect(settings().fullscreen, isFalse);
+    expect(fullscreen(), isFalse);
   });
 
   testWidgets('the arrows of a choice and the − + of a stepper are clicked on their own', (tester) async {
