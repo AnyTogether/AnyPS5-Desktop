@@ -14,6 +14,58 @@ void main() {
       expect(ids(const PadFacts(system: HostSystem.windows)), ['noControllers', 'usbCable', 'bluetoothPairing', 'dualShock3Windows']);
     });
 
+    test('a DualShock 3 tip follows the drivers installed: DsHidMini, then BthPS3 for Bluetooth', () {
+      expect(ids(const PadFacts(system: HostSystem.windows, services: {'dshidmini'})), [
+        'noControllers',
+        'usbCable',
+        'bluetoothPairing',
+        'dualShock3WindowsBluetooth',
+      ]);
+      expect(ids(const PadFacts(system: HostSystem.windows, services: {'dshidmini', 'bthps3'})), [
+        'noControllers',
+        'usbCable',
+        'bluetoothPairing',
+      ]);
+      // BthPS3 alone does not start the pad: DsHidMini first.
+      expect(ids(const PadFacts(system: HostSystem.windows, services: {'bthps3'})).last, 'dualShock3Windows');
+    });
+
+    test('a DualShock 3 listed without DsHidMini is in the way: Windows cannot start it', () {
+      const ds3 = PadInfo(
+        id: 'sdl2',
+        name: 'PS3 Controller',
+        kind: PadKind.dualShock3,
+        driver: 'SDL DirectInput',
+        vendor: 0x054C,
+        product: 0x0268,
+      );
+      final finding = PadTroubleshooter.diagnose(const PadFacts(system: HostSystem.windows, pads: [ds3])).single;
+      expect(finding.id, 'dualShock3Windows');
+      expect(finding.problem, isTrue);
+      // With DsHidMini it is started: nothing to say.
+      expect(ids(const PadFacts(system: HostSystem.windows, pads: [ds3], services: {'dshidmini'})), isEmpty);
+      // A third-party pad named after it is an ordinary HID pad.
+      const afterglow = PadInfo(
+        id: 'sdl3',
+        name: 'Afterglow PS3 Controller',
+        kind: PadKind.dualShock3,
+        driver: 'SDL DirectInput',
+        vendor: 0x0E6F,
+        product: 0x0263,
+      );
+      expect(ids(const PadFacts(system: HostSystem.windows, pads: [afterglow])), isEmpty);
+      expect(PadTroubleshooter.sonyDualShock3(ds3), isTrue);
+      expect(PadTroubleshooter.sonyDualShock3(afterglow), isFalse);
+    });
+
+    test('a service is looked for where kernel and user-mode drivers keep theirs', () {
+      expect(PadTroubleshooter.serviceKeys('dshidmini'), [
+        r'HKLM\SYSTEM\CurrentControlSet\Services\dshidmini',
+        r'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\WUDF\Services\dshidmini',
+      ]);
+      expect(PadTroubleshooter.windowsServices, containsAll(['dshidmini', 'BthPS3']));
+    });
+
     test('Steam with PlayStation support on is in the way of a PlayStation pad', () {
       final facts = PadFacts(system: HostSystem.windows, pads: [sense], processes: {'steam.exe'}, steamPlayStationSupport: 2);
       final finding = PadTroubleshooter.diagnose(facts).single;
@@ -111,6 +163,19 @@ void main() {
       expect(findings.single.command, contains('ATTRS{idVendor}=="054c"'));
       // Read through HIDAPI already: nothing to say.
       expect(ids(PadFacts(system: HostSystem.linux, pads: [sense], hidrawDenied: true)), isEmpty);
+    });
+
+    test("a DualShock 3 is hid-sony's through evdev, motors included: no udev rule for it", () {
+      const ds3 = PadInfo(
+        id: 'sdl0',
+        name: 'PS3 Controller',
+        kind: PadKind.dualShock3,
+        driver: 'SDL evdev',
+        vendor: 0x054C,
+        product: 0x0268,
+      );
+      expect(ids(const PadFacts(system: HostSystem.linux, pads: [ds3], hidrawDenied: true)), isEmpty);
+      expect(ids(const PadFacts(system: HostSystem.linux, pads: [ds3])), isEmpty, reason: 'nothing to install on Linux');
     });
 
     test('SDL2 missing on Linux says how to install it', () {
