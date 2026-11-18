@@ -317,8 +317,9 @@ is not loaded has no menu to open.
 ## Internal resolution
 
 The menu's first page has an **Internal resolution** row after Audio: the
-scale the game is drawn at. It is the one graphics option the menu shows; the
-others wait for a Graphics page ("Not yet").
+scale the game is drawn at. It is the one option of the Graphics section
+(`RetroOptionSection.graphics`) the menu shows; the others wait for a
+Graphics page ("Not yet").
 
 **Which option, and when it shows.** The row is
 `swanstation_GPU_ResolutionScale` for a PS1 game and
@@ -998,11 +999,13 @@ draws the PS2 rows and the PS2 missing-BIOS screen.
   in Settings › Shortcuts: neither has one by default, and Esc is Start in the
   default Controls. A default key changes every game's shortcuts, so it is
   left for the signed install, before release builds find a host.
-- **Graphics.** The menu shows only the internal resolution. SwanStation's
-  other graphics options (`GPU_*` and `Display_*`) and LRPS2's other video
-  options are left for a Graphics page of their own;
+- **Graphics.** Of the graphics options the menu shows only the internal
+  resolution. SwanStation's other graphics options (`GPU_*` and `Display_*`)
+  are left for a Graphics page of their own;
   `RetroGameMenu.optionsIn(RetroOptionSection.graphics)` already gives them in
-  the host's order for that page. There is no internal resolution row in
+  the host's order for that page. LRPS2's other options titled "Video > …"
+  (VR among them) stay under Advanced, as #171 left them; this change does not
+  move them. There is no internal resolution row in
   Settings › Emulators and no automatic choice by graphics card or display
   yet. How long a PS1 change takes to show, and the row on a real game through
   the launcher, have not been seen: the tests use recorded statuses.
