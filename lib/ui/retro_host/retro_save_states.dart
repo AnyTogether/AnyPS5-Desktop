@@ -47,6 +47,13 @@ class RetroSaveStates extends ChangeNotifier {
   ({int slot, bool saving})? _running;
   bool _disposed = false;
 
+  /// Whether the last save or load was a load the host answered `false`. A load the core began but
+  /// did not finish in time is answered so, and it ends the game with `errorCode` `other`; a PS1
+  /// game's memory card may then already be the state's, as the core finishes the load after the
+  /// reply and the host writes the card when the game ends (protocol.md "The memory card").
+  bool get loadAnsweredFalse => _loadAnsweredFalse;
+  bool _loadAnsweredFalse = false;
+
   /// Reads the slots from the folder again.
   Future<void> refresh() async {
     final read = await folder.read();
@@ -64,6 +71,7 @@ class RetroSaveStates extends ChangeNotifier {
   /// one of a moment the slot may no longer hold.
   Future<RetroStateOutcome> save(int slot) => _run(slot, saving: true, () async {
     final shown = game.picture.value?.clone();
+    _loadAnsweredFalse = false;
     try {
       final outcome = await game.saveState(slot);
       switch (outcome) {
@@ -85,6 +93,7 @@ class RetroSaveStates extends ChangeNotifier {
   /// as such.
   Future<RetroStateOutcome> load(int slot) => _run(slot, saving: false, () async {
     final outcome = await game.loadState(slot);
+    _loadAnsweredFalse = outcome == RetroStateOutcome.notNow;
     if (outcome == RetroStateOutcome.noState) await refresh();
     return outcome;
   });

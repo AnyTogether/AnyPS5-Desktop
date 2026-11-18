@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "Пусто",
   "retroStateSaving": "Сохранение…",
   "retroStateLoading": "Загрузка…",
+  "retroStateCardAfterEnd": "Игра остановилась во время загрузки состояния, поэтому карта памяти, возможно, уже вернулась к этому моменту.",
   "retroStateOverwriteTitle": "Перезаписать слот %@?",
   "retroStateOverwrite": "Перезаписать",
   "retroStateOverwriteDetail": "Состояние, сохранённое %@, будет заменено этим моментом.",

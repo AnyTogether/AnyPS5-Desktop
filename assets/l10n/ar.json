@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "فارغة",
   "retroStateSaving": "جارٍ الحفظ…",
   "retroStateLoading": "جارٍ التحميل…",
+  "retroStateCardAfterEnd": "توقفت اللعبة أثناء تحميل الحالة، لذا قد تكون بطاقة الذاكرة قد عادت بالفعل إلى تلك اللحظة.",
   "retroStateOverwriteTitle": "هل تريد استبدال الخانة %@؟",
   "retroStateOverwrite": "استبدال",
   "retroStateOverwriteDetail": "تُستبدل الحالة المحفوظة في %@ بهذه اللحظة.",

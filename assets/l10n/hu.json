@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "Üres",
   "retroStateSaving": "Mentés…",
   "retroStateLoading": "Betöltés…",
+  "retroStateCardAfterEnd": "A játék leállt az állapot betöltése közben, ezért a memóriakártya talán már visszaállt arra a pillanatra.",
   "retroStateOverwriteTitle": "Felülírja a(z) %@. helyet?",
   "retroStateOverwrite": "Felülírás",
   "retroStateOverwriteDetail": "A(z) %@ időpontban mentett állapot helyére ez a pillanat kerül.",

@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "Boş",
   "retroStateSaving": "Kaydediliyor…",
   "retroStateLoading": "Yükleniyor…",
+  "retroStateCardAfterEnd": "Durum yüklenirken oyun durdu, bu yüzden hafıza kartı da o ana geri dönmüş olabilir.",
   "retroStateOverwriteTitle": "%@. yuvanın üzerine yazılsın mı?",
   "retroStateOverwrite": "Üzerine yaz",
   "retroStateOverwriteDetail": "%@ tarihinde kaydedilen durumun yerini bu an alır.",

@@ -617,7 +617,7 @@ with that picture and the date and time, and refuses a state its build cannot
 read. Here the launcher shows the host's eight slots of a game as Slot 1 to 8.
 
 - **The model.** `RetroPlay.states` is a `RetroSaveStates` over the game and
-  its `RetroStateFolder` (`retro/states/<console>/<Game.slug>`,
+  its `RetroStateFolder` (`retro/states/<console>/<Game.titleId>`,
   `AppPaths.retroStates`), built from the same normalized disc path the
   host's `start.disc` gets, so the slot names cannot drift from the host's. It
   reads the slots when the game starts, after every save, and after a load
@@ -636,9 +636,12 @@ read. Here the launcher shows the host's eight slots of a game as Slot 1 to 8.
   "Disc 1.cue" in different folders) would share slots in one console folder,
   and one game's state would load into the other. protocol.md lets the
   launcher name any `start.states` folder, so each game gets its own, named by
-  `Game.slug`: the retro.json title ID for a game that has one, so its states
-  stay when its folder moves, and otherwise the hash of its path and size the
-  library names it by. The memory cards stay shared by disc name in `saves`,
+  its `Game.titleId` with hyphens kept: the retro.json title ID for a game
+  that has one, so its states stay when its folder moves, and otherwise the
+  hash of its path and size the library names it by (a disc without a
+  retro.json that is moved or renamed starts with no states, as with any other
+  per-game record of it). Two games whose retro.json give the same title ID
+  share their states. The memory cards stay shared by disc name in `saves`,
   as on main. No release ever wrote the per-console folder, so nothing is
   moved.
 - **Save state's page.** Every slot, with the date and time its state was
@@ -679,8 +682,17 @@ read. Here the launcher shows the host's eight slots of a game as Slot 1 to 8.
   build changed), of another game (`otherGame`), or a damaged file or one from
   a newer emulator (`badState`); anything else says only that it could not be
   loaded (`retroStateProblem`).
+- **Rows that come and go.** The first page gains rows as the status changes:
+  Save state and Load state at the first frame, and the discs and sections
+  once the status lists them. `RetroPlay.firstPageRows` keeps the ids of the
+  page last built, and `_keepRetroMenuRow` puts the focus back on the row it
+  was on, wherever that row now is.
 - **The game ending.** A game that ends while the menu or the question is open
   closes both (`retroMenuShown`), and the menu always opens on its first page.
+  A PS1 game that ends with `errorCode` `other` right after a load the host
+  answered `false` also says that its memory card may already be back at that
+  moment (`retroStateCardAfterEnd`), since protocol.md says such a load may
+  still have replaced card 1.
 
 ## The unchecked-host mark
 
@@ -952,15 +964,16 @@ Save states have tests of their own, replaying the recorded host of
 [`test/ui/retro_host/retro_save_states_test.dart`](../test/ui/retro_host/retro_save_states_test.dart)
 gives each recorded `saveState` and `loadState` reply to `RetroHostGame` and
 checks the outcome the menu acts on, the start without `states` on a host
-without the capability, the picture kept, one call at a time, and a slot found
-empty. [`test/ui/retro_host_save_states_test.dart`](../test/ui/retro_host_save_states_test.dart)
+without the capability, the picture kept, one call at a time, no other call
+of the game sent until a state call's reply, and a slot found empty. [`test/ui/retro_host_save_states_test.dart`](../test/ui/retro_host_save_states_test.dart)
 plays them through the launcher: each game's own states folder (also for two
 games whose discs have the same name) and the PS2 one, the rows only with the
 capability and only from the first frame on (the focus kept as they appear),
 saving into an empty and a used slot (Overwrite slot N?, with Cancel, Back, PS
 and Options on it), Saving… and Loading… on the slot while a call runs, a
 failed save, loading with each recorded refusal and its words, a slot found
-empty, and the game ending under the question.
+empty, the game ending under the question, and a PS1 game ending with
+`other` after a load answered `false`.
 [`retro_host_play_golden_test.dart`](../test/ui/retro_host_play_golden_test.dart)
 draws the menu with Save state and Load state, Save state's slots with two
 pictures saved from the game's frame through the real path, and Overwrite slot

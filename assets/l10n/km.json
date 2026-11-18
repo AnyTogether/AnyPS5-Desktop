@@ -2474,6 +2474,7 @@
   "retroStateEmpty": "ទទេ",
   "retroStateSaving": "កំពុងរក្សាទុក…",
   "retroStateLoading": "កំពុងផ្ទុក…",
+  "retroStateCardAfterEnd": "ហ្គេមបានឈប់ពេលកំពុងផ្ទុកស្ថានភាព ដូច្នេះកាតអង្គចងចាំប្រហែលជាបានត្រឡប់ទៅពេលនោះរួចហើយ។",
   "retroStateOverwriteTitle": "សរសេរជាន់លើរន្ធ %@ មែនទេ?",
   "retroStateOverwrite": "សរសេរជាន់លើ",
   "retroStateOverwriteDetail": "ស្ថានភាពដែលបានរក្សាទុកនៅ %@ ត្រូវបានជំនួសដោយពេលនេះ។",

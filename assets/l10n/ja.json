@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "空き",
   "retroStateSaving": "セーブ中…",
   "retroStateLoading": "ロード中…",
+  "retroStateCardAfterEnd": "ステートのロード中にゲームが停止したため、メモリーカードはすでにその瞬間に戻っている可能性があります。",
   "retroStateOverwriteTitle": "スロット %@ を上書きしますか?",
   "retroStateOverwrite": "上書き",
   "retroStateOverwriteDetail": "%@ に保存したステートがこの瞬間に置き換わります。",

@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "Kosong",
   "retroStateSaving": "Menyimpan…",
   "retroStateLoading": "Memuat…",
+  "retroStateCardAfterEnd": "Game berhenti saat state dimuat, jadi kartu memori mungkin sudah kembali ke momen itu.",
   "retroStateOverwriteTitle": "Timpa slot %@?",
   "retroStateOverwrite": "Timpa",
   "retroStateOverwriteDetail": "State yang disimpan pada %@ diganti dengan momen ini.",

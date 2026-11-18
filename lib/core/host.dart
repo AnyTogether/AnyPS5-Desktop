@@ -117,7 +117,7 @@ class AppPaths {
   String get retroPs2Bios => p.join(retroSystem, 'pcsx2', 'bios');
   String get retroPs2Saves => p.join(config, 'retro', 'saves', 'ps2');
 
-  /// Where the emulator host keeps the save states of the PS1 game whose `Game.slug` is [game], or
+  /// Where the emulator host keeps the save states of the PS1 game whose `Game.titleId` is [game], or
   /// with [ps2] the PS2 game's, beside their memory cards: the folder `start.states` names
   /// (anyps5-retro-host docs/protocol.md "saveState and loadState"), one per game, as the host
   /// names a slot only after its disc and checks a state's game only by that name.

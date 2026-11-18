@@ -2474,6 +2474,7 @@
   "retroStateEmpty": "ວ່າງ",
   "retroStateSaving": "ກຳລັງບັນທຶກ…",
   "retroStateLoading": "ກຳລັງໂຫຼດ…",
+  "retroStateCardAfterEnd": "ເກມຢຸດໃນຂະນະທີ່ກຳລັງໂຫຼດສະຖານະ, ສະນັ້ນບັດຄວາມຈຳອາດຈະກັບໄປຫາຊ່ວງເວລານັ້ນແລ້ວ.",
   "retroStateOverwriteTitle": "ຂຽນທັບຊ່ອງ %@ ບໍ່?",
   "retroStateOverwrite": "ຂຽນທັບ",
   "retroStateOverwriteDetail": "ສະຖານະທີ່ບັນທຶກໄວ້ເມື່ອ %@ ຈະຖືກແທນທີ່ດ້ວຍຊ່ວງເວລານີ້.",

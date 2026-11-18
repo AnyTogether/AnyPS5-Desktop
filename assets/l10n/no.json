@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "Tom",
   "retroStateSaving": "Lagrer …",
   "retroStateLoading": "Laster inn …",
+  "retroStateCardAfterEnd": "Spillet stoppet mens tilstanden ble lastet inn, så minnekortet kan allerede ha gått tilbake til det øyeblikket.",
   "retroStateOverwriteTitle": "Overskrive plass %@?",
   "retroStateOverwrite": "Overskriv",
   "retroStateOverwriteDetail": "Tilstanden lagret %@ erstattes av dette øyeblikket.",

@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "Gol",
   "retroStateSaving": "Se salvează…",
   "retroStateLoading": "Se încarcă…",
+  "retroStateCardAfterEnd": "Jocul s-a oprit în timp ce se încărca starea, așa că este posibil ca și cardul de memorie să fi revenit deja la acel moment.",
   "retroStateOverwriteTitle": "Suprascrii slotul %@?",
   "retroStateOverwrite": "Suprascrie",
   "retroStateOverwriteDetail": "Starea salvată pe %@ este înlocuită de acest moment.",

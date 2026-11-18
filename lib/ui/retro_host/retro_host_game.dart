@@ -154,6 +154,18 @@ class RetroHostGame extends ChangeNotifier {
   Future<bool>? _detaching;
   Future<void>? _starting;
 
+  /// A `saveState` or `loadState` under way, until its reply: protocol.md "saveState and
+  /// loadState" says a launcher MUST NOT send another call after one until that reply has come, as
+  /// a call queued behind it in the host could otherwise be answered more than 5 seconds after it
+  /// was sent. Every other call of this game waits for it ([_afterStateCall]); pings go on.
+  Future<void>? _stateCallDone;
+
+  Future<void> _afterStateCall() async {
+    for (var done = _stateCallDone; done != null; done = _stateCallDone) {
+      await done;
+    }
+  }
+
   bool get _gameLive => _phase == RetroHostGamePhase.loading || _phase == RetroHostGamePhase.playing;
 
   /// Waits for the host's greeting, then starts the game. Throws [StateError] when a game was
@@ -201,6 +213,7 @@ class RetroHostGame extends ChangeNotifier {
     if (!_gameLive || _polling) return;
     _polling = true;
     try {
+      if (_stateCallDone != null) await _afterStateCall();
       final current = await session.status();
       if (!_gameLive) return;
       if (current == null) {
@@ -270,6 +283,10 @@ class RetroHostGame extends ChangeNotifier {
   Future<RetroStateOutcome> _stateCall(String method, int slot) async {
     if (slot < 0 || slot >= RetroStateFolder.slots) throw RangeError.range(slot, 0, RetroStateFolder.slots - 1, 'slot');
     if (!_gameLive || !_savesStates) return RetroStateOutcome.notNow;
+    if (_stateCallDone != null) await _afterStateCall();
+    if (!_gameLive) return RetroStateOutcome.notNow;
+    final done = Completer<void>();
+    _stateCallDone = done.future;
     try {
       final result = await session.call(method, {'slot': slot});
       return result is Map ? RetroStateOutcome.done : RetroStateOutcome.notNow;
@@ -277,6 +294,9 @@ class RetroHostGame extends ChangeNotifier {
       return RetroStateOutcome.ofError(error.code);
     } on Object {
       return RetroStateOutcome.failed;
+    } finally {
+      _stateCallDone = null;
+      done.complete();
     }
   }
 
@@ -290,6 +310,7 @@ class RetroHostGame extends ChangeNotifier {
     try {
       await session.ready;
       if (_hostEnded || _phase == RetroHostGamePhase.closed) return;
+      if (_stateCallDone != null) await _afterStateCall();
       await session.call('volume', {'level': _level, 'muted': _isMuted});
     } on Object {
       return;
@@ -299,6 +320,7 @@ class RetroHostGame extends ChangeNotifier {
   Future<bool> _gameCall(String method, Object? args) async {
     if (!_gameLive) return false;
     try {
+      if (_stateCallDone != null) await _afterStateCall();
       return await session.call(method, args) == true;
     } on Object {
       return false;
@@ -344,6 +366,7 @@ class RetroHostGame extends ChangeNotifier {
     _notify();
     if (now == wasPaused) return;
     try {
+      if (_stateCallDone != null) await _afterStateCall();
       await session.call('pause', now);
     } on Object catch (error) {
       if (_gameLive) _end(failure: '$error');
@@ -371,6 +394,7 @@ class RetroHostGame extends ChangeNotifier {
 
   Future<RetroStatus?> _stopAndRelease() async {
     try {
+      if (_stateCallDone != null) await _afterStateCall();
       final ended = await session.stopGame();
       await session.call('release');
       return ended;
@@ -400,6 +424,7 @@ class RetroHostGame extends ChangeNotifier {
     var free = false;
     if (!_hostEnded && _closing == null) {
       try {
+        if (_stateCallDone != null) await _afterStateCall();
         await session.call('release');
         free = await session.status() == null && !_hostEnded && _closing == null;
       } on Object catch (error) {

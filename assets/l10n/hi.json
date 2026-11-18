@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "खाली",
   "retroStateSaving": "सेव हो रहा है…",
   "retroStateLoading": "लोड हो रहा है…",
+  "retroStateCardAfterEnd": "स्टेट लोड होते समय गेम रुक गया, इसलिए मेमोरी कार्ड शायद पहले ही उस पल पर लौट चुका है।",
   "retroStateOverwriteTitle": "स्लॉट %@ बदलें?",
   "retroStateOverwrite": "बदलें",
   "retroStateOverwriteDetail": "%@ को सेव किए गए स्टेट की जगह यह पल ले लेगा।",

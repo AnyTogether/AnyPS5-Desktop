@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "খালি",
   "retroStateSaving": "সেভ হচ্ছে…",
   "retroStateLoading": "লোড হচ্ছে…",
+  "retroStateCardAfterEnd": "স্টেট লোড হওয়ার সময় গেমটি থেমে গেছে, তাই মেমরি কার্ড হয়তো ইতিমধ্যে সেই মুহূর্তে ফিরে গেছে।",
   "retroStateOverwriteTitle": "স্লট %@ প্রতিস্থাপন করবেন?",
   "retroStateOverwrite": "প্রতিস্থাপন করুন",
   "retroStateOverwriteDetail": "%@-এ সেভ করা স্টেটের জায়গায় এই মুহূর্তটি রাখা হবে।",

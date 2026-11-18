@@ -92,6 +92,34 @@ void main() {
     expect(() => game.saveState(8), throwsRangeError);
   });
 
+  test('no other call is sent after a saveState or loadState until its reply (protocol.md)', () async {
+    await started();
+    session.callResults['saveState'] = recording.calls('slots', 'saveState').first.reply['result'];
+    session.callResults['option'] = true;
+    final gate = session.callGate = Completer<void>();
+    final saving = game.saveState(1);
+    await pumpEventQueue();
+    session.callGate = null;
+    var refreshed = false;
+    final waiting = [
+      game.pause(true),
+      game.refresh().then((_) => refreshed = true),
+      game.setOption('k', 'v'),
+      game.setVolume(level: 0),
+    ];
+    final loading = game.loadState(1);
+    await pumpEventQueue();
+    expect(session.calls.last.$1, 'saveState', reason: 'everything else waits for its reply');
+    expect(refreshed, isFalse, reason: 'status waits too');
+    gate.complete();
+    expect(await saving, RetroStateOutcome.done);
+    await Future.wait(waiting);
+    await loading;
+    final after = [for (final call in session.calls.skipWhile((call) => call.$1 != 'saveState').skip(1)) call.$1];
+    expect(after, containsAll(['pause', 'option', 'volume', 'loadState']));
+    expect(refreshed, isTrue);
+  });
+
   test('no game loaded is notNow, without a call', () async {
     expect(await game.saveState(0), RetroStateOutcome.notNow);
     expect(session.calls, isEmpty);

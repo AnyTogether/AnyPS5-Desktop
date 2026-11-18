@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "Tom",
   "retroStateSaving": "Sparar…",
   "retroStateLoading": "Läser in…",
+  "retroStateCardAfterEnd": "Spelet stannade medan läget lästes in, så minneskortet kan redan ha gått tillbaka till det ögonblicket.",
   "retroStateOverwriteTitle": "Skriva över plats %@?",
   "retroStateOverwrite": "Skriv över",
   "retroStateOverwriteDetail": "Läget som sparades %@ ersätts av det här ögonblicket.",

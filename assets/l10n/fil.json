@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "Walang laman",
   "retroStateSaving": "Sine-save…",
   "retroStateLoading": "Naglo-load…",
+  "retroStateCardAfterEnd": "Huminto ang laro habang nilo-load ang state, kaya maaaring nakabalik na rin ang memory card sa sandaling iyon.",
   "retroStateOverwriteTitle": "Palitan ang slot %@?",
   "retroStateOverwrite": "Palitan",
   "retroStateOverwriteDetail": "Papalitan ng sandaling ito ang state na na-save noong %@.",

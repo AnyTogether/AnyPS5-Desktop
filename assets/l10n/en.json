@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "Empty",
   "retroStateSaving": "Saving…",
   "retroStateLoading": "Loading…",
+  "retroStateCardAfterEnd": "The game stopped while the state was loading, so the memory card may already be back at that moment.",
   "retroStateOverwriteTitle": "Overwrite slot %@?",
   "retroStateOverwrite": "Overwrite",
   "retroStateOverwriteDetail": "The state saved %@ is replaced by this moment.",

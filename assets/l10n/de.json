@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "Leer",
   "retroStateSaving": "Wird gespeichert…",
   "retroStateLoading": "Wird geladen…",
+  "retroStateCardAfterEnd": "Das Spiel wurde beim Laden des Zustands beendet, daher ist die Memory Card vielleicht schon zu diesem Moment zurückgekehrt.",
   "retroStateOverwriteTitle": "Platz %@ überschreiben?",
   "retroStateOverwrite": "Überschreiben",
   "retroStateOverwriteDetail": "Der am %@ gespeicherte Zustand wird durch diesen Moment ersetzt.",

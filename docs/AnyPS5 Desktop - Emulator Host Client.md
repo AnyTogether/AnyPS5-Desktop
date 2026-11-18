@@ -366,9 +366,14 @@ reads the host's own `call-start-ps2.json` and `call-status-ps2-no-bios.json`.
 
 A host that lists `saveStates` (`RetroHostClient.canSaveStates`) saves and
 loads a game's state for one player. That capability is on the save states
-branch of the host, B-Howell/anyps5-retro-host-upstream `save-states` at
-3576e38, whose protocol.md section "saveState and loadState" this follows; it
-is not on the host's `main` yet. These states are an offline feature of one
+branch of the host, B-Howell/anyps5-retro-host-upstream `save-states` (host
+PR AnyTogether/anyps5-retro-host#24, not merged yet, so no host commit on
+`main` can be named here), whose protocol.md section "saveState and
+loadState" this follows at d4c0da5. The recording below was made at 3576e38;
+what the branch changed after it (a checksum in the file's header, a load
+handed to the core only within 3.5 seconds, Windows file names refused as
+`argument`, a save the file cannot hold as `coreRefused`) changes no message
+the launcher reads, only `bytes` by the 8 of the checksum. These states are an offline feature of one
 player on one machine: nothing here starts an online match from a state. The
 protocol lines it relies on:
 
@@ -388,7 +393,14 @@ protocol lines it relies on:
   name or build identity differs from this game's `status.core`"),
   `coreRefused` and `fileError`;
 - the memory card: "Loading a state puts the card back as it was when the
-  state was saved" for a PS1 game; "A PS2 state does not hold the memory card".
+  state was saved" for a PS1 game; "A PS2 state does not hold the memory card";
+  and "A load that ended the game with `other` (above) may still have replaced
+  card 1 [...] A launcher that sees that ending after a `loadState` should tell
+  the player that the memory card may now be the state's";
+- the order of calls: "a launcher MUST NOT send another call after
+  `saveState` or `loadState` until that reply has come; otherwise the second
+  reply could come more than 5 seconds after its call was sent. Pings go on
+  as usual".
 
 What the launcher does with them:
 
@@ -404,8 +416,14 @@ What the launcher does with them:
 - **Where states live.** `start.states` is `retro/states/ps1/<game>` or
   `retro/states/ps2/<game>` in the launcher's data folder
   (`AppPaths.retroStates`), next to `retro/saves/<console>`, where `<game>` is
-  the game's `Game.slug`: its retro.json title ID when it has one, otherwise
-  the hash of its path and size the library names it by. The host names each
+  the game's `Game.titleId` as it is, hyphens kept (not `Game.slug`, which
+  drops them, so `A-BC` and `AB-C` would meet): `PS1-` or `PS2-` and its
+  retro.json title ID when it has one, otherwise the hash of its path and
+  size the library names it by. Its letters are only `A-Z`, `0-9` and `-`,
+  with the console first, so it is a safe file name everywhere and never a
+  Windows device name. Two games whose retro.json give the same title ID are
+  one game to the launcher and share their states, as they would on a
+  console. The host names each
   slot after the disc and checks a state's game only by the console and that
   name (`otherGame`), so with one folder per console two discs with the same
   name in different folders would share slots, and one game's state would
@@ -436,7 +454,20 @@ What the launcher does with them:
   host writes no other file there and reads none.
 - **Outcomes.** `RetroStateOutcome` is the result for the UI: `done`,
   `notNow` (`false`), one value per error code, and `failed` for an `argument`
-  error, a code this launcher does not know, or a host that went away.
+  error (on Windows also a disc whose name Windows would not keep, such as
+  `NUL.cue`), a code this launcher does not know, or a host that went away.
+- **Nothing after a state call until its reply.** `RetroHostGame` sends every
+  other call of its game (`status` polls, `pause`, `volume`, `option`,
+  `changeDisc`, `connectedPorts`, `stop`, `release`) only once a
+  `saveState` or `loadState` it sent has been answered
+  (`RetroHostGame._afterStateCall`); the client's pings go on. A call asked
+  meanwhile is sent after the reply, at most 4.5 seconds later, in the order
+  it was asked, and its own 5-second limit starts when it is sent.
+- **A load that ended the game.** After a PS1 load answered `false`
+  (`RetroSaveStates.loadAnsweredFalse`), a game that then ends with
+  `errorCode` `other` shows "The game stopped while the state was loading, so
+  the memory card may already be back at that moment." beside the usual
+  problem.
 
 [`test/fixtures/retro_host_save_states_recording.json`](../test/fixtures/retro_host_save_states_recording.json)
 holds every message each way, as its exact text (frames left out), of a host

@@ -68,6 +68,10 @@ class RetroPlay {
   /// it was asked in, not from the menu opened again while it waited.
   int menuVisits = 0;
 
+  /// The ids of the menu's first page as last built: the rows it gains or loses as the status
+  /// changes leave the focus on the row it was on ([RetroHostPlaying._keepRetroMenuRow]).
+  List<String> firstPageRows = const [];
+
   /// The phase and the problem the launcher last acted on ([RetroHostPlaying._retroChanged]).
   (RetroHostGamePhase, String?)? _seen;
 
@@ -414,7 +418,7 @@ extension RetroHostPlaying on AppModel {
           ..vibration = preferences.controllerVibration;
     final menu = RetroGameMenu(host, controls: controls);
     final discPath = p.normalize(disc.path);
-    final states = p.normalize(paths.retroStates(game.slug, ps2: ps2));
+    final states = p.normalize(paths.retroStates(game.titleId, ps2: ps2));
     final saveStates = RetroSaveStates(
       host,
       RetroStateFolder(folder: states, disc: discPath),
@@ -505,14 +509,12 @@ extension RetroHostPlaying on AppModel {
     }
     final seen = (play.host.phase, play.problem);
     if (seen == play._seen) {
+      _keepRetroMenuRow(play);
       if (retroMenuShown) _redraw();
       return;
     }
-    final before = play._seen?.$1;
     play._seen = seen;
-    if (before == RetroHostGamePhase.loading && play.host.phase == RetroHostGamePhase.playing) {
-      _keepRetroMenuRow(play);
-    }
+    _keepRetroMenuRow(play);
     if (play.host.phase == RetroHostGamePhase.ended && !play.closing) {
       if (!play.over) {
         play.endedAt = DateTime.now();
@@ -522,6 +524,9 @@ extension RetroHostPlaying on AppModel {
         overlay = null;
         _leaveRetroPages(play);
         unawaited(play.menu.close());
+      }
+      if (!play.ps2 && play.states.loadAnsweredFalse && play.host.endStatus?.errorCode == RetroErrorCode.other) {
+        show(T.text('retroStateCardAfterEnd'));
       }
       final problem = play.problem;
       _padLog?.call('emulator host: the game ended (${play.host.endStatus?.error ?? play.host.failure ?? 'no error'})');
@@ -663,37 +668,37 @@ extension RetroHostPlaying on AppModel {
         ),
       ];
     }
+    final rows = _retroFirstPageRows(play);
+    play.firstPageRows = [for (final row in rows) row.id];
+    return [PanelCategory(id: 'retroMenu', title: play.game.name, rows: rows)];
+  }
+
+  List<PanelRow> _retroFirstPageRows(RetroPlay play) {
     final menu = play.menu;
     return [
-      PanelCategory(
-        id: 'retroMenu',
-        title: play.game.name,
-        rows: [
-          PanelRow(id: 'resume', title: T.text('quickResume'), kind: ActionRow(resumeRetroGame)),
-          for (final disc in menu.rows.whereType<RetroDiscRow>())
-            PanelRow(
-              id: 'disc-${disc.index}',
-              title: disc.label,
-              detail: disc.inserted
-                  ? T.text(menu.discChangeFailed ? 'retroMenuDiscFailedDetail' : 'retroMenuDiscInsertedDetail')
-                  : (disc.enabled ? null : T.text('retroMenuDiscChangingDetail')),
-              kind: ActionRow(() => unawaited(menu.chooseDisc(disc))),
-            ),
-          ..._retroStateMenuRows(play),
-          for (final MapEntry(key: section, value: (title, detail)) in retroMenuSections.entries)
-            if (_retroSectionRows(play, section).isNotEmpty)
-              PanelRow(
-                id: 'section-${section.name}',
-                title: T.text(title),
-                detail: T.text(detail),
-                kind: ActionRow(() => _openRetroMenuSection(play, section)),
-              ),
+      PanelRow(id: 'resume', title: T.text('quickResume'), kind: ActionRow(resumeRetroGame)),
+      for (final disc in menu.rows.whereType<RetroDiscRow>())
+        PanelRow(
+          id: 'disc-${disc.index}',
+          title: disc.label,
+          detail: disc.inserted
+              ? T.text(menu.discChangeFailed ? 'retroMenuDiscFailedDetail' : 'retroMenuDiscInsertedDetail')
+              : (disc.enabled ? null : T.text('retroMenuDiscChangingDetail')),
+          kind: ActionRow(() => unawaited(menu.chooseDisc(disc))),
+        ),
+      ..._retroStateMenuRows(play),
+      for (final MapEntry(key: section, value: (title, detail)) in retroMenuSections.entries)
+        if (_retroSectionRows(play, section).isNotEmpty)
           PanelRow(
-            id: 'closeGame',
-            title: T.text('quickCloseGame'),
-            kind: ActionRow(() => unawaited(closeRetroGame()), destructive: true),
+            id: 'section-${section.name}',
+            title: T.text(title),
+            detail: T.text(detail),
+            kind: ActionRow(() => _openRetroMenuSection(play, section)),
           ),
-        ],
+      PanelRow(
+        id: 'closeGame',
+        title: T.text('quickCloseGame'),
+        kind: ActionRow(() => unawaited(closeRetroGame()), destructive: true),
       ),
     ];
   }
@@ -771,12 +776,17 @@ extension RetroHostPlaying on AppModel {
     play.overwriting = null;
   }
 
-  /// The first frame is up, so Save state and Load state join the menu's first page: the row in
-  /// focus stays the one it was on, below them.
+  /// The menu's first page gained or lost rows as the game's status changed (Save state and Load
+  /// state once the first frame is up, the discs and sections once the status lists them): the
+  /// focus stays on the row it was on, wherever that row now is.
   void _keepRetroMenuRow(RetroPlay play) {
     if (overlay != Layer.retroMenu || play.menuSection != null || play.statePage != null) return;
-    final at = _retroMenuCategories().single.rows.indexWhere((row) => row.id == 'saveState');
-    if (at >= 0 && panelRow >= at) panelRow += 2;
+    final before = play.firstPageRows;
+    if (panelRow < 0 || panelRow >= before.length) return;
+    final focused = before[panelRow];
+    final now = play.firstPageRows = [for (final row in _retroFirstPageRows(play)) row.id];
+    final index = now.indexOf(focused);
+    if (index >= 0) panelRow = index;
   }
 
   /// Save state and Load state on the menu's first page, where the game's host saves states and

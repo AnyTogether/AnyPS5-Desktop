@@ -38,7 +38,8 @@ void main() {
   List<String> rowIds(AppModel model) => [for (final row in model.panelCategories().single.rows) row.id];
 
   /// The game's states folder, as the launcher keeps it.
-  String statesOf(Game game, {bool ps2 = false}) => p.normalize(launcher.model.paths.retroStates(game.slug, ps2: ps2));
+  String statesOf(Game game, {bool ps2 = false}) =>
+      p.normalize(launcher.model.paths.retroStates(game.titleId, ps2: ps2));
   RetroStateFolder folder({bool ps2 = false}) => RetroStateFolder(
     folder: statesOf(ps2 ? launcher.ps2Game : launcher.game, ps2: ps2),
     disc: ps2 ? launcher.ps2Disc! : launcher.disc,
@@ -72,7 +73,7 @@ void main() {
   test('a game starts with its own states folder, and its menu has Save state and Load state', () async {
     final model = await playing();
     expect(launcher.session.startArgs?['states'], statesOf(launcher.game));
-    expect(p.basename(statesOf(launcher.game)), 'ps1slus00001', reason: "named by the game's title ID");
+    expect(p.basename(statesOf(launcher.game)), 'PS1-SLUS00001', reason: "named by the game's title ID");
     expect(T.text('retroMenuSaveState'), 'Save state', reason: 'sentence case, as every row');
     expect(T.text('retroMenuLoadState'), 'Load state');
     model.openRetroMenu();
@@ -100,12 +101,13 @@ void main() {
     final other = Directory(p.join(launcher.model.root!, 'Day Racer'))..createSync();
     File(p.join(other.path, 'game.cue')).createSync();
     File(p.join(other.path, 'retro.json')).writeAsStringSync(
-      jsonEncode({'platform': 'ps1', 'titleId': 'SLUS00002', 'name': 'Day Racer', 'disc': 'game.cue'}),
+      jsonEncode({'platform': 'ps1', 'titleId': 'SLUS0-0001', 'name': 'Day Racer', 'disc': 'game.cue'}),
     );
     launcher.model.rescan();
     await settleFiles();
     final day = launcher.model.games.singleWhere((game) => game.name == 'Day Racer');
     final night = launcher.model.games.singleWhere((game) => game.name == 'Night Racer');
+    expect(day.slug, night.slug, reason: 'title IDs that differ only by a hyphen');
     final dayStates = RetroStateFolder(folder: statesOf(day), disc: day.retro!.path);
     final nightStates = RetroStateFolder(folder: statesOf(night), disc: night.retro!.path);
     expect(
@@ -191,11 +193,11 @@ void main() {
     model.openRetroMenu();
     expect(rowIds(model), ['resume', 'section-audio', 'closeGame'], reason: 'the host saves nothing yet');
     model.panelRow = rowIds(model).indexOf('closeGame');
-    launcher.session.nextStatus = fakeStatus();
+    launcher.session.nextStatus = menuStatus();
     await launcher.play.host.refresh();
     await pumpEventQueue();
     expect(launcher.play.host.phase, RetroHostGamePhase.playing);
-    expect(rowIds(model), ['resume', 'saveState', 'loadState', 'section-audio', 'closeGame']);
+    expect(rowIds(model), containsAllInOrder(['resume', 'disc-0', 'disc-1', 'saveState', 'loadState', 'closeGame']));
     expect(rowIds(model)[model.panelRow], 'closeGame', reason: 'the focus stays on the row it was on');
   });
 
@@ -379,6 +381,28 @@ void main() {
     await pumpEventQueue();
     expect(model.overlay, isNull, reason: 'the question goes with the game');
     expect(launcher.play.statePage, isNull);
+  });
+
+  test('a PS1 load answered false that ended the game with other says the card may be back at that moment', () async {
+    launcher = Ps1Launcher();
+    launcher.session.canSaveStates = true;
+    File(folder().statePath(0))
+      ..createSync(recursive: true)
+      ..writeAsBytesSync([1]);
+    final model = launcher.model..setRetroHostPs1(true);
+    await launcher.start();
+    await settleFiles();
+    launcher.session.callResults['loadState'] = false;
+    model.openRetroMenu();
+    await settleFiles();
+    (launcher.row('loadState').kind as ActionRow).run();
+    (launcher.row('state-0').kind as ActionRow).run();
+    await settleFiles();
+    expect(model.toast, T.text('retroStateLoadFailed'));
+    launcher.session.nextStatus = fakeStatus(ended: true, errorCode: RetroErrorCode.other);
+    await launcher.play.host.refresh();
+    await pumpEventQueue();
+    expect(model.toast, T.text('retroStateCardAfterEnd'));
   });
 
   test('the words for a state that did not work', () {

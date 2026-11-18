@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "Vacía",
   "retroStateSaving": "Guardando…",
   "retroStateLoading": "Cargando…",
+  "retroStateCardAfterEnd": "El juego se detuvo mientras se cargaba el estado, así que puede que la tarjeta de memoria ya haya vuelto a ese momento.",
   "retroStateOverwriteTitle": "¿Sobrescribir la ranura %@?",
   "retroStateOverwrite": "Sobrescribir",
   "retroStateOverwriteDetail": "El estado guardado el %@ se sustituye por este momento.",

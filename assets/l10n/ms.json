@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "Kosong",
   "retroStateSaving": "Sedang menyimpan…",
   "retroStateLoading": "Sedang memuatkan…",
+  "retroStateCardAfterEnd": "Permainan berhenti semasa keadaan dimuatkan, jadi kad memori mungkin sudah kembali ke detik itu.",
   "retroStateOverwriteTitle": "Tulis ganti slot %@?",
   "retroStateOverwrite": "Tulis ganti",
   "retroStateOverwriteDetail": "Keadaan yang disimpan pada %@ digantikan dengan detik ini.",

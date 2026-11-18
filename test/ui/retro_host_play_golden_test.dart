@@ -142,7 +142,7 @@ void main() {
     final recording = SaveStatesHostRecording.load();
     final model = launcher.model;
     final folder = RetroStateFolder(
-      folder: p.normalize(model.paths.retroStates(launcher.game.slug)),
+      folder: p.normalize(model.paths.retroStates(launcher.game.titleId)),
       disc: p.normalize(launcher.disc),
     );
     launcher.session

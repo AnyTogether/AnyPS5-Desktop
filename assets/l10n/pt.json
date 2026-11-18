@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "Vazio",
   "retroStateSaving": "Salvando…",
   "retroStateLoading": "Carregando…",
+  "retroStateCardAfterEnd": "O jogo parou enquanto o estado era carregado, então o cartão de memória pode já ter voltado a esse momento.",
   "retroStateOverwriteTitle": "Substituir o espaço %@?",
   "retroStateOverwrite": "Substituir",
   "retroStateOverwriteDetail": "O estado guardado em %@ é substituído por este momento.",

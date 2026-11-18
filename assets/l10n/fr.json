@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "Vide",
   "retroStateSaving": "Sauvegarde en cours…",
   "retroStateLoading": "Chargement en cours…",
+  "retroStateCardAfterEnd": "Le jeu s’est arrêté pendant le chargement de l’état, la carte mémoire est donc peut-être déjà revenue à ce moment.",
   "retroStateOverwriteTitle": "Remplacer l’emplacement %@ ?",
   "retroStateOverwrite": "Remplacer",
   "retroStateOverwriteDetail": "L’état sauvegardé le %@ est remplacé par ce moment.",

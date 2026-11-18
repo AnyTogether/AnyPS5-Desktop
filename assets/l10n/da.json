@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "Tom",
   "retroStateSaving": "Gemmer…",
   "retroStateLoading": "Indlæser…",
+  "retroStateCardAfterEnd": "Spillet stoppede, mens tilstanden blev indlæst, så hukommelseskortet er måske allerede gået tilbage til det øjeblik.",
   "retroStateOverwriteTitle": "Overskriv plads %@?",
   "retroStateOverwrite": "Overskriv",
   "retroStateOverwriteDetail": "Tilstanden gemt %@ erstattes af dette øjeblik.",

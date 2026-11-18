@@ -2471,6 +2471,7 @@
   "retroStateEmpty": "खाली",
   "retroStateSaving": "सेव हो रहल बा…",
   "retroStateLoading": "लोड हो रहल बा…",
+  "retroStateCardAfterEnd": "स्टेट लोड होत घरी गेम रुक गइल, एह से मेमोरी कार्ड पहिलहीं ओह पल पर लवट गइल हो सकेला।",
   "retroStateOverwriteTitle": "स्लॉट %@ बदल दीं?",
   "retroStateOverwrite": "बदल दीं",
   "retroStateOverwriteDetail": "%@ के सेव कइल स्टेट के जगह ई पल आ जाई।",

@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "Prázdná",
   "retroStateSaving": "Ukládání…",
   "retroStateLoading": "Načítání…",
+  "retroStateCardAfterEnd": "Hra se zastavila během načítání stavu, takže paměťová karta se možná už vrátila do toho okamžiku.",
   "retroStateOverwriteTitle": "Přepsat pozici %@?",
   "retroStateOverwrite": "Přepsat",
   "retroStateOverwriteDetail": "Stav uložený %@ nahradí tento okamžik.",

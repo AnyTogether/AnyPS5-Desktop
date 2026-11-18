@@ -2488,6 +2488,7 @@
   "retroStateEmpty": "空",
   "retroStateSaving": "正在保存…",
   "retroStateLoading": "正在读取…",
+  "retroStateCardAfterEnd": "游戏在读取即时存档时停止，所以记忆卡可能已经回到那一刻。",
   "retroStateOverwriteTitle": "覆盖存档位 %@？",
   "retroStateOverwrite": "覆盖",
   "retroStateOverwriteDetail": "%@ 保存的即时存档将被这一刻替换。",

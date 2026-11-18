@@ -2472,6 +2472,7 @@
   "retroStateEmpty": "ባዶ",
   "retroStateSaving": "እያስቀመጠ ነው…",
   "retroStateLoading": "እየጫነ ነው…",
+  "retroStateCardAfterEnd": "ሁኔታው በመጫን ላይ እያለ ጨዋታው ቆሟል፣ ስለዚህ የማስታወሻ ካርዱ ቀድሞውኑ ወደዚያ ቅጽበት ተመልሶ ሊሆን ይችላል።",
   "retroStateOverwriteTitle": "ቦታ %@ን ይተካ?",
   "retroStateOverwrite": "ተካ",
   "retroStateOverwriteDetail": "በ%@ የተቀመጠው ሁኔታ በዚህ ቅጽበት ይተካል።",
