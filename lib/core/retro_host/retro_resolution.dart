@@ -17,14 +17,14 @@ const retroResolutionKeyPs2 = 'pcsx2_upscale_multiplier';
 /// The internal resolution's option key for a PS1 game, or with [ps2] for a PS2 game.
 String retroResolutionKey({bool ps2 = false}) => ps2 ? retroResolutionKeyPs2 : retroResolutionKeyPs1;
 
-/// The values the launcher offers, by console, with the scale each one draws at: Native to 4x.
-/// LRPS2 lists no 3x. Larger scales are not offered: on a 1080p or 1440p display most of the gain
-/// is at 2x to 4x, and PS2 games at 8x ran at about half speed on a fast graphics card
-/// (anyps5-retro-host docs/ps2.md "Drawing"). The host may list fewer, and only those it lists
-/// are offered.
+/// The values the launcher offers, by console, with the scale each one draws at: Native to 4x,
+/// and 6x and 8x for PS1 and 8x for PS2 for strong graphics cards. LRPS2 lists no 3x or 6x;
+/// SwanStation's 5x and 7x are left out, so each step is a clear one. 8x is for the player to
+/// choose: PS2 games at 8x ran at about half speed on a fast graphics card (anyps5-retro-host
+/// docs/ps2.md "Drawing"). The host may list fewer, and only those it lists are offered.
 const _offered = {
-  false: {'1': 1, '2': 2, '3': 3, '4': 4},
-  true: {'1x (Native)': 1, '2x': 2, '4x': 4},
+  false: {'1': 1, '2': 2, '3': 3, '4': 4, '6': 6, '8': 8},
+  true: {'1x (Native)': 1, '2x': 2, '4x': 4, '8x': 8},
 };
 
 /// One value the row offers.

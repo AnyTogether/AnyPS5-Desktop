@@ -107,6 +107,9 @@ void main() {
     final on = RetroGraphicsChoice.of(halfway, retroWidescreenPs1)!;
     expect(on.selected, 1, reason: 'the hack is on, though the aspect ratio is still 4:3');
     expect(on.changesFor(halfway, 0), {'swanstation_GPU_WidescreenHack': 'false'}, reason: '4:3 already');
+    expect(on.changesFor(halfway, 1), {
+      'swanstation_Display_AspectRatio': '16:9',
+    }, reason: 'the value shown is set whole again');
   });
 
   test('the note: in a moment while a chosen value is not in effect yet', () {

@@ -203,20 +203,40 @@ class RetroGameMenu extends ChangeNotifier {
   }
 
   /// Chooses the value at [index] of [setting]'s row: the options it sets that differ from the
-  /// host's are sent, in order, stopping at the first the host refuses. Every option the value
-  /// sets, to keep together, once the host took those sent; null when the row does not offer that
-  /// value now, it is already chosen, or the host refused one.
+  /// host's are sent, in order. One choice at a time: another made while one is sent is not taken,
+  /// so two choices never leave a setting's options half of each. When the host refuses one, those
+  /// it took are set back to what the host had, so widescreen's hack never stays without its
+  /// aspect ratio. Every option the value sets, to keep together, once the host took them all;
+  /// null when the row does not offer that value now, it already has it, a choice is being sent,
+  /// or the host refused one.
   Future<Map<String, String>?> chooseGraphics(RetroGraphicsSetting setting, int index) async {
     final status = game.status;
     final choice = RetroGraphicsChoice.of(status, setting);
-    if (status == null || choice == null || index < 0 || index >= choice.values.length) return null;
+    if (_choosingGraphics || status == null || choice == null || index < 0 || index >= choice.values.length) {
+      return null;
+    }
     final changes = choice.changesFor(status, index);
     if (changes.isEmpty) return null;
-    for (final MapEntry(:key, :value) in changes.entries) {
-      if (!await game.setOption(key, value)) return null;
+    _choosingGraphics = true;
+    try {
+      final taken = <String>[];
+      for (final MapEntry(:key, :value) in changes.entries) {
+        if (!await game.setOption(key, value)) {
+          for (final key in taken) {
+            final option = status.options[key]!;
+            await game.setOption(key, option.values[option.selected]);
+          }
+          return null;
+        }
+        taken.add(key);
+      }
+      return choice.values[index].offer!.options;
+    } finally {
+      _choosingGraphics = false;
     }
-    return choice.values[index].offer!.options;
   }
+
+  bool _choosingGraphics = false;
 
   /// Moves the volume [steps] of [volumeStep] up (down when negative), from 0 to 1. Turning it up
   /// unmutes. The level is counted in whole steps and divided last, so three tenths is 0.3, not

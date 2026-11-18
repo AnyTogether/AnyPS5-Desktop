@@ -358,15 +358,18 @@ value and limits none), when the core lists no such option, or for a PS2
 game on a host without `ps2ResolutionLimits` (`RetroHostGame.limitsPs2Resolution`,
 from `welcome`).
 
-**Which values.** The launcher offers Native, 2x, 3x and 4x for PS1 (`"1"`
-to `"4"`) and Native, 2x and 4x for PS2 (`"1x (Native)"`, `"2x"`, `"4x"`;
-LRPS2 has no 3x), and of those only the ones the host lists, in the host's
+**Which values.** The launcher offers Native, 2x, 3x, 4x, 6x and 8x for PS1
+(`"1"` to `"4"`, `"6"`, `"8"`) and Native, 2x, 4x and 8x for PS2
+(`"1x (Native)"`, `"2x"`, `"4x"`, `"8x"`; LRPS2 has no 3x or 6x), and of
+those only the ones the host lists, in the host's
 order. The value the game has is always shown, also one the launcher does not
 offer, with the host's label, so the row never claims a value the game does
-not use. 5x and above are not offered: on a 1080p or 1440p display most of
-the gain is at 2x to 4x, and PS2 games at 8x ran at 26 to 40 frames a second
-on an RTX 4080 SUPER in the host's own measurement (host `docs/ps2.md`
-"Drawing"), while the host still offers 8x where it fits. The labels are the
+not use. 6x and 8x are there for strong graphics cards, for the player to
+choose (SwanStation's 5x and 7x are left out): on a 1080p or 1440p display
+most of the gain is at 2x to 4x, and PS2 games at 8x ran at 26 to 40 frames
+a second on an RTX 4080 SUPER in the host's own measurement (host
+`docs/ps2.md` "Drawing"), so a game never starts at 8x unless the player
+chose it. The labels are the
 launcher's (`retroResolutionNative`, `retroResolutionScale` "%@x"), not the
 cores', which disagree ("3x (for 720p)" in SwanStation).
 
@@ -448,10 +451,15 @@ the game is started again." once chosen, otherwise "Changes take effect when
 the game is started again.".
 
 **Choosing.** `RetroGameMenu.chooseGraphics` sends `option` for each option
-of the value that differs from the host's, in order, and stops at the first
-the host refuses. Once the host took them all, every option of that value is
-kept in `Preferences.retroHostOptions`, so widescreen's hack and aspect
-ratio are always kept and sent together.
+of the value that differs from the host's, in order, one choice at a time: a
+choice made while another is still being sent is not taken, so two choices
+never leave widescreen's hack from one and its aspect ratio from the other.
+When the host refuses an option, those it took are set back to what the host
+had. Once the host took them all, every option of that value is kept in
+`Preferences.retroHostOptions`, so the launcher keeps and sends widescreen's
+hack and aspect ratio together. The words of every Graphics row (titles, the
+line under each, the values' labels) are in
+[`lib/ui/retro_host/retro_graphics_words.dart`](../lib/ui/retro_host/retro_graphics_words.dart).
 
 **Defaults.** `retroStartOptions` sends the kept values that are shown, over
 `retroGraphicsDefaults` for the settings the player chose no value of:
@@ -964,6 +972,9 @@ native memory as a real ring slot would be, so no host is started.
   are neither shown nor sent; and `retroStartOptions` puts the kept values
   over the Graphics defaults, dropping a stereo or hardware fix kept from
   before.
+- [`retro_graphics_words_test.dart`](../test/ui/retro_host/retro_graphics_words_test.dart)
+  checks each Graphics setting's title and line (widescreen's per console),
+  the lines for a value not yet in effect, and the values' labels.
 - [`test/core/retro_host/retro_graphics_test.dart`](../test/core/retro_host/retro_graphics_test.dart)
   reads the recorded SwanStation status and the real LRPS2's options
   (`lrps2-no-bios-folder` in `retro_host_ps2_recording.json`): each console's

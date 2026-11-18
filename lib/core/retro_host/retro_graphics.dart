@@ -258,10 +258,11 @@ class RetroGraphicsChoice {
   final RetroGraphicsNote note;
 
   /// The core option values to send for the value at [index]: those that differ from what the
-  /// host has chosen, in the offer's order; empty for the value chosen or one the launcher does not
-  /// offer.
+  /// host has chosen, in the offer's order, also for the value chosen when one of its other options
+  /// differs (widescreen's aspect ratio); empty when the host has them all, or for a value the
+  /// launcher does not offer.
   Map<String, String> changesFor(RetroStatus status, int index) {
-    final offer = index == selected ? null : values[index].offer;
+    final offer = values[index].offer;
     if (offer == null) return const {};
     return {
       for (final MapEntry(:key, :value) in offer.options.entries)

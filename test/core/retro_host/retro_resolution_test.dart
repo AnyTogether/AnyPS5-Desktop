@@ -39,13 +39,13 @@ void main() {
   List<String> valuesOf(RetroResolutionChoice choice) => [for (final value in choice.values) value.value];
 
   group('PS1', () {
-    test("SwanStation's eight scales: the menu offers Native to 4x", () {
+    test("SwanStation's eight scales: the menu offers Native to 4x, 6x and 8x", () {
       final status = RetroStatus.parse(ps1Status());
       expect(status.options[retroResolutionKeyPs1]!.values, ['1', '2', '3', '4', '5', '6', '7', '8']);
       final choice = RetroResolutionChoice.of(status, limitsPs2: false)!;
       expect(choice.key, retroResolutionKeyPs1);
-      expect(valuesOf(choice), ['1', '2', '3', '4']);
-      expect([for (final value in choice.values) value.scale], [1, 2, 3, 4]);
+      expect(valuesOf(choice), ['1', '2', '3', '4', '6', '8']);
+      expect([for (final value in choice.values) value.scale], [1, 2, 3, 4, 6, 8]);
       expect(choice.values[2].label, '3x (for 720p)', reason: "the host's label, kept for the log");
       expect((choice.selected, choice.active.value, choice.note), (0, '1', RetroGraphicsNote.none));
     });
@@ -68,12 +68,12 @@ void main() {
 
     test('a value chosen that the launcher does not offer is still shown, with its own label', () {
       final choice = RetroResolutionChoice.of(
-        edited(ps1Status(), retroResolutionKeyPs1, selected: 7, activeValue: '8'),
+        edited(ps1Status(), retroResolutionKeyPs1, selected: 6, activeValue: '7'),
         limitsPs2: false,
       )!;
-      expect(valuesOf(choice), ['1', '2', '3', '4', '8']);
-      expect(choice.selected, 4);
-      expect(choice.values.last, const RetroResolutionValue(value: '8', scale: null, label: '8x'));
+      expect(valuesOf(choice), ['1', '2', '3', '4', '6', '7', '8']);
+      expect(choice.selected, 5);
+      expect(choice.values[5], const RetroResolutionValue(value: '7', scale: null, label: '7x'));
     });
 
     test('a change applies in a moment: chosen but not active, or graphicsPending', () {
