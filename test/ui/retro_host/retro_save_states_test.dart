@@ -121,30 +121,37 @@ void main() {
     expect(states.anySaved, isTrue);
   });
 
-  test("a save that did not work keeps the old picture only while the slot's file is the old one", () async {
+  test('a save whose end is not known takes the picture away; one the core refused leaves it', () async {
     await started();
     final states = RetroSaveStates(game, RetroStateFolder(folder: p.join(temp.path, 'states'), disc: request().disc));
     addTearDown(states.dispose);
-    final state = File(states.folder.statePath(2))
+    File(states.folder.statePath(2))
       ..createSync(recursive: true)
-      ..writeAsBytesSync([1])
-      ..setLastModifiedSync(DateTime(2026, 11, 1));
-    File(states.folder.picturePath(2)).writeAsBytesSync([9]);
-    final late = recording.calls('refused', 'saveState').single.reply['error']! as Map<String, Object?>;
-    session.callErrors['saveState'] = RetroCallError(late['code']! as String, late['message']! as String);
+      ..writeAsBytesSync([1]);
+    final picture = File(states.folder.picturePath(2))..writeAsBytesSync([9]);
+    RetroCallError recorded(String code) {
+      final error = recording
+          .stateCalls()
+          .map((exchange) => exchange.reply['error'])
+          .whereType<Map<String, Object?>>()
+          .firstWhere((error) => error['code'] == code);
+      return RetroCallError(code, error['message']! as String);
+    }
 
-    expect(await states.save(2), RetroStateOutcome.fileError);
-    expect(File(states.folder.picturePath(2)).readAsBytesSync(), [9], reason: 'the old state is still there');
+    session.callErrors['saveState'] = recorded(RetroCallError.coreRefused);
+    expect(await states.save(2), RetroStateOutcome.coreRefused);
+    expect(picture.readAsBytesSync(), [9], reason: 'the core gave no state: the slot is as it was');
 
-    session.onCall = (method, args) => state
-      ..writeAsBytesSync([2])
-      ..setLastModifiedSync(DateTime(2026, 11, 2));
+    session.callErrors.clear();
+    session.callResults['saveState'] = false;
+    expect(await states.save(2), RetroStateOutcome.notNow);
+    expect(picture.existsSync(), isTrue, reason: 'a save that never ran changes nothing');
+
+    session.callResults.clear();
+    session.callErrors['saveState'] = recorded(RetroCallError.fileError);
     expect(await states.save(2), RetroStateOutcome.fileError);
-    expect(
-      File(states.folder.picturePath(2)).existsSync(),
-      isFalse,
-      reason: 'a late write put the new state in place, and no frame was shown to picture it',
-    );
+    expect(picture.existsSync(), isFalse, reason: 'a late write may still put the new state in the slot');
+    expect(states.slot(2).empty, isFalse);
   });
 
   test('one save or load at a time; a slot found empty is read again', () async {
