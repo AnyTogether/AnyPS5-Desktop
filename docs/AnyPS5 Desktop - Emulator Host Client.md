@@ -1032,9 +1032,10 @@ named in `.github/workflows/ci.yml`:
   and the ring's `DuplicateHandle`, `MapViewOfFile` and `VirtualQuery` checks.
   The sessions that are only for Linux and macOS skip themselves there.
 
-That commit is the host repository's `main` with save states merged
-(AnyTogether/anyps5-retro-host#24, 1e5c278), which also holds its fake host
-(#10) and PS2 (#18).
+That commit is the host repository's `main` with PS2 resolution limits merged
+(AnyTogether/anyps5-retro-host#25, 44060c0), whose sessions list
+`ps2ResolutionLimits`, which also holds its fake host (#10), PS2 (#18) and save
+states (#24).
 
 [`test/core/retro_host/retro_status_test.dart`](../test/core/retro_host/retro_status_test.dart)
 covers how a `status` is read, and reads every status the fixture sessions send
