@@ -3,10 +3,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:math' as math;
-import 'dart:ui' as ui show Image;
+import 'dart:ui' as ui show Image, PlatformDispatcher;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show Color, IconData, Icons;
+import 'package:flutter/widgets.dart' show GlobalKey;
 import 'package:flutter/services.dart' show HardwareKeyboard, LogicalKeyboardKey, PlatformException;
 import 'package:path/path.dart' as p;
 
@@ -15,7 +16,6 @@ import '../core/capture/game_sound.dart';
 import '../core/capture/screen_cast_portal.dart';
 import '../core/capture/video_encoders.dart';
 import '../core/capture/wayland_capture.dart';
-import '../core/child_processes.dart';
 import '../core/audio/audio_out.dart';
 import '../core/audio/interface_sounds.dart';
 import '../core/audio/theme_music.dart';
@@ -29,6 +29,7 @@ import '../core/crash_report.dart' show Diagnosis, IssueDraft, SystemInfo;
 import '../core/launcher_health.dart';
 import '../core/desktop_notice.dart';
 import '../core/desktop/desktop.dart';
+import 'cover_snapshot.dart';
 import '../core/desktop/launcher_window.dart';
 import '../core/discord_presence.dart' show DiscordPresence;
 import '../core/now_playing.dart' show NowPlayingSource;
@@ -46,6 +47,7 @@ import '../core/game_deletion.dart' show Trash;
 import '../core/game_library.dart';
 import '../core/game_log.dart';
 import '../core/game_process.dart';
+import '../core/child_processes.dart';
 import '../core/game_presets.dart';
 import '../core/game_settings.dart';
 import '../core/launch_resolution.dart';
@@ -2759,6 +2761,22 @@ class AppModel extends ChangeNotifier {
   (String, void Function())? afterRebuild;
 
   Game? starting;
+
+  /// The game whose cover stays up after it started, until its window has opened and settled
+  /// (full screen or its size applied): the cover is what fades over the game. Separate from
+  /// [starting], which means "the process is being started" to everything that reads it.
+  Game? coverGame;
+
+  /// Ends the hand-off now (an overlay opened over the cover): completes the wait of the run in
+  /// [_handOff], whose [coverGame] it also stands for.
+  Completer<void>? _coverDismissed;
+
+  /// The cover's picture is on screen over the game as a window of its own (Windows): the cover
+  /// in the launcher goes at once, without a fade of its own.
+  bool coverHandedOver = false;
+
+  /// The cover in the launcher's widgets, whose picture fades over the game.
+  final GlobalKey coverBoundary = GlobalKey(debugLabel: 'start cover');
   (Game, RunningGame)? running;
 
   /// A PS1 game playing in the launcher's window through the emulator host (retro_host_play.dart).
@@ -3102,6 +3120,14 @@ class AppModel extends ChangeNotifier {
   bool _cancelWasShown = false;
 
   void _changed() {
+    // A menu opened over the cover (the PS button): the cover is drawn above the overlays, so it
+    // goes instead of hiding a menu that still takes the presses. During the Windows layered
+    // hand-off coverGame is already null; completing _coverDismissed still releases the picture.
+    if (overlay != null && starting == null && _coverDismissed != null) {
+      coverGame = null;
+      final dismissed = _coverDismissed;
+      if (dismissed != null && !dismissed.isCompleted) dismissed.complete();
+    }
     if (launcherProblem != null) offerLauncherReport();
     // The small Cancel went away (the unlock ended): a focus on it goes back to the main button,
     // and a focus on a button after it moves one place left, so it stays on the same button
@@ -4454,11 +4480,19 @@ class AppModel extends ChangeNotifier {
       final began = DateTime.now();
       // Upstream's engine does not read ANYPS5_FULLSCREEN or ANYPS5_WINDOW_SIZE: the launcher
       // sizes its window or presses its F11 once the window is open.
-      if (!engine.readsDisplaySettingsOf(game)) {
-        unawaited(desktop.applyDisplay(run.pid, fullscreen: settings.fullscreen, windowSize: settings.windowSize));
+      final Future<bool>? display = engine.readsDisplaySettingsOf(game)
+          ? null
+          : desktop
+                .applyDisplay(run.pid, fullscreen: settings.fullscreen, windowSize: settings.windowSize)
+                .catchError((Object _) => false);
+      if (settings.startAnimation) {
+        // Start animation on: cover stays while the game loads. Full screen then fades over the
+        // game window; windowed fades out on the launcher home. Off: no cover hand-off.
+        unawaited(_handOff(game, run, display, fadeOverGame: settings.fadesCover));
+      } else if (preferences.hideWhilePlaying) {
+        // Settings › Behaviour › Hide the launcher while a game runs.
+        unawaited(_hideForGame());
       }
-      // Settings › Behaviour › Hide the launcher while a game runs.
-      if (preferences.hideWhilePlaying) unawaited(_hideForGame());
       _watchTrophies(game);
       together.gameChanged();
       discord.update();
@@ -4531,6 +4565,66 @@ class AppModel extends ChangeNotifier {
 
   /// The game the phone asked for while another played; it starts when that one has gone.
   String? _launchAfterExit;
+
+  /// From the game's process started to its window settled: the cover stays, then goes (over
+  /// the game on Windows, by itself elsewhere), and only then does the launcher step aside
+  /// (Hide the launcher while a game runs). Never keeps the cover when the game closes, or when
+  /// its window does not open.
+  Future<void> _handOff(Game game, RunningGame run, Future<bool>? display, {required bool fadeOverGame}) async {
+    final watch = Stopwatch()..start();
+    var ended = false;
+    final exited = run.exitCode.then<void>((_) => ended = true, onError: (Object _) => ended = true);
+    final dismissed = Completer<void>();
+    _coverDismissed = dismissed;
+    final settled = Future.any<void>([
+      dismissed.future,
+      ?display?.then<void>((_) {}),
+      exited,
+      // An engine that sizes its own window has no display step to wait for: the window opening
+      // is what the cover waits for, on Windows, and a second is all it has elsewhere.
+      if (display == null) Future<void>.delayed(const Duration(seconds: 1)),
+    ]);
+    coverGame = game;
+    coverHandedOver = false;
+    _changed();
+    try {
+      final reduced = Motion.reduced || ui.PlatformDispatcher.instance.accessibilityFeatures.disableAnimations;
+      // Full screen: layered fade over the game when possible. Windowed (or Linux): keep the
+      // Flutter cover on the home screen until settled, then drop it — never over the game.
+      var shown = false;
+      if (fadeOverGame) {
+        shown = await desktop.fadeCover(
+          run.pid,
+          until: settled,
+          exited: exited,
+          fade: reduced ? const Duration(milliseconds: 120) : coverFade,
+          cover: (width, height) => snapshotCover(coverBoundary, width, height),
+          onCovered: () {
+            if (!identical(_coverDismissed, dismissed)) return;
+            coverHandedOver = true;
+            coverGame = null;
+            _changed();
+          },
+        );
+      }
+      if (!shown && !ended) {
+        // Cover on the launcher home: wait until the game is ready, then remove it.
+        final left = coverWindowWait - watch.elapsed;
+        await settled.timeout(left.isNegative ? Duration.zero : left, onTimeout: () {});
+      }
+    } on Object {
+      // The game starts as it did without the cover.
+    } finally {
+      // Another start's cover is not this run's to take away.
+      if (identical(_coverDismissed, dismissed)) {
+        _coverDismissed = null;
+        coverGame = null;
+        coverHandedOver = false;
+        _changed();
+      }
+    }
+    if (preferences.hideWhilePlaying && !ended && running?.$2 == run) await _hideForGame();
+  }
 
   /// Gives up the game starting (Close on the phone while it starts), as on the Mac.
   void cancelStart() {
@@ -6982,6 +7076,12 @@ class AppModel extends ChangeNotifier {
           change(defaults.copyWith(fullscreen: index == 1));
         }),
       ),
+      PanelRow(
+        id: 'defaultStartAnimation',
+        title: T.text('startAnimation'),
+        detail: T.text('startAnimationDetail'),
+        kind: ToggleRow(defaults.startAnimation, (value) => change(defaults.copyWith(startAnimation: value))),
+      ),
       if (!defaults.fullscreen)
         PanelRow(
           id: 'defaultWindowSize',
@@ -7413,6 +7513,22 @@ class AppModel extends ChangeNotifier {
             set: (value) => change(settings.copyWith(windowSize: value)),
           ),
         ),
+      // Cover while the game opens: in full screen it can fade over the game; in a window it
+      // stays on the home screen until the display step finishes.
+      PanelRow(
+        id: 'startAnimation',
+        title: T.text('startAnimation'),
+        detail: T.text('startAnimationDetail'),
+        kind: ChoiceRow(
+          [byDefault(T.text(defaults.startAnimation ? 'on' : 'off')), T.text('on'), T.text('off')],
+          switch (settings.ownStartAnimation) {
+            null => 0,
+            true => 1,
+            false => 2,
+          },
+          (index) => change(settings.copyWith(startAnimation: index == 0 ? null : index == 1)),
+        ),
+      ),
       if (supportsResolution)
         // The relinker applies it: an unlock running now goes on with the one it started with.
         held(

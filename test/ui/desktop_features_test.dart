@@ -65,9 +65,13 @@ class FakeDesktop implements DesktopWindows {
   @override
   bool? launcherFocused() => focused;
 
+  /// How long [applyDisplay] waits before completing (so cover tests can observe the home cover).
+  Duration displayDelay = Duration.zero;
+
   @override
   Future<bool> applyDisplay(int pid, {required bool fullscreen, required int windowSize}) async {
     calls.add('display ${fullscreen ? 'fullscreen' : '$windowSize%'}');
+    if (displayDelay > Duration.zero) await Future<void>.delayed(displayDelay);
     return true;
   }
 
@@ -91,6 +95,39 @@ class FakeDesktop implements DesktopWindows {
     calls.add('card');
     cards.add(card);
     return cardsWork;
+  }
+
+  /// What a start cover does here: [coverWorks] false is a desktop without one; true waits for
+  /// the display to settle, as Windows' does, and then goes.
+  bool coverWorks = false;
+
+  /// The game's window never opens: the wait for it ends only when the process does ([exited]),
+  /// as on Windows, where it would otherwise run for [windowTimeout].
+  bool windowNeverOpens = false;
+  final List<String> coverEvents = [];
+
+  @override
+  Future<bool> fadeCover(
+    int pid, {
+    required Future<RgbaImage?> Function(int width, int height) cover,
+    required Future<void> until,
+    Duration fade = coverFade,
+    Duration windowTimeout = coverWindowWait,
+    Future<void>? exited,
+    void Function()? onCovered,
+  }) async {
+    coverEvents.add('asked');
+    if (windowNeverOpens) {
+      await (exited ?? Future<void>.delayed(windowTimeout));
+      coverEvents.add('no window');
+      return false;
+    }
+    if (!coverWorks) return false;
+    onCovered?.call();
+    coverEvents.add('covered');
+    await until;
+    coverEvents.add('gone');
+    return true;
   }
 
   @override
@@ -262,7 +299,7 @@ void main() {
       await Future<void>.delayed(GuideSwitch.defaultDebounce);
       pads.press(PadButton.guide);
       expect(desktop.calls.where((call) => call == 'raise' || call == 'focus'), ['raise', 'focus']);
-      expect(desktop.calls.first, 'display 75%', reason: 'upstream\'s engine: the launcher sizes the window');
+      expect(desktop.calls.first, 'display 75%', reason: 'upstream\'s engine: windowed is the default, the launcher sizes the window');
       model.stopGame();
       await playing;
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);

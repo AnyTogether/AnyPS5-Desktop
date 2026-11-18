@@ -575,7 +575,9 @@ void main() {
       expect(model.currentSettings(game).fullscreen, isTrue);
       final environment = model.currentSettings(game).environment(launcherLanguage: 1);
       expect(environment['ANYPS5_FULLSCREEN'], '1');
-      // Window size is hidden in fullscreen; Upscaling comes next, then vertical sync.
+      // Window size is hidden in fullscreen; Start animation comes next, then Upscaling.
+      await press(tester, LogicalKeyboardKey.arrowDown);
+      expect(model.currentSettings(game).ownStartAnimation, isNull);
       await press(tester, LogicalKeyboardKey.arrowDown);
       // Bilinear, FSR 1.
       await press(tester, LogicalKeyboardKey.arrowRight);

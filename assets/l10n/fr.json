@@ -1422,6 +1422,8 @@
   "launcherVolume": "Volume du lanceur",
   "launcherVolumeDetail": "Tout ce que joue le lanceur : ses sons et sa musique. 0 % le rend muet ; les jeux gardent leur propre volume.",
   "start": "Démarrer",
+  "startAnimation": "Animation de démarrage",
+  "startAnimationDetail": "Pendant le chargement, la jaquette reste affichée. En plein écran elle s'estompe sur le jeu, en fenêtre sur l'écran d'accueil. Désactivé : pas de jaquette.",
   "startFailed": "Impossible de démarrer le jeu",
   "starting": "Démarrage…",
   "status": "État",

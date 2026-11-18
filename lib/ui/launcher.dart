@@ -37,6 +37,7 @@ import 'panels.dart';
 import 'profiles_view.dart';
 import 'retro_host/retro_play_view.dart';
 import 'retro_host/retro_unchecked_mark.dart';
+import 'start_cover.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'together_model.dart';
@@ -554,7 +555,7 @@ class _LauncherShellState extends State<LauncherShell> {
                                         // build: marked over every layer, compiled out of a release.
                                         if (RetroHostPlaying.runsUnchecked && (model.retroPlay?.unchecked ?? false))
                                           const RetroUncheckedMark(),
-                                        if (model.starting != null) _StartingCard(model: model),
+                                                                        StartCoverLayer(model: model),
                                         if (model.together.ringing != null && model.pairing == null)
                                           RingingCard(model: model),
                                         if (model.pairing != null) PairingCard(model: model),
@@ -605,52 +606,6 @@ class _WindowBase extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!window.seeThrough) return ColoredBox(color: deep, child: child);
     return CustomPaint(painter: GlassTintPainter(window.tint), child: child);
-  }
-}
-
-class _StartingCard extends StatelessWidget {
-  const _StartingCard({required this.model});
-
-  final AppModel model;
-
-  @override
-  Widget build(BuildContext context) {
-    final scale = LayoutScale.of(context);
-    final game = model.starting!;
-    return ColoredBox(
-      color: Colors.black.withValues(alpha: 0.6),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (game.icon != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(24 * scale),
-                child: SizedBox.square(
-                  dimension: 160 * scale,
-                  child: ArtworkImage(path: game.icon!, cacheWidth: 400),
-                ),
-              ),
-            SizedBox(height: 28 * scale),
-            Text(game.name, style: AppText.display(36 * scale, weight: FontWeight.w300)),
-            SizedBox(height: 12 * scale),
-            SizedBox(
-              width: 520 * scale,
-              child: Text(
-                T.text('startingText'),
-                textAlign: TextAlign.center,
-                style: AppText.display(16 * scale, color: Colors.white.withValues(alpha: 0.65), height: 1.4),
-              ),
-            ),
-            SizedBox(height: 24 * scale),
-            SizedBox(
-              width: 260 * scale,
-              child: IndeterminateLine(color: model.accentChoice.color),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 
