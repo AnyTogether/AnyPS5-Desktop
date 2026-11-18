@@ -417,7 +417,10 @@ What the launcher does with them:
 - **The picture.** Beside each slot the launcher keeps a small PNG of the
   frame shown when it was saved, `<name>.<slot>.png`, written beside it and
   renamed into place. A save with no frame to draw from removes the old
-  picture, so a picture never shows a moment its slot no longer holds. The
+  picture, and a save that did not work but changed the slot's file anyway (a
+  late write that reached its rename before its `fileError`, as protocol.md
+  allows) gets the new picture, so a picture never shows a moment its slot no
+  longer holds. The
   host writes no other file there and reads none.
 - **Outcomes.** `RetroStateOutcome` is the result for the UI: `done`,
   `notNow` (`false`), one value per error code, and `failed` for an `argument`

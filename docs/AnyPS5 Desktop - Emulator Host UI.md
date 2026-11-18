@@ -635,7 +635,12 @@ read. Here the launcher shows the host's eight slots of a game as Slot 1 to 8.
   once the host has saved, `retroStatePicture` draws it 240 pixels wide at the
   game's display aspect and encodes it as PNG, kept beside the state. A save
   with no frame, or whose picture cannot be made or written, keeps no picture:
-  the log says why, and the save still counts.
+  the log says why, and the save still counts. A save that did not work keeps
+  the old picture only while the slot's file is unchanged.
+- **Late answers.** A save or load goes back to the game only if the menu still
+  shows the page of the visit it was asked in (`RetroPlay.menuVisits`): one
+  that answers after the player left the menu and opened it again leaves the
+  new visit alone.
 - **Load State's page.** The same slots; only a slot that holds a state can be
   chosen, and the focus starts on the first one. With nothing saved yet the
   first page's Load State cannot be chosen and says so. For a PS1 game its

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -211,6 +212,33 @@ void main() {
     expect(launcher.session.calls.where((call) => call.$1 == 'loadState').last.$2, {'slot': 4});
     expect(model.overlay, isNull, reason: 'back to the game, which goes on from the state');
     expect(model.toast, 'Slot 5 loaded');
+  });
+
+  test('a load that answers after the menu was left and opened again leaves the new visit alone', () async {
+    launcher = Ps1Launcher();
+    launcher.session.canSaveStates = true;
+    File(folder().statePath(0))
+      ..createSync(recursive: true)
+      ..writeAsBytesSync([1]);
+    final model = launcher.model..setRetroHostPs1(true);
+    await launcher.start();
+    await settleFiles();
+    launcher.session.callResults['loadState'] = loaded;
+    final gate = Completer<void>();
+    model.openRetroMenu();
+    (launcher.row('loadState').kind as ActionRow).run();
+    launcher.session.callGate = gate;
+    (launcher.row('state-0').kind as ActionRow).run();
+    await pumpEventQueue();
+    model.resumeRetroGame();
+    launcher.session.callGate = null;
+    model.openRetroMenu();
+    (launcher.row('loadState').kind as ActionRow).run();
+    gate.complete();
+    await settleFiles();
+    expect(model.toast, 'Slot 1 loaded');
+    expect(model.overlay, Layer.retroMenu, reason: 'the menu opened again stays open');
+    expect(model.panelCategories().single.id, 'retroMenu-load');
   });
 
   test('a slot found empty on load says it could not be loaded and shows as empty', () async {

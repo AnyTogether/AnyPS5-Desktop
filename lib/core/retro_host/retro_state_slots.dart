@@ -101,18 +101,23 @@ class RetroStateFolder {
 
   String picturePath(int slot) => p.join(folder, '$name.$slot.png');
 
+  /// When [slot]'s state file was last written; null when there is none.
+  Future<DateTime?> written(int slot) async {
+    try {
+      final state = await File(statePath(slot)).stat();
+      return state.type == FileSystemEntityType.file ? state.modified : null;
+    } on FileSystemException {
+      return null;
+    }
+  }
+
   /// Every slot as the folder holds it now. A slot whose state cannot be read is empty; a picture
   /// that cannot be read, or is far larger than one the launcher writes, is left out.
   Future<List<RetroStateSlot>> read() async => [for (var slot = 0; slot < slots; slot++) await _read(slot)];
 
   Future<RetroStateSlot> _read(int slot) async {
-    final FileStat state;
-    try {
-      state = await File(statePath(slot)).stat();
-    } on FileSystemException {
-      return RetroStateSlot(slot);
-    }
-    if (state.type != FileSystemEntityType.file) return RetroStateSlot(slot);
+    final savedAt = await written(slot);
+    if (savedAt == null) return RetroStateSlot(slot);
     Uint8List? picture;
     try {
       final file = File(picturePath(slot));
@@ -120,7 +125,7 @@ class RetroStateFolder {
     } on FileSystemException {
       picture = null;
     }
-    return RetroStateSlot(slot, savedAt: state.modified, picture: picture);
+    return RetroStateSlot(slot, savedAt: savedAt, picture: picture);
   }
 
   /// Keeps [png] as [slot]'s picture: written beside it, then renamed over it, so a picture is

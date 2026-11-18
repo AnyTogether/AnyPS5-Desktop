@@ -64,6 +64,10 @@ class RetroPlay {
   /// The slot Overwrite slot N? asks about ([Layer.retroOverwriteState]).
   int? overwriting;
 
+  /// How many times the menu was opened: a save or load goes back to the game only from the visit
+  /// it was asked in, not from the menu opened again while it waited.
+  int menuVisits = 0;
+
   /// The phase and the problem the launcher last acted on ([RetroHostPlaying._retroChanged]).
   (RetroHostGamePhase, String?)? _seen;
 
@@ -529,6 +533,7 @@ extension RetroHostPlaying on AppModel {
     final play = retroPlay;
     if (play == null || play.closing || !play.host.loaded || retroMenuShown) return;
     _leaveRetroPages(play);
+    play.menuVisits++;
     open(Layer.retroMenu);
     unawaited(play.menu.open());
   }
@@ -879,6 +884,7 @@ extension RetroHostPlaying on AppModel {
   /// Saves the game into [slot]: back to the game once it is saved, the slot said; still on Save
   /// State when it did not work, which is said.
   Future<void> _saveRetroState(RetroPlay play, int slot) async {
+    final visit = play.menuVisits;
     final outcome = await play.states.save(slot);
     if (_disposed || !identical(retroPlay, play)) return;
     _padLog?.call('emulator host: save state slot $slot: ${outcome.name}');
@@ -888,7 +894,7 @@ extension RetroHostPlaying on AppModel {
       return;
     }
     show(T.format('retroStateSaved', ['${slot + 1}']));
-    if (overlay == Layer.retroMenu && play.statePage == RetroStatePage.save) resumeRetroGame();
+    if (_onRetroStatePage(play, RetroStatePage.save, visit)) resumeRetroGame();
   }
 
   /// Loads the state in [slot]: back to the game, which goes on from it; still on Load State when
@@ -896,6 +902,7 @@ extension RetroHostPlaying on AppModel {
   /// said.
   Future<void> _loadRetroState(RetroPlay play, int slot) async {
     if (play.states.busy) return;
+    final visit = play.menuVisits;
     final outcome = await play.states.load(slot);
     if (_disposed || !identical(retroPlay, play)) return;
     _padLog?.call('emulator host: load state slot $slot: ${outcome.name}');
@@ -905,8 +912,12 @@ extension RetroHostPlaying on AppModel {
       return;
     }
     show(T.format('retroStateLoaded', ['${slot + 1}']));
-    if (overlay == Layer.retroMenu && play.statePage == RetroStatePage.load) resumeRetroGame();
+    if (_onRetroStatePage(play, RetroStatePage.load, visit)) resumeRetroGame();
   }
+
+  /// Whether the menu still shows [page] of the visit [visit] a save or load was asked in.
+  bool _onRetroStatePage(RetroPlay play, RetroStatePage page, int visit) =>
+      overlay == Layer.retroMenu && play.statePage == page && play.menuVisits == visit;
 
   /// A core option chosen in the menu: sent to the game, and kept for every later one once the
   /// host took it.
