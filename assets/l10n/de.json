@@ -1422,6 +1422,8 @@
   "launcherVolume": "Launcher-Lautstärke",
   "launcherVolumeDetail": "Alles, was der Launcher abspielt: seine Töne und Musik. 0 % ist stumm; Spiele behalten ihre eigene Lautstärke.",
   "start": "Starten",
+  "startAnimation": "Startanimation",
+  "startAnimationDetail": "Während ein Spiel lädt, bleibt sein Cover sichtbar. Im Vollbild blendet es über dem Spiel aus, im Fenster auf dem Startbildschirm. Aus: kein Cover.",
   "startFailed": "Das Spiel konnte nicht gestartet werden",
   "starting": "Wird gestartet…",
   "status": "Status",

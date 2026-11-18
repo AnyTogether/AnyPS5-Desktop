@@ -1422,6 +1422,8 @@
   "launcherVolume": "Launcher volume",
   "launcherVolumeDetail": "Everything the launcher plays: its sounds and music. 0 % is silent; games keep their own volume.",
   "start": "Start",
+  "startAnimation": "Start animation",
+  "startAnimationDetail": "While a game loads, its cover stays up. In full screen it fades over the game, in a window on the home screen. Off: no cover is shown.",
   "startFailed": "The game could not start",
   "starting": "Starting…",
   "status": "Status",

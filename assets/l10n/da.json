@@ -1422,6 +1422,8 @@
   "launcherVolume": "Launcherens lydstyrke",
   "launcherVolumeDetail": "Alt, hvad launcheren afspiller: dens lyde og musik. 0 % er lydløs; spil beholder deres egen lydstyrke.",
   "start": "Start",
+  "startAnimation": "Startanimation",
+  "startAnimationDetail": "Mens et spil indlæses, bliver coveret vist. I fuldskærm forsvinder det over spillet, i vindue på startskærmen. Fra: intet cover.",
   "startFailed": "Spillet kunne ikke starte",
   "starting": "Starter…",
   "status": "Status",

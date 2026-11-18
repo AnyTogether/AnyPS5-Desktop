@@ -329,7 +329,7 @@ StickModifier = KEY:F24
   });
 
   group('display defaults', () {
-    test('the built-in defaults are what a game with no settings always started with', () {
+    test('the built-in defaults: windowed, a window of 75%, vertical sync on', () {
       const defaults = DisplayDefaults();
       expect(defaults.fullscreen, isFalse);
       expect(defaults.windowSize, 75);
@@ -425,11 +425,29 @@ StickModifier = KEY:F24
         untouched.withDefaults(const DisplayDefaults()).environment(launcherLanguage: 1)['ANYPS5_FULLSCREEN'],
         '0',
       );
+      expect(
+        full.withDefaults(const DisplayDefaults()).environment(launcherLanguage: 1)['ANYPS5_FULLSCREEN'],
+        '1',
+      );
       expect(window.withDefaults(const DisplayDefaults()).environment(launcherLanguage: 1)['ANYPS5_WINDOW_SIZE'], '60');
       expect(
         tearing.withDefaults(const DisplayDefaults()).environment(launcherLanguage: 1)['ANYPS5_PRESENT_MODE'],
         'immediate',
       );
+    });
+
+    test('current and legacy game files: own choices and defaults', () {
+      GameSettings read(String text) => GameSettings.fromJson(jsonDecode(text) as Map<String, dynamic>);
+      expect(read('{"settingsVersion":${GameSettings.version},"fullscreen":false}').fullscreen, isFalse);
+      expect(read('{"settingsVersion":${GameSettings.version},"fullscreen":true}').ownFullscreen, isTrue);
+      final none = read('{"settingsVersion":${GameSettings.version}}');
+      expect(none.ownFullscreen, isNull);
+      expect(none.fullscreen, isFalse, reason: 'no choice: windowed default');
+      expect(read('{"overlay":"off"}').ownFullscreen, isNull);
+      expect(read('{"fullscreen":true,"windowSize":75}').ownFullscreen, isTrue);
+      // Built-in windowed + size: treated as never chosen when both match the old built-in.
+      expect(read('{"fullscreen":false,"windowSize":75}').followsDisplayDefaults, isTrue);
+      expect(read('{"fullscreen":false,"windowSize":60}').ownWindowSize, 60);
     });
 
     test('the defaults as JSON, and a broken or missing value as the built-in one', () {
@@ -452,6 +470,8 @@ StickModifier = KEY:F24
       expect(DisplayDefaults.load(file), const DisplayDefaults());
       File(file).writeAsStringSync('{"theme":1,"displayDefaults":{"fullscreen":true}}');
       expect(DisplayDefaults.load(file), const DisplayDefaults(fullscreen: true));
+      File(file).writeAsStringSync('{"theme":1}');
+      expect(DisplayDefaults.load(file), const DisplayDefaults(), reason: 'no displayDefaults key: built-in');
     });
   });
 
