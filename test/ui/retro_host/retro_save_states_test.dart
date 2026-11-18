@@ -159,6 +159,36 @@ void main() {
     );
   });
 
+  test('a game closed while its picture is made writes no picture', () async {
+    await started();
+    final drawing = Completer<Uint8List?>();
+    final states = RetroSaveStates(
+      game,
+      RetroStateFolder(folder: p.join(temp.path, 'states'), disc: request().disc),
+      picture: (image, aspect) => drawing.future,
+    );
+    session.callResults['saveState'] = recording.calls('slots', 'saveState').first.reply['result'];
+    session.onCall = (method, args) => File(states.folder.statePath(0))
+      ..createSync(recursive: true)
+      ..writeAsBytesSync([1]);
+    final frame = FakeSlot(4, 4)..fill([10, 20, 30, 255]);
+    addTearDown(frame.free);
+    session.send(frame.pin());
+    for (var turn = 0; turn < 50 && game.picture.value == null; turn++) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    expect(game.picture.value, isNotNull);
+    final saving = states.save(0);
+    for (var turn = 0; turn < 50 && !File(states.folder.statePath(0)).existsSync(); turn++) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    await pumpEventQueue();
+    states.dispose();
+    drawing.complete(Uint8List.fromList([7]));
+    expect(await saving, RetroStateOutcome.done);
+    expect(File(states.folder.picturePath(0)).existsSync(), isFalse);
+  });
+
   test('one save or load at a time; a slot found empty is read again', () async {
     await started();
     final states = RetroSaveStates(game, RetroStateFolder(folder: p.join(temp.path, 'states'), disc: request().disc));

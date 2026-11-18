@@ -638,7 +638,9 @@ read. Here the launcher shows the host's eight slots of a game as Slot 1 to 8.
   the log says why, and the save still counts. A save that did not work takes
   the slot's picture away, since the new state may still land in it (a late
   write after `fileError`, or a host that went away after writing), unless the
-  core refused it, which leaves the slot as it was.
+  core refused it, which leaves the slot as it was. A game closed while its
+  picture is being made writes none, since the next game may already be saving
+  into that slot.
 - **Late answers.** A save or load goes back to the game only if the menu still
   shows the page of the visit it was asked in (`RetroPlay.menuVisits`): one
   that answers after the player left the menu and opened it again leaves the

@@ -109,6 +109,10 @@ class RetroSaveStates extends ChangeNotifier {
         log?.call('emulator host: no picture for state slot $slot: $error');
       }
     }
+    // A game closed while its picture was made writes nothing: the next game may already be
+    // saving into the same slot. The state it saved shows without a picture, or with an older one,
+    // which RetroStateFolder.read leaves out.
+    if (_disposed) return;
     try {
       await folder.keepPicture(slot, png);
     } on FileSystemException catch (error) {
