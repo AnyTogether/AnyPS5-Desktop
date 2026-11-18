@@ -37,6 +37,8 @@ void main() {
   GameSettings settings() => model.currentSettings(orbit());
 
   Future<void> openGameSettings(WidgetTester tester) async {
+    // These tests exercise the Window option and its size stepper.
+    model.preferences.displayDefaults = const DisplayDefaults(fullscreen: false);
     model.select(model.games.indexOf(orbit()));
     model.open(Layer.gameSettings);
     await pumpLauncher(tester, model);

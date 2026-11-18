@@ -31,9 +31,12 @@ enum OverlayStyle { minimal, detailed }
 enum Upscaler { bilinear, fsr1 }
 
 /// Settings › Default Display: how a game starts that made no display choice of its own (Game
-/// Settings › Display, Window Size and Vertical Sync left at Default). The built-in values are
-/// the ones every game started with before there were defaults.
+/// Settings › Display, Window Size and Vertical Sync left at Default). Full screen is the current
+/// built-in default; legacy game files are migrated against the former windowed values below.
 class DisplayDefaults {
+  /// Current preferences schema; unversioned files used Window as the implicit default.
+  static const preferencesVersion = 1;
+
   const DisplayDefaults({this.fullscreen = true, this.windowSize = 75, this.vsync = true, this.startAnimation = true});
 
   /// A value missing or of the wrong kind is the built-in one.
@@ -57,7 +60,17 @@ class DisplayDefaults {
   static DisplayDefaults load(String preferencesFile) {
     try {
       final json = jsonDecode(File(preferencesFile).readAsStringSync());
-      return DisplayDefaults.fromJson(json is Map ? json['displayDefaults'] : null);
+      if (json is! Map) return const DisplayDefaults();
+      if (json.containsKey('displayDefaults')) {
+        return DisplayDefaults.fromJson(json['displayDefaults']);
+      }
+      // An unversioned preferences file predates the full-screen default. Its missing display
+      // choice meant Window; a current file carries preferencesVersion even when defaults are
+      // left at their built-in values.
+      if ((json['preferencesVersion'] as num? ?? 0) < preferencesVersion) {
+        return const DisplayDefaults(fullscreen: false);
+      }
+      return const DisplayDefaults();
     } on Object {
       return const DisplayDefaults();
     }
@@ -151,12 +164,9 @@ class GameSettings {
     var windowSize = (json['windowSize'] as num?)?.toInt();
     var vsync = json['vsync'] is bool ? json['vsync'] as bool : null;
     if ((json['settingsVersion'] as num? ?? 1) < version) {
-      // A file from before the defaults wrote every display key, changed or not: a value that
-      // is the old built-in one was most likely never chosen, so it follows the defaults (which
-      // start as those same values: nothing changes until they do). Windowed with a size of its
-      // own was chosen, though.
-      // Files written before display defaults used Window as their built-in value.
-      // Treat that legacy value as unset so the new Full Screen default can take effect.
+      // Legacy files wrote every display key, even when unchanged. Their built-in values were
+      // Window, 75% and VSync on: treat those as unset so the new defaults can take effect. A
+      // windowed choice with a different size was deliberate and must remain the game's own.
       const builtIn = DisplayDefaults(fullscreen: false);
       if (windowSize == builtIn.windowSize) windowSize = null;
       if (fullscreen == builtIn.fullscreen && windowSize == null) fullscreen = null;

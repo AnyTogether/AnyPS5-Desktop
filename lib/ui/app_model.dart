@@ -148,6 +148,10 @@ part 'themes_model.dart';
 class Preferences {
   Preferences();
 
+  /// Marks files written with the current built-in display defaults. Older files without this
+  /// marker used Window as their implicit default.
+  static const version = DisplayDefaults.preferencesVersion;
+
   factory Preferences.fromJson(Map<String, dynamic> json) => Preferences()
     ..language = json['language'] as String? ?? 'en'
     // A look this launcher does not know (or garbage) is Cosmic; the rest of the file still counts.
@@ -246,7 +250,10 @@ class Preferences {
         if (id is String) id,
     }
     ..prepareNewGames = json['prepareNewGames'] as bool? ?? true
-    ..displayDefaults = DisplayDefaults.fromJson(json['displayDefaults'])
+    ..displayDefaults =
+        (json['preferencesVersion'] as num? ?? 0) < version && !json.containsKey('displayDefaults')
+        ? const DisplayDefaults(fullscreen: false)
+        : DisplayDefaults.fromJson(json['displayDefaults'])
     ..launcherFullscreen = json['launcherFullscreen'] as bool?
     ..windowButtons = json['windowButtons'] as bool? ?? true
     ..pauseOnMenu = json['pauseOnMenu'] as bool? ?? true
@@ -500,6 +507,7 @@ class Preferences {
   Map<String, String> compatAsked = {};
 
   Map<String, Object?> toJson() => {
+    'preferencesVersion': version,
     'language': language,
     'theme': theme,
     'accent': accent,

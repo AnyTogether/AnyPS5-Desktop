@@ -51,16 +51,16 @@ void main() {
     model.open(Layer.gameSettings);
   }
 
-  test('the Settings section starts windowed, vertical sync on', () {
+  test('the Settings section starts full screen, vertical sync on', () {
     openDefaults();
     final category = model.panelCategories()[model.panelCategory];
     expect(category.title, T.text('displayDefaults'));
     expect(
       category.rows.map((row) => row.id),
-      ['defaultDisplay', 'defaultStartAnimation', 'defaultWindowSize', 'defaultVsync'],
-      reason: 'windowed has a size and the start animation',
+      ['defaultDisplay', 'defaultStartAnimation', 'defaultVsync'],
+      reason: 'full screen has no window size and keeps the start animation',
     );
-    expect((row('defaultDisplay').kind as ChoiceRow).selected, 0);
+    expect((row('defaultDisplay').kind as ChoiceRow).selected, 1);
     expect(model.preferences.displayDefaults.windowSize, 75);
     expect((row('defaultVsync').kind as ToggleRow).value, isTrue);
     expect(model.preferences.displayDefaults, const DisplayDefaults());
@@ -93,9 +93,9 @@ void main() {
   test('a game with no choice of its own follows the defaults; its own choice wins', () {
     model.preferences.displayDefaults = const DisplayDefaults(vsync: false);
     final following = model.launchSettings(orbit());
-    expect(following.fullscreen, isFalse);
+    expect(following.fullscreen, isTrue);
     expect(following.vsync, isFalse);
-    expect(following.environment(launcherLanguage: 1)['ANYPS5_FULLSCREEN'], '0');
+    expect(following.environment(launcherLanguage: 1)['ANYPS5_FULLSCREEN'], '1');
 
     model.saveSettings(orbit(), const GameSettings(fullscreen: false, windowSize: 60));
     final own = model.launchSettings(orbit());
@@ -157,14 +157,14 @@ void main() {
     expect(model.launchSettings(orbit()).vsync, isFalse);
   });
 
-  test('a game started with no choice anywhere opens in a window', () async {
+  test('a game started with no choice anywhere opens full screen', () async {
     final installed = Installer.installedFolder(orbit(), model.root!);
     File(p.join(installed, 'app.elf')).writeAsStringSync('#!/bin/sh\nexit 0\n');
     if (!Platform.isWindows) Process.runSync('chmod', ['755', p.join(installed, 'app.elf')]);
     model.select(model.games.indexOf(orbit()));
     await model.play(orbit());
     expect(desktop.calls.first, startsWith('display '), reason: 'upstream\'s engine: the launcher sizes the window');
-    expect(desktop.calls.first, isNot('display fullscreen'));
+    expect(desktop.calls.first, 'display fullscreen');
   }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
 
   group('an update keeps what games opened with before', () {
@@ -173,9 +173,9 @@ void main() {
     setUp(() => folder = Directory.systemTemp.createTempSync('display_defaults_prefs'));
     tearDown(() => folder.deleteSync(recursive: true));
 
-    test('preferences saved before the full-screen default still open games in a window', () {
+    test('legacy preferences without a display choice keep the old Window default', () {
       final old = Preferences.fromJson({'prepareNewGames': true, 'stickDeadzone': 10});
-      expect(old.displayDefaults.fullscreen, isFalse);
+      expect(old.displayDefaults.fullscreen, isFalse, reason: 'an unversioned preferences file keeps its old Window default');
       expect(old.displayDefaults.windowSize, 75);
       final game = const GameSettings().withDefaults(old.displayDefaults);
       expect(game.fullscreen, isFalse);
@@ -183,32 +183,35 @@ void main() {
       expect(game.fadesCover, isFalse);
     });
 
-    test('a first start, with no file, opens games in a window', () {
+    test('a first start, with no file, uses full screen', () {
       final file = p.join(folder.path, 'preferences.json');
-      expect(Preferences.load(file, systemLocales: const ['en']).displayDefaults.fullscreen, isFalse);
-      expect(Preferences().displayDefaults.fullscreen, isFalse);
+      expect(Preferences.load(file, systemLocales: const ['en']).displayDefaults.fullscreen, isTrue);
+      expect(Preferences().displayDefaults.fullscreen, isTrue);
     });
 
-    test('a file from an older launcher stays Window, and the launcher\'s own save keeps the choice either way', () {
+    test('an older file keeps its old Window default, and a current file records its version', () {
       final file = p.join(folder.path, 'preferences.json');
       File(file).writeAsStringSync('{"prepareNewGames":true}');
       final loaded = Preferences.load(file);
       expect(loaded.displayDefaults.fullscreen, isFalse);
       File(file).writeAsStringSync(jsonEncode(loaded.toJson()));
-      expect(Preferences.load(file).displayDefaults.fullscreen, isFalse, reason: 'saved as Window, read as Window');
+      expect(loaded.toJson()['preferencesVersion'], Preferences.version);
+      expect(Preferences.load(file).displayDefaults.fullscreen, isFalse, reason: 'the migrated legacy default is saved explicitly');
       // Window chosen for a launcher that started in full screen, and full screen chosen back.
       final fresh = Preferences()..displayDefaults = const DisplayDefaults(fullscreen: false);
       File(file).writeAsStringSync(jsonEncode(fresh.toJson()));
-      expect(Preferences.load(file).displayDefaults.fullscreen, isFalse);
+      expect(Preferences.load(file).displayDefaults.fullscreen, isFalse, reason: 'an explicit Window choice is retained');
       File(file).writeAsStringSync(jsonEncode((Preferences()..prepareNewGames = false).toJson()));
-      expect(Preferences.load(file).displayDefaults.fullscreen, isFalse, reason: 'new launcher, nothing changed: its default stays');
+      expect(Preferences.load(file).displayDefaults.fullscreen, isTrue, reason: 'new launcher, nothing changed: its default stays');
     });
 
     test('a game started from the command line reads the same rule', () {
       final file = p.join(folder.path, 'preferences.json');
-      expect(DisplayDefaults.load(file).fullscreen, isFalse, reason: 'no file');
+      expect(DisplayDefaults.load(file).fullscreen, isTrue, reason: 'no file');
       File(file).writeAsStringSync('{"theme":1}');
-      expect(DisplayDefaults.load(file).fullscreen, isFalse, reason: 'older launcher');
+      expect(DisplayDefaults.load(file).fullscreen, isFalse, reason: 'older launcher with no display choice');
+      File(file).writeAsStringSync(jsonEncode(Preferences().toJson()));
+      expect(DisplayDefaults.load(file), const DisplayDefaults(), reason: 'a current file marks the new built-in default');
       File(file).writeAsStringSync('{"theme":1,"displayDefaults":{"fullscreen":true}}');
       expect(DisplayDefaults.load(file).fullscreen, isTrue);
       File(file).writeAsStringSync('{"displayDefaults":"nonsense"}');
@@ -216,7 +219,7 @@ void main() {
     });
 
     test('a game file from before the settings version keeps Window or Full Screen as written', () {
-      final window = GameSettings.fromJson(const {'fullscreen': false, 'windowSize': 75, 'vsync': true, 'overlay': 'off'});
+      final window = GameSettings.fromJson(const {'fullscreen': false, 'windowSize': 60, 'vsync': true, 'overlay': 'off'});
       final full = GameSettings.fromJson(const {'fullscreen': true, 'windowSize': 75, 'vsync': true, 'overlay': 'off'});
       const defaults = DisplayDefaults();
       expect(window.withDefaults(defaults).fullscreen, isFalse, reason: 'own Window choice kept');
