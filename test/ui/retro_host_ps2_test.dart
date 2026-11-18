@@ -177,10 +177,11 @@ void main() {
   );
 
   group('the signed release', () {
-    test('one without LRPS2 shows no PS2 rows, and is checked for SwanStation alone', () async {
+    test('1.0.0, without an LRPS2 package, shows no PS2 rows, and is checked for SwanStation alone', () async {
       launcher = await Ps1Launcher.withRelease(ps2: false);
       final model = launcher.model..setRetroHostPs2(true);
       expect(model.retroHostInstall!.ps2Core, isNull);
+      expect(row('retro-host-ps2-download'), isNull, reason: 'its release has no PS2 emulator to add');
       expect(row('retro-host-ps2'), isNull);
       expect(row('retro-host-ps2-bios'), isNull);
       final checked = await model.retroHostDownload.store.check();
@@ -195,6 +196,8 @@ void main() {
       expect(install.checked, isTrue);
       expect(install.ps2Core, p.join(p.dirname(install.host), RetroHostSystem.current!.ps2Core));
       expect(row('retro-host-ps2')!.kind, isA<ToggleRow>());
+      expect(row('retro-host-ps2-download')!.title, T.format('retroHostPs2Installed', ['1.1.0']));
+      expect(row('retro-host-ps2-remove')!.kind, isA<ActionRow>());
       model.closeOverlay();
       await startPs2(recording.lastStatus('lrps2-no-bios-folder'));
       final checked = launcher.checked.single!;
@@ -218,6 +221,21 @@ void main() {
       expect(model.toast, T.text('retroHostCheckFailed'));
     });
 
+    test('one whose LRPS2 package is not added offers it beside the host, and shows no other PS2 row', () async {
+      launcher = await Ps1Launcher.withRelease(ps2: true, addPs2: false);
+      final model = launcher.model..setRetroHostPs2(true);
+      expect(model.retroHostInstall!.ps2Core, isNull);
+      final ids = launcher.emulatorSettings().rows.map((row) => row.id).toList();
+      expect(ids.indexOf('retro-host-ps2-download'), ids.indexOf('retro-host-download') + 1);
+      final offer = row('retro-host-ps2-download')!;
+      expect((offer.title, offer.detail), (T.text('retroHostPs2Download'), T.text('retroHostPs2DownloadDetail')));
+      expect(offer.kind, isA<ActionRow>());
+      for (final id in ['retro-host-ps2', 'retro-host-ps2-bios', 'retro-host-ps2-remove']) {
+        expect(row(id), isNull, reason: id);
+      }
+      expect(model.playsInHost(RetroPlatform.ps2), isFalse);
+    });
+
     group('downloaded', () {
       late FakeGitHub github;
       setUp(() async {
@@ -226,27 +244,102 @@ void main() {
       });
       tearDown(() async => github.close());
 
-      test('one that adds LRPS2 lists PS2 cue sheets, and a newer one without it hides them again', () async {
+      List<String> fetchedSince(int seen) => github.downloads.skip(seen).map(p.posix.basename).toList();
+      final system = RetroHostSystem.current!.name;
+
+      test('the PS2 emulator is added on its own, moves with the host, and goes with a release without it', () async {
         github.releases.add(retroHostFixtureRelease(ps2: true));
         launcher = Ps1Launcher(hostFound: false, retroHostApi: github.api)..addPs2CueSheet('Cue Racer');
-        final model = launcher.model..setRetroHostPs2(true);
-        expect(model.playsInHost(RetroPlatform.ps2), isFalse, reason: 'no host yet');
-        expect(launcher.lists('Cue Racer'), isFalse, reason: 'it would start in PCSX2');
+        final model = launcher.model;
+        expect(row('retro-host-ps2-download'), isNull, reason: 'no host yet');
 
         await model.retroHostDownload.download();
-        expect(model.toast, T.format('retroHostReady', ['1.0.0']));
-        expect(model.retroHostInstall!.ps2Core, isNotNull);
+        expect(model.toast, T.format('retroHostReady', ['1.1.0']));
+        expect(fetchedSince(0).where((name) => name.contains('lrps2')), isEmpty, reason: 'never downloaded unasked');
+        expect(model.retroHostInstall!.ps2Core, isNull);
+        expect(launcher.lists('Cue Racer'), isFalse);
+
+        var seen = github.downloads.length;
+        await model.retroHostDownload.ps2.add();
+        expect(model.toast, T.format('retroHostPs2Ready', ['1.1.0']));
+        expect(fetchedSince(seen).where((name) => name.startsWith('anyps5-')), [
+          'anyps5-retro-host-1.1.0-$system-lrps2.files',
+          'anyps5-retro-host-1.1.0-$system-lrps2.zip',
+        ]);
+        expect(model.preferences.retroHostPs2, isTrue, reason: 'the first PS2 emulator turns its games on');
         expect(model.playsInHost(RetroPlatform.ps2), isTrue);
         expect(launcher.lists('Cue Racer'), isTrue, reason: 'scanned again once the host gained LRPS2');
-        expect(model.games.singleWhere((game) => game.name == 'Cue Racer').retro!.platform, RetroPlatform.ps2);
+        expect(row('retro-host-ps2-download')!.detail, T.text('retroHostPs2InstalledDetail'));
+        for (final id in ['retro-host-ps2', 'retro-host-ps2-bios', 'retro-host-ps2-remove']) {
+          expect(row(id), isNotNull, reason: id);
+        }
 
-        github.releases.insert(0, retroHostFixtureRelease(tag: 'v1.0.1'));
+        github.releases.insert(0, retroHostFixtureRelease(tag: 'v1.1.1', ps2: true));
+        seen = github.downloads.length;
         await model.retroHostDownload.download();
-        expect(model.toast, T.format('retroHostReady', ['1.0.1']));
+        expect(model.toast, T.format('retroHostReady', ['1.1.1']));
+        expect(fetchedSince(seen), contains('anyps5-retro-host-1.1.1-$system-lrps2.zip'));
+        expect(model.retroHostDownload.installedCores, {RetroHostCorePackage.lrps2});
+        expect(row('retro-host-ps2-download')!.title, T.format('retroHostPs2Installed', ['1.1.1']));
+        (await model.retroHostDownload.store.check()).release();
+
+        github.releases.insert(0, retroHostFixtureRelease(tag: 'v1.2.0'));
+        await model.retroHostDownload.download();
+        expect(model.toast, T.format('retroHostReady', ['1.2.0']));
         expect(model.retroHostInstall!.ps2Core, isNull);
+        expect(row('retro-host-ps2-download'), isNull, reason: 'the new release has no PS2 emulator');
         expect(model.preferences.retroHostPs2, isTrue, reason: 'the setting is kept for a later host');
-        expect(model.playsInHost(RetroPlatform.ps2), isFalse);
         expect(launcher.lists('Cue Racer'), isFalse, reason: 'scanned again once the host lost LRPS2');
+      });
+
+      test('the PS2 emulator is removed again, and PS1 games still play', () async {
+        github.releases.add(retroHostFixtureRelease(ps2: true));
+        launcher = Ps1Launcher(hostFound: false, retroHostApi: github.api)..addPs2CueSheet('Cue Racer');
+        final model = launcher.model;
+        await model.retroHostDownload.download();
+        await model.retroHostDownload.ps2.add();
+        final ps2Core = model.retroHostInstall!.ps2Core!;
+
+        (row('retro-host-ps2-remove')!.kind as ActionRow).run();
+        await until(() => model.toast == T.text('retroHostPs2Removed'), const Duration(seconds: 10));
+        expect(File(ps2Core).existsSync(), isFalse);
+        expect(model.retroHostInstall!.ps2Core, isNull);
+        expect(launcher.lists('Cue Racer'), isFalse);
+        for (final id in ['retro-host-ps2', 'retro-host-ps2-bios', 'retro-host-ps2-remove']) {
+          expect(row(id), isNull, reason: id);
+        }
+        expect(row('retro-host-ps2-download')!.title, T.text('retroHostPs2Download'), reason: 'offered again');
+
+        model.closeOverlay();
+        final playing = model.play(launcher.game);
+        await until(() => launcher.opened.isNotEmpty, const Duration(seconds: 10));
+        expect(launcher.checked.single?.ps2Core, isNull);
+        launcher.session.readyCompleter.complete();
+        await playing;
+      });
+
+      test('the PS2 emulator is neither added nor removed while a game plays', () async {
+        github.releases.add(retroHostFixtureRelease(ps2: true));
+        launcher = Ps1Launcher(hostFound: false, retroHostApi: github.api);
+        final model = launcher.model;
+        await model.retroHostDownload.download();
+        model.closeOverlay();
+        await launcher.start();
+        final seen = github.downloads.length;
+        await model.retroHostDownload.ps2.add();
+        expect(model.toast, T.text('retroHostPs2CloseGame'));
+        expect(github.downloads, hasLength(seen));
+        expect(model.retroHostInstall!.ps2Core, isNull);
+      });
+
+      test('without the release of its host on GitHub, the PS2 emulator is not available', () async {
+        launcher = await Ps1Launcher.withRelease(ps2: true, addPs2: false, retroHostApi: github.api);
+        final model = launcher.model;
+        github.releases.add(retroHostFixtureRelease(tag: 'v1.1.1', ps2: true));
+        await model.retroHostDownload.ps2.add();
+        expect(model.toast, T.text('retroHostPs2NotYet'));
+        expect(row('retro-host-ps2-download')!.detail, T.text('retroHostPs2NotYet'));
+        expect(model.retroHostInstall!.ps2Core, isNull);
       });
     });
   });

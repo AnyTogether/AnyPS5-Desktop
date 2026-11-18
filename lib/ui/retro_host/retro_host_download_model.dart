@@ -9,11 +9,13 @@ import '../../core/toolkit_download.dart';
 import '../app_model.dart';
 import '../components.dart';
 import '../strings.dart';
+import 'retro_host_core_download_model.dart';
 
 /// The PS1 emulator host as a managed download, as ffmpeg is: Settings › Emulators offers it from
 /// the host repository's signed releases, the player presses to download or update it, and it is
-/// checked on download and before every game ([RetroHostStore]). A debug build that runs the host
-/// `ANYPS5_RETRO_HOST` names offers none.
+/// checked on download and before every game ([RetroHostStore]). The PS2 emulator is a download of
+/// its own from the same release ([ps2]), which moves with the host. A debug build that runs the
+/// host `ANYPS5_RETRO_HOST` names offers none.
 class RetroHostDownloadModel {
   RetroHostDownloadModel(this.app)
     : store = RetroHostStore(app.paths.retroHost, keys: app.services.retroHostReleases?.signingKeys) {
@@ -23,25 +25,38 @@ class RetroHostDownloadModel {
   final AppModel app;
   final RetroHostStore store;
 
+  /// The PS2 emulator, LRPS2, added beside the installed host from its release.
+  late final ps2 = RetroHostCoreDownloadModel(this, RetroHostCorePackage.lrps2);
+
   /// The installed host to start, as [RetroHostStore.installed] last found it; checked before each
   /// start all the same.
   RetroHostInstall? get installed => _installed;
   RetroHostInstall? _installed;
 
-  /// The installed host's version, for its row.
+  /// The installed host's version, for its rows.
+  RetroHostVersion? get version => _version;
   RetroHostVersion? _version;
 
+  /// The core packages added beside the installed host, and those its release has, as the last
+  /// look found them ([RetroHostStore.installedCores], [RetroHostStore.offeredCores]).
+  Set<RetroHostCorePackage> get installedCores => _installedCores;
+  Set<RetroHostCorePackage> _installedCores = const {};
+  Set<RetroHostCorePackage> get offeredCores => _offeredCores;
+  Set<RetroHostCorePackage> _offeredCores = const {};
+
   /// Reads the installed host from disk: when the model is made, and again only when its folder
-  /// may have changed (a new host put in place, or the installed one failing its check), not on
-  /// every play or Settings row.
+  /// may have changed (a new host put in place, a core package added or removed, or the installed
+  /// one failing its check), not on every play or Settings row.
   void _look() {
     _installed = store.installed();
     _version = _installed == null ? null : store.version;
+    _installedCores = _installed == null ? const {} : store.installedCores;
+    _offeredCores = _installed == null ? const {} : store.offeredCores;
   }
 
   /// [_look] once the model is made: where the host gained or lost LRPS2, the library is scanned
   /// again, as it lists PS2 cue sheets only while the host plays PS2 discs.
-  void _lookAgain() {
+  void lookAgain() {
     final ps2 = _installed?.ps2Core != null;
     _look();
     if ((_installed?.ps2Core != null) != ps2) app.rescan();
@@ -60,7 +75,8 @@ class RetroHostDownloadModel {
   DownloadCancel? _cancel;
   bool get downloading => _cancel != null;
 
-  /// The new host is being put in place of the old: no host may start until it is.
+  /// The new host is being put in place of the old, or a core package is being added or removed:
+  /// no host may start until it is.
   bool installing = false;
 
   /// The checked files are being written over the old host's: past the point of stopping, so the
@@ -92,7 +108,7 @@ class RetroHostDownloadModel {
   /// again.
   void failedCheck(String reason) {
     broken = reason;
-    _lookAgain();
+    lookAgain();
     app.refresh();
   }
 
@@ -100,10 +116,10 @@ class RetroHostDownloadModel {
   /// it in place. Runs only when the player pressed for it; said to the player however it ends.
   /// The first host installed turns on Run PS1 games in the separate host.
   Future<void> download() async {
-    if (downloading || _closed) return;
+    if (downloading || ps2.busy || _closed) return;
     final source = app.services.retroHostReleases;
     if (source == null || store.system == null) return;
-    if (_hostInUse) {
+    if (hostInUse) {
       app.show(T.text('retroHostDownloadCloseGame'));
       return;
     }
@@ -114,6 +130,7 @@ class RetroHostDownloadModel {
     progress = const ToolkitProgress(ToolkitPhase.download, 0, 0);
     app.refresh();
     final before = store.version;
+    final cores = store.installedCores;
     var shown = -1;
     try {
       final release = RetroHostStore.newest(await source.all());
@@ -128,6 +145,7 @@ class RetroHostDownloadModel {
       }
       final download = await store.fetch(
         release,
+        cores: cores,
         cancel: cancel,
         onProgress: (next) {
           progress = next;
@@ -142,18 +160,18 @@ class RetroHostDownloadModel {
       progress = const ToolkitProgress(ToolkitPhase.unpack, 1, 1);
       installing = true;
       app.refresh();
-      if (_hostInUse) throw ToolkitFailure(ToolkitFailureKind.badLayout, T.text('retroHostDownloadCloseGame'));
+      if (hostInUse) throw ToolkitFailure(ToolkitFailureKind.badLayout, T.text('retroHostDownloadCloseGame'));
       await app.stopKeptRetroHost();
-      if (_hostInUse) throw ToolkitFailure(ToolkitFailureKind.badLayout, T.text('retroHostDownloadCloseGame'));
+      if (hostInUse) throw ToolkitFailure(ToolkitFailureKind.badLayout, T.text('retroHostDownloadCloseGame'));
       if (_closed) return;
       if (cancel.cancelled) throw ToolkitFailure(ToolkitFailureKind.cancelled, 'the download was stopped');
       placing = true;
       app.refresh();
       final RetroHostVersion version;
       try {
-        version = await store.putInPlace(download);
+        version = await store.putInPlace(download, cores: cores);
       } finally {
-        _lookAgain();
+        lookAgain();
       }
       broken = null;
       if (before == null) app.setRetroHostPs1(true);
@@ -200,6 +218,8 @@ class RetroHostDownloadModel {
     if (!placing) _cancel?.cancel();
   }
 
+  /// The launcher is going ([close]).
+  bool get closed => _closed;
   bool _closed = false;
 
   /// The launcher goes: a download stops, and one already fetched is not put in place, since the
@@ -207,10 +227,11 @@ class RetroHostDownloadModel {
   void close() {
     _closed = true;
     cancel();
+    ps2.cancel();
   }
 
   /// A game plays in a host, or one is starting.
-  bool get _hostInUse => _starts > 0 || app.retroPlay != null;
+  bool get hostInUse => _starts > 0 || app.retroPlay != null;
 
   /// Settings › Emulators' row for the download: one press to download the host, then how it
   /// goes; once installed, its version, and a press looks for a newer one. Nothing where no host
@@ -219,24 +240,13 @@ class RetroHostDownloadModel {
   List<PanelRow> rows({required bool uncheckedHost}) {
     if (!offered || uncheckedHost) return const [];
     if (downloading) {
-      final now = progress;
       return [
-        PanelRow(
+        retroDownloadProgressRow(
           id: 'retro-host-download',
-          title: T.format('retroHostDownloading', [((now?.fraction ?? 0) * 100).floor()]),
-          detail: placing
-              ? T.text('retroHostChecking')
-              : T.format('retroHostProgress', [
-                  switch (now?.phase) {
-                    ToolkitPhase.download when (now?.total ?? 0) > 0 => T.format('engineProgress', [
-                      byteText(now!.received),
-                      byteText(now.total),
-                    ]),
-                    ToolkitPhase.unpack || ToolkitPhase.finish => T.text('retroHostChecking'),
-                    _ => T.text('retroHostLooking'),
-                  },
-                ]),
-          kind: ActionRow(cancel),
+          title: 'retroHostDownloading',
+          progress: progress,
+          placing: placing,
+          cancel: cancel,
         ),
       ];
     }
@@ -263,3 +273,30 @@ class RetroHostDownloadModel {
     ];
   }
 }
+
+/// A Settings › Emulators row for an emulator download under way, the host's or a core package's:
+/// [title] (a text with the percentage) and how far it is, pressed to stop it ([cancel]) until
+/// its files are [placing], past the point of stopping.
+PanelRow retroDownloadProgressRow({
+  required String id,
+  required String title,
+  required ToolkitProgress? progress,
+  required bool placing,
+  required void Function() cancel,
+}) => PanelRow(
+  id: id,
+  title: T.format(title, [((progress?.fraction ?? 0) * 100).floor()]),
+  detail: placing
+      ? T.text('retroHostChecking')
+      : T.format('retroHostProgress', [
+          switch (progress?.phase) {
+            ToolkitPhase.download when (progress?.total ?? 0) > 0 => T.format('engineProgress', [
+              byteText(progress!.received),
+              byteText(progress.total),
+            ]),
+            ToolkitPhase.unpack || ToolkitPhase.finish => T.text('retroHostChecking'),
+            _ => T.text('retroHostLooking'),
+          },
+        ]),
+  kind: ActionRow(cancel),
+);

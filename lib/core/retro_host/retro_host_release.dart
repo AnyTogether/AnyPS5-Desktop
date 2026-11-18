@@ -30,11 +30,32 @@ class RetroHostNotReleased extends RetroHostReleaseFailure {
   const RetroHostNotReleased(super.message);
 }
 
+/// A core that ships in a package of its own beside the host package, which the player adds as an
+/// emulator of its own (protocol.md "Finding and checking the host"): today only LRPS2, the PS2
+/// core. Its package is `anyps5-retro-host-<version>-<os>-<arch>-<name>.zip` with its `.files`, in
+/// the same release as the host package, and unpacks into the host's folder.
+enum RetroHostCorePackage {
+  lrps2;
+
+  /// The core library the package holds on [system], which its `.files` must list.
+  String library(RetroHostSystem system) => switch (this) {
+    lrps2 => system.ps2Core,
+  };
+
+  /// The package's zip in the release of host [version] for [system].
+  String zipName(RetroHostVersion version, RetroHostSystem system) => '${_stem(version, system)}.zip';
+
+  /// The package's `.files` in the release of host [version] for [system].
+  String filesName(RetroHostVersion version, RetroHostSystem system) => '${_stem(version, system)}.files';
+
+  String _stem(RetroHostVersion version, RetroHostSystem system) => 'anyps5-retro-host-$version-${system.name}-$name';
+}
+
 /// One system a host release is built for: `<os>-<arch>` in its file names, and the names of the
-/// host, of SwanStation and of LRPS2 inside its zip. The names must be the ones the host
-/// repository's tools/package_release.py (`SYSTEMS`) packs: a release whose LRPS2 is named
-/// otherwise is taken for one without LRPS2. A release that does not ship LRPS2 has no [ps2Core]
-/// in its zip.
+/// host and SwanStation inside its host package and of LRPS2 inside its LRPS2 package. The names
+/// must be the ones the host repository's tools/package_release.py (`SYSTEMS`) packs: an LRPS2
+/// package that names its core otherwise is refused. A release from before LRPS2 shipped has no
+/// LRPS2 package.
 class RetroHostSystem {
   const RetroHostSystem(this.name, {required this.executable, required this.core, required this.ps2Core});
 
@@ -126,8 +147,8 @@ class RetroHostChecked {
   /// runs.
   final String core;
 
-  /// The LRPS2 library the release ships, checked with the others, or null when its `.files` lists
-  /// none: a release without PS2.
+  /// The LRPS2 library of the installed LRPS2 package, checked with the others, or null when that
+  /// package is not installed.
   final String? ps2Core;
 
   /// Where the operating system takes the host from, when that is not [executable]: on Linux the
@@ -157,19 +178,22 @@ class RetroHostChecked {
 }
 
 /// A release whose SHA256SUMS is signed by a trusted key, and the names of this system's files in
-/// it: [zipName] and [filesName], with their digests in [sums].
+/// it: the host package's [zipName] and [filesName], with their digests in [sums], and the [cores]
+/// whose packages it has for this system.
 class RetroHostSignedRelease {
   const RetroHostSignedRelease({
     required this.version,
     required this.zipName,
     required this.filesName,
     required this.sums,
+    this.cores = const {},
   });
 
   final RetroHostVersion version;
   final String zipName;
   final String filesName;
   final SignedSums sums;
+  final Set<RetroHostCorePackage> cores;
 }
 
 /// Finding and checking the emulator host as anyps5-retro-host docs/protocol.md "Finding and
@@ -193,10 +217,12 @@ abstract final class RetroHostRelease {
   }
 
   /// The checks before each start: the signature, the tag kept on install against the signed
-  /// version, the `.files` against SHA256SUMS, and the host executable, SwanStation and, when the
-  /// `.files` lists it, LRPS2 against the `.files`, each hashed from a [CheckedFile] that stays held
-  /// in the result. LRPS2 is checked for a PS1 game too, since one host plays the next game, PS1 or
-  /// PS2, on the cores checked when it started.
+  /// version, the host package's `.files` and the `.files` of every core package installed beside
+  /// it against SHA256SUMS, and the host executable, SwanStation and each installed core package's
+  /// core (LRPS2) against those `.files`, each hashed from a [CheckedFile] that stays held in the
+  /// result. LRPS2 is checked for a PS1 game too, since one host plays the next game, PS1 or PS2, on
+  /// the cores checked when it started. A core package counts as installed when its `.files` is in
+  /// [folder] and SHA256SUMS lists it; a core library no checked `.files` lists is never given.
   static Future<RetroHostChecked> checkBeforeStart(
     Directory folder, {
     List<ReleaseKey>? keys,
@@ -211,18 +237,22 @@ abstract final class RetroHostRelease {
     );
     final release = _releaseOf(sums, target, minimum);
     checkTag(_readTag(folder), release.version);
-    final listing = _readSmall(p.join(folder.path, release.filesName));
-    if (sha256.convert(listing).toString() != sums.digestFor(release.filesName)) {
-      throw RetroHostReleaseFailure('${release.filesName} does not match the signed release');
+    final files = _signedList(folder.path, release.filesName, sums);
+    final toCheck = [(target.executable, release.filesName, files), (target.core, release.filesName, files)];
+    final installedCores = <RetroHostCorePackage>{};
+    for (final core in release.cores) {
+      final filesName = core.filesName(release.version, target);
+      if (!File(p.join(folder.path, filesName)).existsSync()) continue;
+      toCheck.add((core.library(target), filesName, _signedList(folder.path, filesName, sums)));
+      installedCores.add(core);
     }
-    final files = parseFileList(listing);
-    final ps2 = files.containsKey(target.ps2Core);
+    final ps2 = installedCores.contains(RetroHostCorePackage.lrps2);
     final held = <CheckedFile>[];
     try {
-      for (final name in [target.executable, target.core, if (ps2) target.ps2Core]) {
-        final expected = files[name];
+      for (final (name, listName, listed) in toCheck) {
+        final expected = listed[name];
         if (expected == null) {
-          throw RetroHostReleaseFailure('${release.filesName} does not list $name', file: name);
+          throw RetroHostReleaseFailure('$listName does not list $name', file: name);
         }
         final CheckedFile file;
         try {
@@ -259,9 +289,12 @@ abstract final class RetroHostRelease {
   /// The checks on download, then the unpacking: the signature, the signed version against [tag],
   /// the zip and the `.files` against SHA256SUMS, and every file of the zip against the `.files`.
   /// [download] holds the files as published under [tag]; [into] is replaced by the unpacked zip
-  /// with SHA256SUMS, SHA256SUMS.sig, the `.files` and the tag ([tagName]) beside it. The reading,
-  /// hashing and writing run on another isolate, so the window stays responsive; only the two
-  /// renames that put the new host in place run here. Gives the version installed.
+  /// with SHA256SUMS, SHA256SUMS.sig, the `.files` and the tag ([tagName]) beside it. Each of
+  /// [cores] the release has a package of is checked the same way and unpacked into the same
+  /// folder in the same step, with its `.files`; one the release lacks is not there afterwards, so
+  /// a core package moves with the host or goes. The reading, hashing and writing run on another
+  /// isolate, so the window stays responsive; only the two renames that put the new host in place
+  /// run here. Gives the version installed.
   static Future<RetroHostVersion> install(
     Directory download,
     Directory into, {
@@ -269,13 +302,14 @@ abstract final class RetroHostRelease {
     List<ReleaseKey>? keys,
     RetroHostSystem? system,
     RetroHostVersion minimum = minimumVersion,
+    Set<RetroHostCorePackage> cores = const {},
   }) async {
     final target = system ?? _currentSystem();
     final from = download.path;
     final staging = Directory('${into.path}.new');
     final stagingPath = staging.path;
     final version = await Isolate.run(
-      () => _stage(from, stagingPath, tag: tag, keys: keys, system: target, minimum: minimum),
+      () => _stage(from, stagingPath, tag: tag, keys: keys, system: target, minimum: minimum, cores: cores),
     );
     try {
       _replace(into, staging);
@@ -294,42 +328,37 @@ abstract final class RetroHostRelease {
     required List<ReleaseKey>? keys,
     required RetroHostSystem system,
     required RetroHostVersion minimum,
+    required Set<RetroHostCorePackage> cores,
   }) async {
     final sumsBytes = _readSmall(p.join(download, ReleaseSigning.sumsName));
     final signatureBytes = _readSmall(p.join(download, ReleaseSigning.signatureName));
     final release = signed(sumsBytes, signatureBytes, tag: tag, keys: keys, system: system, minimum: minimum);
-    final sums = release.sums;
-    final listing = _readSmall(p.join(download, release.filesName));
-    if (sha256.convert(listing).toString() != sums.digestFor(release.filesName)) {
-      throw RetroHostReleaseFailure('${release.filesName} does not match the signed release');
+    final host = _checkedPackage(download, release.filesName, release.zipName, release.sums, [
+      system.executable,
+      system.core,
+    ]);
+    final packages = [host];
+    for (final core in cores.intersection(release.cores)) {
+      final package = _checkedPackage(
+        download,
+        core.filesName(release.version, system),
+        core.zipName(release.version, system),
+        release.sums,
+        [core.library(system)],
+      );
+      _checkApart([for (final other in packages) other.files], package);
+      packages.add(package);
     }
-    final List<int> zipBytes;
-    try {
-      zipBytes = File(p.join(download, release.zipName)).readAsBytesSync();
-    } on FileSystemException {
-      throw RetroHostReleaseFailure('${release.zipName} is missing');
-    }
-    if (sums.digestFor(release.zipName) != sha256.convert(zipBytes).toString()) {
-      throw RetroHostReleaseFailure('${release.zipName} does not match the signed release');
-    }
-    final files = parseFileList(listing);
-    for (final name in [system.executable, system.core]) {
-      if (!files.containsKey(name)) throw RetroHostReleaseFailure('${release.filesName} does not list $name');
-    }
-    final unpacked = _unpack(zipBytes, files, release.zipName);
 
     final staging = Directory(stagingPath);
     if (staging.existsSync()) staging.deleteSync(recursive: true);
     staging.createSync(recursive: true);
     try {
-      for (final MapEntry(key: name, value: bytes) in unpacked.entries) {
-        final file = File(p.joinAll([staging.path, ...name.split('/')]));
-        file.parent.createSync(recursive: true);
-        file.writeAsBytesSync(bytes, flush: true);
+      for (final package in packages) {
+        _write(staging.path, package);
       }
       File(p.join(staging.path, ReleaseSigning.sumsName)).writeAsBytesSync(sumsBytes, flush: true);
       File(p.join(staging.path, ReleaseSigning.signatureName)).writeAsBytesSync(signatureBytes, flush: true);
-      File(p.join(staging.path, release.filesName)).writeAsBytesSync(listing, flush: true);
       File(p.join(staging.path, tagName)).writeAsStringSync(tag, flush: true);
       if (!Platform.isWindows) {
         final made = await Process.run('chmod', ['755', p.join(staging.path, system.executable)]);
@@ -340,6 +369,94 @@ abstract final class RetroHostRelease {
       rethrow;
     }
     return release.version;
+  }
+
+  /// Adds [core]'s package to the host installed in [into], from [download], which holds that
+  /// package's zip and `.files` as published in the installed host's release. The package is
+  /// checked as on download, against the SHA256SUMS kept beside the installed host, whose
+  /// signature and tag are checked again first, so only a package of the installed release is
+  /// taken. None of its names may be one the host package or another installed core package has,
+  /// ignoring case. Its files are written into [into], and its `.files` last, so a package stopped
+  /// halfway is not installed ([installedCores]) and its files are never given to the host. Stop
+  /// the host first: on Windows it holds its files while it runs. The checks and the writing run
+  /// on another isolate.
+  static Future<void> addCore(
+    Directory download,
+    Directory into,
+    RetroHostCorePackage core, {
+    List<ReleaseKey>? keys,
+    RetroHostSystem? system,
+    RetroHostVersion minimum = minimumVersion,
+  }) async {
+    final target = system ?? _currentSystem();
+    final from = download.path;
+    final to = into.path;
+    await Isolate.run(() => _addCore(from, to, core, keys: keys, system: target, minimum: minimum));
+  }
+
+  static void _addCore(
+    String download,
+    String into,
+    RetroHostCorePackage core, {
+    required List<ReleaseKey>? keys,
+    required RetroHostSystem system,
+    required RetroHostVersion minimum,
+  }) {
+    final release = installedRelease(Directory(into), keys: keys, system: system, minimum: minimum);
+    final sums = release.sums;
+    if (!release.cores.contains(core)) {
+      throw RetroHostNotReleased('the installed host ${release.version} has no ${core.name} package');
+    }
+    final filesName = core.filesName(release.version, system);
+    final installed = [
+      _signedList(into, release.filesName, sums),
+      for (final other in release.cores)
+        if (other != core && File(p.join(into, other.filesName(release.version, system))).existsSync())
+          _signedList(into, other.filesName(release.version, system), sums),
+    ];
+    final package = _checkedPackage(download, filesName, core.zipName(release.version, system), sums, [
+      core.library(system),
+    ]);
+    _checkApart(installed, package);
+    final listing = File(p.join(into, filesName));
+    if (listing.existsSync()) listing.deleteSync();
+    _write(into, package);
+  }
+
+  /// Removes [core]'s package from the host installed in [into]: its `.files` first, so it is no
+  /// longer installed, then every file that `.files` lists and the folders left empty. A name the
+  /// host package's `.files` lists too is left, so the host is never damaged. Stop the host first.
+  /// Nothing happens when the package is not installed.
+  static void removeCore(Directory into, RetroHostCorePackage core, {RetroHostSystem? system}) {
+    final target = system ?? _currentSystem();
+    final listing = _installedCoreFiles(into, target, core);
+    if (listing == null) return;
+    Map<String, String> files;
+    try {
+      files = parseFileList(listing.readAsBytesSync());
+    } on Object {
+      files = const {};
+    }
+    final host = _installedFiles(into, target);
+    final Set<String> kept;
+    try {
+      kept = host == null
+          ? const {}
+          : parseFileList(File(p.join(into.path, host.group(0)!)).readAsBytesSync()).keys.toSet();
+    } on Object {
+      throw RetroHostReleaseFailure('the host package beside ${core.name} cannot be read');
+    }
+    listing.deleteSync();
+    for (final name in files.keys) {
+      if (kept.contains(name)) continue;
+      final file = File(p.joinAll([into.path, ...name.split('/')]));
+      if (file.existsSync()) file.deleteSync();
+      var folder = file.parent;
+      while (p.isWithin(into.path, folder.path) && folder.existsSync() && folder.listSync().isEmpty) {
+        folder.deleteSync();
+        folder = folder.parent;
+      }
+    }
   }
 
   /// Puts the host back after a launcher stopped between [_replace]'s two renames: [into] is
@@ -408,8 +525,26 @@ abstract final class RetroHostRelease {
       zipName: release.zipName,
       filesName: release.filesName,
       sums: signed,
+      cores: release.cores,
     );
   }
+
+  /// The release of the host installed in [folder], from the SHA256SUMS, its signature and the tag
+  /// kept beside it, checked as [signed] checks a download: the digests a core package added to it
+  /// must match ([addCore]).
+  static RetroHostSignedRelease installedRelease(
+    Directory folder, {
+    List<ReleaseKey>? keys,
+    RetroHostSystem? system,
+    RetroHostVersion minimum = minimumVersion,
+  }) => signed(
+    _readSmall(p.join(folder.path, ReleaseSigning.sumsName)),
+    _readSmall(p.join(folder.path, ReleaseSigning.signatureName)),
+    tag: _readTag(folder),
+    keys: keys,
+    system: system,
+    minimum: minimum,
+  );
 
   /// The version of the host in [folder] as its SHA256SUMS names it, read without any check, for
   /// showing; null when the folder holds no host release for [system] (the sums list every
@@ -420,19 +555,73 @@ abstract final class RetroHostRelease {
     return match == null ? null : RetroHostVersion.tryParse(match.group(1)!);
   }
 
-  /// Whether the installed release's `.files` lists LRPS2, as [checkBeforeStart] decides it: a
-  /// `pcsx2_libretro` file in [folder] that the `.files` does not list is not the release's LRPS2.
-  /// Not checked: a listed LRPS2 is checked before each start.
+  /// Whether the installed LRPS2 package's `.files` lists LRPS2, as [checkBeforeStart] decides it:
+  /// a `pcsx2_libretro` file in [folder] that no installed `.files` lists is not the release's
+  /// LRPS2, nor is one the host package lists. Not checked: a listed LRPS2 is checked before each
+  /// start.
   static bool installedHasPs2Core(Directory folder, {RetroHostSystem? system}) {
     final target = system ?? RetroHostSystem.current;
-    final match = _installedFiles(folder, target);
-    if (target == null || match == null) return false;
+    if (target == null) return false;
+    final listing = _installedCoreFiles(folder, target, RetroHostCorePackage.lrps2);
+    if (listing == null) return false;
     try {
-      return parseFileList(File(p.join(folder.path, match.group(0)!)).readAsBytesSync()).containsKey(target.ps2Core);
+      return parseFileList(listing.readAsBytesSync()).containsKey(target.ps2Core);
     } on FileSystemException {
       return false;
     } on RetroHostReleaseFailure {
       return false;
+    }
+  }
+
+  /// The core packages installed beside the host in [folder]: those whose `.files`, named for the
+  /// installed host's version, is there and listed in its SHA256SUMS, as [checkBeforeStart] finds
+  /// them. Not checked.
+  static Set<RetroHostCorePackage> installedCores(Directory folder, {RetroHostSystem? system}) {
+    final target = system ?? RetroHostSystem.current;
+    if (target == null) return const {};
+    return {
+      for (final core in RetroHostCorePackage.values)
+        if (_installedCoreFiles(folder, target, core) != null) core,
+    };
+  }
+
+  /// The core packages the installed host's release has for [system], whether installed or not:
+  /// both the zip and the `.files` of each, named for the installed host's version, are in the
+  /// SHA256SUMS kept beside it. Empty for a release from before LRPS2 shipped, such as 1.0.0. Not
+  /// checked: adding one checks the sums again ([addCore]).
+  static Set<RetroHostCorePackage> offeredCores(Directory folder, {RetroHostSystem? system}) {
+    final target = system ?? RetroHostSystem.current;
+    final version = installedVersion(folder, system: target);
+    if (target == null || version == null) return const {};
+    final Map<String, String> digests;
+    try {
+      digests = ReleaseSigning.parseSums(File(p.join(folder.path, ReleaseSigning.sumsName)).readAsBytesSync());
+    } on FileSystemException {
+      return const {};
+    } on SigningFailure {
+      return const {};
+    }
+    return {
+      for (final core in RetroHostCorePackage.values)
+        if (digests.containsKey(core.filesName(version, target)) && digests.containsKey(core.zipName(version, target)))
+          core,
+    };
+  }
+
+  /// [core]'s `.files` beside the installed host in [folder], named for its version and listed in
+  /// its SHA256SUMS; null when it is not there. Not checked.
+  static File? _installedCoreFiles(Directory folder, RetroHostSystem target, RetroHostCorePackage core) {
+    final version = installedVersion(folder, system: target);
+    if (version == null) return null;
+    final name = core.filesName(version, target);
+    final file = File(p.join(folder.path, name));
+    try {
+      final digests = ReleaseSigning.parseSums(File(p.join(folder.path, ReleaseSigning.sumsName)).readAsBytesSync());
+      return digests.containsKey(name) && file.existsSync() ? file : null;
+    } on FileSystemException {
+      return null;
+    } on SigningFailure {
+      return null;
     }
   }
 
@@ -502,7 +691,7 @@ abstract final class RetroHostRelease {
 
   static final _releaseName = RegExp(r'^anyps5-retro-host-([^-]+)-([a-z0-9]+-[a-z0-9]+)\.(zip|files)$');
 
-  static ({RetroHostVersion version, String zipName, String filesName}) _releaseOf(
+  static ({RetroHostVersion version, String zipName, String filesName, Set<RetroHostCorePackage> cores}) _releaseOf(
     SignedSums sums,
     RetroHostSystem system,
     RetroHostVersion minimum,
@@ -521,7 +710,83 @@ abstract final class RetroHostRelease {
     if (version.compareTo(minimum) < 0) {
       throw RetroHostReleaseFailure('the host $version is older than $minimum, the oldest this launcher runs');
     }
-    return (version: version, zipName: 'anyps5-retro-host-$versionText-${system.name}.zip', filesName: filesName);
+    final cores = <RetroHostCorePackage>{};
+    for (final core in RetroHostCorePackage.values) {
+      final zip = sums.digests.containsKey(core.zipName(version, system));
+      final files = sums.digests.containsKey(core.filesName(version, system));
+      if (zip != files) throw RetroHostReleaseFailure('the release lists only half of the ${core.name} package');
+      if (zip) cores.add(core);
+    }
+    return (
+      version: version,
+      zipName: 'anyps5-retro-host-$versionText-${system.name}.zip',
+      filesName: filesName,
+      cores: cores,
+    );
+  }
+
+  /// The `.files` [name] in [folder], read and held to its digest in [sums], as a file list.
+  static Map<String, String> _signedList(String folder, String name, SignedSums sums) {
+    final listing = _readSmall(p.join(folder, name));
+    if (sha256.convert(listing).toString() != sums.digestFor(name)) {
+      throw RetroHostReleaseFailure('$name does not match the signed release');
+    }
+    return parseFileList(listing);
+  }
+
+  /// One package of a release in [folder], checked as on download: its `.files` [filesName] and
+  /// zip [zipName] against [sums], every file of the zip against the `.files`, and [required]
+  /// listed in it. Gives the package unpacked in memory, with its `.files` as published.
+  static _Package _checkedPackage(
+    String folder,
+    String filesName,
+    String zipName,
+    SignedSums sums,
+    List<String> required,
+  ) {
+    final listing = _readSmall(p.join(folder, filesName));
+    if (sha256.convert(listing).toString() != sums.digestFor(filesName)) {
+      throw RetroHostReleaseFailure('$filesName does not match the signed release');
+    }
+    final List<int> zipBytes;
+    try {
+      zipBytes = File(p.join(folder, zipName)).readAsBytesSync();
+    } on FileSystemException {
+      throw RetroHostReleaseFailure('$zipName is missing');
+    }
+    if (sums.digestFor(zipName) != sha256.convert(zipBytes).toString()) {
+      throw RetroHostReleaseFailure('$zipName does not match the signed release');
+    }
+    final files = parseFileList(listing);
+    for (final name in required) {
+      if (!files.containsKey(name)) throw RetroHostReleaseFailure('$filesName does not list $name');
+    }
+    return (filesName: filesName, listing: listing, files: files, unpacked: _unpack(zipBytes, files, zipName));
+  }
+
+  /// Refuses [package] when one of its names is a name, or a folder, of one of [others], ignoring
+  /// case, as the host's `package_release.py --check` does across the packages of one system: they
+  /// all unpack into one folder, so none may write over another's file.
+  static void _checkApart(List<Map<String, String>> others, _Package package) {
+    final names = [
+      for (final other in others) ...other.entries,
+      ...package.files.entries,
+    ].map((entry) => '${entry.value}  ${entry.key}').join('\n');
+    try {
+      parseFileList(utf8.encode(names));
+    } on RetroHostReleaseFailure catch (failure) {
+      throw RetroHostReleaseFailure('${package.filesName} shares a name with an installed package: ${failure.message}');
+    }
+  }
+
+  /// Writes [package]'s files into [folder], and its `.files` last.
+  static void _write(String folder, _Package package) {
+    for (final MapEntry(key: name, value: bytes) in package.unpacked.entries) {
+      final file = File(p.joinAll([folder, ...name.split('/')]));
+      file.parent.createSync(recursive: true);
+      file.writeAsBytesSync(bytes, flush: true);
+    }
+    File(p.join(folder, package.filesName)).writeAsBytesSync(package.listing, flush: true);
   }
 
   static Map<String, List<int>> _unpack(List<int> zipBytes, Map<String, String> files, String zipName) {
@@ -581,3 +846,6 @@ abstract final class RetroHostRelease {
   static RetroHostSystem _currentSystem() =>
       RetroHostSystem.current ?? (throw const RetroHostReleaseFailure('no emulator host is released for this system'));
 }
+
+/// One package of a release, checked and unpacked in memory ([RetroHostRelease._checkedPackage]).
+typedef _Package = ({String filesName, List<int> listing, Map<String, String> files, Map<String, List<int>> unpacked});
