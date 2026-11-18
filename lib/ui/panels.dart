@@ -864,17 +864,10 @@ class _RowView extends StatelessWidget {
           )
         : Row(
             children: [
-              if (row.picture != null) ...[
+              if (row.picture != null || row.pictureAspect != null) ...[
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8 * scale),
-                  child: Image.memory(
-                    row.picture!,
-                    width: 44 * scale,
-                    height: 44 * scale,
-                    fit: BoxFit.cover,
-                    cacheWidth: 132,
-                    errorBuilder: (_, _, _) => SizedBox(width: 44 * scale, height: 44 * scale),
-                  ),
+                  child: _RowPicture(row: row, height: 44 * scale, empty: titleColor.withValues(alpha: 0.08)),
                 ),
                 SizedBox(width: 16 * scale),
               ] else if (row.person != null) ...[
@@ -1012,6 +1005,37 @@ class _RowView extends StatelessWidget {
       excludeSemantics: true,
       onTap: row.focusable ? onTap : null,
       child: view,
+    );
+  }
+}
+
+/// A row's picture before its title, [height] high: square, or as wide as [PanelRow.pictureAspect]
+/// says; with no picture, its place filled with [empty].
+class _RowPicture extends StatelessWidget {
+  const _RowPicture({required this.row, required this.height, required this.empty});
+
+  final PanelRow row;
+  final double height;
+  final Color empty;
+
+  @override
+  Widget build(BuildContext context) {
+    final width = height * (row.pictureAspect ?? 1);
+    final picture = row.picture;
+    if (picture == null) {
+      return SizedBox(
+        width: width,
+        height: height,
+        child: ColoredBox(color: empty),
+      );
+    }
+    return Image.memory(
+      picture,
+      width: width,
+      height: height,
+      fit: BoxFit.cover,
+      cacheWidth: (132 * (row.pictureAspect ?? 1)).round(),
+      errorBuilder: (_, _, _) => SizedBox(width: width, height: height),
     );
   }
 }

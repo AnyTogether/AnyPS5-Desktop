@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/retro_host/retro_host_client.dart';
 import '../../core/retro_host/retro_host_protocol.dart';
 import '../../core/retro_host/retro_host_session.dart';
+import '../../core/retro_host/retro_state_slots.dart';
 import 'retro_frame_image.dart';
 
 /// Where one game in an emulator host stands.
@@ -133,6 +134,12 @@ class RetroHostGame extends ChangeNotifier {
   bool get consoleRefused => _consoleRefused;
   bool _consoleRefused = false;
 
+  /// Whether the game was started with a states folder on a host that lists `saveStates`, so
+  /// [saveState] and [loadState] can be asked for. A start with a folder on an older host leaves the
+  /// folder out, and the game plays without save states.
+  bool get savesStates => _savesStates;
+  bool _savesStates = false;
+
   /// How the host's connection ended; null while it is open. [RetroHostEnd.unsupported] means
   /// the host speaks no protocol version this launcher does: the emulator needs updating.
   RetroHostEnd? get hostEnd => _hostEnd;
@@ -166,7 +173,9 @@ class RetroHostGame extends ChangeNotifier {
         _end(failure: 'The host does not list the $retroCapabilityPs2 capability.');
         return;
       }
-      await session.startGame(request.toArgs());
+      final states = request.states != null && session.canSaveStates;
+      await session.startGame((states ? request : request.withoutStates()).toArgs());
+      _savesStates = states;
     } on Object catch (error) {
       if (_phase == RetroHostGamePhase.starting) _end(failure: '$error');
       return;
@@ -247,6 +256,28 @@ class RetroHostGame extends ChangeNotifier {
     final taken = await _gameCall('option', {'key': key, 'value': value});
     if (taken) await refresh();
     return taken;
+  }
+
+  /// `saveState`: saves the game's state into [slot], 0 to 7, of the states folder it was started
+  /// with ([savesStates]). The host writes it between two frames, also while paused.
+  Future<RetroStateOutcome> saveState(int slot) => _stateCall('saveState', slot);
+
+  /// `loadState`: loads the state in [slot], 0 to 7, back into the game; a paused game shows it
+  /// with its next frame once resumed. A state of another game or core build is refused
+  /// ([RetroStateOutcome.otherGame], [RetroStateOutcome.otherCore]) and the game runs on.
+  Future<RetroStateOutcome> loadState(int slot) => _stateCall('loadState', slot);
+
+  Future<RetroStateOutcome> _stateCall(String method, int slot) async {
+    if (slot < 0 || slot >= RetroStateFolder.slots) throw RangeError.range(slot, 0, RetroStateFolder.slots - 1, 'slot');
+    if (!_gameLive || !_savesStates) return RetroStateOutcome.notNow;
+    try {
+      final result = await session.call(method, {'slot': slot});
+      return result is Map ? RetroStateOutcome.done : RetroStateOutcome.notNow;
+    } on RetroCallError catch (error) {
+      return RetroStateOutcome.ofError(error.code);
+    } on Object {
+      return RetroStateOutcome.failed;
+    }
   }
 
   /// `volume`: the host's output volume for this and every later game. Sent once the host has

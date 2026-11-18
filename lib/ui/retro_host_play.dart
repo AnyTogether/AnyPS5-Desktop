@@ -12,6 +12,7 @@ class RetroPlay {
     required this.program,
     required this.core,
     required this.unchecked,
+    required this.states,
   });
 
   final Game game;
@@ -33,6 +34,10 @@ class RetroPlay {
   final RetroGameMenu menu;
   final DateTime started;
 
+  /// The game's save states, in its menu's Save State and Load State where its host saves states
+  /// ([RetroSaveStates.available]).
+  final RetroSaveStates states;
+
   /// The player chose Close Game: the end that follows is not an error to show.
   bool closing = false;
 
@@ -53,6 +58,12 @@ class RetroPlay {
   /// The section of the menu shown, or null for the menu's first page.
   RetroOptionSection? menuSection;
 
+  /// The menu's Save State or Load State page shown, or null.
+  RetroStatePage? statePage;
+
+  /// The slot Overwrite slot N? asks about ([Layer.retroOverwriteState]).
+  int? overwriting;
+
   /// The phase and the problem the launcher last acted on ([RetroHostPlaying._retroChanged]).
   (RetroHostGamePhase, String?)? _seen;
 
@@ -64,8 +75,10 @@ class RetroPlay {
     if (_released) return;
     _released = true;
     host.removeListener(listener);
+    states.removeListener(listener);
     controls.dispose();
     menu.dispose();
+    states.dispose();
     host.dispose();
   }
 
@@ -75,6 +88,26 @@ class RetroPlay {
   /// Why the game stopped, as the key of the words to show the player; null while it plays, and
   /// for a game that ended without an error or that the player closed.
   String? get problem => closing ? null : retroHostProblem(host, ps2: ps2);
+}
+
+/// The pages of the game's menu that list its save state slots.
+enum RetroStatePage { save, load }
+
+/// The words for a save or load of a state that did not work, by its key: a load the host refused
+/// for a state of another emulator build, of another game or damaged says so; anything else says
+/// only that it did not work.
+String retroStateProblem(RetroStateOutcome outcome, {required bool saving}) => switch (outcome) {
+  RetroStateOutcome.otherCore when !saving => 'retroStateOtherCore',
+  RetroStateOutcome.otherGame when !saving => 'retroStateOtherGame',
+  RetroStateOutcome.badState when !saving => 'retroStateBad',
+  _ => saving ? 'retroStateSaveFailed' : 'retroStateLoadFailed',
+};
+
+/// "2026-11-18 14:03": when a slot's state was saved, as the cloud saves show theirs.
+String retroStateTime(DateTime date) {
+  final local = date.toLocal();
+  String two(int value) => value.toString().padLeft(2, '0');
+  return '${local.year}-${two(local.month)}-${two(local.day)} ${two(local.hour)}:${two(local.minute)}';
 }
 
 /// Why [host]'s game stopped, as the key of the words to show the player; null while it plays or
@@ -189,6 +222,9 @@ extension RetroHostPlaying on AppModel {
 
   /// Whether the game's own screen is in front: a game in the host and no layer over it.
   bool get retroInGame => retroPlay != null && overlay == null;
+
+  /// Whether the game's menu is shown, or the question one of its rows asks (Overwrite slot N?).
+  bool get retroMenuShown => overlay == Layer.retroMenu || overlay == Layer.retroOverwriteState;
 
   /// Shuts down the host kept for the next game and waits until it has exited, so its files are
   /// no longer held: before the host is replaced by a download.
@@ -373,6 +409,12 @@ extension RetroHostPlaying on AppModel {
           ..deadzonePercent = preferences.stickDeadzone
           ..vibration = preferences.controllerVibration;
     final menu = RetroGameMenu(host, controls: controls);
+    final states = p.normalize(paths.retroStates(ps2: ps2));
+    final saveStates = RetroSaveStates(
+      host,
+      RetroStateFolder(folder: states, disc: disc.path),
+      log: _padLog,
+    );
     final play = RetroPlay(
       game: game,
       host: host,
@@ -382,9 +424,12 @@ extension RetroHostPlaying on AppModel {
       program: install.host,
       core: core,
       unchecked: !install.checked,
+      states: saveStates,
     );
     retroPlay = play;
     host.addListener(_retroChanged);
+    saveStates.addListener(_retroChanged);
+    unawaited(saveStates.refresh());
     sounds.play(Cue.select);
     overlay = null;
     preferences.lastPlayed[game.id] = play.started.toIso8601String();
@@ -399,6 +444,7 @@ extension RetroHostPlaying on AppModel {
         disc: p.normalize(disc.path),
         system: p.normalize(paths.retroSystem),
         saves: p.normalize(ps2 ? paths.retroPs2Saves : paths.retroSaves),
+        states: states,
         options: {
           for (final MapEntry(:key, :value) in preferences.retroHostOptions.entries)
             if (retroOptionSent(key, ps2: ps2)) key: value,
@@ -454,7 +500,7 @@ extension RetroHostPlaying on AppModel {
     }
     final seen = (play.host.phase, play.problem);
     if (seen == play._seen) {
-      if (overlay == Layer.retroMenu) _redraw();
+      if (retroMenuShown) _redraw();
       return;
     }
     play._seen = seen;
@@ -463,9 +509,9 @@ extension RetroHostPlaying on AppModel {
         play.endedAt = DateTime.now();
         together.family.followGame();
       }
-      if (play.menu.isOpen || overlay == Layer.retroMenu) {
+      if (play.menu.isOpen || retroMenuShown) {
         overlay = null;
-        play.menuSection = null;
+        _leaveRetroPages(play);
         unawaited(play.menu.close());
       }
       final problem = play.problem;
@@ -481,8 +527,8 @@ extension RetroHostPlaying on AppModel {
   /// PS in the game: its menu, the game paused and the controllers kept out of it.
   void openRetroMenu() {
     final play = retroPlay;
-    if (play == null || play.closing || !play.host.loaded || overlay == Layer.retroMenu) return;
-    play.menuSection = null;
+    if (play == null || play.closing || !play.host.loaded || retroMenuShown) return;
+    _leaveRetroPages(play);
     open(Layer.retroMenu);
     unawaited(play.menu.open());
   }
@@ -501,8 +547,8 @@ extension RetroHostPlaying on AppModel {
   void resumeRetroGame() {
     final play = retroPlay;
     if (play == null) return;
-    play.menuSection = null;
-    if (overlay == Layer.retroMenu) {
+    _leaveRetroPages(play);
+    if (retroMenuShown) {
       overlay = null;
       sounds.play(Cue.back);
     }
@@ -517,9 +563,9 @@ extension RetroHostPlaying on AppModel {
     final play = retroPlay;
     if (play == null || play.closing) return;
     play.closing = true;
-    play.menuSection = null;
+    _leaveRetroPages(play);
     _countRetroPlay(play);
-    if (overlay == Layer.retroMenu) overlay = null;
+    if (retroMenuShown) overlay = null;
     _changed();
     try {
       if (await play.host.detach()) {
@@ -530,7 +576,7 @@ extension RetroHostPlaying on AppModel {
     } finally {
       play.release(_retroChanged);
       if (identical(retroPlay, play)) retroPlay = null;
-      if (overlay == Layer.retroMenu) overlay = null;
+      if (retroMenuShown) overlay = null;
       if (!_disposed) _changed();
     }
   }
@@ -541,8 +587,16 @@ extension RetroHostPlaying on AppModel {
   bool _retroCommand(Command command) {
     final play = retroPlay;
     if (play == null) return false;
+    if (overlay == Layer.retroOverwriteState) {
+      if (command == Command.home || command == Command.back || command == Command.options) {
+        _cancelRetroOverwrite(play);
+        return true;
+      }
+      // Its two answers take the arrows and Enter, as on any yes or no.
+      return command == Command.previousGame || command == Command.nextGame;
+    }
     if (overlay == Layer.retroMenu) {
-      if (command == Command.back && play.menuSection != null) {
+      if (command == Command.back && (play.menuSection != null || play.statePage != null)) {
         _leaveRetroMenuSection(play);
         return true;
       }
@@ -572,13 +626,23 @@ extension RetroHostPlaying on AppModel {
     return true;
   }
 
-  /// The game's menu. Its first page: Resume, the discs of a multi-disc game, a row for each
-  /// section ([retroMenuSections]) that has rows, and Close Game. A section's page: its options
-  /// in the order the host lists them, with Volume and Mute first in Audio. Back on a section's
-  /// page goes back to the first page.
+  /// The game's menu. Its first page: Resume, the discs of a multi-disc game, Save State and Load
+  /// State where its host saves states, a row for each section ([retroMenuSections]) that has rows,
+  /// and Close Game. A section's page: its options in the order the host lists them, with Volume
+  /// and Mute first in Audio. Save State's and Load State's pages: the game's slots. Back on a page
+  /// goes back to the first page.
   List<PanelCategory> _retroMenuCategories() {
     final play = retroPlay;
     if (play == null) return const [];
+    if (play.statePage case final page?) {
+      return [
+        PanelCategory(
+          id: 'retroMenu-${page.name}',
+          title: T.text(page == RetroStatePage.save ? 'retroMenuSaveState' : 'retroMenuLoadState'),
+          rows: _retroStateRows(play, page),
+        ),
+      ];
+    }
     final section = play.menuSection;
     if (section != null) {
       return [
@@ -605,6 +669,7 @@ extension RetroHostPlaying on AppModel {
                   : (disc.enabled ? null : T.text('retroMenuDiscChangingDetail')),
               kind: ActionRow(() => unawaited(menu.chooseDisc(disc))),
             ),
+          ..._retroStateMenuRows(play),
           for (final MapEntry(key: section, value: (title, detail)) in retroMenuSections.entries)
             if (_retroSectionRows(play, section).isNotEmpty)
               PanelRow(
@@ -673,15 +738,174 @@ extension RetroHostPlaying on AppModel {
     _changed();
   }
 
-  /// Back from a section's page to the first page, on the section's row.
+  /// Back from a section's or a state page to the first page, on the row that opened it.
   void _leaveRetroMenuSection(RetroPlay play) {
-    final section = play.menuSection;
-    play.menuSection = null;
+    final id = switch ((play.menuSection, play.statePage)) {
+      (final section?, _) => 'section-${section.name}',
+      (_, RetroStatePage.save) => 'saveState',
+      (_, RetroStatePage.load) => 'loadState',
+      _ => null,
+    };
+    _leaveRetroPages(play);
     final rows = _retroMenuCategories().single.rows;
-    final index = rows.indexWhere((row) => row.id == 'section-${section?.name}');
+    final index = rows.indexWhere((row) => row.id == id);
     panelRow = index < 0 ? 0 : index;
     sounds.play(Cue.back);
     _changed();
+  }
+
+  /// The menu opens, or is left, on its first page.
+  void _leaveRetroPages(RetroPlay play) {
+    play.menuSection = null;
+    play.statePage = null;
+    play.overwriting = null;
+  }
+
+  /// Save State and Load State on the menu's first page, where the game's host saves states: Load
+  /// State says what a load takes back with it (a PS1 game's memory card), or that nothing is saved
+  /// yet, when it cannot be chosen.
+  List<PanelRow> _retroStateMenuRows(RetroPlay play) {
+    final states = play.states;
+    if (!states.available) return const [];
+    return [
+      PanelRow(
+        id: 'saveState',
+        title: T.text('retroMenuSaveState'),
+        detail: T.text('retroMenuSaveStateDetail'),
+        kind: ActionRow(() => _openRetroStatePage(play, RetroStatePage.save)),
+      ),
+      PanelRow(
+        id: 'loadState',
+        title: T.text('retroMenuLoadState'),
+        detail: T.text(
+          !states.anySaved
+              ? 'retroMenuNoStatesDetail'
+              : (play.ps2 ? 'retroMenuLoadStateDetail' : 'retroMenuLoadStatePs1Detail'),
+        ),
+        kind: states.anySaved ? ActionRow(() => _openRetroStatePage(play, RetroStatePage.load)) : const InfoRow(''),
+      ),
+    ];
+  }
+
+  /// A state page's rows: every slot, from 1, with when its state was saved and its picture. On
+  /// Save State each slot can be chosen; on Load State only a slot that holds a state.
+  List<PanelRow> _retroStateRows(RetroPlay play, RetroStatePage page) {
+    return [
+      for (final slot in play.states.slots)
+        PanelRow(
+          id: 'state-${slot.slot}',
+          title: T.format('retroStateSlot', ['${slot.slot + 1}']),
+          detail: switch (slot.savedAt) {
+            final savedAt? => retroStateTime(savedAt),
+            null => T.text('retroStateEmpty'),
+          },
+          picture: slot.picture,
+          pictureAspect: play.host.aspect,
+          kind: page == RetroStatePage.load && slot.empty
+              ? const InfoRow('')
+              : ActionRow(
+                  () => unawaited(
+                    page == RetroStatePage.save ? _chooseRetroSaveSlot(play, slot) : _loadRetroState(play, slot.slot),
+                  ),
+                ),
+        ),
+    ];
+  }
+
+  void _openRetroStatePage(RetroPlay play, RetroStatePage page) {
+    if (!identical(retroPlay, play) || overlay != Layer.retroMenu) return;
+    play.statePage = page;
+    final rows = _retroStateRows(play, page);
+    panelRow = math.max(0, rows.indexWhere((row) => row.focusable));
+    sounds.play(Cue.select);
+    _changed();
+  }
+
+  /// A slot chosen on Save State: an empty one is saved into at once; one that holds a state asks
+  /// Overwrite slot N? first.
+  Future<void> _chooseRetroSaveSlot(RetroPlay play, RetroStateSlot slot) async {
+    if (play.states.busy || !identical(retroPlay, play)) return;
+    if (slot.empty) return _saveRetroState(play, slot.slot);
+    play.overwriting = slot.slot;
+    open(Layer.retroOverwriteState);
+    _changed();
+  }
+
+  /// Overwrite slot N?: Cancel first, where the focus starts, then Overwrite, which says when the
+  /// state it replaces was saved.
+  List<PanelCategory> _retroOverwriteCategories() {
+    final play = retroPlay;
+    final slot = play?.overwriting;
+    if (play == null || slot == null) return const [];
+    final savedAt = play.states.slot(slot).savedAt;
+    return [
+      PanelCategory(
+        id: 'retroOverwriteState',
+        title: T.format('retroStateOverwriteTitle', ['${slot + 1}']),
+        rows: [
+          PanelRow(id: 'cancel', title: T.text('cancel'), kind: ActionRow(() => _cancelRetroOverwrite(play))),
+          PanelRow(
+            id: 'overwrite',
+            title: T.text('retroStateOverwrite'),
+            detail: savedAt == null ? null : T.format('retroStateOverwriteDetail', [retroStateTime(savedAt)]),
+            kind: ActionRow(() => unawaited(_confirmRetroOverwrite(play)), destructive: true),
+          ),
+        ],
+      ),
+    ];
+  }
+
+  /// Back from Overwrite slot N? to Save State, on that slot.
+  void _cancelRetroOverwrite(RetroPlay play) {
+    final slot = play.overwriting;
+    play.overwriting = null;
+    if (overlay != Layer.retroOverwriteState) return;
+    overlay = Layer.retroMenu;
+    panelRow = slot ?? 0;
+    sounds.play(Cue.back);
+    _changed();
+  }
+
+  Future<void> _confirmRetroOverwrite(RetroPlay play) async {
+    final slot = play.overwriting;
+    if (slot == null || overlay != Layer.retroOverwriteState) return;
+    play.overwriting = null;
+    overlay = Layer.retroMenu;
+    panelRow = slot;
+    _changed();
+    await _saveRetroState(play, slot);
+  }
+
+  /// Saves the game into [slot]: back to the game once it is saved, the slot said; still on Save
+  /// State when it did not work, which is said.
+  Future<void> _saveRetroState(RetroPlay play, int slot) async {
+    final outcome = await play.states.save(slot);
+    if (_disposed || !identical(retroPlay, play)) return;
+    _padLog?.call('emulator host: save state slot $slot: ${outcome.name}');
+    if (outcome != RetroStateOutcome.done) {
+      show(T.text(retroStateProblem(outcome, saving: true)));
+      _changed();
+      return;
+    }
+    show(T.format('retroStateSaved', ['${slot + 1}']));
+    if (overlay == Layer.retroMenu && play.statePage == RetroStatePage.save) resumeRetroGame();
+  }
+
+  /// Loads the state in [slot]: back to the game, which goes on from it; still on Load State when
+  /// the host refused it (a state of another emulator build or game, or a damaged file), which is
+  /// said.
+  Future<void> _loadRetroState(RetroPlay play, int slot) async {
+    if (play.states.busy) return;
+    final outcome = await play.states.load(slot);
+    if (_disposed || !identical(retroPlay, play)) return;
+    _padLog?.call('emulator host: load state slot $slot: ${outcome.name}');
+    if (outcome != RetroStateOutcome.done) {
+      show(T.text(retroStateProblem(outcome, saving: false)));
+      _changed();
+      return;
+    }
+    show(T.format('retroStateLoaded', ['${slot + 1}']));
+    if (overlay == Layer.retroMenu && play.statePage == RetroStatePage.load) resumeRetroGame();
   }
 
   /// A core option chosen in the menu: sent to the game, and kept for every later one once the

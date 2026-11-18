@@ -23,6 +23,8 @@ default, see "In the launcher" and "PS2 games").
 | [`lib/core/retro_host/retro_seats.dart`](../lib/core/retro_host/retro_seats.dart) | `RetroSeats`: which controller sits at each of the PS1's two ports. |
 | [`lib/ui/retro_host/retro_host_controls.dart`](../lib/ui/retro_host/retro_host_controls.dart) | `RetroHostControls`: plays a `RetroHostGame` with the launcher's controllers, connects port 2 and forwards vibration. `RetroPadReader` is how it reads the controllers. |
 | [`lib/ui/retro_host/retro_game_menu.dart`](../lib/ui/retro_host/retro_game_menu.dart) | `RetroGameMenu`: the in-game menu's rows (discs, core options, volume) and what choosing them does. |
+| [`lib/ui/retro_host/retro_save_states.dart`](../lib/ui/retro_host/retro_save_states.dart) | `RetroSaveStates`: a game's save state slots as its states folder holds them, and saving into one (with a picture of the moment) and loading one, one at a time. |
+| [`lib/ui/retro_host/retro_state_picture.dart`](../lib/ui/retro_host/retro_state_picture.dart) | `retroStatePicture`: the small PNG of the game's picture kept beside a saved state. |
 | [`lib/ui/retro_host/retro_option_sections.dart`](../lib/ui/retro_host/retro_option_sections.dart) | `RetroOptionSection` and `retroOptionSection`: which section of the menu each SwanStation option belongs to, which options are graphics options the menu leaves out, and which options are not shown. |
 | [`lib/core/retro_host/retro_host_install.dart`](../lib/core/retro_host/retro_host_install.dart) | `RetroHostInstall`: the host and SwanStation library a build runs, and whether it is checked before each start. |
 | [`lib/ui/retro_host/retro_host_download_model.dart`](../lib/ui/retro_host/retro_host_download_model.dart) | `RetroHostDownloadModel`: Settings › Emulators' row that downloads, updates and repairs the signed host, and what a failed check before a start leaves it saying. |
@@ -595,6 +597,59 @@ also offers the PS1 BIOS folder there (O or Triangle,
 protocol version shows that it needs updating, and a host that never greeted
 the launcher shows that it could not be started.
 
+## Save states
+
+On a host that lists `saveStates` ([Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>)
+"Save states"), a game's menu has **Save State** and **Load State** on its
+first page, after the discs and before the sections. They are an offline
+feature for one player; nothing online uses them. On a host without the
+capability, such as the signed host v1.0.0, the game starts without a states
+folder and neither row shows.
+
+How the standard emulators do it shaped this: RetroArch's Quick Menu has Save
+State and Load State on a numbered slot of each game, with a picture of the
+moment beside each state; DuckStation's pause menu lists each game's slots
+with that picture and the date and time, and refuses a state its build cannot
+read. Here the launcher shows the host's eight slots of a game as Slot 1 to 8.
+
+- **The model.** `RetroPlay.states` is a `RetroSaveStates` over the game and
+  its `RetroStateFolder` (`retro/states/<console>`, `AppPaths.retroStates`). It
+  reads the slots when the game starts, after every save, and after a load
+  that found its slot empty: the launcher's own saves are the only thing that
+  changes the folder while it plays. One save or load runs at a time
+  (`RetroSaveStates.busy`), and a row chosen meanwhile does nothing.
+- **Save State's page.** Every slot, with the date and time its state was
+  saved (`retroStateTime`, "2026-11-18 14:03", as the cloud saves show theirs)
+  or Empty, and the picture kept beside it at the game's shape
+  (`PanelRow.pictureAspect`, which also keeps an empty slot's place so the
+  titles line up). An empty slot is saved into at once. A slot that holds a
+  state asks **Overwrite slot N?** first (`Layer.retroOverwriteState`, a
+  `ConfirmCard` with the game's icon): Cancel first, where the focus starts,
+  then Overwrite, which says when the state it replaces was saved. Back, PS
+  and Options on the question go back to Save State on that slot; held PS
+  goes back to the game. A save that works says "Saved in slot N" and goes
+  back to the game; one that does not says it could not be saved and stays on
+  the page.
+- **The picture.** `RetroSaveStates.save` takes a clone of the frame shown when
+  the slot is chosen, which is the paused game's while the menu is open, and
+  once the host has saved, `retroStatePicture` draws it 240 pixels wide at the
+  game's display aspect and encodes it as PNG, kept beside the state. A save
+  with no frame, or whose picture cannot be made or written, keeps no picture:
+  the log says why, and the save still counts.
+- **Load State's page.** The same slots; only a slot that holds a state can be
+  chosen, and the focus starts on the first one. With nothing saved yet the
+  first page's Load State cannot be chosen and says so. For a PS1 game its
+  line says that the memory card goes back to that moment too, as the host's
+  protocol.md says a PS1 state holds memory card 1. A load that works says
+  "Slot N loaded" and goes back to the game, which goes on from the state. A
+  load the host refused says why in plain words and stays on the page: a state
+  of another version of the emulator (`otherCore`, a host release whose core
+  build changed), of another game (`otherGame`), or a damaged file or one from
+  a newer emulator (`badState`); anything else says only that it could not be
+  loaded (`retroStateProblem`).
+- **The game ending.** A game that ends while the menu or the question is open
+  closes both (`retroMenuShown`), and the menu always opens on its first page.
+
 ## The unchecked-host mark
 
 The host's protocol.md asks a launcher that runs an unchecked host to say so
@@ -860,6 +915,22 @@ started from the checked files, two games in one host, files let go after the
 host exited. The host runs with the test's own environment, as the launcher starts
 it, so WinLibs' `bin` folder has to be on `PATH` there.
 
+Save states have tests of their own, replaying the recorded host of
+[Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>) "Save states":
+[`test/ui/retro_host/retro_save_states_test.dart`](../test/ui/retro_host/retro_save_states_test.dart)
+gives each recorded `saveState` and `loadState` reply to `RetroHostGame` and
+checks the outcome the menu acts on, the start without `states` on a host
+without the capability, the picture kept, one call at a time, and a slot found
+empty. [`test/ui/retro_host_save_states_test.dart`](../test/ui/retro_host_save_states_test.dart)
+plays them through the launcher: the PS1 and PS2 states folders, the rows
+only with the capability, saving into an empty and a used slot (Overwrite slot
+N?, Cancel and PS on it), a failed save, loading with each recorded refusal
+and its words, a slot found empty, and the game ending under the question.
+[`retro_host_play_golden_test.dart`](../test/ui/retro_host_play_golden_test.dart)
+draws the menu with Save State and Load State, Save State's slots with two
+pictures saved from the game's frame through the real path, and Overwrite slot
+1?.
+
 PS2 has tests of its own, with no BIOS of any kind:
 [`test/ui/retro_host_ps2_test.dart`](../test/ui/retro_host_ps2_test.dart)
 covers the PS2 rows with and without LRPS2 beside the host, the folder they
@@ -880,6 +951,14 @@ draws the PS2 rows and the PS2 missing-BIOS screen.
 
 ## Not yet
 
+- **Save states wait for the host.** Save State and Load State show only with
+  a host that lists `saveStates`, which no signed host release does yet. No
+  real game was saved or loaded through the launcher: the host's own test of
+  that branch saved and loaded Spyro on SwanStation and Jak and Daxter on
+  LRPS2, and the launcher was tested against that host's recorded replies.
+- **No resume state, no deleting a slot.** RetroArch's and DuckStation's
+  resume state on quit (the host takes it as a `path` state) and a way to
+  delete a slot are not in this menu yet.
 - **No PS2 game seen running in the launcher.** LRPS2 boots nothing without a
   Sony BIOS, and none may be used in a test, so the launcher's tests have only
   the real core's missing BIOS. A manual run of the host alone (host main

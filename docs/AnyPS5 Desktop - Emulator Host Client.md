@@ -28,6 +28,7 @@ described in [The emulator host in the launcher's UI](<AnyPS5 Desktop - Emulator
 | [`tool/check_release_build.dart`](../tool/check_release_build.dart) | Run after every release and nightly `flutter build`: fails on a test build, from the defines Flutter compiled it with and from the mark in its AOT snapshot. Its `files` check, which `packaging/sign-release.sh` runs before signing, fails on any release file holding a test build, or one it cannot read. |
 | [`tool/release_files.dart`](../tool/release_files.dart) | Reads the AOT snapshot out of each release file as its packaging writes it (the zip, the .tar.gz, the .deb's `data.tar`, the AppImage's SquashFS image), and every file the Windows installer installs (its LZMA2 file data). |
 | [`packaging/sign-release.sh`](../packaging/sign-release.sh) | Signs a Stable release's files on the release Mac, after the `files` check has passed every one. |
+| [`lib/core/retro_host/retro_state_slots.dart`](../lib/core/retro_host/retro_state_slots.dart) | `RetroStateFolder`, `RetroStateSlot` and `RetroStateOutcome`: a game's save state slots in the launcher's states folder, the picture kept beside each, and what a `saveState` or `loadState` came to (see "Save states" below). |
 | [`lib/core/retro_host/checked_file.dart`](../lib/core/retro_host/checked_file.dart) | A release file held open while it is checked and started: no sharing for writing or deleting on Windows, a close-on-exec descriptor above 3 elsewhere. It hashes what it holds, never the path again. |
 
 `retro_host_client.dart` handles:
@@ -360,6 +361,90 @@ host took, the strict `status.console`, the PS2 `bios` words and folder, and
 where LRPS2's options go. The fixture test plays the recorded LRPS2 status
 through the client against the fake host, checks the client's refusals, and
 reads the host's own `call-start-ps2.json` and `call-status-ps2-no-bios.json`.
+
+## Save states
+
+A host that lists `saveStates` (`RetroHostClient.canSaveStates`) saves and
+loads a game's state for one player. That capability is on the save states
+branch of the host, B-Howell/anyps5-retro-host-upstream `save-states` at
+3576e38, whose protocol.md section "saveState and loadState" this follows; it
+is not on the host's `main` yet. These states are an offline feature of one
+player on one machine: nothing here starts an online match from a state. The
+protocol lines it relies on:
+
+- capability `saveStates`: "Save states for PS1 and PS2 games, for one player:
+  `start.states` and the methods `saveState` and `loadState`";
+- `start.states`: "the folder where this game's save states are kept. The host
+  creates it on the first save, and writes nothing else in it. Without it,
+  `saveState` and `loadState` are `argument` errors. The launcher MUST NOT send
+  it to a host without `saveStates`";
+- a slot: "the file `<disc's name without its extension>.<slot>.state` in
+  `start.states`, so a game has 8 slots, which the launcher shows as it likes";
+- the result: "`{"bytes":<integer>,"micros":<integer>}`", or "`false` when no
+  game is loaded, when it has not published its first frame (`status.ready`),
+  when it has ended, or when the game's thread did not get to the call within
+  4 seconds";
+- the error codes `noState`, `badState`, `otherGame`, `otherCore` ("the core's
+  name or build identity differs from this game's `status.core`"),
+  `coreRefused` and `fileError`;
+- the memory card: "Loading a state puts the card back as it was when the
+  state was saved" for a PS1 game; "A PS2 state does not hold the memory card".
+
+What the launcher does with them:
+
+- **Only to a host that lists it.** The client throws `StateError` before it
+  sends `saveState`, `loadState`, or a `start` that names `states`, to a host
+  without `saveStates`. `RetroHostGame` leaves `states` out of the start of
+  such a host itself, so a game on the signed host v1.0.0 starts as before and
+  has no save states (`RetroHostGame.savesStates` false).
+- **The result.** A `saveState` or `loadState` result must be `false` or an
+  object with integers `bytes` and `micros`, 0 or more; anything else is a
+  protocol error. After a host failure both give `false`, as the other
+  methods that return a boolean do.
+- **Where states live.** `start.states` is `retro/states/ps1` or
+  `retro/states/ps2` in the launcher's data folder (`AppPaths.retroStates`),
+  next to `retro/saves/<console>`, one folder per console as memory cards are
+  kept. The host names each game's slots after its disc, as it names its
+  memory card, so the launcher reads them by the same name
+  (`RetroStateFolder.discName`, the host's `Stem`: the last part of the path,
+  after `/` or on Windows also `\`, without what follows its last dot unless
+  that dot is its first letter). Two discs with the same name in different
+  folders share their slots, as they share their memory card.
+- **What the launcher reads.** Only each slot's file: whether it is there and
+  when it was written, its date and time in the menu. The header the host
+  writes is the host's to check: a state of another game, core or core build
+  is refused by the host (`otherGame`, `otherCore`), and the launcher says so.
+- **The picture.** Beside each slot the launcher keeps a small PNG of the
+  frame shown when it was saved, `<name>.<slot>.png`, written beside it and
+  renamed into place. A save with no frame to draw from removes the old
+  picture, so a picture never shows a moment its slot no longer holds. The
+  host writes no other file there and reads none.
+- **Outcomes.** `RetroStateOutcome` is the result for the UI: `done`,
+  `notNow` (`false`), one value per error code, and `failed` for an `argument`
+  error, a code this launcher does not know, or a host that went away.
+
+[`test/fixtures/retro_host_save_states_recording.json`](../test/fixtures/retro_host_save_states_recording.json)
+holds every message each way, as its exact text (frames left out), of a host
+built from that branch at 3576e38 on Windows (MSVC Release) with the host
+repository's fake core, driven as this launcher drives it with the volume at
+0 and muted: a welcome listing `saveStates`; `saveState` and `loadState` with
+no game (`false`); a game started without `states` (`argument`); a game with
+`states` saved in slots 0 and 3, loaded while paused and not, and an empty slot
+(`noState`); a file that is not a state (`badState`), a state the core refused
+(`coreRefused`), a folder where a slot's file would be (`fileError`); another
+disc (`otherGame`); a PS2 game's slot; and a second host whose core reported
+another build (`otherCore`). It also holds the names in the states folder after
+each, which show the host's file names. No BIOS, disc or state of a real game
+was used, and paths were made generic.
+[`test/support/save_states_host_recording.dart`](../test/support/save_states_host_recording.dart)
+reads it.
+[`test/core/retro_host/retro_state_slots_test.dart`](../test/core/retro_host/retro_state_slots_test.dart)
+checks the launcher's `start` against the one the host took, its slot names
+against the files the host wrote, every recorded error code's outcome, and the
+folder's reading and pictures. The fixture test plays the recorded `start`,
+saves, loads and refusals through the client against the fake host, checks
+that nothing about states goes to a host without `saveStates`, and that a
+`saveState` result of `true` is a protocol error.
 
 ## Debug and test builds
 
@@ -867,6 +952,12 @@ when `ANYPS5_RETRO_HOST_CHECKOUT` is set.
 
 ## Not yet
 
+- **Save states wait for the host.** `saveStates` is on the host's
+  `save-states` branch, not on its `main` or in a signed release, so CI's
+  fixture checkout (`RETRO_HOST_COMMIT`, host main 1b57932) has no session of
+  it: the client is checked against the recorded host instead ("Save states"
+  above). Once the host merges it, a later `RETRO_HOST_COMMIT` brings its own
+  fixtures.
 - **protocol.md names debug builds only.** The host repository's protocol.md
   at 9052aff, "Finding and checking the host", says "Debug builds of the
   launcher MAY run the host named by the environment variable

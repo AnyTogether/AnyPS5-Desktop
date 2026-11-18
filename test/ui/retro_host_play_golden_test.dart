@@ -1,6 +1,8 @@
 import 'dart:ffi';
+import 'dart:io';
 
 import 'package:anyps5_desktop/core/retro_host/retro_host_protocol.dart';
+import 'package:anyps5_desktop/core/retro_host/retro_state_slots.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/launcher.dart';
 import 'package:anyps5_desktop/ui/retro_host/retro_play_view.dart';
@@ -8,15 +10,18 @@ import 'package:anyps5_desktop/ui/retro_host/retro_unchecked_mark.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 
 import '../support/ps1_launcher.dart';
 import '../support/ps2_host_recording.dart';
+import '../support/save_states_host_recording.dart';
 import '../support/ui_support.dart';
 import 'retro_host/fake_retro_host_session.dart';
 
 /// A PS1 game in the emulator host as it looks: loading, stopped on an error, its menu over the
-/// game, the mark of a game on an unchecked host, and Settings › Emulators with the host's rows; and
-/// a PS2 game's rows and its missing BIOS.
+/// game, its save state slots and the question before one is overwritten, the mark of a game on an
+/// unchecked host, and Settings › Emulators with the host's rows; and a PS2 game's rows and its
+/// missing BIOS.
 void main() {
   late Ps1Launcher launcher;
   final shell = find.byType(LauncherShell);
@@ -52,9 +57,17 @@ void main() {
   }
 
   /// A game playing on the signed release's host, as a release has it, or with [unchecked] on
-  /// the host `ANYPS5_RETRO_HOST` names, as a debug or test build has it.
-  Future<void> playing(WidgetTester tester, {RetroStatus? status, bool frame = true, bool unchecked = false}) async {
+  /// the host `ANYPS5_RETRO_HOST` names, as a debug or test build has it; with [saveStates], a host
+  /// that lists `saveStates`.
+  Future<void> playing(
+    WidgetTester tester, {
+    RetroStatus? status,
+    bool frame = true,
+    bool unchecked = false,
+    bool saveStates = false,
+  }) async {
     launcher = unchecked ? Ps1Launcher() : (await tester.runAsync(Ps1Launcher.withRelease))!;
+    launcher.session.canSaveStates = saveStates;
     launcher.model.setRetroHostPs1(true);
     await tester.runAsync(() => launcher.start(status: status));
     await pumpLauncher(tester, launcher.model);
@@ -120,6 +133,79 @@ void main() {
     expect(find.text('Internal Resolution Scale'), findsNothing, reason: 'graphics is not in the menu');
     expect(find.text(T.text('quickCloseGame')), findsOneWidget);
     await expectLater(shell, matchesGoldenFile('goldens/retro_host_menu_en.png'));
+  });
+
+  /// Saves the game shown into [slots] as a player would, from its menu, with the host writing each
+  /// state's file as the recorded host did; each is then dated [at], so the time shown is the same
+  /// on every computer.
+  Future<RetroStateFolder> saved(WidgetTester tester, List<int> slots, DateTime at) async {
+    final recording = SaveStatesHostRecording.load();
+    final model = launcher.model;
+    final folder = RetroStateFolder(folder: p.normalize(model.paths.retroStates()), disc: launcher.disc);
+    launcher.session
+      ..callResults['saveState'] = recording.calls('slots', 'saveState').first.reply['result']
+      ..onCall = (method, args) {
+        if (method == 'saveState') {
+          File(folder.statePath((args! as Map)['slot'] as int))
+            ..createSync(recursive: true)
+            ..writeAsBytesSync([1]);
+        }
+      };
+    for (final slot in slots) {
+      model.openRetroMenu();
+      (model.panelCategories().single.rows.singleWhere((row) => row.id == 'saveState').kind as ActionRow).run();
+      await tester.runAsync(() async {
+        (model.panelCategories().single.rows[slot].kind as ActionRow).run();
+        for (var turn = 0; turn < 50 && !File(folder.picturePath(slot)).existsSync(); turn++) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+        File(folder.statePath(slot)).setLastModifiedSync(at.add(Duration(minutes: slot)));
+      });
+      expect(File(folder.picturePath(slot)).existsSync(), isTrue, reason: 'slot $slot kept its picture');
+    }
+    await tester.runAsync(() => launcher.play.states.refresh());
+    model.toast = null;
+    return folder;
+  }
+
+  testWidgets('the menu with save states: Save State, and Load State once one is saved', (tester) async {
+    await playing(tester, status: recordedStatus(), saveStates: true);
+    await saved(tester, [0], DateTime(2026, 11, 18, 14, 3));
+    launcher.model.openRetroMenu();
+    await settle(tester);
+    expect(find.text(T.text('retroMenuSaveState')), findsOneWidget);
+    expect(find.text(T.text('retroMenuLoadState')), findsOneWidget);
+    expect(find.text(T.text('retroMenuLoadStatePs1Detail')), findsOneWidget);
+    await expectLater(shell, matchesGoldenFile('goldens/retro_host_menu_states_en.png'));
+  });
+
+  testWidgets("Save State: the game's slots, with when each state was saved and its picture", (tester) async {
+    await playing(tester, status: recordedStatus(), saveStates: true);
+    await saved(tester, [0, 2], DateTime(2026, 11, 18, 14, 3));
+    final model = launcher.model..openRetroMenu();
+    (model.panelCategories().single.rows.singleWhere((row) => row.id == 'saveState').kind as ActionRow).run();
+    model.panelRow = 2;
+    // The slots' pictures are decoded once their rows are built, so a second settle draws them.
+    await settle(tester);
+    await settle(tester);
+    expect(find.text('Slot 1'), findsOneWidget);
+    expect(find.text('2026-11-18 14:03'), findsOneWidget);
+    expect(find.text('2026-11-18 14:05'), findsOneWidget);
+    expect(find.text(T.text('retroStateEmpty')), findsNWidgets(RetroStateFolder.slots - 2));
+    await expectLater(shell, matchesGoldenFile('goldens/retro_host_save_state_en.png'));
+  });
+
+  testWidgets('Overwrite slot 1?: Cancel first, and when the state it replaces was saved', (tester) async {
+    await playing(tester, status: recordedStatus(), saveStates: true);
+    await saved(tester, [0], DateTime(2026, 11, 18, 14, 3));
+    final model = launcher.model..openRetroMenu();
+    (model.panelCategories().single.rows.singleWhere((row) => row.id == 'saveState').kind as ActionRow).run();
+    (model.panelCategories().single.rows.first.kind as ActionRow).run();
+    await settle(tester);
+    expect(model.overlay, Layer.retroOverwriteState);
+    expect(find.text('Overwrite slot 1?'), findsOneWidget);
+    expect(find.text(T.format('retroStateOverwriteDetail', ['2026-11-18 14:03'])), findsOneWidget);
+    await expectLater(shell, matchesGoldenFile('goldens/retro_host_overwrite_state_en.png'));
   });
 
   testWidgets('a section of the menu: Console, with the options that need a restart marked', (tester) async {
