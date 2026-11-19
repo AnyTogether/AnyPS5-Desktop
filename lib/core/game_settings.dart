@@ -57,7 +57,7 @@ class DisplayDefaults {
   /// Older unversioned files without this setting relied on the former built-in Window default,
   /// rather than recording a choice. The same applies to the old Window + 75% combination, while
   /// a different window size is evidence that Window was deliberately selected.
-  factory DisplayDefaults.fromPreferences(Map json) {
+  factory DisplayDefaults.fromPreferences(Map<String, dynamic> json) {
     final saved = json['displayDefaults'];
     final defaults = DisplayDefaults.fromJson(saved);
     if ((json['preferencesVersion'] as num? ?? 0) >= preferencesVersion || saved is! Map) {
