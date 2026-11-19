@@ -250,10 +250,7 @@ class Preferences {
         if (id is String) id,
     }
     ..prepareNewGames = json['prepareNewGames'] as bool? ?? true
-    ..displayDefaults =
-        (json['preferencesVersion'] as num? ?? 0) < version && !json.containsKey('displayDefaults')
-        ? const DisplayDefaults(fullscreen: false)
-        : DisplayDefaults.fromJson(json['displayDefaults'])
+    ..displayDefaults = DisplayDefaults.fromPreferences(json)
     ..launcherFullscreen = json['launcherFullscreen'] as bool?
     ..windowButtons = json['windowButtons'] as bool? ?? true
     ..pauseOnMenu = json['pauseOnMenu'] as bool? ?? true

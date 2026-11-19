@@ -173,14 +173,28 @@ void main() {
     setUp(() => folder = Directory.systemTemp.createTempSync('display_defaults_prefs'));
     tearDown(() => folder.deleteSync(recursive: true));
 
-    test('legacy preferences without a display choice keep the old Window default', () {
+    test('legacy preferences without a display choice use the new Full Screen default', () {
       final old = Preferences.fromJson({'prepareNewGames': true, 'stickDeadzone': 10});
-      expect(old.displayDefaults.fullscreen, isFalse, reason: 'an unversioned preferences file keeps its old Window default');
-      expect(old.displayDefaults.windowSize, 75);
+      expect(old.displayDefaults, const DisplayDefaults());
       final game = const GameSettings().withDefaults(old.displayDefaults);
-      expect(game.fullscreen, isFalse);
-      expect(game.environment(launcherLanguage: 1)['ANYPS5_FULLSCREEN'], '0');
-      expect(game.fadesCover, isFalse);
+      expect(game.fullscreen, isTrue);
+      expect(game.environment(launcherLanguage: 1)['ANYPS5_FULLSCREEN'], '1');
+      expect(game.fadesCover, isTrue);
+    });
+
+    test('legacy Window defaults migrate only when the old 75% size is unchanged', () {
+      final window = Preferences.fromJson({
+        'displayDefaults': {'fullscreen': false, 'windowSize': 60, 'vsync': true},
+      });
+      expect(window.displayDefaults, const DisplayDefaults(fullscreen: false, windowSize: 60));
+
+      final untouchedWindow = Preferences.fromJson({
+        'displayDefaults': {'fullscreen': false, 'windowSize': 75, 'vsync': false},
+      });
+      expect(
+        untouchedWindow.displayDefaults,
+        const DisplayDefaults(fullscreen: true, windowSize: 75, vsync: false, startAnimation: false),
+      );
     });
 
     test('a first start, with no file, uses full screen', () {
@@ -189,27 +203,42 @@ void main() {
       expect(Preferences().displayDefaults.fullscreen, isTrue);
     });
 
-    test('an older file keeps its old Window default, and a current file records its version', () {
+    test('an unversioned file follows Full Screen and round-trips without adding displayDefaults', () {
       final file = p.join(folder.path, 'preferences.json');
       File(file).writeAsStringSync('{"prepareNewGames":true}');
       final loaded = Preferences.load(file);
-      expect(loaded.displayDefaults.fullscreen, isFalse);
-      File(file).writeAsStringSync(jsonEncode(loaded.toJson()));
-      expect(loaded.toJson()['preferencesVersion'], Preferences.version);
-      expect(Preferences.load(file).displayDefaults.fullscreen, isFalse, reason: 'the migrated legacy default is saved explicitly');
-      // Window chosen for a launcher that started in full screen, and full screen chosen back.
-      final fresh = Preferences()..displayDefaults = const DisplayDefaults(fullscreen: false);
-      File(file).writeAsStringSync(jsonEncode(fresh.toJson()));
-      expect(Preferences.load(file).displayDefaults.fullscreen, isFalse, reason: 'an explicit Window choice is retained');
-      File(file).writeAsStringSync(jsonEncode((Preferences()..prepareNewGames = false).toJson()));
-      expect(Preferences.load(file).displayDefaults.fullscreen, isTrue, reason: 'new launcher, nothing changed: its default stays');
+      expect(loaded.displayDefaults, const DisplayDefaults());
+      final saved = loaded.toJson();
+      expect(saved['preferencesVersion'], Preferences.version);
+      expect(saved.containsKey('displayDefaults'), isFalse);
+      File(file).writeAsStringSync(jsonEncode(saved));
+      expect(Preferences.load(file).displayDefaults, const DisplayDefaults());
+      expect(Preferences.load(file).toJson().containsKey('displayDefaults'), isFalse);
+    });
+
+    test('versioned preferences keep an explicit Window choice as written', () {
+      final file = p.join(folder.path, 'preferences.json');
+      final chosen = Preferences()..displayDefaults = const DisplayDefaults(fullscreen: false);
+      File(file).writeAsStringSync(jsonEncode(chosen.toJson()));
+      expect(Preferences.load(file).displayDefaults.fullscreen, isFalse);
     });
 
     test('a game started from the command line reads the same rule', () {
       final file = p.join(folder.path, 'preferences.json');
       expect(DisplayDefaults.load(file).fullscreen, isTrue, reason: 'no file');
       File(file).writeAsStringSync('{"theme":1}');
-      expect(DisplayDefaults.load(file).fullscreen, isFalse, reason: 'older launcher with no display choice');
+      expect(DisplayDefaults.load(file), const DisplayDefaults(), reason: 'unversioned file with no choice follows the new default');
+      File(file).writeAsStringSync(
+        '{"displayDefaults":{"fullscreen":false,"windowSize":60,"vsync":true}}',
+      );
+      expect(DisplayDefaults.load(file), const DisplayDefaults(fullscreen: false, windowSize: 60));
+      File(file).writeAsStringSync(
+        '{"displayDefaults":{"fullscreen":false,"windowSize":75,"vsync":false,"startAnimation":false}}',
+      );
+      expect(
+        DisplayDefaults.load(file),
+        const DisplayDefaults(fullscreen: true, windowSize: 75, vsync: false, startAnimation: false),
+      );
       File(file).writeAsStringSync(jsonEncode(Preferences().toJson()));
       expect(DisplayDefaults.load(file), const DisplayDefaults(), reason: 'a current file marks the new built-in default');
       File(file).writeAsStringSync('{"theme":1,"displayDefaults":{"fullscreen":true}}');

@@ -471,7 +471,26 @@ StickModifier = KEY:F24
       File(file).writeAsStringSync('{"theme":1,"displayDefaults":{"fullscreen":true}}');
       expect(DisplayDefaults.load(file), const DisplayDefaults(fullscreen: true));
       File(file).writeAsStringSync('{"theme":1}');
-      expect(DisplayDefaults.load(file), const DisplayDefaults(fullscreen: false), reason: 'an unversioned file keeps the legacy Window default');
+      expect(DisplayDefaults.load(file), const DisplayDefaults(), reason: 'an unversioned file with no choice follows Full Screen');
+      File(file).writeAsStringSync(
+        '{"displayDefaults":{"fullscreen":false,"windowSize":60,"vsync":true}}',
+      );
+      expect(DisplayDefaults.load(file), const DisplayDefaults(fullscreen: false, windowSize: 60));
+      File(file).writeAsStringSync(
+        '{"displayDefaults":{"fullscreen":false,"windowSize":75,"vsync":false,"startAnimation":false}}',
+      );
+      expect(
+        DisplayDefaults.load(file),
+        const DisplayDefaults(fullscreen: true, windowSize: 75, vsync: false, startAnimation: false),
+      );
+      File(file).writeAsStringSync(
+        '{"preferencesVersion":1,"displayDefaults":{"fullscreen":false,"windowSize":75,"vsync":false}}',
+      );
+      expect(
+        DisplayDefaults.load(file),
+        const DisplayDefaults(fullscreen: false, windowSize: 75, vsync: false),
+        reason: 'versioned preferences are read as written',
+      );
     });
   });
 

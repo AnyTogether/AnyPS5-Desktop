@@ -34,7 +34,7 @@ enum Upscaler { bilinear, fsr1 }
 /// Settings › Display, Window Size and Vertical Sync left at Default). Full screen is the current
 /// built-in default; legacy game files are migrated against the former windowed values below.
 class DisplayDefaults {
-  /// Current preferences schema; unversioned files used Window as the implicit default.
+  /// Current preferences schema; versioned files keep their display defaults as written.
   static const preferencesVersion = 1;
 
   const DisplayDefaults({this.fullscreen = true, this.windowSize = 75, this.vsync = true, this.startAnimation = true});
@@ -52,6 +52,23 @@ class DisplayDefaults {
     );
   }
 
+  /// Reads the display defaults from a launcher's preferences file.
+  ///
+  /// Older unversioned files without this setting relied on the former built-in Window default,
+  /// rather than recording a choice. The same applies to the old Window + 75% combination, while
+  /// a different window size is evidence that Window was deliberately selected.
+  factory DisplayDefaults.fromPreferences(Map json) {
+    final saved = json['displayDefaults'];
+    final defaults = DisplayDefaults.fromJson(saved);
+    if ((json['preferencesVersion'] as num? ?? 0) >= preferencesVersion || saved is! Map) {
+      return defaults;
+    }
+    if (saved['fullscreen'] == false && defaults.windowSize == 75) {
+      return defaults.copyWith(fullscreen: true);
+    }
+    return defaults;
+  }
+
   static const minimumWindowSize = 30;
 
   /// The defaults the launcher saved in its preferences file (`displayDefaults`), for a game
@@ -61,16 +78,7 @@ class DisplayDefaults {
     try {
       final json = jsonDecode(File(preferencesFile).readAsStringSync());
       if (json is! Map) return const DisplayDefaults();
-      if (json.containsKey('displayDefaults')) {
-        return DisplayDefaults.fromJson(json['displayDefaults']);
-      }
-      // An unversioned preferences file predates the full-screen default. Its missing display
-      // choice meant Window; a current file carries preferencesVersion even when defaults are
-      // left at their built-in values.
-      if ((json['preferencesVersion'] as num? ?? 0) < preferencesVersion) {
-        return const DisplayDefaults(fullscreen: false);
-      }
-      return const DisplayDefaults();
+      return DisplayDefaults.fromPreferences(json);
     } on Object {
       return const DisplayDefaults();
     }
