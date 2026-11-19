@@ -11,6 +11,32 @@ section is copied into the release.
 
 Nothing yet.
 
+## 0.1.27
+
+- **Save states for PS1 games in the launcher's window.** With emulator host 1.1.0, the PS button's
+  game menu has Save state and Load state: eight slots per game, each with the date and time it was
+  saved and a small picture of that moment. Saving over a slot asks first, and a state made by
+  another version of the emulator or from another game is refused with a plain message. Loading a
+  PS1 state also puts its memory card back to that moment. Each game keeps its states in its own
+  folder in the launcher's data folder, next to the memory cards, so two different games whose
+  discs have the same file name do not share their slots. They are for playing alone, and nothing
+  online uses them. Settings › Emulators downloads host 1.1.0. If you already have the PS1
+  emulator, select its row there to update it. Thanks to B-Howell, who built this.
+- **PS1 games in the launcher's window can be drawn sharper.** The game's menu (PS button) has a new
+  row after Audio, Internal resolution: Native, 2x, 3x or 4x. It lists only the values the emulator
+  can show, the choice is kept for later PS1 games, and the game changes in a moment. If the
+  emulator cannot show a value you saved, the game uses the largest one it can and the row says so.
+  The row shows only while the emulator draws on the graphics card, and higher values need a faster
+  graphics card. The PS1 emulator's other graphics settings are not in the menu yet. PS2 games get
+  the same row (Native, 2x or 4x) later: it stays hidden until an emulator host with a PS2 emulator
+  (LRPS2) is released. Host 1.1.0 has none, so PS2 discs still start in PCSX2. Thanks to B-Howell,
+  who built this.
+- **Better DualShock 3 advice in Settings › Controllers.** On Windows, a DualShock 3 that is plugged
+  in without DsHidMini is now flagged, an installed DsHidMini is recognised, and Bluetooth points to
+  BthPS3. On Linux, the tip says how to pair it over its cable, and no longer suggests a udev rule
+  it does not need.
+- **In Turkish, the PS1 game menu's Controller section is called Kontrolcü**, as on the Mac.
+
 ## 0.1.26
 
 - **Settings › Emulators can download the PS1 emulator.** With emulator games turned on, a new row
