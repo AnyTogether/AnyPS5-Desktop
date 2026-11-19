@@ -189,7 +189,7 @@ void main() {
       expect(window.displayDefaults, const DisplayDefaults(fullscreen: false, windowSize: 60));
 
       final untouchedWindow = Preferences.fromJson({
-        'displayDefaults': {'fullscreen': false, 'windowSize': 75, 'vsync': false},
+        'displayDefaults': {'fullscreen': false, 'windowSize': 75, 'vsync': false, 'startAnimation': false},
       });
       expect(
         untouchedWindow.displayDefaults,
