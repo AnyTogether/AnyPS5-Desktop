@@ -202,9 +202,10 @@ class RetroHostCoreDownloadModel {
     ];
   }
 
-  /// The row that removes the package, once it is added and nothing else changes the host.
+  /// The row that removes the package, once it is added and nothing else changes the host: hidden
+  /// while the host downloads or installs, when [remove] would do nothing.
   List<PanelRow> removeRows({required bool uncheckedHost}) {
-    if (uncheckedHost || !installed || busy) return const [];
+    if (uncheckedHost || !installed || _blocked) return const [];
     return [
       PanelRow(
         id: 'retro-host-ps2-remove',

@@ -65,7 +65,12 @@ void main() {
     final sums = File(p.join(retroHostPs2Fixture, ReleaseSigning.sumsName)).readAsBytesSync();
     final listed = ReleaseSigning.parseSums(sums).keys.toSet();
     for (final name in ['windows-x64', 'linux-x64', 'macos-arm64']) {
-      expect(listed, containsAll(['anyps5-retro-host-1.1.0-$name.zip', 'anyps5-retro-host-1.1.0-$name-lrps2.files']));
+      expect(
+        listed,
+        containsAll([
+          for (final ending in ['.zip', '.files', '-lrps2.zip', '-lrps2.files']) 'anyps5-retro-host-1.1.0-$name$ending',
+        ]),
+      );
     }
     expect(
       File(p.join(retroHostPs2Fixture, ReleaseSigning.signatureName)).readAsStringSync(),
@@ -150,6 +155,16 @@ void main() {
 
     final newer = folderOf(retroHostFixtureFiles(version: '1.1.1', ps2: true), 'newer');
     expect(await failure(() => addPs2(newer)), contains('is missing'), reason: 'named for another release');
+    final release = retroHostFixtureFiles(ps2: true);
+    final other = folderOf({
+      for (final ending in ['-lrps2.files', '-lrps2.zip'])
+        'anyps5-retro-host-1.1.0-windows-x64$ending': release['anyps5-retro-host-1.1.0-linux-x64$ending']!,
+    }, 'other');
+    expect(
+      await failure(() => addPs2(other)),
+      contains('does not match the signed release'),
+      reason: "another package's bytes under this package's names",
+    );
     expect(RetroHostRelease.installedCores(installed(), system: system), isEmpty);
     expect(File(inHost(system.ps2Core)).existsSync(), isFalse);
   });
@@ -185,9 +200,21 @@ void main() {
     expect(File(inHost('SOURCE.txt')).readAsStringSync(), isNot(contains('over the host')));
   });
 
+  test('a .files cut short while it was written is not installed, and the next add writes it whole', () async {
+    await installHost();
+    final listing = File(inHost('anyps5-retro-host-1.1.0-windows-x64-lrps2.files'));
+    final whole = File(p.join(retroHostPs2Fixture, p.basename(listing.path))).readAsBytesSync();
+    File('${listing.path}.part').writeAsBytesSync(whole.take(whole.length ~/ 2).toList());
+    expect(RetroHostRelease.installedCores(installed(), system: system), isEmpty);
+    await addPs2();
+    expect(listing.readAsBytesSync(), whole);
+    expect(File('${listing.path}.part').existsSync(), isFalse);
+    expect(RetroHostRelease.installedCores(installed(), system: system), {lrps2});
+  });
+
   test('removing LRPS2 deletes its files and leaves the host whole', () async {
     await installHost(addPs2: true);
-    RetroHostRelease.removeCore(installed(), lrps2, system: system);
+    RetroHostRelease.removeCore(installed(), lrps2, keys: keys, system: system);
     expect(RetroHostRelease.installedCores(installed(), system: system), isEmpty);
     for (final name in ['SOURCE-lrps2.txt', 'licenses/lrps2-GPL-3.0.txt', system.ps2Core]) {
       expect(File(inHost(name)).existsSync(), isFalse, reason: name);
@@ -196,7 +223,7 @@ void main() {
     final checked = await check();
     addTearDown(checked.release);
     expect(checked.ps2Core, isNull);
-    RetroHostRelease.removeCore(installed(), lrps2, system: system);
+    RetroHostRelease.removeCore(installed(), lrps2, keys: keys, system: system);
   });
 
   group('a host update', () {

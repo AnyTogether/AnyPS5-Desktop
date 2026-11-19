@@ -281,7 +281,7 @@ class RetroHostStore {
     final target = system;
     if (target == null) return;
     try {
-      RetroHostRelease.removeCore(folder, core, system: target);
+      RetroHostRelease.removeCore(folder, core, keys: keys, system: target);
     } on RetroHostReleaseFailure catch (failure) {
       throw ToolkitFailure(ToolkitFailureKind.badLayout, failure.message);
     } on FileSystemException catch (failure) {

@@ -176,7 +176,10 @@ class RetroHostDownloadModel {
       broken = null;
       if (before == null) app.setRetroHostPs1(true);
       app.sounds.play(Cue.unlocked);
-      app.show(T.format('retroHostReady', ['$version']));
+      final dropped = cores.difference(store.installedCores);
+      app.show(
+        T.format(dropped.contains(RetroHostCorePackage.lrps2) ? 'retroHostPs2Dropped' : 'retroHostReady', ['$version']),
+      );
     } on FileSystemException catch (failure) {
       error = failure.osError?.message ?? failure.message;
       app.show(T.format('retroHostDownloadFailed', [error!]));

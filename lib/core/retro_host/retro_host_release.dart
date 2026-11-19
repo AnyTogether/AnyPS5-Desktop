@@ -424,31 +424,41 @@ abstract final class RetroHostRelease {
   }
 
   /// Removes [core]'s package from the host installed in [into]: its `.files` first, so it is no
-  /// longer installed, then every file that `.files` lists and the folders left empty. A name the
-  /// host package's `.files` lists too is left, so the host is never damaged. Stop the host first.
-  /// Nothing happens when the package is not installed.
-  static void removeCore(Directory into, RetroHostCorePackage core, {RetroHostSystem? system}) {
+  /// longer installed, then every file that `.files` lists and the folders left empty. The list is
+  /// only trusted when it matches the installed release's signed SHA256SUMS; otherwise only the
+  /// `.files` and the core library are deleted, by their exact names. A name the host package's
+  /// `.files` lists too, in any case, is left, so the host is never damaged on a file system that
+  /// ignores case. Stop the host first. Nothing happens when the package is not installed.
+  static void removeCore(Directory into, RetroHostCorePackage core, {List<ReleaseKey>? keys, RetroHostSystem? system}) {
     final target = system ?? _currentSystem();
     final listing = _installedCoreFiles(into, target, core);
     if (listing == null) return;
     Map<String, String> files;
     try {
-      files = parseFileList(listing.readAsBytesSync());
-    } on Object {
-      files = const {};
+      final release = installedRelease(into, keys: keys, system: target);
+      files = _signedList(into.path, p.basename(listing.path), release.sums);
+    } on RetroHostReleaseFailure {
+      files = {core.library(target): ''};
+    } on SigningFailure {
+      files = {core.library(target): ''};
+    } on FileSystemException {
+      files = {core.library(target): ''};
     }
     final host = _installedFiles(into, target);
     final Set<String> kept;
     try {
       kept = host == null
           ? const {}
-          : parseFileList(File(p.join(into.path, host.group(0)!)).readAsBytesSync()).keys.toSet();
+          : {
+              for (final name in parseFileList(File(p.join(into.path, host.group(0)!)).readAsBytesSync()).keys)
+                name.toLowerCase(),
+            };
     } on Object {
       throw RetroHostReleaseFailure('the host package beside ${core.name} cannot be read');
     }
     listing.deleteSync();
     for (final name in files.keys) {
-      if (kept.contains(name)) continue;
+      if (kept.contains(name.toLowerCase())) continue;
       final file = File(p.joinAll([into.path, ...name.split('/')]));
       if (file.existsSync()) file.deleteSync();
       var folder = file.parent;
@@ -779,14 +789,18 @@ abstract final class RetroHostRelease {
     }
   }
 
-  /// Writes [package]'s files into [folder], and its `.files` last.
+  /// Writes [package]'s files into [folder], and its `.files` last: to `<name>.part` first, then
+  /// renamed, so a launcher stopped while it writes leaves either the whole `.files` or none, and
+  /// the package is installed completely or not at all.
   static void _write(String folder, _Package package) {
     for (final MapEntry(key: name, value: bytes) in package.unpacked.entries) {
       final file = File(p.joinAll([folder, ...name.split('/')]));
       file.parent.createSync(recursive: true);
       file.writeAsBytesSync(bytes, flush: true);
     }
-    File(p.join(folder, package.filesName)).writeAsBytesSync(package.listing, flush: true);
+    final part = File(p.join(folder, '${package.filesName}.part'));
+    part.writeAsBytesSync(package.listing, flush: true);
+    part.renameSync(p.join(folder, package.filesName));
   }
 
   static Map<String, List<int>> _unpack(List<int> zipBytes, Map<String, String> files, String zipName) {
