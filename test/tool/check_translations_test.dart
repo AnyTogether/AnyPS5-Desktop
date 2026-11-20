@@ -40,6 +40,16 @@ void main() {
     expect(report.problems.single, contains('bakc'));
   });
 
+  test('a key written twice is a problem, in English too: the launcher would show only the last one', () {
+    final report = checkLanguage('de', '{"languageName": "Deutsch", "back": "Zurück", "back": "Zurueck"}', english);
+    expect(report.problems.single, contains('"back"'));
+    final (_, problems) = readTexts('en.json', '{"back": "Back", "gamesFound": "%d games found", "back": "Back"}');
+    expect(problems.single, contains('"back"'));
+    // Keys of a nested object, texts in a list and an escaped quote in a text are not keys of the file.
+    expect(duplicateKeys(r'{"a": "x", "b": {"a": "y"}, "c": ["a", "a"], "d": "\"a\": \"a\": "}'), isEmpty);
+    expect(duplicateKeys('{"a": "x", "b": "y", "a": "z", "b": "w", "a": "v"}'), ['a', 'b']);
+  });
+
   test('missing keys are only counted, the language name too', () {
     final report = checkLanguage('de', '{"back": "Zurück"}', english);
     expect(report.problems, isEmpty);

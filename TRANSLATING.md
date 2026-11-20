@@ -138,7 +138,7 @@ above and run the app (`flutter run` for the Windows/Linux launcher and the phon
 
 ## The check
 
-Each pull request runs a check of the files: valid JSON, one flat object of texts, a name that
+Each pull request runs a check of the files: valid JSON, one flat object of texts with no key twice, a name that
 is a language code, no key English lacks, English's placeholders in each text, descriptions that
 end as sentences. It also shows how
 much of each language is translated, for example
@@ -171,3 +171,10 @@ added), copy the new lines into your file and translate them. The order of the l
 matter. A key removed from English has to go from your file too: the check names it.
 
 Maintainers: setting up the Weblate project is in [docs/WEBLATE.md](docs/WEBLATE.md).
+
+Maintainers: the tests read the languages from `assets/l10n`, so a new file needs no test edit. It
+does change the screenshots of the language grid (`first_start_language_en.png`,
+`first_start_language_tr.png`, `onboarding_language.png`) and adds `update_notice_<code>.png`:
+remake them on CI with `gh workflow run ci.yml -R AnyTogether/AnyPS5-Desktop --ref <branch> -f
+update_goldens=true` and commit the changed images to the pull request. A failing test in a file
+with goldens stops that run before it uploads them.
