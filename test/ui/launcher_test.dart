@@ -665,12 +665,16 @@ void main() {
       model.games = [];
       await pumpLauncher(tester, model);
       expect(find.text('Welcome to AnyPS5'), findsOneWidget);
-      // Down is the next row of languages, right the next card: Türkçe is on the second row.
+      // Down is the next row of languages, right the next card: down to Türkçe's row, then right to it.
       await press(tester, LogicalKeyboardKey.arrowDown);
       expect(T.language, T.languages[AppModel.languageColumns]);
       final turkish = T.languages.indexOf(Language.byCode('tr'));
-      expect(turkish ~/ AppModel.languageColumns, 1);
-      for (var card = AppModel.languageColumns; card < turkish; card++) {
+      final row = turkish ~/ AppModel.languageColumns;
+      expect(row, greaterThanOrEqualTo(1));
+      for (var down = 1; down < row; down++) {
+        await press(tester, LogicalKeyboardKey.arrowDown);
+      }
+      for (var card = row * AppModel.languageColumns; card < turkish; card++) {
         await press(tester, LogicalKeyboardKey.arrowRight);
       }
       expect(T.language, Language.byCode('tr'));
