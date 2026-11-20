@@ -55,13 +55,18 @@ void main() {
 
   test('the files the launcher ships are its languages: English, then the others by their own names', () async {
     await T.load();
-    expect(
-      [for (final language in T.languages) language.code],
-      [
-        'en', 'id', 'ms', 'da', 'de', 'es', 'fil', 'fr', 'hu', 'no', 'pl', 'pt', 'ro', 'sv', 'tr', 'cs', 'ru', 'ur', //
-        'ar', 'bho', 'hi', 'bn', 'lo', 'am', 'km', 'ja', 'zh-Hans', 'zh-Hant', 'ko',
-      ],
-    );
+    // Every file in assets/l10n, read from the folder so that a new language needs no edit here:
+    // English first, then the others by the names their files give them.
+    final shipped = <String, String>{
+      for (final file in Directory('assets/l10n').listSync().whereType<File>())
+        if (file.path.endsWith('.json'))
+          file.uri.pathSegments.last.replaceAll('.json', ''):
+              (jsonDecode(file.readAsStringSync()) as Map<String, Object?>)['languageName']! as String,
+    };
+    expect(shipped.length, greaterThan(20));
+    final others = shipped.keys.where((code) => code != 'en').toList()
+      ..sort((a, b) => shipped[a]!.trim().toLowerCase().compareTo(shipped[b]!.trim().toLowerCase()));
+    expect([for (final language in T.languages) language.code], ['en', ...others]);
     expect(T.languages.first.displayName, 'English');
     final names = {for (final language in T.languages) language.code: language.displayName};
     expect(names['de'], 'Deutsch');
