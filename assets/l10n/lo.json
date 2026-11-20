@@ -2501,7 +2501,7 @@
   "retroGraphicsValueSmooth": "ລຽບ",
   "retroGraphicsValueExtraSmooth": "ລຽບຫຼາຍ",
   "retroSmoothTextures": "ພື້ນຜິວລຽບ",
-  "retroSmoothTexturesDetail": "ເຮັດໃຫ້ພື້ນຜິວທີ່ເປັນຫຼ່ຽມຂອງວັດຖຸ 3D ລຽບຂຶ້ນ.",
+  "retroSmoothTexturesDetail": "ເຮັດໃຫ້ພື້ນຜິວ ແລະ ສະໄປຣທ໌ທີ່ເປັນຫຼ່ຽມລຽບຂຶ້ນ; ພາບ 2D ອາດເຫັນຮອຍຕໍ່.",
   "retroFixWobbly3d": "ແກ້ 3D ທີ່ສັ່ນ",
   "retroFixWobbly3dDetail": "ປ້ອງກັນບໍ່ໃຫ້ຮູບຊົງ 3D ແລະ ພື້ນຜິວຂອງມັນສັ່ນ.",
   "retroWidescreen": "ຈໍກວ້າງ",

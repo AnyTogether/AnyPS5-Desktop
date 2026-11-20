@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "মসৃণ",
   "retroGraphicsValueExtraSmooth": "অতি মসৃণ",
   "retroSmoothTextures": "মসৃণ টেক্সচার",
-  "retroSmoothTexturesDetail": "3D বস্তুর খসখসে টেক্সচার মসৃণ করে।",
+  "retroSmoothTexturesDetail": "খসখসে টেক্সচার ও স্প্রাইট মসৃণ করে; 2D ছবিতে জোড়ের দাগ দেখা যেতে পারে।",
   "retroFixWobbly3d": "কাঁপা 3D ঠিক করুন",
   "retroFixWobbly3dDetail": "3D আকার ও তাদের টেক্সচার কাঁপতে দেয় না।",
   "retroWidescreen": "ওয়াইডস্ক্রিন",

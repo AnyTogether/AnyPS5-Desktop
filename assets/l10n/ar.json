@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "ناعم",
   "retroGraphicsValueExtraSmooth": "ناعم جدًا",
   "retroSmoothTextures": "تنعيم النسيج",
-  "retroSmoothTexturesDetail": "ينعّم النسيج المربّع للأجسام ثلاثية الأبعاد.",
+  "retroSmoothTexturesDetail": "ينعّم النسيج المربّع والرسوم المتحركة؛ قد تظهر فواصل في الرسوم ثنائية الأبعاد.",
   "retroFixWobbly3d": "إصلاح اهتزاز الأبعاد الثلاثية",
   "retroFixWobbly3dDetail": "يمنع الأشكال ثلاثية الأبعاد ونسيجها من الاهتزاز.",
   "retroWidescreen": "شاشة عريضة",

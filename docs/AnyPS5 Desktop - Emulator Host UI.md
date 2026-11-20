@@ -459,22 +459,35 @@ When the host refuses an option, those it took are asked back to what the
 host had. Should the host refuse that too, the row claims neither value: a
 setting whose options match no offer whole (the hack on at 4:3) shows its
 first option with the host's label until the player chooses Off or On, which
-sets every option of that value. Once the host took them all, every option of that value is kept in
-`Preferences.retroHostOptions`, so the launcher keeps and sends widescreen's
-hack and aspect ratio together. The words of every Graphics row (titles, the
+sets every option of that value. Once the host took them all, every option of
+that value is kept together, so the launcher keeps and sends widescreen's hack
+and aspect ratio together. They are kept for every later game of the console
+in `Preferences.retroHostOptions`, but PS1 widescreen's
+(`RetroGraphicsSetting.perGame`, `retroGraphicsPerGameKeys`), which is kept in
+`Preferences.retroHostGameOptions` under the game's title ID, as its save
+states are, and sent only when that game starts. The hack suits 3D games and
+breaks 2D and pre-rendered ones, and it also changes what the emulated GTE
+computes, so one game's choice must not reach another. A PS1 widescreen value
+kept for every game by an earlier version is no longer sent. LRPS2's
+widescreen patch stays kept for every PS2 game, since LRPS2 applies it only to
+a game its database has a patch for. The words of every Graphics row (titles, the
 line under each, the values' labels) are in
 [`lib/ui/retro_host/retro_graphics_words.dart`](../lib/ui/retro_host/retro_graphics_words.dart).
 
 **Defaults.** `retroStartOptions` sends the kept values that are shown, over
 `retroGraphicsDefaults` for the settings the player chose no value of:
 
-- PS1: smooth textures Smooth (bilinear) when the kept internal resolution is
-  2x or more, Off at Native; fix wobbly 3D on; and true colour on
-  (`swanstation_GPU_TrueColor`, DuckStation's own default today), which has
-  no row and is always sent on, with scaled dithering left at its on default;
+- PS1: fix wobbly 3D on; and true colour on (`swanstation_GPU_TrueColor`,
+  DuckStation's own default today), which has no row and is always sent on,
+  with scaled dithering left at its on default. A player who wants the
+  console's dithering back has no way to turn it off in the menu;
 - PS2: sharper textures on (16x), which cost nothing measurable.
 
-Widescreen is never on unless the player turns it on: SwanStation's hack
+Smooth textures stay Off (`Nearest`, DuckStation's default too) unless the
+player chooses Smooth or Extra smooth: bilinear filtering also smooths 2D
+sprites, fonts and tiled backgrounds, which then show seams, and SwanStation's
+per-game list sets `gpu_texture_filter` for no game. Widescreen is never on
+unless the player turns it on: SwanStation's hack
 breaks 2D and pre-rendered games and SwanStation's own per-game list turns it
 off for none, and LRPS2's patch exists only for the games in its database.
 `Main_ApplyGameSettings` stays at its on default and is no longer shown, so
@@ -975,7 +988,7 @@ native memory as a real ring slot would be, so no host is started.
   graphics options are not; LRPS2's VR, paraLLEl-GS, EE/VU and HW Hacks keys
   are neither shown nor sent; and `retroStartOptions` puts the kept values
   over the Graphics defaults, dropping a stereo or hardware fix kept from
-  before.
+  before, and sends PS1 widescreen only from the game's own kept values.
 - [`retro_graphics_words_test.dart`](../test/ui/retro_host/retro_graphics_words_test.dart)
   checks each Graphics setting's title and line (widescreen's per console),
   the lines for a value not yet in effect, and the values' labels.
@@ -985,7 +998,7 @@ native memory as a real ring slot would be, so no host is started.
   rows and none of the other's, nothing that needs the GPU without it, only
   the values the host lists, a chosen value no offer has (`JINC2`), widescreen's
   two options together, the notes (in a moment, LRPS2's widescreen at the next
-  start), and the defaults by resolution.
+  start), and the defaults, which smooth no textures at any resolution.
 - [`retro_resolution_words_test.dart`](../test/ui/retro_host/retro_resolution_words_test.dart)
   checks the row's labels (Native, the scale, the host's own label for a
   value the launcher does not offer) and the line under it for each note.
@@ -1056,7 +1069,10 @@ native memory as a real ring slot would be, so no host is started.
   page on the section's row, the restart marks, what is kept), the Internal
   resolution row (Native to 4x of the eight scales the host lists, a refused
   `option` not kept, a taken one kept and sent at the next start, no row while
-  the host draws without the GPU), options not shown and not sent, Close game keeping the host and the next game starting
+  the host draws without the GPU), PS1 widescreen kept for the game it was
+  chosen in only (a second PS1 game, `secondPs1`, starts without it, a choice
+  kept for every game still reaches it, and the game's own value survives the
+  preferences being saved and read back), options not shown and not sent, Close game keeping the host and the next game starting
   on it, the kept host shut down when the player leaves the PS1 games, after
   the idle limit and when another game starts, a kept host that crashed and a
   host that crashed during a game (both replaced by a new host for the next

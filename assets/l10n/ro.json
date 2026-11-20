@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "Fin",
   "retroGraphicsValueExtraSmooth": "Foarte fin",
   "retroSmoothTextures": "Texturi netede",
-  "retroSmoothTexturesDetail": "Netezește texturile pixelate ale obiectelor 3D.",
+  "retroSmoothTexturesDetail": "Netezește texturile pixelate și spriteurile; grafica 2D poate avea îmbinări vizibile.",
   "retroFixWobbly3d": "Corectează 3D-ul tremurat",
   "retroFixWobbly3dDetail": "Împiedică formele 3D și texturile lor să tremure.",
   "retroWidescreen": "Ecran lat",

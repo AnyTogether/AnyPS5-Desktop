@@ -96,13 +96,21 @@ bool retroOptionSent(String key, {bool ps2 = false}) {
   return section != null && section != RetroOptionSection.graphics;
 }
 
-/// The core options a game of [ps2]'s console starts with: the values the player kept that are
-/// sent ([retroOptionSent]), over the Graphics defaults for the settings the player did not choose
-/// ([retroGraphicsDefaults]).
-Map<String, String> retroStartOptions(Map<String, String> kept, {required bool ps2}) {
+/// The core options a game of [ps2]'s console starts with: the values the player kept for every
+/// game ([kept]) and for this game ([game]) that are sent ([retroOptionSent]), over the Graphics
+/// defaults for the settings the player did not choose ([retroGraphicsDefaults]). An option kept
+/// per game ([retroGraphicsPerGameKeys]) comes from [game] only, so a value kept for every game
+/// (by an older launcher) is not sent.
+Map<String, String> retroStartOptions(
+  Map<String, String> kept, {
+  required bool ps2,
+  Map<String, String> game = const {},
+}) {
   final sent = {
     for (final MapEntry(:key, :value) in kept.entries)
-      if (retroOptionSent(key, ps2: ps2)) key: value,
+      if (!retroGraphicsPerGameKeys.contains(key) && retroOptionSent(key, ps2: ps2)) key: value,
+    for (final MapEntry(:key, :value) in game.entries)
+      if (retroGraphicsPerGameKeys.contains(key) && retroOptionSent(key, ps2: ps2)) key: value,
   };
   return {...retroGraphicsDefaults(sent, ps2: ps2), ...sent};
 }

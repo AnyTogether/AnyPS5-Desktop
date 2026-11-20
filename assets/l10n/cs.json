@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "Hladké",
   "retroGraphicsValueExtraSmooth": "Velmi hladké",
   "retroSmoothTextures": "Hladké textury",
-  "retroSmoothTexturesDetail": "Vyhlazuje kostičkované textury 3D objektů.",
+  "retroSmoothTexturesDetail": "Vyhlazuje kostičkované textury i sprity; 2D grafika může mít viditelné švy.",
   "retroFixWobbly3d": "Opravit chvějící se 3D",
   "retroFixWobbly3dDetail": "Brání chvění 3D tvarů a jejich textur.",
   "retroWidescreen": "Širokoúhlý obraz",

@@ -477,7 +477,11 @@ extension RetroHostPlaying on AppModel {
         system: p.normalize(paths.retroSystem),
         saves: p.normalize(ps2 ? paths.retroPs2Saves : paths.retroSaves),
         states: states,
-        options: retroStartOptions(preferences.retroHostOptions, ps2: ps2),
+        options: retroStartOptions(
+          preferences.retroHostOptions,
+          ps2: ps2,
+          game: preferences.retroHostGameOptions[game.titleId] ?? const {},
+        ),
       ),
     );
   }
@@ -786,15 +790,20 @@ extension RetroHostPlaying on AppModel {
     ),
   );
 
-  /// A Graphics value chosen in the menu: the options it sets sent to the game, and kept for every
-  /// later game of its console once the host took them all. Each takes effect as its option does:
-  /// in a moment, or at the game's next start.
+  /// A Graphics value chosen in the menu: the options it sets sent to the game, and kept once the
+  /// host took them all, for every later game of its console, or for this game only when the
+  /// setting is kept per game ([RetroGraphicsSetting.perGame]). Each takes effect as its option
+  /// does: in a moment, or at the game's next start.
   Future<void> _chooseRetroGraphics(RetroGraphicsSetting setting, int index) async {
     final play = retroPlay;
     if (play == null) return;
     final taken = await play.menu.chooseGraphics(setting, index);
     if (taken == null || _disposed) return;
-    preferences.retroHostOptions.addAll(taken);
+    if (setting.perGame) {
+      (preferences.retroHostGameOptions[play.game.titleId] ??= {}).addAll(taken);
+    } else {
+      preferences.retroHostOptions.addAll(taken);
+    }
     savePreferences();
     _changed();
   }

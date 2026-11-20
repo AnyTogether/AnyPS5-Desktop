@@ -2499,7 +2499,7 @@
   "retroGraphicsValueSmooth": "ለስላሳ",
   "retroGraphicsValueExtraSmooth": "በጣም ለስላሳ",
   "retroSmoothTextures": "ለስላሳ ቴክስቸሮች",
-  "retroSmoothTexturesDetail": "የ3D ነገሮችን ሻካራ ቴክስቸሮች ያለሰልሳል።",
+  "retroSmoothTexturesDetail": "ሻካራ ቴክስቸሮችን እና ስፕራይቶችን ያለሰልሳል፤ 2D ምስሎች ስፌቶች ሊያሳዩ ይችላሉ።",
   "retroFixWobbly3d": "የሚንቀጠቀጥ 3D አስተካክል",
   "retroFixWobbly3dDetail": "የ3D ቅርጾችና ቴክስቸሮቻቸው እንዳይንቀጠቀጡ ያደርጋል።",
   "retroWidescreen": "ሰፊ ማያ",

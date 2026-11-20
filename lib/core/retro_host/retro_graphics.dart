@@ -6,7 +6,6 @@
 library;
 
 import 'retro_host_protocol.dart';
-import 'retro_resolution.dart';
 
 /// What a Graphics row says under its value.
 enum RetroGraphicsNote {
@@ -46,7 +45,13 @@ class RetroGraphicsOffer {
 
 /// A graphics setting of one console's core, as a Graphics row offers it.
 class RetroGraphicsSetting {
-  const RetroGraphicsSetting({required this.kind, required this.ps2, required this.needsGpu, required this.offers});
+  const RetroGraphicsSetting({
+    required this.kind,
+    required this.ps2,
+    required this.needsGpu,
+    required this.offers,
+    this.perGame = false,
+  });
 
   /// Which setting it is; its name is the row's id.
   final RetroGraphicsKind kind;
@@ -60,6 +65,11 @@ class RetroGraphicsSetting {
 
   /// The values offered, in the row's order.
   final List<RetroGraphicsOffer> offers;
+
+  /// The value chosen is kept for the game it was chosen in only, not for every game of its
+  /// console: one that suits some games and breaks others, which the core's per-game list does not
+  /// turn off.
+  final bool perGame;
 
   /// The core option the row shows: the one whose chosen value says which value is chosen.
   String get key => offers.first.options.keys.first;
@@ -97,11 +107,13 @@ const retroFixWobbly3d = RetroGraphicsSetting(
 
 /// SwanStation's widescreen hack, with the 16:9 aspect ratio it needs: the two change together. It
 /// widens the view of 3D games and breaks 2D and pre-rendered ones, and SwanStation's per-game list
-/// turns it off for no game, so it is never chosen for the player.
+/// turns it off for no game, so it is never chosen for the player, and a game it is chosen in keeps
+/// it for itself only.
 const retroWidescreenPs1 = RetroGraphicsSetting(
   kind: RetroGraphicsKind.widescreen,
   ps2: false,
   needsGpu: false,
+  perGame: true,
   offers: [
     RetroGraphicsOffer(RetroGraphicsLevel.off, {_widescreenHack: 'false', _aspectRatio: '4:3'}),
     RetroGraphicsOffer(RetroGraphicsLevel.on, {_widescreenHack: 'true', _aspectRatio: '16:9'}),
@@ -120,8 +132,8 @@ const retroSharperTextures = RetroGraphicsSetting(
 );
 
 /// LRPS2's widescreen patch from its game database, applied when the game boots, only for a game
-/// it has a patch for. Its 16:10, 21:9 and 32:9 values are not offered (LRPS2 never parses
-/// `enabled (32:9)`), and it is never chosen for the player.
+/// it has a patch for, so one choice suits every PS2 game. Its 16:10, 21:9 and 32:9 values are not
+/// offered (LRPS2 never parses `enabled (32:9)`), and it is never chosen for the player.
 const retroWidescreenPs2 = RetroGraphicsSetting(
   kind: RetroGraphicsKind.widescreen,
   ps2: true,
@@ -142,34 +154,32 @@ const retroGraphicsSettings = [
   retroWidescreenPs2,
 ];
 
-/// The settings of a PS1 game, or with [ps2] of a PS2 game.
-Iterable<RetroGraphicsSetting> retroGraphicsSettingsOf({required bool ps2}) =>
-    retroGraphicsSettings.where((setting) => setting.ps2 == ps2);
-
 /// Every core option a Graphics row sets, of both consoles.
 final retroGraphicsKeys = {for (final setting in retroGraphicsSettings) ...setting.keys};
+
+/// Every core option a Graphics row sets that is kept per game ([RetroGraphicsSetting.perGame]).
+final retroGraphicsPerGameKeys = {
+  for (final setting in retroGraphicsSettings)
+    if (setting.perGame) ...setting.keys,
+};
 
 /// The core options a game starts with for the settings the player has not chosen ([kept] holds
 /// the values the player chose), and SwanStation's true colour, which the menu does not offer:
 ///
-/// - PS1: smooth textures (bilinear) from 2x up, off at Native, as the internal resolution kept
-///   says (Native when none is); fix wobbly 3D on; true colour on, which DuckStation now has by
-///   default, with SwanStation's scaled dithering left on;
+/// - PS1: fix wobbly 3D on; true colour on, which DuckStation now has by default, with
+///   SwanStation's scaled dithering left on;
 /// - PS2: sharper textures on.
 ///
-/// Widescreen is not among them: the cores start without it. A setting the player chose any value
-/// of is left out whole, so a widescreen hack is never started without its aspect ratio.
+/// Smooth textures and widescreen are not among them: the cores start with the console's own
+/// textures and picture. SwanStation's per-game list turns neither off for the games it breaks
+/// (bilinear filtering seams 2D sprites, fonts and tiled backgrounds), as it does PGXP and true
+/// colour. A setting the player chose any value of is left out whole.
 Map<String, String> retroGraphicsDefaults(Map<String, String> kept, {required bool ps2}) {
   bool chosen(RetroGraphicsSetting setting) => setting.keys.any(kept.containsKey);
   if (ps2) {
     return {if (!chosen(retroSharperTextures)) _anisotropic: '16x'};
   }
-  final scale = int.tryParse(kept[retroResolutionKeyPs1] ?? '') ?? 1;
-  return {
-    if (!chosen(retroSmoothTextures)) _textureFilter: scale >= 2 ? 'Bilinear' : 'Nearest',
-    if (!chosen(retroFixWobbly3d)) _pgxp: 'true',
-    retroTrueColorKey: 'true',
-  };
+  return {if (!chosen(retroFixWobbly3d)) _pgxp: 'true', retroTrueColorKey: 'true'};
 }
 
 /// SwanStation's true colour, which removes the console's dithering. Always on: the menu does not
@@ -249,7 +259,7 @@ class RetroGraphicsChoice {
     if (options.any((option) => option.restart)) {
       return settled ? RetroGraphicsNote.changesAtNextStart : RetroGraphicsNote.nextStart;
     }
-    return settled ? RetroGraphicsNote.none : RetroGraphicsNote.applying;
+    return settled && !status.graphicsPending ? RetroGraphicsNote.none : RetroGraphicsNote.applying;
   }
 
   final RetroGraphicsSetting setting;

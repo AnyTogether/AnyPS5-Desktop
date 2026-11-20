@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "平滑",
   "retroGraphicsValueExtraSmooth": "更平滑",
   "retroSmoothTextures": "平滑纹理",
-  "retroSmoothTexturesDetail": "让 3D 物体的方块状纹理变得平滑。",
+  "retroSmoothTexturesDetail": "让方块状纹理和精灵变得平滑；2D 画面可能出现接缝。",
   "retroFixWobbly3d": "修正 3D 抖动",
   "retroFixWobbly3dDetail": "防止 3D 形状及其纹理抖动。",
   "retroWidescreen": "宽屏",

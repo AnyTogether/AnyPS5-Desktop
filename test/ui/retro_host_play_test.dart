@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:anyps5_desktop/core/game_library.dart';
@@ -349,7 +350,7 @@ void main() {
     expect(model.panelCategories().single.rows[model.panelRow].id, 'section-graphics');
   });
 
-  test('the Graphics rows: what the host lists, sent together and kept for later games', () async {
+  test('the Graphics rows: what the host lists, sent together and kept', () async {
     launcher = Ps1Launcher();
     final model = launcher.model..setRetroHostPs1(true);
     await launcher.start(status: recordedStatus());
@@ -387,9 +388,9 @@ void main() {
       ],
       reason: 'the hack and its aspect ratio change together',
     );
-    expect(model.preferences.retroHostOptions, {
-      'swanstation_GPU_WidescreenHack': 'true',
-      'swanstation_Display_AspectRatio': '16:9',
+    expect(model.preferences.retroHostOptions, isEmpty, reason: 'widescreen is kept for this game only');
+    expect(model.preferences.retroHostGameOptions, {
+      launcher.game.titleId: {'swanstation_GPU_WidescreenHack': 'true', 'swanstation_Display_AspectRatio': '16:9'},
     });
     expect((launcher.row('widescreen').kind as ChoiceRow).selected, 1);
     expect(launcher.row('widescreen').detail, T.text('retroWidescreenPs1Detail'), reason: 'in effect');
@@ -458,10 +459,43 @@ void main() {
     gate.complete();
     await pumpEventQueue();
     expect(options(), hasLength(before + 2), reason: "widescreen's two options, and no texture filter");
-    expect(model.preferences.retroHostOptions, {
+    expect(model.preferences.retroHostGameOptions[launcher.game.titleId], {
       'swanstation_GPU_WidescreenHack': 'true',
       'swanstation_Display_AspectRatio': '16:9',
     });
+  });
+
+  test('widescreen chosen in one PS1 game starts that game only with it, and survives a restart', () async {
+    launcher = Ps1Launcher(secondPs1: true);
+    final model = launcher.model..setRetroHostPs1(true);
+    await launcher.start(status: recordedStatus());
+    final session = launcher.session;
+    model.openRetroMenu();
+    await pumpEventQueue();
+    (launcher.row('section-graphics').kind as ActionRow).run();
+    session.callResults['option'] = true;
+    session.nextStatus = recordedStatus(
+      selected: {'swanstation_GPU_WidescreenHack': 0, 'swanstation_Display_AspectRatio': 1},
+    );
+    (launcher.row('widescreen').kind as ChoiceRow).set(1);
+    await pumpEventQueue();
+    (launcher.row('smoothTextures').kind as ChoiceRow).set(1);
+    await pumpEventQueue();
+    expect(model.preferences.retroHostOptions, {'swanstation_GPU_TextureFilter': 'Bilinear'}, reason: 'every game');
+    await model.closeRetroGame();
+
+    const widescreen = {'swanstation_GPU_WidescreenHack', 'swanstation_Display_AspectRatio'};
+    Map<Object?, Object?> started() => launcher.session.startArgs!['options']! as Map<Object?, Object?>;
+    await launcher.start(status: recordedStatus(), other: launcher.secondPs1Game);
+    expect(started().keys.toSet().intersection(widescreen), isEmpty, reason: 'the other game starts without it');
+    expect(started()['swanstation_GPU_TextureFilter'], 'Bilinear', reason: 'a choice kept for every game still is');
+    await model.closeRetroGame();
+
+    final saved = Preferences.fromJson(jsonDecode(jsonEncode(model.preferences.toJson())) as Map<String, dynamic>);
+    expect(saved.retroHostGameOptions, model.preferences.retroHostGameOptions, reason: 'saved and read back');
+    await launcher.start(status: recordedStatus());
+    expect(started(), containsPair('swanstation_GPU_WidescreenHack', 'true'));
+    expect(started(), containsPair('swanstation_Display_AspectRatio', '16:9'));
   });
 
   test('while the host draws without the GPU, Graphics offers only widescreen', () async {
@@ -487,7 +521,6 @@ void main() {
     await launcher.start(status: recordedStatus());
     expect(launcher.session.startArgs!['options'], {
       'swanstation_CDROM_ReadSpeedup': '2',
-      'swanstation_GPU_TextureFilter': 'Nearest',
       'swanstation_GPU_PGXPEnable': 'true',
       'swanstation_GPU_TrueColor': 'true',
     });

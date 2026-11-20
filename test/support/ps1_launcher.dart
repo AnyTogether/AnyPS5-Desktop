@@ -21,7 +21,7 @@ import 'ui_support.dart';
 /// variable), and a fake host session for every host started in it: [sessions] in order, a new one
 /// made for a host started once every session there was used. With `ps2`, LRPS2 is beside the
 /// host too (the signed release with PS2 for [withRelease]), and the games folder also has a PS2
-/// disc ([ps2Game]).
+/// disc ([ps2Game]). With `secondPs1`, the games folder has another PS1 disc ([secondPs1Game]).
 class Ps1Launcher {
   Ps1Launcher._({
     required bool hostFound,
@@ -29,6 +29,7 @@ class Ps1Launcher {
     FakeRetroHostSession? session,
     Uri? retroHostApi,
     bool ps2 = false,
+    bool secondPs1 = false,
   }) : sessions = [session ?? FakeRetroHostSession()] {
     final temp = temporaryFolder('ps1-host');
     final hostFolder = Directory(p.join(temp.path, 'host'))..createSync();
@@ -47,6 +48,13 @@ class Ps1Launcher {
     File(p.join(folder.path, 'retro.json')).writeAsStringSync(
       jsonEncode({'platform': 'ps1', 'titleId': 'SLUS00001', 'name': 'Night Racer', 'disc': 'game.cue'}),
     );
+    if (secondPs1) {
+      final second = Directory(p.join(model.root!, 'Day Racer'))..createSync();
+      File(p.join(second.path, 'game.cue')).createSync();
+      File(p.join(second.path, 'retro.json')).writeAsStringSync(
+        jsonEncode({'platform': 'ps1', 'titleId': 'SLUS00002', 'name': 'Day Racer', 'disc': 'game.cue'}),
+      );
+    }
     if (ps2) {
       final ps2Folder = Directory(p.join(model.root!, 'Sky Racer'))..createSync();
       ps2Disc = (File(p.join(ps2Folder.path, 'Sky Racer.iso'))..createSync()).path;
@@ -55,7 +63,7 @@ class Ps1Launcher {
       );
     }
     model.setRetroLibrary(true);
-    game = model.games.singleWhere((game) => game.retro?.platform == RetroPlatform.ps1);
+    game = model.games.singleWhere((game) => game.retro?.platform == RetroPlatform.ps1 && game.name == 'Night Racer');
     model.retroStatusEvery = const Duration(hours: 1);
     model.openRetroHost = (install, {checked, required volume, required muted}) {
       opened.add((install, volume, muted));
@@ -66,9 +74,21 @@ class Ps1Launcher {
   }
 
   /// A launcher on the debug host [host] (ANYPS5_RETRO_HOST), or none with [hostFound] false; with
-  /// [ps2], LRPS2 beside it and a PS2 disc in the games folder.
-  Ps1Launcher({bool hostFound = true, FakeRetroHostSession? session, Uri? retroHostApi, bool ps2 = false})
-    : this._(hostFound: hostFound, release: false, session: session, retroHostApi: retroHostApi, ps2: ps2);
+  /// [ps2], LRPS2 beside it and a PS2 disc in the games folder; with [secondPs1], another PS1 disc.
+  Ps1Launcher({
+    bool hostFound = true,
+    FakeRetroHostSession? session,
+    Uri? retroHostApi,
+    bool ps2 = false,
+    bool secondPs1 = false,
+  }) : this._(
+         hostFound: hostFound,
+         release: false,
+         session: session,
+         retroHostApi: retroHostApi,
+         ps2: ps2,
+         secondPs1: secondPs1,
+       );
 
   /// A launcher whose host is the recorded signed release, installed into its storage, as a
   /// release build has it; with [ps2], the release with LRPS2 and a PS2 disc in the games folder.
@@ -99,6 +119,9 @@ class Ps1Launcher {
   /// The PS2 game, when the launcher was made with `ps2`.
   Game get ps2Game => model.games.singleWhere((game) => game.retro?.platform == RetroPlatform.ps2);
 
+  /// The other PS1 game, when the launcher was made with `secondPs1`.
+  Game get secondPs1Game => model.games.singleWhere((game) => game.name == 'Day Racer');
+
   /// Puts the PS2 cue sheet [name] (and its bin) under a PS2 folder in the games folder: a disc
   /// PCSX2 does not boot, so the library lists it only while PS2 discs play in the host.
   void addPs2CueSheet(String name) {
@@ -125,11 +148,11 @@ class Ps1Launcher {
   AppModel get model => fixture.model;
   RetroPlay get play => model.retroPlay!;
 
-  /// Plays the game ([ps2Game] with [ps2]), the host greets the launcher (unless it did before) and
-  /// the game loads.
-  Future<void> start({RetroStatus? status, bool ps2 = false}) async {
+  /// Plays the game ([ps2Game] with [ps2], or [other]), the host greets the launcher (unless it did
+  /// before) and the game loads.
+  Future<void> start({RetroStatus? status, bool ps2 = false, Game? other}) async {
     session.nextStatus = status ?? fakeStatus();
-    final playing = model.play(ps2 ? ps2Game : game);
+    final playing = model.play(other ?? (ps2 ? ps2Game : game));
     if (!session.readyCompleter.isCompleted) session.readyCompleter.complete();
     await playing;
     await pumpEventQueue();

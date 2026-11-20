@@ -141,7 +141,6 @@ void main() {
       'saves': p.normalize(model.paths.retroSaves),
       'options': {
         'swanstation_Console_Region': 'NTSC-J',
-        'swanstation_GPU_TextureFilter': 'Nearest',
         'swanstation_GPU_PGXPEnable': 'true',
         'swanstation_GPU_TrueColor': 'true',
       },

@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "चिकना",
   "retroGraphicsValueExtraSmooth": "बहुत चिकना",
   "retroSmoothTextures": "चिकने टेक्सचर",
-  "retroSmoothTexturesDetail": "3D चीज़ों के खुरदुरे टेक्सचर को चिकना करता है।",
+  "retroSmoothTexturesDetail": "खुरदुरे टेक्सचर और स्प्राइट को चिकना करता है; 2D चित्रों में जोड़ दिख सकते हैं।",
   "retroFixWobbly3d": "हिलता 3D ठीक करें",
   "retroFixWobbly3dDetail": "3D आकृतियों और उनके टेक्सचर को हिलने से रोकता है।",
   "retroWidescreen": "वाइडस्क्रीन",

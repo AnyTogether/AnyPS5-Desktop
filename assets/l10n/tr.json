@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "Yumuşak",
   "retroGraphicsValueExtraSmooth": "Çok yumuşak",
   "retroSmoothTextures": "Yumuşak dokular",
-  "retroSmoothTexturesDetail": "3D nesnelerin köşeli dokularını yumuşatır.",
+  "retroSmoothTexturesDetail": "Köşeli dokuları ve spriteları yumuşatır; 2D çizimlerde ek yerleri görünebilir.",
   "retroFixWobbly3d": "Titreyen 3D'yi düzelt",
   "retroFixWobbly3dDetail": "3D şekillerin ve dokularının titremesini önler.",
   "retroWidescreen": "Geniş ekran",

@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "Mjuk",
   "retroGraphicsValueExtraSmooth": "Extra mjuk",
   "retroSmoothTextures": "Mjuka texturer",
-  "retroSmoothTexturesDetail": "Jämnar ut de kantiga texturerna på 3D-föremål.",
+  "retroSmoothTexturesDetail": "Jämnar ut kantiga texturer och sprites; 2D-grafik kan få synliga skarvar.",
   "retroFixWobbly3d": "Rätta vinglig 3D",
   "retroFixWobbly3dDetail": "Hindrar 3D-former och deras texturer från att vingla.",
   "retroWidescreen": "Bredbild",

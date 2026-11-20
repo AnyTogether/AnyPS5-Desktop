@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "Halus",
   "retroGraphicsValueExtraSmooth": "Ekstra halus",
   "retroSmoothTextures": "Tekstur halus",
-  "retroSmoothTexturesDetail": "Menghaluskan tekstur kotak-kotak pada objek 3D.",
+  "retroSmoothTexturesDetail": "Menghaluskan tekstur kotak-kotak dan sprite; gambar 2D bisa menampakkan sambungan.",
   "retroFixWobbly3d": "Perbaiki 3D yang goyang",
   "retroFixWobbly3dDetail": "Mencegah bentuk 3D dan teksturnya bergoyang.",
   "retroWidescreen": "Layar lebar",

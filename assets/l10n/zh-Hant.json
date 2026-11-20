@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "平滑",
   "retroGraphicsValueExtraSmooth": "更平滑",
   "retroSmoothTextures": "平滑材質",
-  "retroSmoothTexturesDetail": "讓 3D 物件的方塊狀材質變得平滑。",
+  "retroSmoothTexturesDetail": "讓方塊狀材質和精靈變得平滑；2D 畫面可能出現接縫。",
   "retroFixWobbly3d": "修正 3D 抖動",
   "retroFixWobbly3dDetail": "防止 3D 形狀及其材質抖動。",
   "retroWidescreen": "寬螢幕",

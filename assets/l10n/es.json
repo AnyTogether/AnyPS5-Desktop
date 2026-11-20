@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "Suave",
   "retroGraphicsValueExtraSmooth": "Muy suave",
   "retroSmoothTextures": "Texturas suaves",
-  "retroSmoothTexturesDetail": "Suaviza las texturas pixeladas de los objetos 3D.",
+  "retroSmoothTexturesDetail": "Suaviza las texturas pixeladas y los sprites; el arte 2D puede mostrar costuras.",
   "retroFixWobbly3d": "Corregir 3D tembloroso",
   "retroFixWobbly3dDetail": "Evita que las formas 3D y sus texturas tiemblen.",
   "retroWidescreen": "Pantalla panorámica",

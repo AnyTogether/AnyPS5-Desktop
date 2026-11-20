@@ -153,17 +153,16 @@ void main() {
     );
   });
 
-  test('the defaults of the settings not chosen: by resolution for PS1, sharper textures for PS2', () {
+  test('the defaults of the settings not chosen: fix wobbly 3D for PS1, sharper textures for PS2', () {
     expect(retroGraphicsDefaults({}, ps2: false), {
-      'swanstation_GPU_TextureFilter': 'Nearest',
       'swanstation_GPU_PGXPEnable': 'true',
       'swanstation_GPU_TrueColor': 'true',
     });
-    expect(retroGraphicsDefaults({'swanstation_GPU_ResolutionScale': '2'}, ps2: false), {
-      'swanstation_GPU_TextureFilter': 'Bilinear',
-      'swanstation_GPU_PGXPEnable': 'true',
-      'swanstation_GPU_TrueColor': 'true',
-    });
+    expect(
+      retroGraphicsDefaults({'swanstation_GPU_ResolutionScale': '4'}, ps2: false),
+      retroGraphicsDefaults({}, ps2: false),
+      reason: 'textures are not smoothed for the player at any resolution',
+    );
     expect(
       retroGraphicsDefaults({
         'swanstation_GPU_TextureFilter': 'xBR',

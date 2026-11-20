@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "Sima",
   "retroGraphicsValueExtraSmooth": "Extra sima",
   "retroSmoothTextures": "Sima textúrák",
-  "retroSmoothTexturesDetail": "Kisimítja a 3D-s tárgyak kockás textúráit.",
+  "retroSmoothTexturesDetail": "Kisimítja a kockás textúrákat és a spriteokat; a 2D-s grafikán varratok látszhatnak.",
   "retroFixWobbly3d": "Remegő 3D javítása",
   "retroFixWobbly3dDetail": "Megakadályozza, hogy a 3D-s formák és textúráik remegjenek.",
   "retroWidescreen": "Szélesvászon",

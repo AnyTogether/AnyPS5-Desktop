@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "Glatt",
   "retroGraphicsValueExtraSmooth": "Extra glatt",
   "retroSmoothTextures": "Glatte Texturen",
-  "retroSmoothTexturesDetail": "Glättet die pixeligen Texturen von 3D-Objekten.",
+  "retroSmoothTexturesDetail": "Glättet pixelige Texturen und Sprites; 2D-Grafik kann sichtbare Nähte zeigen.",
   "retroFixWobbly3d": "Wackelndes 3D beheben",
   "retroFixWobbly3dDetail": "Verhindert, dass 3D-Formen und ihre Texturen wackeln.",
   "retroWidescreen": "Breitbild",

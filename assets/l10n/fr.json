@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "Lisse",
   "retroGraphicsValueExtraSmooth": "Très lisse",
   "retroSmoothTextures": "Textures lissées",
-  "retroSmoothTexturesDetail": "Lisse les textures pixelisées des objets 3D.",
+  "retroSmoothTexturesDetail": "Lisse les textures pixelisées et les sprites ; les graphismes 2D peuvent montrer des coutures.",
   "retroFixWobbly3d": "Corriger la 3D tremblante",
   "retroFixWobbly3dDetail": "Empêche les formes 3D et leurs textures de trembler.",
   "retroWidescreen": "Écran large",

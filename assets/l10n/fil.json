@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "Makinis",
   "retroGraphicsValueExtraSmooth": "Napakakinis",
   "retroSmoothTextures": "Makinis na texture",
-  "retroSmoothTexturesDetail": "Pinakikinis ang magaspang na texture ng mga 3D na bagay.",
+  "retroSmoothTexturesDetail": "Pinakikinis ang magaspang na texture at sprite; maaaring may makitang dugtungan sa 2D na sining.",
   "retroFixWobbly3d": "Ayusin ang umuugang 3D",
   "retroFixWobbly3dDetail": "Pinipigilan ang pag-uga ng mga 3D na hugis at ng kanilang texture.",
   "retroWidescreen": "Widescreen",

@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "Smooth",
   "retroGraphicsValueExtraSmooth": "Extra smooth",
   "retroSmoothTextures": "Smooth textures",
-  "retroSmoothTexturesDetail": "Softens the blocky textures of 3D objects.",
+  "retroSmoothTexturesDetail": "Softens blocky textures and sprites; 2D art can show seams.",
   "retroFixWobbly3d": "Fix wobbly 3D",
   "retroFixWobbly3dDetail": "Keeps 3D shapes and their textures from wobbling.",
   "retroWidescreen": "Widescreen",

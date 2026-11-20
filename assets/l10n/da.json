@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "Glat",
   "retroGraphicsValueExtraSmooth": "Ekstra glat",
   "retroSmoothTextures": "Glatte teksturer",
-  "retroSmoothTexturesDetail": "Udglatter de kantede teksturer på 3D-objekter.",
+  "retroSmoothTexturesDetail": "Udglatter kantede teksturer og sprites; 2D-grafik kan få synlige sømme.",
   "retroFixWobbly3d": "Ret vaklende 3D",
   "retroFixWobbly3dDetail": "Forhindrer 3D-former og deres teksturer i at vakle.",
   "retroWidescreen": "Widescreen",

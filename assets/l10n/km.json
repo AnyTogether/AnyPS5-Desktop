@@ -2501,7 +2501,7 @@
   "retroGraphicsValueSmooth": "រលោង",
   "retroGraphicsValueExtraSmooth": "រលោងខ្លាំង",
   "retroSmoothTextures": "វាយនភាពរលោង",
-  "retroSmoothTexturesDetail": "ធ្វើឱ្យវាយនភាពជាប្រអប់ៗនៃវត្ថុ 3D រលោង។",
+  "retroSmoothTexturesDetail": "ធ្វើឱ្យវាយនភាព និងស្ព្រាយជាប្រអប់ៗរលោង។ រូប 2D អាចមានស្នាមតភ្ជាប់។",
   "retroFixWobbly3d": "ជួសជុល 3D ដែលញ័រ",
   "retroFixWobbly3dDetail": "ការពាររូបរាង 3D និងវាយនភាពរបស់វាពីការញ័រ។",
   "retroWidescreen": "អេក្រង់ធំទូលាយ",

@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "부드럽게",
   "retroGraphicsValueExtraSmooth": "더 부드럽게",
   "retroSmoothTextures": "부드러운 텍스처",
-  "retroSmoothTexturesDetail": "3D 물체의 각진 텍스처를 부드럽게 합니다.",
+  "retroSmoothTexturesDetail": "각진 텍스처와 스프라이트를 부드럽게 합니다. 2D 그림에 이음매가 보일 수 있습니다.",
   "retroFixWobbly3d": "흔들리는 3D 보정",
   "retroFixWobbly3dDetail": "3D 모양과 텍스처가 흔들리지 않게 합니다.",
   "retroWidescreen": "와이드스크린",

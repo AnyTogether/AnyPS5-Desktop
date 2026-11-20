@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "なめらか",
   "retroGraphicsValueExtraSmooth": "よりなめらか",
   "retroSmoothTextures": "テクスチャをなめらかに",
-  "retroSmoothTexturesDetail": "3Dオブジェクトのギザギザしたテクスチャをなめらかにします。",
+  "retroSmoothTexturesDetail": "ギザギザしたテクスチャやスプライトをなめらかにします。2Dの絵につなぎ目が見えることがあります。",
   "retroFixWobbly3d": "3Dの揺れを修正",
   "retroFixWobbly3dDetail": "3Dの形とテクスチャが揺れないようにします。",
   "retroWidescreen": "ワイド画面",

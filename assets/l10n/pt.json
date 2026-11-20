@@ -2515,7 +2515,7 @@
   "retroGraphicsValueSmooth": "Suave",
   "retroGraphicsValueExtraSmooth": "Muito suave",
   "retroSmoothTextures": "Texturas suaves",
-  "retroSmoothTexturesDetail": "Suaviza as texturas serrilhadas dos objetos 3D.",
+  "retroSmoothTexturesDetail": "Suaviza as texturas serrilhadas e os sprites; a arte 2D pode mostrar emendas.",
   "retroFixWobbly3d": "Corrigir 3D tremido",
   "retroFixWobbly3dDetail": "Impede que as formas 3D e suas texturas tremam.",
   "retroWidescreen": "Tela larga",

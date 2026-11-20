@@ -125,28 +125,24 @@ void main() {
 
   test('a start sends the kept values the menu shows over the Graphics defaults', () {
     expect(retroStartOptions({}, ps2: false), {
-      'swanstation_GPU_TextureFilter': 'Nearest',
       'swanstation_GPU_PGXPEnable': 'true',
       'swanstation_GPU_TrueColor': 'true',
-    }, reason: 'Native: no smoothing; fix wobbly 3D and true colour on; no widescreen');
+    }, reason: "fix wobbly 3D and true colour on; the console's own textures; no widescreen");
     expect(
       retroStartOptions({'swanstation_GPU_ResolutionScale': '3', 'swanstation_CDROM_ReadSpeedup': '2'}, ps2: false),
       {
-        'swanstation_GPU_TextureFilter': 'Bilinear',
         'swanstation_GPU_PGXPEnable': 'true',
         'swanstation_GPU_TrueColor': 'true',
         'swanstation_GPU_ResolutionScale': '3',
         'swanstation_CDROM_ReadSpeedup': '2',
       },
-      reason: 'smooth from 2x up',
+      reason: 'no smoothing chosen for the player at a higher resolution either',
     );
     expect(
       retroStartOptions({
         'swanstation_GPU_TextureFilter': 'xBR',
         'swanstation_GPU_PGXPEnable': 'false',
         'swanstation_GPU_TrueColor': 'false',
-        'swanstation_GPU_WidescreenHack': 'true',
-        'swanstation_Display_AspectRatio': '16:9',
         'swanstation_GPU_MSAA': '4',
         'pcsx2_anisotropic_filtering': 'disabled',
       }, ps2: false),
@@ -154,11 +150,20 @@ void main() {
         'swanstation_GPU_TrueColor': 'true',
         'swanstation_GPU_TextureFilter': 'xBR',
         'swanstation_GPU_PGXPEnable': 'false',
-        'swanstation_GPU_WidescreenHack': 'true',
-        'swanstation_Display_AspectRatio': '16:9',
       },
       reason: 'the values the player chose win; true colour has no row; MSAA and PS2 options are not sent',
     );
+    const widescreen = {'swanstation_GPU_WidescreenHack': 'true', 'swanstation_Display_AspectRatio': '16:9'};
+    expect(
+      retroStartOptions(widescreen, ps2: false).keys,
+      isNot(contains('swanstation_GPU_WidescreenHack')),
+      reason: 'PS1 widescreen kept for every game (by an older launcher) is not sent',
+    );
+    expect(retroStartOptions({}, ps2: false, game: {...widescreen, 'swanstation_CDROM_ReadSpeedup': '2'}), {
+      'swanstation_GPU_PGXPEnable': 'true',
+      'swanstation_GPU_TrueColor': 'true',
+      ...widescreen,
+    }, reason: "the game's own widescreen is sent; only per-game options come from the game's list");
     expect(retroStartOptions({}, ps2: true), {'pcsx2_anisotropic_filtering': '16x'});
     expect(
       retroStartOptions({

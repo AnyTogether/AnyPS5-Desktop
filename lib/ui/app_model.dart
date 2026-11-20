@@ -186,6 +186,15 @@ class Preferences {
         for (final MapEntry(:key, :value) in entries.entries)
           if (key is String && value is String) key: value,
     }
+    ..retroHostGameOptions = {
+      if (json['retroHostGameOptions'] case final Map<dynamic, dynamic> games)
+        for (final MapEntry(key: game, value: options) in games.entries)
+          if (game is String && options is Map<dynamic, dynamic>)
+            game: {
+              for (final MapEntry(:key, :value) in options.entries)
+                if (key is String && value is String) key: value,
+            },
+    }
     ..toolkitFolder = json['toolkitFolder'] as String?
     ..onboarded = json['onboarded'] as bool? ?? false
     ..gameArtwork = json['gameArtwork'] as bool? ?? true
@@ -326,6 +335,10 @@ class Preferences {
   /// The SwanStation options the player chose in the game's menu, by key, given to every PS1 game
   /// the host starts (protocol.md "start": `options`).
   Map<String, String> retroHostOptions = {};
+
+  /// The core options the player chose in a game's menu that are kept for that game only
+  /// (`retroGraphicsPerGameKeys`: PS1 widescreen), by the game's title ID, then by key.
+  Map<String, Map<String, String>> retroHostGameOptions = {};
   String? toolkitFolder;
   bool onboarded = false;
   bool gameArtwork = true;
@@ -519,6 +532,7 @@ class Preferences {
     if (retroHostVolume != 100) 'retroHostVolume': retroHostVolume,
     if (retroHostMuted) 'retroHostMuted': true,
     if (retroHostOptions.isNotEmpty) 'retroHostOptions': retroHostOptions,
+    if (retroHostGameOptions.isNotEmpty) 'retroHostGameOptions': retroHostGameOptions,
     // The first one under the old name too, for an older launcher started again.
     'gamesFolder': gamesFolders.firstOrNull,
     'toolkitFolder': toolkitFolder,
@@ -2767,6 +2781,7 @@ class AppModel extends ChangeNotifier {
       return;
     }
   }
+
   String? _playAfterInstall;
 
   /// What goes on once a copy made by another engine is rebuilt ([rebuildFirst]): the game's
@@ -5588,7 +5603,8 @@ class AppModel extends ChangeNotifier {
 
   /// Unlocks the user asked for are under way or waiting (the games prepared on their own while
   /// the computer idles do not count: closing with only those asks nothing and waits for nothing).
-  bool get hasManualUnlock => _installer != null || _parked.isNotEmpty || queue.isNotEmpty || (_preparer != null && prepare.promoted);
+  bool get hasManualUnlock =>
+      _installer != null || _parked.isNotEmpty || queue.isNotEmpty || (_preparer != null && prepare.promoted);
 
   bool _quitting = false;
 
@@ -5611,9 +5627,7 @@ class AppModel extends ChangeNotifier {
     cancelUnlocksForExit();
     _changed();
     // The relinker is stopped and its work folder removed before the window goes.
-    for (var waited = 0;
-        waited < 100 && (_installer != null || _parked.isNotEmpty || _preparer != null);
-        waited++) {
+    for (var waited = 0; waited < 100 && (_installer != null || _parked.isNotEmpty || _preparer != null); waited++) {
       await Future<void>.delayed(const Duration(milliseconds: 100));
     }
     quitLauncher();
@@ -5677,10 +5691,13 @@ class AppModel extends ChangeNotifier {
         _stopTimer?.cancel();
         _stopTimer = null;
         await run.close();
-        await run.exitCode.timeout(stopGrace, onTimeout: () {
-          run.kill();
-          return -1;
-        });
+        await run.exitCode.timeout(
+          stopGrace,
+          onTimeout: () {
+            run.kill();
+            return -1;
+          },
+        );
       }
       media.dispose();
       await _stopReplay().timeout(const Duration(seconds: 3), onTimeout: () {});
@@ -6420,10 +6437,7 @@ class AppModel extends ChangeNotifier {
                   if (unlocks) T.text('quitUnlocksDetail'),
                   if (_removals.isNotEmpty) T.text('quitRemovingNote'),
                 ].join(' '),
-                kind: ActionRow(
-                  unlocks ? () => unawaited(quitWithUnlocks()) : quitLauncher,
-                  destructive: true,
-                ),
+                kind: ActionRow(unlocks ? () => unawaited(quitWithUnlocks()) : quitLauncher, destructive: true),
               ),
             ],
           ),
@@ -8723,7 +8737,8 @@ class AppModel extends ChangeNotifier {
         starting ??
         games
             .where(
-              (game) => progress[game.id] != null && !_handPaused.contains(game.id) && !_resumeWaiting.contains(game.id),
+              (game) =>
+                  progress[game.id] != null && !_handPaused.contains(game.id) && !_resumeWaiting.contains(game.id),
             )
             .firstOrNull ??
         games.where((game) => queue.contains(game.id)).firstOrNull;
