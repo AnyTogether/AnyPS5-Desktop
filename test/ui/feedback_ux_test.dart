@@ -4,6 +4,7 @@ import 'package:anyps5_desktop/core/desktop/launcher_window.dart';
 import 'package:anyps5_desktop/core/gamepad/guide_switch.dart';
 import 'package:anyps5_desktop/core/gamepad/pad_navigation.dart';
 import 'package:anyps5_desktop/core/gamepad/shortcuts.dart';
+import 'package:anyps5_desktop/core/game_settings.dart';
 import 'package:anyps5_desktop/core/host.dart';
 import 'package:anyps5_desktop/core/remote/remote_protocol.dart';
 import 'package:anyps5_desktop/core/installer.dart';
@@ -339,19 +340,20 @@ void main() {
     });
 
     test('game settings: the window mode only changes in edit mode', () {
+      model.preferences.displayDefaults = const DisplayDefaults(fullscreen: false);
       model.closeOverlay();
       model.open(Layer.gameSettings);
       final game = model.selectedGame!;
       expect(model.panelCategories().first.rows.first.id, 'display');
       pads.press(PadButton.dpadRight);
       pads.press(PadButton.dpadLeft);
-      expect(model.currentSettings(game).fullscreen, isFalse);
+      expect(model.currentSettings(game).ownFullscreen ?? model.preferences.displayDefaults.fullscreen, isFalse);
       expect(model.currentSettings(game).ownFullscreen, isNull);
       pads.press(PadButton.south);
       pads.press(PadButton.dpadRight);
       expect(model.currentSettings(game).ownFullscreen, isFalse, reason: 'Default, then Window');
       pads.press(PadButton.dpadRight);
-      expect(model.currentSettings(game).fullscreen, isTrue);
+      expect(model.currentSettings(game).ownFullscreen ?? model.preferences.displayDefaults.fullscreen, isTrue);
     });
   });
 

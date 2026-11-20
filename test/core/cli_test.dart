@@ -98,7 +98,7 @@ void main() {
     final again = File(p.join(temp.path, 'home', '.local', 'state', 'AnyPS5', 'logs', 'PPSA07007.log'))
         .readAsStringSync();
     expect(RegExp(r'^--- \S+ \S+ trace$', multiLine: true).hasMatch(again), isTrue);
-    expect(again, contains('ANYPS5_FULLSCREEN=0'));
+    expect(again, contains('ANYPS5_FULLSCREEN=1'));
     // Settings › Default Display reaches a game started here too.
     final preferences = File(AppPaths.forSystem(HostSystem.linux, environment: environment).preferencesFile)
       ..createSync(recursive: true)
@@ -142,7 +142,7 @@ void main() {
       final log = File(paths.logFile('PPSA07007')).readAsStringSync();
       expect(log, contains('relinked game --aps5-report=off two words'));
       expect(log, contains('ANYPS5_MINE=a b'));
-      expect(log, contains('ANYPS5_FULLSCREEN=0'), reason: "the launcher's own value");
+      expect(log, contains('ANYPS5_FULLSCREEN=1'), reason: "the launcher's own value");
       expect(
         log,
         contains(

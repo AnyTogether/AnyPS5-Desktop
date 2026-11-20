@@ -5,6 +5,7 @@ import 'package:anyps5_desktop/core/desktop/desktop.dart';
 import 'package:anyps5_desktop/core/gamepad/feel.dart';
 import 'package:anyps5_desktop/core/gamepad/guide_switch.dart';
 import 'package:anyps5_desktop/core/gamepad/pad_navigation.dart';
+import 'package:anyps5_desktop/core/game_settings.dart';
 import 'package:anyps5_desktop/core/installer.dart';
 import 'package:anyps5_desktop/core/screenshots.dart';
 import 'package:anyps5_desktop/core/toolkit_download.dart';
@@ -285,6 +286,8 @@ void main() {
     });
 
     test('while a game runs, PS goes from the game to the launcher and back', () async {
+      // This test covers focus switching, not the new full-screen default.
+      model.preferences.displayDefaults = const DisplayDefaults(fullscreen: false);
       final orbit = model.games.firstWhere((game) => game.titleId == 'PPSA01001');
       final installed = Installer.installedFolder(orbit, model.root!);
       File(p.join(installed, 'app.elf')).writeAsStringSync('#!/bin/sh\nsleep 2\n');
@@ -299,12 +302,14 @@ void main() {
       await Future<void>.delayed(GuideSwitch.defaultDebounce);
       pads.press(PadButton.guide);
       expect(desktop.calls.where((call) => call == 'raise' || call == 'focus'), ['raise', 'focus']);
-      expect(desktop.calls.first, 'display 75%', reason: 'upstream\'s engine: windowed is the default, the launcher sizes the window');
+      expect(desktop.calls.first, 'display 75%', reason: 'this test explicitly selects Window so it can focus on controller switching');
       model.stopGame();
       await playing;
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
 
     Future<({Future<void> done})> startOrbit({String script = 'sleep 2'}) async {
+      // These tests cover desktop focus and controller behavior, not display defaults.
+      model.preferences.displayDefaults = const DisplayDefaults(fullscreen: false);
       final orbit = model.games.firstWhere((game) => game.titleId == 'PPSA01001');
       final installed = Installer.installedFolder(orbit, model.root!);
       File(p.join(installed, 'app.elf')).writeAsStringSync('#!/bin/sh\n$script\n');
