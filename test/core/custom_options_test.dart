@@ -87,13 +87,19 @@ void main() {
       ]);
       expect(checkRelinkerOptions('--windows-fixed-base "0x 1000"').words, ['--windows-fixed-base', '0x 1000']);
       expect(checkRelinkerOptions('   ').words, isEmpty);
+      expect(checkRelinkerOptions('--function-symbol-roots --registry').words, [
+        '--function-symbol-roots',
+        '--registry',
+      ]);
     });
 
     test('the launcher keeps the system, the target and the paths', () {
       for (final option in RelinkerOptions.launcherOwned) {
         expect(relinkerProblem('--lazy-binding $option'), OptionProblem(OptionProblemKind.launcherOption, option));
       }
-      expect(RelinkerOptions.launcherOwned, hasLength(11));
+      expect(RelinkerOptions.launcherOwned, hasLength(12));
+      // --to-avx picks the CPU the game is made for, as --to-rosetta does.
+      expect(relinkerProblem('--to-avx'), const OptionProblem(OptionProblemKind.launcherOption, '--to-avx'));
     });
 
     test('options that give no game, or a broken one, are refused', () {

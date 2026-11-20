@@ -141,6 +141,7 @@ abstract final class RelinkerOptions {
     '--macos',
     '--to-intel',
     '--to-rosetta',
+    '--to-avx',
     '--sce-module-path',
     '--module-dir',
     '--executable',
@@ -175,6 +176,7 @@ abstract final class RelinkerOptions {
     '--skip-syscall-check',
     '--trap-sdk-syscall-stubs',
     '--lazy-binding',
+    '--function-symbol-roots',
   };
 
   /// The unused-import filter levels, written without dashes.
