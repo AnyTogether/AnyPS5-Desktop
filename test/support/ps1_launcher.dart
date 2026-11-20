@@ -71,8 +71,14 @@ class Ps1Launcher {
     : this._(hostFound: hostFound, release: false, session: session, retroHostApi: retroHostApi, ps2: ps2);
 
   /// A launcher whose host is the recorded signed release, installed into its storage, as a
-  /// release build has it; with [ps2], the release with LRPS2 and a PS2 disc in the games folder.
-  static Future<Ps1Launcher> withRelease({FakeRetroHostSession? session, Uri? retroHostApi, bool ps2 = false}) async {
+  /// release build has it; with [ps2], the release with the LRPS2 package, added beside the host
+  /// unless [addPs2] is false, and a PS2 disc in the games folder.
+  static Future<Ps1Launcher> withRelease({
+    FakeRetroHostSession? session,
+    Uri? retroHostApi,
+    bool ps2 = false,
+    bool addPs2 = true,
+  }) async {
     final launcher = Ps1Launcher._(
       hostFound: true,
       release: true,
@@ -80,7 +86,7 @@ class Ps1Launcher {
       retroHostApi: retroHostApi,
       ps2: ps2,
     );
-    await installRetroHostFixture(RetroHostStore(launcher.model.paths.retroHost).folder, ps2: ps2);
+    await installRetroHostFixture(RetroHostStore(launcher.model.paths.retroHost).folder, ps2: ps2, addPs2: addPs2);
     return launcher;
   }
 

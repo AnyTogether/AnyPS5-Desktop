@@ -21,8 +21,8 @@ described in [The emulator host in the launcher's UI](<AnyPS5 Desktop - Emulator
 | [`lib/core/retro_host/retro_host_protocol.dart`](../lib/core/retro_host/retro_host_protocol.dart) | The protocol's values, field checks and the game's `status`. |
 | [`lib/core/retro_host/frame_ring.dart`](../lib/core/retro_host/frame_ring.dart) | Checks a ring's header and growth. Pins the newest frame and checks its size. |
 | [`lib/core/retro_host/retro_host_client.dart`](../lib/core/retro_host/retro_host_client.dart) | One host process, as described in the sections below. |
-| [`lib/core/retro_host/retro_host_release.dart`](../lib/core/retro_host/retro_host_release.dart) | Checks a signed host release before it is unpacked and before each start, and installs it whole or not at all (see "Finding and checking the host" below). |
-| [`lib/core/retro_host/retro_host_store.dart`](../lib/core/retro_host/retro_host_store.dart) | `RetroHostStore`: the host downloaded from the host repository's signed GitHub releases into the launcher's own storage, and its check before each start. |
+| [`lib/core/retro_host/retro_host_release.dart`](../lib/core/retro_host/retro_host_release.dart) | Checks a signed host release before it is unpacked and before each start, and installs it whole or not at all; adds and removes a core package (`RetroHostCorePackage`, today LRPS2) beside the installed host (see "Finding and checking the host" and "Core packages" below). |
+| [`lib/core/retro_host/retro_host_store.dart`](../lib/core/retro_host/retro_host_store.dart) | `RetroHostStore`: the host downloaded from the host repository's signed GitHub releases into the launcher's own storage, the core packages added from the installed host's release, and their check before each start. |
 | [`lib/core/retro_host/retro_host_install.dart`](../lib/core/retro_host/retro_host_install.dart) | `RetroHostInstall`: the host, SwanStation and, where it is beside them, LRPS2 a build runs, the downloaded release's (checked) or, in a debug or test build (`RetroHostBuild`), the one `ANYPS5_RETRO_HOST` names (unchecked). |
 | [`lib/core/retro_host/retro_host_build.dart`](../lib/core/retro_host/retro_host_build.dart) | `RetroHostBuild`: whether this launcher was compiled as a release, a test build or a debug build, and the mark only a test build's compiled program carries (see "Debug and test builds"). |
 | [`tool/check_release_build.dart`](../tool/check_release_build.dart) | Run after every release and nightly `flutter build`: fails on a test build, from the defines Flutter compiled it with and from the mark in its AOT snapshot. Its `files` check, which `packaging/sign-release.sh` runs before signing, fails on any release file holding a test build, or one it cannot read. |
@@ -157,17 +157,21 @@ section asks of a launcher. A host release is signed like a launcher release:
 `SHA256SUMS` and `SHA256SUMS.sig`, checked with
 [`release_signing.dart`](../lib/core/release_signing.dart) and the keys in
 [`release_keys.dart`](../lib/core/release_keys.dart). Beside them, each system
-has `anyps5-retro-host-<version>-<os>-<arch>.zip` and its `.files`, which lists
-every file in the zip in `shasum` format. The host repository's
-`tools/package_release.py` writes them, and its `docs/host.md` "Releases" says
-where the maintainers sign.
+has its host package, `anyps5-retro-host-<version>-<os>-<arch>.zip` and its
+`.files`, which lists every file in the zip in `shasum` format. A release that
+ships LRPS2 also has, for each system, the LRPS2 core package
+`anyps5-retro-host-<version>-<os>-<arch>-lrps2.zip` and its `.files` ("Core
+packages" below). The host repository's `tools/package_release.py` writes
+them, and its `docs/host.md` "Releases" says where the maintainers sign.
 
 - **Where the host lives.** In `RetroHost/host` in the launcher's own data
   folder, beside its toolkits and its ffmpeg (`AppPaths.retroHost`:
   `%LOCALAPPDATA%\AnyPS5\RetroHost` on Windows,
   `~/.local/share/AnyPS5/RetroHost` on Linux). The folder holds the unpacked
-  zip, with `SHA256SUMS`, `SHA256SUMS.sig`, this system's `.files` and
-  `.release-tag` (the tag the release was published under) kept beside it. This departs from protocol.md as written (at
+  host package, with `SHA256SUMS`, `SHA256SUMS.sig`, this system's `.files` and
+  `.release-tag` (the tag the release was published under) kept beside it, and
+  every core package the player added, unpacked into the same folder with its
+  own `.files`. This departs from protocol.md as written (at
   9052aff), which says a release launcher runs "a host it ships with or
   downloads into its own storage: from its own directory on Windows and
   Linux", found with `GetModuleFileNameW` or `/proc/self/exe`. The launcher's
@@ -178,9 +182,11 @@ where the maintainers sign.
   and ffmpeg already live there. The host repository's release pull request
   makes the same change to the protocol text (see "Not yet").
 - **Which files are this system's.** Only the names for `windows-x64`,
-  `linux-x64` or `macos-arm64`, by exact name. A release with no `.files` for
-  this system, or more than one, is refused. The version is read from that
-  name, so it is covered by the signature.
+  `linux-x64` or `macos-arm64`, by exact name. A release with no host `.files`
+  for this system, or more than one, is refused. The version is read from that
+  name, so it is covered by the signature. The host package's name pattern
+  (`_releaseName`) does not match a core package's `-lrps2` names, so a
+  launcher that knows no core package finds the host package as before.
 - **The tag must be the signed version.** The launcher picks a release by its
   tag, but installs the version its signed `.files` name gives. Someone who
   can publish releases without the signing key could otherwise publish an
@@ -204,7 +210,9 @@ where the maintainers sign.
   downloads `SHA256SUMS` and `SHA256SUMS.sig` first and checks the signature
   (`RetroHostRelease.signed`) before anything else is fetched. Only then does it
   download this system's `.files` and zip, each checked against the digest the
-  signed sums give it. The other systems' files and the source archive are not
+  signed sums give it, and the package of each core the player added
+  (`fetch(cores:)`), so those move with the host. The other systems' files,
+  the core packages the player did not add and the source archive are not
   downloaded. A redirect from https to plain http is refused for every
   download (`AssetDownload.redirected`); GitHub's release downloads only
   redirect within https. Files go to `RetroHost/.downloads/<tag>`, resuming as the ffmpeg
@@ -215,7 +223,11 @@ where the maintainers sign.
 - **On install** (`RetroHostRelease.install`). The signature and the tag are
   checked again from the files on disk, then the zip and the `.files` against
   `SHA256SUMS`, then every file in the zip against the `.files`. A file that
-  is missing, an extra file, or a symbolic link is refused. Names follow the
+  is missing, an extra file, or a symbolic link is refused. Each core package
+  the player had (`install(cores:)`) is checked the same way and unpacked into
+  the same `host.new`, so the new release's packages replace the old ones in
+  the same step; one the new release lacks is not there afterwards. Names
+  follow the
   host's `package_release.py --check`: each part is letters, digits and
   `._+-`, does not start or end with a dot and is no Windows device name
   (`con`, `prn`, `aux`, `nul`, `com0`-`com9`, `lpt0`-`lpt9`, with or without
@@ -237,10 +249,13 @@ where the maintainers sign.
   any other.
 - **Before each start** (`checkBeforeStart`, through `RetroHostStore.check`).
   The signature is checked again, then the kept tag against the signed
-  version, then the `.files` against `SHA256SUMS`, then
-  the host executable and SwanStation against the `.files`, and LRPS2 too
-  when the `.files` lists it (`RetroHostChecked.ps2Core`; see "PS2 games").
-  Each is hashed from a `CheckedFile`, on another isolate.
+  version, then the host package's `.files` and the `.files` of every core
+  package installed beside it against `SHA256SUMS`, then the host executable
+  and SwanStation against the host `.files`, and each installed core
+  package's core (LRPS2) against its own `.files` (`RetroHostChecked.ps2Core`;
+  see "Core packages"). A core package counts as installed when its `.files`,
+  named for the installed version, is in the folder and `SHA256SUMS` lists it.
+  Each file is hashed from a `CheckedFile`, on another isolate.
   - On Windows both stay open with read sharing only (no `FILE_SHARE_WRITE`
     or `FILE_SHARE_DELETE`). Nothing can write, rename or delete them, or
     rename another file onto them, until the host has exited. The host loads
@@ -289,6 +304,70 @@ where the maintainers sign.
   (`RetroHostStore.installed`, a `RetroHostInstall` with `checked` set), and
   only with that release's cores (SwanStation, and LRPS2 when it ships one).
 
+## Core packages
+
+The host repository's split release (host PR #22, fork branch `ps2-release`
+at 4599660,
+[`docs/protocol.md`](https://github.com/B-Howell/anyps5-retro-host-upstream/blob/45996605fc1eea406c9ea7c7b20481e13785a77a/docs/protocol.md)
+"Finding and checking the host") ships LRPS2 in a package of its own, so a
+player who plays only PS1 games never downloads it. The lines this follows:
+
+- "A core that not every player needs ships in a **core package** of its own,
+  `anyps5-retro-host-<version>-<os>-<arch>-<core>.zip` with its `.files`, in
+  the same release. Today that is only `lrps2`";
+- "No file in it has the name of a file in the host package, so both unpack
+  into one folder. [...] A release from before LRPS2 shipped, such as 1.0.0,
+  has no core package";
+- "*Adding a core package*: the player adds a core package as an emulator of
+  its own, and a player who never adds it never downloads it. The launcher
+  takes it from the same release as the installed host, the one whose
+  `SHA256SUMS` it keeps, and checks it the same way as on download";
+- "When the launcher installs another host release, it installs every core
+  package it had in the same step from that release. A core package the new
+  release lacks is removed. [...] Removing a core package deletes the files
+  its `.files` lists and the `.files` itself, once the host has exited";
+- "*Before it starts the host*: it checks the signature again, and the host
+  package's `.files` and the `.files` of every core package it installed
+  against `SHA256SUMS`. It then checks the host executable and every core
+  library those `.files` list against them, and on Windows holds them all";
+- "A core library that no checked `.files` lists is never given to the host.
+  A launcher offers PS2 games only when the LRPS2 package is installed and the
+  host lists `ps2`."
+
+How the launcher does it:
+
+- **Which packages a release has** (`RetroHostCorePackage`,
+  `RetroHostRelease.offeredCores`). The names are built from the signed host
+  version and the system, so a package of another release is never taken.
+  A release that lists only one of a package's zip and `.files` is refused.
+  Settings › Emulators offers the PS2 emulator only while the installed host's
+  `SHA256SUMS` lists both for this system: never for a host 1.0.0.
+- **Adding one** (`RetroHostStore.fetchCore`, `putCoreInPlace`,
+  `RetroHostRelease.addCore`). The release to fetch from is the one whose tag
+  is the installed host's `.release-tag`; any other release, or none on
+  GitHub, is "not available". The installed host's `SHA256SUMS` and its
+  signature and tag are checked first (`installedRelease`), and the package's
+  zip and `.files` are fetched against its digests, into
+  `RetroHost/.downloads/<tag>-lrps2`. On another isolate, `addCore` checks
+  them again, every file of the zip against the `.files`, that the `.files`
+  lists the core library, and that no name is one the host package or another
+  installed core package has, ignoring case (the same rule as the host's
+  `--check`). Its files are then written into the host's folder, and its
+  `.files` last, so a package stopped halfway is not installed and its files
+  are never given to the host.
+- **Removing one** (`RetroHostStore.removeCore`, `RetroHostRelease.removeCore`).
+  Its `.files` goes first, so it is no longer installed, then every file it
+  lists and the folders left empty. A name the host package's `.files` lists
+  is left alone.
+- **Only once the host has exited.** Adding and removing shut the kept host
+  down first and wait for it, refuse while a game plays or starts, and hold
+  every start until they are done (`RetroHostDownloadModel.installing`), as a
+  host update does.
+- **A host update** (`RetroHostDownloadModel.download`) fetches and installs
+  the packages in `RetroHostStore.installedCores` from the new release in the
+  same step; a package the new release lacks is gone afterwards, and the
+  library is scanned again when LRPS2 came or went.
+
 ## PS2 games
 
 A host that lists `ps2` (`RetroHostClient.canPlayPs2`) also plays PS2 games,
@@ -312,21 +391,23 @@ What the launcher does with them:
 - **Which core.** `RetroHostInstall.ps2Core` is LRPS2, `pcsx2_libretro.dll`,
   `.so` or `.dylib` (`RetroHostSystem.ps2Core`), beside the host. The names
   must stay the ones the host's `tools/package_release.py` packs (its
-  `SYSTEMS`, on the `ps2-release` branch at 8571e68 the same three): a release
-  whose LRPS2 is named otherwise is taken for one without LRPS2.
-  `RetroHostStore.installed` names it when the installed release's `.files`
-  lists it (`RetroHostRelease.installedHasPs2Core`), as `checkBeforeStart`
-  decides it, so a stray `pcsx2_libretro` file in the host folder is neither
-  offered nor checked; `RetroHostInstall.locate` names it when it is beside an
-  unchecked host. A release that does not ship LRPS2 has none, and PS2 is then
-  not available: Settings › Emulators shows no PS2 rows.
+  `SYSTEMS`, on the `ps2-release` branch at 4599660 the same three): an LRPS2
+  package whose `.files` names it otherwise is refused.
+  `RetroHostStore.installed` names it when the LRPS2 package is installed and
+  its `.files` lists it (`RetroHostRelease.installedHasPs2Core`), as
+  `checkBeforeStart` decides it, so a stray `pcsx2_libretro` file in the host
+  folder is neither offered nor checked; `RetroHostInstall.locate` names it
+  when it is beside an unchecked host. Without the LRPS2 package PS2 is not
+  available: Settings › Emulators shows no PS2 rows but the PS2 emulator's
+  download, where the release has it ("Core packages" above).
 - **Checked like SwanStation.** `checkBeforeStart` checks LRPS2 against the
-  `.files` whenever the `.files` lists it, for a PS1 game too: one host plays
-  the next game on the cores it was checked with, PS1 or PS2, so both are
-  held for its whole life on Windows (and checked again by path on Linux
-  before a kept host's next game). A changed LRPS2 fails the check for every
-  game. A release whose `.files` lists no LRPS2 is checked for SwanStation
-  alone, and its `RetroHostChecked.ps2Core` is null. A failure names the file
+  LRPS2 package's `.files` whenever that package is installed, for a PS1 game
+  too: one host plays the next game on the cores it was checked with, PS1 or
+  PS2, so both are held for its whole life on Windows (and checked again by
+  path on Linux before a kept host's next game). A changed LRPS2, or a changed
+  LRPS2 `.files`, fails the check for every game. A host without the LRPS2
+  package is checked for SwanStation alone, and its `RetroHostChecked.ps2Core`
+  is null. A failure names the file
   that failed (`RetroHostReleaseFailure.file`), and the launcher's log line
   says it, so a broken LRPS2 that stops a PS1 game is named as the cause.
 - **`start`.** `RetroHostStartRequest.console` is `ps2` for a PS2 game and
@@ -963,6 +1044,25 @@ reads the fixture for the tests. They check:
 Tests that change the release sign the copy again with keys of their own,
 to tell the trusted key from a stranger's.
 
+[`test/core/retro_host/retro_host_core_package_test.dart`](../test/core/retro_host/retro_host_core_package_test.dart)
+covers core packages against
+[`test/fixtures/retro_host_release_lrps2`](../test/fixtures/retro_host_release_lrps2),
+a 1.1.0 release with both packages for every system. Each package was packed
+from small stand-in files by `package_release.py` at host PR #22's 4599660 (a
+host run with `--host --core --core-licence --swanstation-commit`, an LRPS2
+run with `--ps2-core --ps2-core-licence --lrps2-commit`), `SHA256SUMS` from
+its `--sums`, and the whole release passed its `--check --version 1.1.0
+--host-repository --host-commit`. `SHA256SUMS.sig` is the fixture key's
+signature, as for the 1.0.0 release. The tests check that the host is
+installed alone and offers LRPS2; that 1.0.0 offers none; that an added LRPS2
+is checked and held with the host before a start; that a changed LRPS2 or
+LRPS2 `.files` fails the check; that a stray `pcsx2_libretro` is never given;
+that a changed package, one of another release and one sharing a name with the
+host package are refused with nothing written; that removing it leaves the
+host whole; that a host update moves it, drops it when the new release lacks
+it and never adds it unasked; and, from a fake GitHub, that only this system's
+LRPS2 files are fetched, and only from the installed host's own release.
+
 To make the fixture again, pack each system's stand-in files with
 `package_release.py --version 1.0.0 --system <system> --host <stand-in>
 --core <stand-in> --core-licence <stand-in> --core-notices <folder>
@@ -1058,17 +1158,19 @@ when `ANYPS5_RETRO_HOST_CHECKOUT` is set.
   ("Debug and test builds" above) is compiled in release mode but is no
   release and is never published. A host pull request of its own, separate
   from the host's release packaging, adds test builds to that text.
-- **No signed release yet.** The download reads the host repository's
-  GitHub releases, and none is published there yet: until the maintainers
-  sign and publish one (that repository's `docs/host.md` "Releases"), a
-  release build says no signed PS1 emulator has been published yet, and has no
-  host to run. The whole path was tested with a real release that the host
-  repository's release workflow packed, signed with the test key
-  ([Emulator host UI](<AnyPS5 Desktop - Emulator Host UI.md>), "Against the real host").
+- **Only 1.0.0 is published.** The host repository's one signed release,
+  v1.0.0, holds the host and SwanStation: no save states and no LRPS2. A
+  release build downloads it; before it, the path was tested with a real
+  release that the host repository's release workflow packed, signed with the
+  test key ([Emulator host UI](<AnyPS5 Desktop - Emulator Host UI.md>), "Against the real host").
 - **The protocol's storage sentence.** protocol.md at 9052aff still says the
   host lives in the launcher's own directory; the launcher keeps a downloaded
   host in its data folder (above), since an AppImage's directory is read-only.
   The host repository's release pull request changes that text.
+- **No signed release ships LRPS2 yet.** The split release is host PR #22;
+  until it is merged and a release (1.1.0) is published, every signed host is
+  1.0.0 and offers no PS2 emulator. The PS2 path was tested against the
+  recorded `retro_host_release_lrps2` fixture, not a published release.
 - **No update check on its own.** A newer host is looked for only when the
   player selects the emulator's row in Settings › Emulators, as ffmpeg's
   download works. Nothing asks GitHub unprompted.

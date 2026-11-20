@@ -281,12 +281,16 @@ extension RetroHostPlaying on AppModel {
     rescan();
   }
 
-  /// Settings › Emulators' rows for the host: its download, or the notice that this build runs an
-  /// unchecked host, and where a host is found, the setting and the BIOS folder; then the same two
-  /// for PS2 where that host has LRPS2 beside it.
+  /// Settings › Emulators' rows for the host: its download and, beside it, the PS2 emulator's
+  /// download where the installed host's release has one, or the notice that this build runs an
+  /// unchecked host; and where a host is found, the setting and the BIOS folder; then the same two
+  /// for PS2 where that host has LRPS2 beside it, with the row that removes the PS2 emulator.
   List<PanelRow> _retroHostSettingsRows() {
     final unchecked = retroHostUnchecked != null;
-    final download = retroHostDownload.rows(uncheckedHost: unchecked);
+    final download = [
+      ...retroHostDownload.rows(uncheckedHost: unchecked),
+      ...retroHostDownload.ps2.rows(uncheckedHost: unchecked),
+    ];
     final install = retroHostInstall;
     if (install == null) return download;
     return [
@@ -310,14 +314,15 @@ extension RetroHostPlaying on AppModel {
           detail: T.text('retroHostBiosFolderDetail'),
           kind: ActionRow(openRetroBiosFolder),
         ),
-      ..._retroHostPs2SettingsRows(install),
+      ..._retroHostPs2SettingsRows(install, unchecked: unchecked),
     ];
   }
 
   /// The PS2 rows of Settings › Emulators under the PS1 ones: where [install] has LRPS2 beside it,
-  /// the setting and, once it is on, the folder LRPS2 looks for the PS2 BIOS in; where it has none
-  /// (a host release that does not ship LRPS2), no rows, so its Settings stay as they are for PS1.
-  List<PanelRow> _retroHostPs2SettingsRows(RetroHostInstall install) {
+  /// the setting and, once it is on, the folder LRPS2 looks for the PS2 BIOS in, then the row that
+  /// removes the PS2 emulator; where it has none (the PS2 emulator not added, or a host release
+  /// that does not ship it), no rows, so its Settings stay as they are for PS1.
+  List<PanelRow> _retroHostPs2SettingsRows(RetroHostInstall install, {required bool unchecked}) {
     if (install.ps2Core == null) return const [];
     return [
       PanelRow(
@@ -333,6 +338,7 @@ extension RetroHostPlaying on AppModel {
           detail: T.text('retroHostPs2BiosFolderDetail'),
           kind: ActionRow(() => openRetroBiosFolder(ps2: true)),
         ),
+      ...retroHostDownload.ps2.removeRows(uncheckedHost: unchecked),
     ];
   }
 

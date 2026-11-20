@@ -14,9 +14,9 @@ import 'retro_host_store.dart';
 /// named by the environment variable `ANYPS5_RETRO_HOST`, and any core, without the checks.
 /// Release builds ignore that variable." A test build is compiled in release mode but is not a
 /// release, and never published (docs/AnyPS5 Desktop - Emulator Host Client.md "Debug and test builds").
-/// The core is the SwanStation library beside the host, as a host release's zip holds the two. A
-/// host release with the `ps2` capability has LRPS2 beside them too (anyps5-retro-host docs/ps2.md
-/// "Releases"), and so may an unchecked host: that is [ps2Core].
+/// The core is the SwanStation library beside the host, as a host package's zip holds the two.
+/// LRPS2 is beside them once the player added the release's LRPS2 package (protocol.md "Finding and
+/// checking the host", core packages), and may be beside an unchecked host: that is [ps2Core].
 class RetroHostInstall {
   const RetroHostInstall({required this.host, required this.core, this.ps2Core, this.checked = false});
 
@@ -30,7 +30,8 @@ class RetroHostInstall {
   final String core;
 
   /// The LRPS2 library a PS2 game is started with (`start.console` `ps2`), or null when this host
-  /// has none beside it: a release that does not ship LRPS2, or an unchecked host built without it.
+  /// has none beside it: a signed host whose LRPS2 package is not added, or an unchecked host built
+  /// without it.
   final String? ps2Core;
 
   /// A signed release's host: its files are checked before each start and held until the host
