@@ -58,8 +58,8 @@ void main() {
     expect(
       [for (final language in T.languages) language.code],
       [
-        'en', 'id', 'ms', 'da', 'de', 'es', 'fil', 'fr', 'hu', 'no', 'pt', 'ro', 'sv', 'tr', 'cs', 'ru', 'ur', 'ar', //
-        'bho', 'hi', 'bn', 'lo', 'am', 'km', 'ja', 'zh-Hans', 'zh-Hant', 'ko',
+        'en', 'id', 'ms', 'da', 'de', 'es', 'fil', 'fr', 'hu', 'no', 'pl', 'pt', 'ro', 'sv', 'tr', 'cs', 'ru', 'ur', //
+        'ar', 'bho', 'hi', 'bn', 'lo', 'am', 'km', 'ja', 'zh-Hans', 'zh-Hant', 'ko',
       ],
     );
     expect(T.languages.first.displayName, 'English');

@@ -176,13 +176,13 @@ void main() {
       expect(TogetherChallenges.metricName(ChallengeMetric.time), 'Oynama süresi');
     });
 
-    test('every challenge text is in all 28 of the launcher\'s languages, translated', () {
+    test('every challenge text is in all 29 of the launcher\'s languages, translated', () {
       fixture = makeFixture();
       final codes = [
         for (final file in Directory('assets/l10n').listSync().whereType<File>())
           if (file.path.endsWith('.json')) file.uri.pathSegments.last.replaceAll('.json', ''),
       ];
-      expect(codes, hasLength(28));
+      expect(codes, hasLength(29));
       final english = languageFile('en');
       final keys = english.keys
           .where((key) => key.startsWith('challenge') || key.startsWith('notifChallenge'))
