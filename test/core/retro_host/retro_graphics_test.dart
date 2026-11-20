@@ -127,6 +127,14 @@ void main() {
       RetroGraphicsNote.applying,
       reason: 'the aspect ratio is not in effect yet',
     );
+    final settled = ps1();
+    expect(RetroGraphicsChoice.of(settled, retroFixWobbly3d)!.note, RetroGraphicsNote.none);
+    final redrawing = RetroStatus.parse({...settled.toJson(), 'graphicsPending': true});
+    expect(
+      RetroGraphicsChoice.of(redrawing, retroFixWobbly3d)!.note,
+      RetroGraphicsNote.applying,
+      reason: 'in effect, but the host is still applying a graphics change',
+    );
   });
 
   test("PS2: sharper textures and widescreen from the real LRPS2's options, the patch at the next start", () {

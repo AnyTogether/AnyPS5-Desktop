@@ -493,6 +493,7 @@ void main() {
 
     final saved = Preferences.fromJson(jsonDecode(jsonEncode(model.preferences.toJson())) as Map<String, dynamic>);
     expect(saved.retroHostGameOptions, model.preferences.retroHostGameOptions, reason: 'saved and read back');
+    model.preferences.retroHostGameOptions = saved.retroHostGameOptions;
     await launcher.start(status: recordedStatus());
     expect(started(), containsPair('swanstation_GPU_WidescreenHack', 'true'));
     expect(started(), containsPair('swanstation_Display_AspectRatio', '16:9'));
