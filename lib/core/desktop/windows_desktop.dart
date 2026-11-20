@@ -66,6 +66,11 @@ final class _Win32 {
     postMessage = user.lookupFunction<Int32 Function(_H, Uint32, IntPtr, IntPtr), int Function(int, int, int, int)>(
       'PostMessageW',
     );
+    sendMessageTimeout = user
+        .lookupFunction<
+          IntPtr Function(_H, Uint32, IntPtr, IntPtr, Uint32, Uint32, Pointer<IntPtr>),
+          int Function(int, int, int, int, int, int, Pointer<IntPtr>)
+        >('SendMessageTimeoutW');
     monitorFromWindow = user.lookupFunction<_H Function(_H, Uint32), int Function(int, int)>('MonitorFromWindow');
     getMonitorInfo = user.lookupFunction<Int32 Function(_H, Pointer<Uint32>), int Function(int, Pointer<Uint32>)>(
       'GetMonitorInfoW',
@@ -164,6 +169,7 @@ final class _Win32 {
   late final void Function(int, int) switchToThisWindow;
   late final int Function(int, Pointer<Uint8>, int) sendInput;
   late final int Function(int, int, int, int) postMessage;
+  late final int Function(int, int, int, int, int, int, Pointer<IntPtr>) sendMessageTimeout;
   late final int Function(int, int) mapVirtualKey;
   late final int Function(int, int) monitorFromWindow;
   late final int Function(int, Pointer<Uint32>) getMonitorInfo;
@@ -210,7 +216,6 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
   static const _notTopmost = -2;
   static const _noSize = 0x0001;
   static const _noMove = 0x0002;
-  static const _noZOrder = 0x0004;
   static const _noActivate = 0x0010;
   static const _showWindow = 0x0040;
 
@@ -253,14 +258,24 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
   /// SwitchToThisWindow, Alt+Tab's own way. True when [window] is in front.
   bool _bringToFront(int window) {
     if (window == 0) return false;
+    // A window that does not answer (a game still loading on its window's thread) is left alone:
+    // each call below waits for its thread, and the thread that would wait is the launcher's
+    // interface (Flutter runs Dart on the window's thread), which then stops answering too.
+    if (!_answers(window)) {
+      log?.call('desktop: window $window does not answer: left where it is');
+      return false;
+    }
     if (_w.isIconic(window) != 0) _w.showWindow(window, 9 /* SW_RESTORE */);
     final front = _w.getForegroundWindow();
     if (front == window) return true;
     final ours = _w.getCurrentThreadId();
-    final threads = <int>{
-      if (front != 0) _w.getWindowThreadProcessId(front, nullptr),
-      _w.getWindowThreadProcessId(window, nullptr),
-    }..removeWhere((thread) => thread == 0 || thread == ours);
+    final threads = threadsToJoin(
+      ours: ours,
+      windows: [
+        if (front != 0) (thread: _w.getWindowThreadProcessId(front, nullptr), answers: _answers(front)),
+        (thread: _w.getWindowThreadProcessId(window, nullptr), answers: true),
+      ],
+    );
     final joined = [
       for (final thread in threads)
         if (_w.attachThreadInput(ours, thread, 1) != 0) thread,
@@ -287,6 +302,20 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
     log?.call('desktop: window $window in front: $how');
     return _w.getForegroundWindow() == window;
   }
+
+  /// Whether [window]'s thread takes a message within [answerTime] (a window of the launcher's
+  /// own thread always does). One that does not is busy (a game loading before it pumps its
+  /// messages) or hung: SetWindowPos, BringWindowToTop, ShowWindow, PrintWindow and an input
+  /// joined to its thread would all wait for it, for as long as it takes.
+  bool _answers(int window) {
+    final thread = _w.getWindowThreadProcessId(window, nullptr);
+    if (thread != 0 && thread == _w.getCurrentThreadId()) return true;
+    return _w.sendMessageTimeout(window, 0 /* WM_NULL */, 0, 0, 0x0002 /* SMTO_ABORTIFHUNG */, answerTime, nullptr) !=
+        0;
+  }
+
+  /// How long [_answers] waits for a window's thread, in milliseconds.
+  static const answerTime = 250;
 
   /// Alt down and up, as typed: unlocks SetForegroundWindow for this process.
   void _tapAlt() => using((arena) {
@@ -411,7 +440,9 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
       );
       final x = work[0] + (work[2] - work[0] - size.width) ~/ 2;
       final y = work[1] + (work[3] - work[1] - size.height) ~/ 2;
-      return _w.setWindowPos(window, 0, x, y, size.width, size.height, _noZOrder | _noActivate) != 0;
+      // Posted to the game's thread (SWP_ASYNCWINDOWPOS), never waited for: the game is often
+      // still loading on that thread, and SetWindowPos would wait until it pumps its messages.
+      return _w.setWindowPos(window, 0, x, y, size.width, size.height, gameWindowPlacement) != 0;
     });
   }
 
@@ -436,6 +467,7 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
 
   /// F11 in the game's window, as if typed: upstream's engine toggles full screen on it.
   bool _pressF11(int window) {
+    // A game that does not answer yet is not brought in front: it gets the key in its queue.
     _bringToFront(window);
     if (_w.getForegroundWindow() == window) {
       return using((arena) {
@@ -540,9 +572,10 @@ class WindowsDesktop implements DesktopWindows, GameAreas {
       try {
         // In front, the screen has the game as the player sees it; covered, the window is asked
         // to draw itself (PW_CLIENTONLY | PW_RENDERFULLCONTENT).
+        // A covered window that does not answer is not asked: PrintWindow would wait for it.
         final copied = _w.getForegroundWindow() == window
             ? _w.bitBlt(memory, 0, 0, width, height, screen, corner[0], corner[1], 0x00CC0020 /* SRCCOPY */)
-            : _w.printWindow(window, memory, 3);
+            : (_answers(window) ? _w.printWindow(window, memory, 3) : 0);
         if (copied == 0) return null;
         final pixels = Uint8List.fromList(bits.value.asTypedList(width * height * 4));
         return RgbaImage.fromBgra(width, height, pixels);
