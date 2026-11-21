@@ -164,6 +164,9 @@ class FakeRetroHostSession extends FakeFrameSource implements RetroHostSession {
   /// How many times `status` was asked.
   int statusAsked = 0;
 
+  /// How long each `status` takes to answer.
+  Duration statusDelay = Duration.zero;
+
   @override
   Future<RetroStatus?> status() async {
     statusAsked++;
@@ -171,6 +174,7 @@ class FakeRetroHostSession extends FakeFrameSource implements RetroHostSession {
     if (error != null) throw error;
     final reply = nextStatus;
     await statusGate?.future;
+    if (statusDelay > Duration.zero) await Future<void>.delayed(statusDelay);
     return reply;
   }
 

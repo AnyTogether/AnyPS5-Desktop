@@ -152,7 +152,11 @@ class RetroHostGame extends ChangeNotifier {
 
   Timer? _poll;
   Future<void>? _polling;
-  bool _pollAgain = false;
+
+  /// How many `status` calls were begun; each caller of [refresh] waits for the first one begun
+  /// after its call ([_waiters], with the number of that call).
+  int _pollsBegun = 0;
+  final _waiters = <(int, Completer<void>)>[];
   bool _disposed = false;
   bool _hostEnded = false;
   bool _detached = false;
@@ -250,33 +254,44 @@ class RetroHostGame extends ChangeNotifier {
     _setPhase(RetroHostGamePhase.loading);
     if (!_focused) await _pauseForFocus();
     if (!_gameLive) return;
-    _poll = Timer.periodic(statusEvery, (_) => unawaited(refresh()));
+    _poll = Timer.periodic(statusEvery, (_) {
+      if (_polling == null) unawaited(refresh());
+    });
     await refresh();
   }
 
   /// Asks `status` and follows it: the aspect ratio, the first frame, and the game's end.
   /// Listeners hear of it only when the status says something new: a game that plays on with the
-  /// same status, asked twice a second, rebuilds nothing. One `status` is asked at a time; asked
-  /// while one is on its way, it is asked once more after it, and the call completes only then, so
-  /// what follows sees a status asked after the call (an `option` the host just took shows).
+  /// same status, asked twice a second, rebuilds nothing. One `status` is asked at a time. The
+  /// call completes once a `status` begun after it was answered, so what follows sees what the
+  /// host said after the call (an `option` the host just took shows); asked while one is on its
+  /// way, it waits for the one after it, and no later call makes it wait longer. The game's twice
+  /// a second ask is left out while one is on its way.
   Future<void> refresh() {
     if (!_gameLive) return Future.value();
-    final polling = _polling;
-    if (polling != null) {
-      _pollAgain = true;
-      return polling;
-    }
-    return _polling = _pollUntilCurrent();
+    final answered = Completer<void>();
+    _waiters.add((_pollsBegun + 1, answered));
+    _polling ??= _pollWhileWaited();
+    return answered.future;
   }
 
-  Future<void> _pollUntilCurrent() async {
+  Future<void> _pollWhileWaited() async {
     try {
-      do {
-        _pollAgain = false;
+      while (_gameLive && _waiters.isNotEmpty) {
+        final number = ++_pollsBegun;
         await _pollOnce();
-      } while (_pollAgain && _gameLive);
+        _waiters.removeWhere((waiter) {
+          if (waiter.$1 > number) return false;
+          waiter.$2.complete();
+          return true;
+        });
+      }
     } finally {
       _polling = null;
+      for (final waiter in _waiters) {
+        waiter.$2.complete();
+      }
+      _waiters.clear();
     }
   }
 

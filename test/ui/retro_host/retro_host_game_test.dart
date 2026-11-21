@@ -157,6 +157,20 @@ void main() {
     await polling;
   });
 
+  test("a host slower than the game's twice a second ask still answers each refresh", () async {
+    session.readyCompleter.complete();
+    session.nextStatus = RetroStatus.parse(jsonDecode(_protocolStatus) as Map<String, Object?>);
+    session.statusDelay = const Duration(milliseconds: 30);
+    final quick = RetroHostGame(session, statusEvery: const Duration(milliseconds: 5));
+    addTearDown(quick.dispose);
+    await quick.start(_request);
+    for (var call = 0; call < 3; call++) {
+      final asked = session.statusAsked;
+      await quick.refresh().timeout(const Duration(seconds: 2));
+      expect(session.statusAsked - asked, lessThanOrEqualTo(2), reason: 'the one on its way, then its own');
+    }
+  });
+
   test('a loading game that loads on with the same status tells no one until it is ready', () async {
     await started(status: fakeStatus(ready: false));
     var heard = 0;
