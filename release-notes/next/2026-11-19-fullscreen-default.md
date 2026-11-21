@@ -1,1 +1,0 @@
-- **Games now start in Full Screen by default.** A game with its own Display choice keeps it, and a Default Display you set to Window stays Window. Settings > Default Display switches every game back to a window.
