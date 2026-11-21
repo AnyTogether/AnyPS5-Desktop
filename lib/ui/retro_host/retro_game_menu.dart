@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../core/retro_host/retro_graphics.dart';
 import '../../core/retro_host/retro_host_protocol.dart';
 import '../../core/retro_host/retro_resolution.dart';
 import 'retro_host_controls.dart';
@@ -132,6 +133,12 @@ class RetroGameMenu extends ChangeNotifier {
   /// ([RetroResolutionChoice.of]).
   RetroResolutionChoice? get resolution => RetroResolutionChoice.of(game.status, limitsPs2: game.limitsPs2Resolution);
 
+  /// The game's other graphics settings as the Graphics page offers them, in its order: those of
+  /// the game's console the host lists ([RetroGraphicsChoice.of]).
+  List<RetroGraphicsChoice> get graphics => [
+    for (final setting in retroGraphicsSettings) ?RetroGraphicsChoice.of(game.status, setting),
+  ];
+
   /// The rows for [status] (null before the first one) and the volume.
   static List<RetroMenuRow> rowsFor(RetroStatus? status, {required double volume, required bool muted}) {
     final discs = status?.discs;
@@ -194,6 +201,43 @@ class RetroGameMenu extends ChangeNotifier {
     if (choice.values[choice.selected].value == value) return false;
     return game.setOption(choice.key, value);
   }
+
+  /// Chooses the value at [index] of [setting]'s row: the options it sets that differ from the
+  /// host's are sent, in order. One choice at a time: another made while one is sent is not taken,
+  /// so two choices never leave a setting's options half of each. When the host refuses one, those
+  /// it took are asked back to what the host had; should the host refuse that too, the row shows
+  /// the half-set value with the host's label ([RetroGraphicsChoice.of]) until the player chooses
+  /// again. Every option the value sets, to keep together, once the host took them all;
+  /// null when the row does not offer that value now, it already has it, a choice is being sent,
+  /// or the host refused one.
+  Future<Map<String, String>?> chooseGraphics(RetroGraphicsSetting setting, int index) async {
+    final status = game.status;
+    final choice = RetroGraphicsChoice.of(status, setting);
+    if (_choosingGraphics || status == null || choice == null || index < 0 || index >= choice.values.length) {
+      return null;
+    }
+    final changes = choice.changesFor(status, index);
+    if (changes.isEmpty) return null;
+    _choosingGraphics = true;
+    try {
+      final taken = <String>[];
+      for (final MapEntry(:key, :value) in changes.entries) {
+        if (!await game.setOption(key, value)) {
+          for (final key in taken) {
+            final option = status.options[key]!;
+            await game.setOption(key, option.values[option.selected]);
+          }
+          return null;
+        }
+        taken.add(key);
+      }
+      return choice.values[index].offer!.options;
+    } finally {
+      _choosingGraphics = false;
+    }
+  }
+
+  bool _choosingGraphics = false;
 
   /// Moves the volume [steps] of [volumeStep] up (down when negative), from 0 to 1. Turning it up
   /// unmutes. The level is counted in whole steps and divided last, so three tenths is 0.3, not

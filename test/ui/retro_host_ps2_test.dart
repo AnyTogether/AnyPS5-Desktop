@@ -111,8 +111,8 @@ void main() {
       'disc': p.normalize(launcher.ps2Disc!),
       'system': p.normalize(model.paths.retroSystem),
       'saves': p.normalize(model.paths.retroPs2Saves),
-      'options': {'pcsx2_fastboot': 'disabled', 'pcsx2_bios': 'scph-mine.bin'},
-    });
+      'options': {'pcsx2_fastboot': 'disabled', 'pcsx2_bios': 'scph-mine.bin', 'pcsx2_anisotropic_filtering': '16x'},
+    }, reason: 'sharper textures start on');
   });
 
   test("the real LRPS2's missing BIOS: the PS2 words, and the options key opens the PS2 BIOS folder", () async {
@@ -139,7 +139,11 @@ void main() {
       'disc': p.normalize(launcher.disc),
       'system': p.normalize(model.paths.retroSystem),
       'saves': p.normalize(model.paths.retroSaves),
-      'options': {'swanstation_Console_Region': 'NTSC-J'},
+      'options': {
+        'swanstation_Console_Region': 'NTSC-J',
+        'swanstation_GPU_PGXPEnable': 'true',
+        'swanstation_GPU_TrueColor': 'true',
+      },
     });
   });
 
@@ -167,7 +171,7 @@ void main() {
       expect(model.panelCategories().single.title, 'Sky Racer');
       final first = [for (final row in model.panelCategories().single.rows) row.id];
       expect(first, containsAllInOrder(['resume', 'section-audio', 'section-advanced', 'closeGame']));
-      expect(first, isNot(contains('resolution')), reason: 'a host without ps2ResolutionLimits');
+      expect(first, isNot(contains('section-graphics')), reason: 'a host without ps2ResolutionLimits');
       (launcher.row('section-advanced').kind as ActionRow).run();
       final bios = launcher.row('option-pcsx2_bios');
       expect(bios.detail, T.text('retroMenuOptionRestartOnlyDetail'), reason: 'LRPS2 reads it only at a start');
@@ -201,12 +205,19 @@ void main() {
       model.openRetroMenu();
       await pumpEventQueue();
       final first = [for (final row in model.panelCategories().single.rows) row.id];
-      expect(first, containsAllInOrder(['section-audio', 'resolution']));
+      expect(first, containsAllInOrder(['section-audio', 'section-graphics']));
       expect(
         first,
         isNot(contains('section-advanced')),
         reason: "LRPS2's VR, the recording's other option, is not shown",
       );
+      expect(
+        launcher.row('section-graphics').detail,
+        T.format('retroResolutionRefusedDetail', ['4x']),
+        reason: 'the refusal shows before Graphics is opened',
+      );
+      (launcher.row('section-graphics').kind as ActionRow).run();
+      expect([for (final row in model.panelCategories().single.rows) row.id], ['resolution']);
       final row = launcher.row('resolution');
       expect(row.detail, T.format('retroResolutionRefusedDetail', ['4x']));
       final choice = row.kind as ChoiceRow;
@@ -240,7 +251,11 @@ void main() {
       });
       launcher.session.limitsPs2Resolution = true;
       await startPs2(recorded());
-      expect(launcher.session.startArgs!['options'], {retroResolutionKeyPs2: '4x', 'pcsx2_fastboot': 'disabled'});
+      expect(launcher.session.startArgs!['options'], {
+        retroResolutionKeyPs2: '4x',
+        'pcsx2_fastboot': 'disabled',
+        'pcsx2_anisotropic_filtering': '16x',
+      });
     });
 
     test('a host without ps2ResolutionLimits is neither offered nor sent a PS2 resolution', () async {
@@ -248,10 +263,17 @@ void main() {
       final model = launcher.model..setRetroHostPs2(true);
       model.preferences.retroHostOptions.addAll({retroResolutionKeyPs2: '4x', 'pcsx2_fastboot': 'disabled'});
       await startPs2(recorded());
-      expect(launcher.session.startArgs!['options'], {'pcsx2_fastboot': 'disabled'});
+      expect(launcher.session.startArgs!['options'], {
+        'pcsx2_fastboot': 'disabled',
+        'pcsx2_anisotropic_filtering': '16x',
+      });
       model.openRetroMenu();
       await pumpEventQueue();
-      expect([for (final row in model.panelCategories().single.rows) row.id], isNot(contains('resolution')));
+      expect(
+        [for (final row in model.panelCategories().single.rows) row.id],
+        isNot(contains('section-graphics')),
+        reason: 'the recording lists no other graphics option',
+      );
     });
   });
 

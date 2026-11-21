@@ -189,16 +189,12 @@ String retroResolutionLabel(RetroResolutionValue value) => switch (value.scale) 
   final scale => T.format('retroResolutionScale', ['$scale']),
 };
 
-/// The words under the internal resolution row ([RetroResolutionNote]). A refusal is said in the
+/// The words under the internal resolution row ([RetroGraphicsNote]). A refusal is said in the
 /// launcher's words, naming the value the game uses; the host's English `resolutionError` goes to
 /// the log.
-String retroResolutionDetail(RetroResolutionChoice choice) => switch (choice.note) {
-  RetroResolutionNote.none => T.text('retroResolutionDetail'),
-  RetroResolutionNote.applying => T.text('retroMenuOptionPendingDetail'),
-  RetroResolutionNote.nextStart => T.text('retroMenuOptionRestartDetail'),
-  RetroResolutionNote.changesAtNextStart => T.text('retroMenuOptionRestartOnlyDetail'),
-  RetroResolutionNote.refused => T.format('retroResolutionRefusedDetail', [retroResolutionLabel(choice.active)]),
-};
+String retroResolutionDetail(RetroResolutionChoice choice) => choice.note == RetroGraphicsNote.refused
+    ? T.format('retroResolutionRefusedDetail', [retroResolutionLabel(choice.active)])
+    : retroGraphicsNoteDetail(choice.note, about: 'retroResolutionDetail');
 
 /// Starts one emulator host for PS1 and PS2 games, with the player's volume: [checked] is the check of a
 /// signed release's host ([RetroHostInstall.checked]), whose files the host holds until it exits.
@@ -210,11 +206,11 @@ typedef RetroHostOpener = RetroHostSession Function(
 });
 
 /// The menu's sections, in the order its first page lists them, each with the words of its row
-/// and heading and of the row's detail. Graphics is not among them: its options are left for a
-/// Graphics page of their own ([RetroOptionSection.graphics]), but for the internal resolution,
-/// a row of its own after Audio.
+/// and heading and of the row's detail. Graphics lists not its options but the internal
+/// resolution and the settings that set them ([RetroGameMenu.graphics]).
 const retroMenuSections = {
   RetroOptionSection.audio: ('retroMenuAudio', 'retroMenuAudioDetail'),
+  RetroOptionSection.graphics: ('retroMenuGraphics', 'retroMenuGraphicsDetail'),
   RetroOptionSection.controller: ('retroMenuController', 'retroMenuControllerDetail'),
   RetroOptionSection.console: ('retroMenuConsole', 'retroMenuConsoleDetail'),
   RetroOptionSection.advanced: ('retroMenuAdvanced', 'retroMenuAdvancedDetail'),
@@ -481,10 +477,11 @@ extension RetroHostPlaying on AppModel {
         system: p.normalize(paths.retroSystem),
         saves: p.normalize(ps2 ? paths.retroPs2Saves : paths.retroSaves),
         states: states,
-        options: {
-          for (final MapEntry(:key, :value) in preferences.retroHostOptions.entries)
-            if (retroOptionSent(key, ps2: ps2)) key: value,
-        },
+        options: retroStartOptions(
+          preferences.retroHostOptions,
+          ps2: ps2,
+          game: preferences.retroHostGameOptions[game.titleId] ?? const {},
+        ),
       ),
     );
   }
@@ -686,10 +683,10 @@ extension RetroHostPlaying on AppModel {
   }
 
   /// The game's menu. Its first page: Resume, the discs of a multi-disc game, Save state and Load
-  /// state where its host saves states, a row for each section ([retroMenuSections]) that has rows
-  /// with the internal resolution after Audio's, and Close Game. A section's page: its options in
-  /// the order the host lists them, with Volume and Mute first in Audio. Save state's and Load
-  /// state's pages: the game's slots. Back on a page goes back to the first page.
+  /// state where its host saves states, a row for each section ([retroMenuSections]) that has rows,
+  /// and Close Game. A section's page: its options in the order the host lists them, with Volume
+  /// and Mute first in Audio; Graphics' page its own rows ([_retroGraphicsRows]). Save state's and
+  /// Load state's pages: the game's slots. Back on a page goes back to the first page.
   List<PanelCategory> _retroMenuCategories() {
     final play = retroPlay;
     if (play == null) return const [];
@@ -731,16 +728,14 @@ extension RetroHostPlaying on AppModel {
           kind: ActionRow(() => unawaited(menu.chooseDisc(disc))),
         ),
       ..._retroStateMenuRows(play),
-      for (final MapEntry(key: section, value: (title, detail)) in retroMenuSections.entries) ...[
+      for (final MapEntry(key: section, value: (title, detail)) in retroMenuSections.entries)
         if (_retroSectionRows(play, section).isNotEmpty)
           PanelRow(
             id: 'section-${section.name}',
             title: T.text(title),
-            detail: T.text(detail),
+            detail: section == RetroOptionSection.graphics ? _retroGraphicsSectionDetail(play) : T.text(detail),
             kind: ActionRow(() => _openRetroMenuSection(play, section)),
           ),
-        if (section == RetroOptionSection.audio) ?_retroResolutionRow(play),
-      ],
       PanelRow(
         id: 'closeGame',
         title: T.text('quickCloseGame'),
@@ -749,7 +744,23 @@ extension RetroHostPlaying on AppModel {
     ];
   }
 
-  /// The first page's Internal resolution row: the values the launcher offers that the host lists
+  /// What the first page's Graphics row says: what the page holds, or the internal resolution's
+  /// refusal, so a saved value the emulator cannot show is said before the page is opened.
+  String _retroGraphicsSectionDetail(RetroPlay play) {
+    final resolution = play.menu.resolution;
+    return resolution?.note == RetroGraphicsNote.refused
+        ? retroResolutionDetail(resolution!)
+        : T.text(retroMenuSections[RetroOptionSection.graphics]!.$2);
+  }
+
+  /// The Graphics page's rows: the internal resolution, then the console's other graphics
+  /// settings, each where the host lists it.
+  List<PanelRow> _retroGraphicsRows(RetroPlay play) => [
+    ?_retroResolutionRow(play),
+    for (final choice in play.menu.graphics) _retroGraphicsRow(choice),
+  ];
+
+  /// The Internal resolution row: the values the launcher offers that the host lists
   /// ([RetroResolutionChoice.of]), or null when the menu offers none.
   PanelRow? _retroResolutionRow(RetroPlay play) {
     final choice = play.menu.resolution;
@@ -764,6 +775,37 @@ extension RetroHostPlaying on AppModel {
         (index) => unawaited(_chooseRetroResolution(play, choice.values[index].value)),
       ),
     );
+  }
+
+  /// A Graphics setting's row ([RetroGraphicsChoice]): its values in the setting's order, with what
+  /// it does or when the value chosen takes effect under it.
+  PanelRow _retroGraphicsRow(RetroGraphicsChoice choice) => PanelRow(
+    id: choice.setting.kind.name,
+    title: retroGraphicsTitle(choice.setting),
+    detail: retroGraphicsDetail(choice),
+    kind: ChoiceRow(
+      [for (final value in choice.values) retroGraphicsLabel(value)],
+      choice.selected,
+      (index) => unawaited(_chooseRetroGraphics(choice.setting, index)),
+    ),
+  );
+
+  /// A Graphics value chosen in the menu: the options it sets sent to the game, and kept once the
+  /// host took them all, for every later game of its console, or for this game only when the
+  /// setting is kept per game ([RetroGraphicsSetting.perGame]). Each takes effect as its option
+  /// does: in a moment, or at the game's next start.
+  Future<void> _chooseRetroGraphics(RetroGraphicsSetting setting, int index) async {
+    final play = retroPlay;
+    if (play == null) return;
+    final taken = await play.menu.chooseGraphics(setting, index);
+    if (taken == null || _disposed) return;
+    if (setting.perGame) {
+      (preferences.retroHostGameOptions[play.game.titleId] ??= {}).addAll(taken);
+    } else {
+      preferences.retroHostOptions.addAll(taken);
+    }
+    savePreferences();
+    _changed();
   }
 
   /// An internal resolution chosen in the menu: sent to the game, and kept for every later game of
@@ -781,6 +823,7 @@ extension RetroHostPlaying on AppModel {
   /// An option that takes effect only when the game starts again says so; a chosen value not yet
   /// in effect says when it will be.
   List<PanelRow> _retroSectionRows(RetroPlay play, RetroOptionSection section) {
+    if (section == RetroOptionSection.graphics) return _retroGraphicsRows(play);
     final menu = play.menu;
     return [
       if (section == RetroOptionSection.audio) ...[

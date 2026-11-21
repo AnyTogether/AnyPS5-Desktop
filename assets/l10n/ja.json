@@ -2500,5 +2500,20 @@
   "retroResolutionDetail": "ゲームをより鮮明に描画します。高い値ほど高速なグラフィックカードが必要です。",
   "retroResolutionNative": "ネイティブ",
   "retroResolutionScale": "%@x",
-  "retroResolutionRefusedDetail": "エミュレーターが保存した解像度を表示できないため、ゲームは %@ を使います。"
+  "retroResolutionRefusedDetail": "エミュレーターが保存した解像度を表示できないため、ゲームは %@ を使います。",
+  "retroMenuGraphics": "グラフィック",
+  "retroMenuGraphicsDetail": "解像度、テクスチャ、ワイド画面。",
+  "retroGraphicsValueOff": "オフ",
+  "retroGraphicsValueOn": "オン",
+  "retroGraphicsValueSmooth": "なめらか",
+  "retroGraphicsValueExtraSmooth": "よりなめらか",
+  "retroSmoothTextures": "テクスチャをなめらかに",
+  "retroSmoothTexturesDetail": "ギザギザしたテクスチャやスプライトをなめらかにします。2Dの絵につなぎ目が見えることがあります。",
+  "retroFixWobbly3d": "3Dの揺れを修正",
+  "retroFixWobbly3dDetail": "3Dの形とテクスチャが揺れないようにします。",
+  "retroWidescreen": "ワイド画面",
+  "retroWidescreenPs1Detail": "3Dゲームを16:9でより広く表示します。2Dゲームや描かれた背景はおかしく見えることがあります。",
+  "retroWidescreenPs2Detail": "ゲームが対応していれば16:9で表示します。",
+  "retroSharperTextures": "テクスチャをくっきり",
+  "retroSharperTexturesDetail": "斜めから見た面のテクスチャをくっきり保ちます。"
 }

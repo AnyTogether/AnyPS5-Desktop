@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/ps1_launcher.dart';
 
 void main() {
-  test('the fifty options of the real host fall into their sections, ten not shown', () {
+  test('the fifty options of the real host fall into their sections, eighteen not shown', () {
     final keys = recordedStatus().options.keys.toList();
     expect(keys, hasLength(50));
     List<String> inSection(RetroOptionSection? section) => [
@@ -36,34 +36,34 @@ void main() {
       'CDROM_PreCacheCHD',
       'CPU_ExecutionMode',
       'CDROM_ReadaheadSectors',
-      'Main_ApplyGameSettings',
       'Main_RunaheadFrameCount',
       'Hacks_OldMDECRoutines',
     ]);
     expect(inSection(RetroOptionSection.graphics), [
       'GPU_ResolutionScale',
-      'GPU_UseSoftwareRendererForReadbacks',
-      'GPU_MSAA',
       'GPU_TrueColor',
       'GPU_ScaledDithering',
-      'GPU_DisableInterlacing',
-      'GPU_ForceNTSCTimings',
-      'Display_Force4_3For24Bit',
       'GPU_ChromaSmoothing24Bit',
       'GPU_TextureFilter',
       'GPU_WidescreenHack',
       'GPU_PGXPEnable',
       'Display_AspectRatio',
-      'Display_CropMode',
-      'GPU_DownsampleMode',
       'GPU_ShaderPrecompile',
     ]);
     expect(inSection(null), [
+      'GPU_UseSoftwareRendererForReadbacks',
+      'GPU_MSAA',
+      'GPU_DisableInterlacing',
+      'GPU_ForceNTSCTimings',
+      'Display_Force4_3For24Bit',
+      'Display_CropMode',
+      'GPU_DownsampleMode',
       'Display_ShowOSDMessages',
       'Display_ActiveStartOffset',
       'Display_ActiveEndOffset',
       'Display_LineStartOffset',
       'Display_LineEndOffset',
+      'Main_ApplyGameSettings',
       'CPU_RecompilerICache',
       'CPU_RecompilerBlockLinking',
       'CPU_FastmemMode',
@@ -77,6 +77,10 @@ void main() {
     expect(retroOptionSection('swanstation_ControllerPorts_MultitapMode'), RetroOptionSection.controller);
     expect(retroOptionSection('swanstation_BIOS_PathPAL'), RetroOptionSection.console);
     expect(retroOptionSection('swanstation_GPU_PGXPCulling'), RetroOptionSection.graphics);
+    for (final key in ['swanstation_GPU_PGXPVertexCache', 'swanstation_GPU_PGXPCPU', 'swanstation_GPU_MSAA']) {
+      expect(retroOptionSection(key), isNull, reason: key);
+      expect(retroOptionSent(key), isFalse, reason: key);
+    }
     expect(retroOptionSection('swanstation_Audio_Something'), RetroOptionSection.audio);
     expect(retroOptionSection('swanstation_Controller_ShowCrosshair'), isNull);
     expect(retroOptionSection('swanstation_TextureReplacements_Other'), isNull);
@@ -87,7 +91,12 @@ void main() {
       expect(retroOptionSection(key), isNull, reason: '$key: AnyPS5 has no VR');
       expect(retroOptionSent(key, ps2: true), isFalse, reason: key);
     }
-    expect(retroOptionSection('pcsx2_vu0_softfloat'), RetroOptionSection.advanced);
+    for (final key in ['pcsx2_vu0_softfloat', 'pcsx2_enable_hw_hacks', 'pcsx2_pgs_ssaa', 'pcsx2_pgs_other']) {
+      expect(retroOptionSection(key), isNull, reason: key);
+      expect(retroOptionSent(key, ps2: true), isFalse, reason: '$key is not sent though an older launcher kept it');
+    }
+    expect(retroOptionSection('pcsx2_bios'), RetroOptionSection.advanced);
+    expect(retroOptionSection('pcsx2_new_option'), RetroOptionSection.advanced);
     expect(retroOptionShown('swanstation_Console_Enable8MBRAM'), isFalse);
     expect(retroOptionShown('swanstation_Console_Region'), isTrue);
     expect(retroOptionSent('swanstation_Console_Region'), isTrue);
@@ -97,11 +106,81 @@ void main() {
     for (final key in [
       'swanstation_GPU_TextureFilter',
       'swanstation_GPU_PGXPEnable',
+      'swanstation_GPU_WidescreenHack',
       'swanstation_Display_AspectRatio',
     ]) {
       expect(retroOptionSection(key), RetroOptionSection.graphics, reason: key);
-      expect(retroOptionSent(key), isFalse, reason: '$key waits for a Graphics page');
+      expect(retroOptionSent(key), isTrue, reason: '$key: a Graphics row sets it');
+      expect(retroOptionSent(key, ps2: true), isFalse, reason: key);
     }
+    for (final key in ['pcsx2_anisotropic_filtering', 'pcsx2_widescreen_hint']) {
+      expect(retroOptionSection(key), RetroOptionSection.graphics, reason: key);
+      expect(retroOptionSent(key, ps2: true), isTrue, reason: '$key: a Graphics row sets it');
+    }
+    for (final key in ['swanstation_GPU_TrueColor', 'swanstation_GPU_ChromaSmoothing24Bit']) {
+      expect(retroOptionSection(key), RetroOptionSection.graphics, reason: key);
+      expect(retroOptionSent(key), isFalse, reason: '$key: no row sets it, so a kept value is not sent');
+    }
+  });
+
+  test('a start sends the kept values the menu shows over the Graphics defaults', () {
+    expect(retroStartOptions({}, ps2: false), {
+      'swanstation_GPU_PGXPEnable': 'true',
+      'swanstation_GPU_TrueColor': 'true',
+    }, reason: "fix wobbly 3D and true colour on; the console's own textures; no widescreen");
+    expect(
+      retroStartOptions({'swanstation_GPU_ResolutionScale': '3', 'swanstation_CDROM_ReadSpeedup': '2'}, ps2: false),
+      {
+        'swanstation_GPU_PGXPEnable': 'true',
+        'swanstation_GPU_TrueColor': 'true',
+        'swanstation_GPU_ResolutionScale': '3',
+        'swanstation_CDROM_ReadSpeedup': '2',
+      },
+      reason: 'no smoothing chosen for the player at a higher resolution either',
+    );
+    expect(
+      retroStartOptions({
+        'swanstation_GPU_TextureFilter': 'xBR',
+        'swanstation_GPU_PGXPEnable': 'false',
+        'swanstation_GPU_TrueColor': 'false',
+        'swanstation_GPU_MSAA': '4',
+        'pcsx2_anisotropic_filtering': 'disabled',
+      }, ps2: false),
+      {
+        'swanstation_GPU_TrueColor': 'true',
+        'swanstation_GPU_TextureFilter': 'xBR',
+        'swanstation_GPU_PGXPEnable': 'false',
+      },
+      reason: 'the values the player chose win; true colour has no row; MSAA and PS2 options are not sent',
+    );
+    const widescreen = {'swanstation_GPU_WidescreenHack': 'true', 'swanstation_Display_AspectRatio': '16:9'};
+    expect(
+      retroStartOptions(widescreen, ps2: false).keys,
+      isNot(contains('swanstation_GPU_WidescreenHack')),
+      reason: 'PS1 widescreen kept for every game (by an older launcher) is not sent',
+    );
+    expect(retroStartOptions({}, ps2: false, game: {...widescreen, 'swanstation_CDROM_ReadSpeedup': '2'}), {
+      'swanstation_GPU_PGXPEnable': 'true',
+      'swanstation_GPU_TrueColor': 'true',
+      ...widescreen,
+    }, reason: "the game's own widescreen is sent; only per-game options come from the game's list");
+    expect(retroStartOptions({}, ps2: true), {'pcsx2_anisotropic_filtering': '16x'});
+    expect(
+      retroStartOptions({
+        'pcsx2_anisotropic_filtering': 'disabled',
+        'pcsx2_widescreen_hint': 'enabled (16:9)',
+        'pcsx2_vr_mode': 'stereoscopic',
+        'pcsx2_enable_hw_hacks': 'enabled',
+        'pcsx2_fastboot': 'disabled',
+        'swanstation_GPU_PGXPEnable': 'false',
+      }, ps2: true),
+      {
+        'pcsx2_anisotropic_filtering': 'disabled',
+        'pcsx2_widescreen_hint': 'enabled (16:9)',
+        'pcsx2_fastboot': 'disabled',
+      },
+      reason: 'stereo and a hardware fix kept by an older launcher are dropped',
+    );
   });
 
   test('SwanStation\'s own (Restart) leaves the title, since the menu says it under each such option', () {

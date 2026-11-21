@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:anyps5_desktop/core/game_library.dart';
@@ -95,8 +96,14 @@ void main() {
       'disc': p.normalize(launcher.disc),
       'system': p.normalize(model.paths.retroSystem),
       'saves': p.normalize(model.paths.retroSaves),
-      'options': {'swanstation_CDROM_ReadSpeedup': '2', 'swanstation_GPU_ResolutionScale': '2'},
-    }, reason: 'the internal resolution is sent; another graphics option has no page yet, so it is kept back');
+      'options': {
+        'swanstation_CDROM_ReadSpeedup': '2',
+        'swanstation_GPU_ResolutionScale': '2',
+        'swanstation_GPU_TextureFilter': 'Bilinear',
+        'swanstation_GPU_PGXPEnable': 'true',
+        'swanstation_GPU_TrueColor': 'true',
+      },
+    }, reason: 'the Graphics rows\' options are sent, with the defaults of the settings not chosen');
     expect(Directory(model.paths.retroSystem).existsSync(), isTrue);
     expect(model.preferences.lastPlayed[launcher.game.id], isNotNull);
 
@@ -181,14 +188,15 @@ void main() {
         'disc-0',
         'disc-1',
         'section-audio',
-        'resolution',
+        'section-graphics',
         'section-controller',
         'section-console',
         'section-advanced',
         'closeGame',
       ],
-      reason: 'Graphics is not in the menu but for the internal resolution; a section shows only with rows',
+      reason: 'a section shows only with rows',
     );
+    expect(launcher.row('section-graphics').detail, T.text('retroMenuGraphicsDetail'));
     expect(launcher.row('disc-0').detail, 'In the console.');
     expect(launcher.row('section-console').title, T.text('retroMenuConsole'));
 
@@ -253,7 +261,6 @@ void main() {
         'option-swanstation_CDROM_PreCacheCHD',
         'option-swanstation_CPU_ExecutionMode',
         'option-swanstation_CDROM_ReadaheadSectors',
-        'option-swanstation_Main_ApplyGameSettings',
         'option-swanstation_Main_RunaheadFrameCount',
         'option-swanstation_Hacks_OldMDECRoutines',
       ],
@@ -269,8 +276,8 @@ void main() {
     );
     expect(
       launcher.play.menu.optionsIn(RetroOptionSection.graphics),
-      hasLength(16),
-      reason: 'kept for a Graphics page',
+      hasLength(9),
+      reason: 'the Graphics page offers rows of its own, not these options one by one',
     );
     expect(launcher.row('option-swanstation_Audio_FastHook').title, 'Use Per-Frame Audio Batching');
     expect(launcher.row('option-swanstation_Audio_FastHook').detail, T.text('retroMenuOptionRestartOnlyDetail'));
@@ -297,18 +304,31 @@ void main() {
     expect(model.overlay, isNull);
   });
 
-  test('the internal resolution after Audio: Native to 4x of what the host lists, kept for later games', () async {
+  test('the internal resolution on Graphics: Native to 8x of what the host lists, kept for later games', () async {
     launcher = Ps1Launcher();
     final model = launcher.model..setRetroHostPs1(true);
     await launcher.start(status: recordedStatus());
     final session = launcher.session;
     model.openRetroMenu();
     await pumpEventQueue();
+    (launcher.row('section-graphics').kind as ActionRow).run();
+    expect(model.panelCategories().single.title, T.text('retroMenuGraphics'));
+    expect(
+      [for (final row in model.panelCategories().single.rows) row.id],
+      ['resolution', 'smoothTextures', 'fixWobbly3d', 'widescreen'],
+    );
     final row = launcher.row('resolution');
     expect(row.title, T.text('retroResolution'));
     expect(row.detail, T.text('retroResolutionDetail'));
     final choice = row.kind as ChoiceRow;
-    expect(choice.options, ['Native', '2x', '3x', '4x'], reason: 'the host lists 1 to 8; 5x to 8x are not offered');
+    expect(choice.options, [
+      'Native',
+      '2x',
+      '3x',
+      '4x',
+      '6x',
+      '8x',
+    ], reason: 'the host lists 1 to 8; 5x and 7x are not offered');
     expect(choice.selected, 0);
 
     session.callResults['option'] = false;
@@ -324,17 +344,170 @@ void main() {
     await pumpEventQueue();
     expect(model.preferences.retroHostOptions['swanstation_GPU_ResolutionScale'], '4');
     expect((launcher.row('resolution').kind as ChoiceRow).selected, 3);
-    expect(model.overlay, Layer.retroMenu, reason: 'the menu stays open on its first page');
+    expect(model.overlay, Layer.retroMenu);
+    expect(model.panelCategories().single.id, 'retroMenu-graphics', reason: 'the menu stays on Graphics');
+    model.handle(Command.back);
+    expect(model.panelCategories().single.rows[model.panelRow].id, 'section-graphics');
   });
 
-  test('no internal resolution row while the host draws without the GPU', () async {
+  test('the Graphics rows: what the host lists, sent together and kept', () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model..setRetroHostPs1(true);
+    await launcher.start(status: recordedStatus());
+    final session = launcher.session;
+    model.openRetroMenu();
+    await pumpEventQueue();
+    (launcher.row('section-graphics').kind as ActionRow).run();
+
+    final smooth = launcher.row('smoothTextures');
+    expect(smooth.title, T.text('retroSmoothTextures'));
+    expect(smooth.detail, T.text('retroSmoothTexturesDetail'));
+    expect((smooth.kind as ChoiceRow).options, [
+      T.text('retroGraphicsValueOff'),
+      T.text('retroGraphicsValueSmooth'),
+      T.text('retroGraphicsValueExtraSmooth'),
+    ], reason: 'Nearest, Bilinear and xBR; JINC2 and the No Edge Blending values are not offered');
+    expect((smooth.kind as ChoiceRow).selected, 0);
+    final wobbly = launcher.row('fixWobbly3d');
+    expect((wobbly.kind as ChoiceRow).options, [T.text('retroGraphicsValueOff'), T.text('retroGraphicsValueOn')]);
+    expect((wobbly.kind as ChoiceRow).selected, 0, reason: 'the recorded game started without PGXP');
+    final widescreen = launcher.row('widescreen');
+    expect(widescreen.detail, T.text('retroWidescreenPs1Detail'));
+
+    session.callResults['option'] = true;
+    session.nextStatus = recordedStatus(
+      selected: {'swanstation_GPU_WidescreenHack': 0, 'swanstation_Display_AspectRatio': 1},
+    );
+    (widescreen.kind as ChoiceRow).set(1);
+    await pumpEventQueue();
+    expect(
+      [for (final call in session.calls.where((call) => call.$1 == 'option')) call.$2],
+      [
+        {'key': 'swanstation_GPU_WidescreenHack', 'value': 'true'},
+        {'key': 'swanstation_Display_AspectRatio', 'value': '16:9'},
+      ],
+      reason: 'the hack and its aspect ratio change together',
+    );
+    expect(model.preferences.retroHostOptions, isEmpty, reason: 'widescreen is kept for this game only');
+    expect(model.preferences.retroHostGameOptions, {
+      launcher.game.titleId: {'swanstation_GPU_WidescreenHack': 'true', 'swanstation_Display_AspectRatio': '16:9'},
+    });
+    expect((launcher.row('widescreen').kind as ChoiceRow).selected, 1);
+    expect(launcher.row('widescreen').detail, T.text('retroWidescreenPs1Detail'), reason: 'in effect');
+
+    session.callResults['option'] = false;
+    (launcher.row('fixWobbly3d').kind as ChoiceRow).set(1);
+    await pumpEventQueue();
+    expect(session.calls.last.$2, {'key': 'swanstation_GPU_PGXPEnable', 'value': 'true'});
+    expect(model.preferences.retroHostOptions, isNot(contains('swanstation_GPU_PGXPEnable')), reason: 'refused');
+  });
+
+  test('widescreen never stays half set: a refused aspect ratio sets the hack back, one choice at a time', () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model..setRetroHostPs1(true);
+    await launcher.start(status: recordedStatus());
+    final session = launcher.session;
+    model.openRetroMenu();
+    await pumpEventQueue();
+    (launcher.row('section-graphics').kind as ActionRow).run();
+    List<Object?> options() => [for (final call in session.calls.where((call) => call.$1 == 'option')) call.$2];
+
+    session.onCall = (method, args) {
+      if (method == 'option') {
+        session.callResults['option'] = (args! as Map)['key'] != 'swanstation_Display_AspectRatio';
+      }
+    };
+    (launcher.row('widescreen').kind as ChoiceRow).set(1);
+    await pumpEventQueue();
+    expect(options(), [
+      {'key': 'swanstation_GPU_WidescreenHack', 'value': 'true'},
+      {'key': 'swanstation_Display_AspectRatio', 'value': '16:9'},
+      {'key': 'swanstation_GPU_WidescreenHack', 'value': 'false'},
+    ], reason: 'the hack is set back to what the host had');
+    expect(model.preferences.retroHostOptions, isEmpty);
+
+    session.callResults['option'] = false;
+    session.onCall = (method, args) {
+      if (method == 'option' && (args! as Map)['key'] == 'swanstation_GPU_WidescreenHack') {
+        session.callResults['option'] = (args as Map)['value'] == 'true';
+      } else if (method == 'option') {
+        session.callResults['option'] = false;
+      }
+    };
+    (launcher.row('widescreen').kind as ChoiceRow).set(1);
+    await pumpEventQueue();
+    expect(options().last, {'key': 'swanstation_GPU_WidescreenHack', 'value': 'false'}, reason: 'asked back');
+    session.nextStatus = recordedStatus(selected: {'swanstation_GPU_WidescreenHack': 0});
+    await launcher.play.host.refresh();
+    final half = launcher.row('widescreen').kind as ChoiceRow;
+    expect(half.options.last, 'Enabled', reason: 'the host refused that too: the row claims neither Off nor On');
+    expect(half.selected, 2);
+    expect(model.preferences.retroHostOptions, isEmpty);
+    session.nextStatus = recordedStatus();
+    await launcher.play.host.refresh();
+
+    session.onCall = null;
+    session.callResults['option'] = true;
+    final gate = session.callGate = Completer<void>();
+    final before = options().length;
+    (launcher.row('widescreen').kind as ChoiceRow).set(1);
+    await pumpEventQueue();
+    (launcher.row('smoothTextures').kind as ChoiceRow).set(1);
+    await pumpEventQueue();
+    expect(options(), hasLength(before + 1), reason: 'the second choice waits for none: it is not taken');
+    session.callGate = null;
+    gate.complete();
+    await pumpEventQueue();
+    expect(options(), hasLength(before + 2), reason: "widescreen's two options, and no texture filter");
+    expect(model.preferences.retroHostGameOptions[launcher.game.titleId], {
+      'swanstation_GPU_WidescreenHack': 'true',
+      'swanstation_Display_AspectRatio': '16:9',
+    });
+  });
+
+  test('widescreen chosen in one PS1 game starts that game only with it, and survives a restart', () async {
+    launcher = Ps1Launcher(secondPs1: true);
+    final model = launcher.model..setRetroHostPs1(true);
+    await launcher.start(status: recordedStatus());
+    final session = launcher.session;
+    model.openRetroMenu();
+    await pumpEventQueue();
+    (launcher.row('section-graphics').kind as ActionRow).run();
+    session.callResults['option'] = true;
+    session.nextStatus = recordedStatus(
+      selected: {'swanstation_GPU_WidescreenHack': 0, 'swanstation_Display_AspectRatio': 1},
+    );
+    (launcher.row('widescreen').kind as ChoiceRow).set(1);
+    await pumpEventQueue();
+    (launcher.row('smoothTextures').kind as ChoiceRow).set(1);
+    await pumpEventQueue();
+    expect(model.preferences.retroHostOptions, {'swanstation_GPU_TextureFilter': 'Bilinear'}, reason: 'every game');
+    await model.closeRetroGame();
+
+    const widescreen = {'swanstation_GPU_WidescreenHack', 'swanstation_Display_AspectRatio'};
+    Map<Object?, Object?> started() => launcher.session.startArgs!['options']! as Map<Object?, Object?>;
+    await launcher.start(status: recordedStatus(), other: launcher.secondPs1Game);
+    expect(started().keys.toSet().intersection(widescreen), isEmpty, reason: 'the other game starts without it');
+    expect(started()['swanstation_GPU_TextureFilter'], 'Bilinear', reason: 'a choice kept for every game still is');
+    await model.closeRetroGame();
+
+    final saved = Preferences.fromJson(jsonDecode(jsonEncode(model.preferences.toJson())) as Map<String, dynamic>);
+    expect(saved.retroHostGameOptions, model.preferences.retroHostGameOptions, reason: 'saved and read back');
+    model.preferences.retroHostGameOptions = saved.retroHostGameOptions;
+    await launcher.start(status: recordedStatus());
+    expect(started(), containsPair('swanstation_GPU_WidescreenHack', 'true'));
+    expect(started(), containsPair('swanstation_Display_AspectRatio', '16:9'));
+  });
+
+  test('while the host draws without the GPU, Graphics offers only widescreen', () async {
     launcher = Ps1Launcher();
     final model = launcher.model..setRetroHostPs1(true);
     final software = RetroStatus.parse({...recordedStatus().toJson(), 'hardware': false});
     await launcher.start(status: software);
     model.openRetroMenu();
     await pumpEventQueue();
-    expect([for (final row in model.panelCategories().single.rows) row.id], isNot(contains('resolution')));
+    (launcher.row('section-graphics').kind as ActionRow).run();
+    expect([for (final row in model.panelCategories().single.rows) row.id], ['widescreen']);
   });
 
   test('an option a player has no use for is neither shown nor sent, though it was kept', () async {
@@ -347,7 +520,11 @@ void main() {
         'swanstation_CDROM_ReadSpeedup': '2',
       });
     await launcher.start(status: recordedStatus());
-    expect(launcher.session.startArgs!['options'], {'swanstation_CDROM_ReadSpeedup': '2'});
+    expect(launcher.session.startArgs!['options'], {
+      'swanstation_CDROM_ReadSpeedup': '2',
+      'swanstation_GPU_PGXPEnable': 'true',
+      'swanstation_GPU_TrueColor': 'true',
+    });
     model.openRetroMenu();
     for (final section in retroMenuSections.keys) {
       (launcher.row('section-${section.name}').kind as ActionRow).run();
