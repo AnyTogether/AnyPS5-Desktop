@@ -214,9 +214,11 @@ void main() {
   test('a stopped download keeps what came, and the next try carries on', () async {
     github.releases.add(retroHostFixtureRelease());
     final zip = 'anyps5-retro-host-1.0.0-windows-x64.zip';
-    github.dropAfter[zip] = 1000;
+    // A connection that keeps dropping: the tries of one download give up, the part stays.
+    github.dropEvery[zip] = 1000;
     final host = store();
     expect((await failure(host.fetch(await newest()))).kind, ToolkitFailureKind.network);
+    github.dropEvery.clear();
     await host.putInPlace(await host.fetch(await newest()));
     expect(github.requests.where((request) => request.$1.endsWith('/$zip') && request.$2 == 'bytes=1000-'), isNotEmpty);
     expect(host.version, const RetroHostVersion(1, 0, 0));

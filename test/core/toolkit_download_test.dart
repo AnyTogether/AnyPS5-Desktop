@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -166,22 +167,18 @@ void main() {
       expect(toolkit.version, 'upstream-v0.2.0');
     });
 
-    test('a dropped connection carries on from where it stopped', () async {
+    test('a dropped connection carries on by itself from where it stopped', () async {
       github.releases.add(upstreamRelease('0.1.3', librarySize: 60000));
       final package = (await releases.latest()).packageFor(HostSystem.linux)!;
       final archive = package.libraries.name;
       github.dropAfter[archive] = 20000;
-      final error = await failure(store(HostSystem.linux).install(package));
-      expect(error.kind, ToolkitFailureKind.network);
-      final part = File(p.join(store(HostSystem.linux).root, '.downloads', '$archive.part'));
-      expect(part.lengthSync(), 20000);
-
       final toolkit = await store(HostSystem.linux).install(package);
       expect(toolkit.problem, isNull);
       final ranges = github.requests.where((request) => request.$1.endsWith(archive)).map((request) => request.$2);
       expect(ranges, contains('bytes=20000-'));
       // The relinker, already complete, was not downloaded again.
       expect(github.downloads.where((path) => path.endsWith('relinker-v0.1.3')), hasLength(1));
+      final part = File(p.join(store(HostSystem.linux).root, '.downloads', '$archive.part'));
       expect(part.existsSync(), isFalse);
     });
 
@@ -189,7 +186,6 @@ void main() {
       github.releases.add(upstreamRelease('0.1.3', librarySize: 60000));
       final package = (await releases.latest()).packageFor(HostSystem.linux)!;
       github.dropAfter[package.libraries.name] = 10000;
-      await failure(store(HostSystem.linux).install(package));
       github.ignoreRange = true;
       final toolkit = await store(HostSystem.linux).install(package);
       expect(toolkit.problem, isNull);
@@ -480,6 +476,144 @@ void main() {
       expect(ToolkitStore.upstreamVersion('upstream-v0.1.3'), '0.1.3');
       expect(ToolkitStore.upstreamVersion('toolkit-1'), isNull);
       expect(ToolkitStore.versionText('0.1.3'), 'upstream-v0.1.3');
+    });
+  });
+
+  group('retries', () {
+    late List<Duration> delays;
+    late Duration stall;
+
+    setUp(() {
+      delays = AssetDownload.retryDelays;
+      stall = AssetDownload.stallTimeout;
+    });
+
+    tearDown(() {
+      AssetDownload.retryDelays = delays;
+      AssetDownload.stallTimeout = stall;
+    });
+
+    /// The requests for [name]: the release's address and the storage host's, with their ranges.
+    List<String> asked(String name) => [
+      for (final (path, range) in github.requests)
+        if (path.endsWith('/$name')) '${path.split('/')[1]} ${range ?? 'all'}',
+    ];
+
+    Future<ArmToolkitPackage> armPackage() async {
+      github.releases.add(armRelease('v0.2.41-arm', '6667cd4b7'));
+      // Served by the fake as upstream's repository: only the file names make it AnyPS5-ARM's.
+      return ArmToolkitPackage.find(await releases.all(), HostSystem.linux)!;
+    }
+
+    Future<void> fetch(ReleaseAsset asset, {DownloadCancel? cancel, void Function(int)? onProgress}) =>
+        AssetDownload.fetch(
+          asset.url,
+          p.join(temp.path, asset.name),
+          size: asset.size,
+          sha256: asset.sha256,
+          cancel: cancel,
+          onProgress: onProgress,
+        );
+
+    test('a resume refused with 403 retries from the asset URL and finishes', () async {
+      final package = await armPackage();
+      final name = package.archive.name;
+      expect(package.archive.size, greaterThan(2000));
+      github.dropAfter[name] = 1000;
+      github.refuseResume[name] = [403];
+      await fetch(package.archive);
+      expect(await AssetDownload.sha256Of(p.join(temp.path, name)), package.archive.sha256);
+      // Every try starts at the release's address, so GitHub's redirect gives a fresh signed one,
+      // and asks only for what is still missing.
+      expect(asked(name), [
+        'download all',
+        'blob all',
+        'download bytes=1000-',
+        'blob bytes=1000-',
+        'download bytes=1000-',
+        'blob bytes=1000-',
+      ]);
+      expect(File(p.join(temp.path, '$name.part')).existsSync(), isFalse);
+    });
+
+    test('a resume refused with 401 and then 410 is tried again each time and finishes', () async {
+      final package = await armPackage();
+      final name = package.archive.name;
+      github.dropAfter[name] = 1000;
+      github.refuseResume[name] = [401, 410];
+      await fetch(package.archive);
+      expect(asked(name).where((request) => request == 'download bytes=1000-'), hasLength(3));
+      expect(File(p.join(temp.path, name)).lengthSync(), package.archive.size);
+    });
+
+    test('a stalled connection is given up after the stall timeout and the download carries on', () async {
+      AssetDownload.stallTimeout = const Duration(milliseconds: 300);
+      final package = await armPackage();
+      final name = package.archive.name;
+      github.stallAfter[name] = 1000;
+      await fetch(package.archive);
+      expect(asked(name), ['download all', 'blob all', 'download bytes=1000-', 'blob bytes=1000-']);
+      expect(await AssetDownload.sha256Of(p.join(temp.path, name)), package.archive.sha256);
+    });
+
+    test('the whole install of the AnyPS5-ARM engine gets past a dropped connection and a refused resume', () async {
+      final package = await armPackage();
+      github.dropAfter[package.archive.name] = 1000;
+      github.refuseResume[package.archive.name] = [403];
+      final arm = ToolkitStore(p.join(temp.path, 'Toolkits'), system: HostSystem.linux);
+      final toolkit = await arm.install(package);
+      expect(toolkit.problem, isNull);
+      expect(toolkit.version, 'arm-6667cd4b7');
+    });
+
+    test('a connection that keeps dropping gives up after its tries, keeping the part to carry on', () async {
+      final package = await armPackage();
+      final name = package.archive.name;
+      github.dropEvery[name] = 1000;
+      final error = await failure(fetch(package.archive));
+      expect(error.kind, ToolkitFailureKind.network);
+      expect(error.message, contains('tried ${AssetDownload.defaultAttempts} times'));
+      expect(asked(name).where((request) => request.startsWith('blob')), hasLength(AssetDownload.defaultAttempts));
+      final part = File(p.join(temp.path, '$name.part'));
+      expect(part.lengthSync(), 1000);
+      github.dropEvery.clear();
+      await fetch(package.archive);
+      expect(asked(name).last, 'blob bytes=1000-');
+      expect(part.existsSync(), isFalse);
+    });
+
+    test('a file the storage host does not have (404) is not asked for again', () async {
+      final package = await armPackage();
+      final name = package.archive.name;
+      github.dropAfter[name] = 1000;
+      github.refuseResume[name] = [404, 404, 404];
+      final error = await failure(fetch(package.archive));
+      expect(error.kind, ToolkitFailureKind.network);
+      expect(error.message, 'the download answered 404');
+      expect(asked(name).where((request) => request.startsWith('blob')), hasLength(2));
+    });
+
+    test('stopping during the pause before the next try stops at once', () async {
+      AssetDownload.retryDelays = const [Duration(seconds: 20)];
+      final package = await armPackage();
+      final name = package.archive.name;
+      github.dropEvery[name] = 1000;
+      final cancel = DownloadCancel();
+      final clock = Stopwatch()..start();
+      final future = failure(
+        fetch(
+          package.archive,
+          cancel: cancel,
+          onProgress: (received) {
+            if (received >= 1000) Timer(const Duration(milliseconds: 200), cancel.cancel);
+          },
+        ),
+      );
+      final error = await future;
+      expect(error.kind, ToolkitFailureKind.cancelled);
+      expect(clock.elapsed, lessThan(const Duration(seconds: 10)));
+      expect(asked(name).where((request) => request.startsWith('blob')), hasLength(1));
+      expect(File(p.join(temp.path, '$name.part')).lengthSync(), 1000);
     });
   });
 

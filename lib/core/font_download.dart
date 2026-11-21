@@ -144,6 +144,8 @@ class FontInstaller {
           onProgress: (received) => onProgress?.call(downloadShare * received / archive.size),
           cancel: cancel,
           client: client,
+          // The installer tries again itself, [attempts] times.
+          attempts: 1,
         );
         break;
       } on ToolkitFailure catch (failure) {

@@ -5890,6 +5890,8 @@ class AppModel extends ChangeNotifier {
           title: T.text('phoneEngineSwitch'),
           detail: have
               ? T.text('phoneEngineSwitchHave')
+              : engine.failed != null
+              ? '${T.format('engineFailedCard', [engine.failedPercent])} · ${engine.error ?? ''}'
               : package == null
               ? T.text('phoneEngineSwitchDetail')
               : T.format('phoneEngineSwitchSize', [byteText(package.size)]),
@@ -8439,6 +8441,16 @@ class AppModel extends ChangeNotifier {
   /// GitHub gave no checksum), or asks GitHub again when it could not be reached.
   void onboardingDownload() {
     if (engine.downloading != null) return;
+    // A download that failed is tried again as it was asked for, carrying on from what came.
+    if (engine.failed != null) {
+      unawaited(
+        engine.retry().then((done) {
+          if (done && onboardingStep == 3) onboardingChoice = 2;
+          notifyListeners();
+        }),
+      );
+      return;
+    }
     final pending = engine.unverified;
     final package = pending ?? engine.offered;
     if (package == null) {
