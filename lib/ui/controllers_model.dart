@@ -180,9 +180,12 @@ class ControllersModel {
     return PadFacts(
       system: app.system,
       pads: roster.pads,
-      sdlLoaded: inventory is SdlPadSource || inventory == null && PadReader.sdlFailure == null,
+      sdlLoaded: PadReader.sdlLoaded(inventory),
       sdlFailure: PadReader.sdlFailure,
-      unmapped: inventory is SdlPadSource ? inventory.unmapped : const [],
+      unmapped: switch (PadReader.current(inventory)) {
+        final SdlPadSource sdl => sdl.unmapped,
+        _ => const [],
+      },
       refused: {...?inventory?.refused, ..._system.refused}.toList(),
       processes: _system.processes,
       services: _system.services,
