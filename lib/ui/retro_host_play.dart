@@ -62,6 +62,10 @@ class RetroPlay {
   /// The section of the menu shown, or null for the menu's first page.
   RetroOptionSection? menuSection;
 
+  /// The Auto Optimizer of the game's internal resolution, while it is on Auto: a PS1 game whose
+  /// player kept no resolution, on a host that measures how it runs.
+  RetroAutoController? auto;
+
   /// The host's last `resolutionError` the log was given, so each one is logged once.
   String resolutionErrorLogged = '';
 
@@ -89,6 +93,7 @@ class RetroPlay {
   void release(VoidCallback listener) {
     if (_released) return;
     _released = true;
+    auto?.dispose();
     host.removeListener(listener);
     states.removeListener(listener);
     controls.dispose();
@@ -459,6 +464,8 @@ extension RetroHostPlaying on AppModel {
       states: saveStates,
     );
     retroPlay = play;
+    final auto = !ps2 && !preferences.retroHostOptions.containsKey(retroResolutionKeyPs1);
+    if (auto) _startRetroAuto(play);
     host.addListener(_retroChanged);
     saveStates.addListener(_retroChanged);
     unawaited(saveStates.refresh());
@@ -483,7 +490,32 @@ extension RetroHostPlaying on AppModel {
           game: preferences.retroHostGameOptions[game.titleId] ?? const {},
         ),
       ),
+      autoResolution: auto
+          ? '${RetroAutoResolution.startScale(_retroAutoScales, need: _retroDisplayNeed, memory: preferences.retroHostAuto[game.titleId])}'
+          : null,
     );
+  }
+
+  /// The PS1 scales the Auto Optimizer may start a game at, before its host lists its own: those the
+  /// launcher offers (`retro_resolution.dart`), which every SwanStation the host draws with lists.
+  static const _retroAutoScales = [1, 2, 3, 4, 6, 8];
+
+  /// The largest PS1 scale the view the game is shown in needs.
+  int get _retroDisplayNeed => retroAutoDisplayNeed(retroDisplayHeight());
+
+  /// Puts [play]'s internal resolution on Auto: the optimizer judges it from now while the game
+  /// plays, and what it learns is kept and saved.
+  void _startRetroAuto(RetroPlay play) {
+    play.auto?.dispose();
+    play.auto = RetroAutoController(
+      menu: play.menu,
+      titleId: play.game.titleId,
+      memories: preferences.retroHostAuto,
+      need: _retroDisplayNeed,
+      saved: savePreferences,
+      log: _padLog,
+      every: retroAutoEvery,
+    )..start();
   }
 
   /// The checks before a start of a signed release's host (protocol.md "Finding and checking the
@@ -761,20 +793,41 @@ extension RetroHostPlaying on AppModel {
   ];
 
   /// The Internal resolution row: the values the launcher offers that the host lists
-  /// ([RetroResolutionChoice.of]), or null when the menu offers none.
+  /// ([RetroResolutionChoice.of]), or null when the menu offers none. A PS1 game on a host that
+  /// measures how it runs also offers Auto first, which names the scale the Auto Optimizer chose.
   PanelRow? _retroResolutionRow(RetroPlay play) {
     final choice = play.menu.resolution;
     if (choice == null) return null;
+    final offersAuto = !play.ps2 && play.host.reportsPerformance;
+    final auto = offersAuto && play.auto != null;
     return PanelRow(
       id: 'resolution',
       title: T.text('retroResolution'),
       detail: retroResolutionDetail(choice),
       kind: ChoiceRow(
-        [for (final value in choice.values) retroResolutionLabel(value)],
-        choice.selected,
-        (index) => unawaited(_chooseRetroResolution(play, choice.values[index].value)),
+        [
+          if (offersAuto) T.format('retroResolutionAuto', [retroResolutionLabel(choice.active)]),
+          for (final value in choice.values) retroResolutionLabel(value),
+        ],
+        auto ? 0 : choice.selected + (offersAuto ? 1 : 0),
+        (index) => unawaited(
+          offersAuto && index == 0
+              ? _chooseRetroAuto(play)
+              : _chooseRetroResolution(play, choice.values[index - (offersAuto ? 1 : 0)].value),
+        ),
       ),
     );
+  }
+
+  /// Auto chosen for a PS1 game's internal resolution: the resolution kept for every game is let
+  /// go, so each game starts at what the Auto Optimizer learned of it, and this one is judged from
+  /// now at the scale it draws at.
+  Future<void> _chooseRetroAuto(RetroPlay play) async {
+    if (play.auto != null || play.over) return;
+    preferences.retroHostOptions.remove(retroResolutionKeyPs1);
+    _startRetroAuto(play);
+    savePreferences();
+    _changed();
   }
 
   /// A Graphics setting's row ([RetroGraphicsChoice]): its values in the setting's order, with what
@@ -811,10 +864,16 @@ extension RetroHostPlaying on AppModel {
   /// An internal resolution chosen in the menu: sent to the game, and kept for every later game of
   /// its console once the host took it. A PS1 game draws at it in a moment, a PS2 game from its
   /// next start.
+  /// A value chosen while on Auto turns Auto off, also the value Auto had chosen, which is then
+  /// kept without being sent again.
   Future<void> _chooseRetroResolution(RetroPlay play, String value) async {
-    final key = play.menu.resolution?.key;
-    if (key == null || !await play.menu.chooseResolution(value) || _disposed) return;
-    preferences.retroHostOptions[key] = value;
+    final choice = play.menu.resolution;
+    if (choice == null) return;
+    final already = play.auto != null && choice.values[choice.selected].value == value;
+    if (!already && !await play.menu.chooseResolution(value) || _disposed) return;
+    play.auto?.dispose();
+    play.auto = null;
+    preferences.retroHostOptions[choice.key] = value;
     savePreferences();
     _changed();
   }

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:anyps5_desktop/core/game_library.dart';
+import 'package:anyps5_desktop/core/retro_host/retro_auto_resolution.dart';
 import 'package:anyps5_desktop/core/gamepad/pad_navigation.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_client.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_protocol.dart';
@@ -348,6 +349,108 @@ void main() {
     expect(model.panelCategories().single.id, 'retroMenu-graphics', reason: 'the menu stays on Graphics');
     model.handle(Command.back);
     expect(model.panelCategories().single.rows[model.panelRow].id, 'section-graphics');
+  });
+
+  test('Auto on a host that measures speed: the start scale, the row, and a hand-picked value', () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model
+      ..setRetroHostPs1(true)
+      ..retroAutoEvery = const Duration(hours: 1)
+      ..retroDisplayHeight = (() => 1080);
+    launcher.session.reportsPerformance = true;
+    await launcher.start(status: recordedStatus(selected: {'swanstation_GPU_ResolutionScale': 1}));
+    final session = launcher.session;
+    expect(
+      (session.startArgs!['options']! as Map)['swanstation_GPU_ResolutionScale'],
+      '2',
+      reason: 'nothing learned of this game yet: 2x, below the 5x a 1080-line view needs',
+    );
+    expect(model.retroPlay!.auto, isNotNull);
+    model.openRetroMenu();
+    await pumpEventQueue();
+    (launcher.row('section-graphics').kind as ActionRow).run();
+    var choice = launcher.row('resolution').kind as ChoiceRow;
+    expect(choice.options, ['Auto (2x)', 'Native', '2x', '3x', '4x', '6x', '8x']);
+    expect(choice.selected, 0);
+
+    session.callResults['option'] = true;
+    choice.set(2);
+    await pumpEventQueue();
+    expect(
+      session.calls.where((call) => call.$1 == 'option'),
+      isEmpty,
+      reason: 'the scale Auto chose, picked by hand, is kept without being sent again',
+    );
+    expect(model.preferences.retroHostOptions['swanstation_GPU_ResolutionScale'], '2');
+    expect(model.retroPlay!.auto, isNull, reason: 'a hand-picked value turns Auto off');
+    choice = launcher.row('resolution').kind as ChoiceRow;
+    expect(choice.selected, 2);
+
+    choice.set(0);
+    await pumpEventQueue();
+    expect(model.preferences.retroHostOptions, isNot(contains('swanstation_GPU_ResolutionScale')));
+    expect(model.retroPlay!.auto, isNotNull);
+    expect((launcher.row('resolution').kind as ChoiceRow).selected, 0);
+  });
+
+  test('Auto starts a game at what it learned of it', () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model
+      ..setRetroHostPs1(true)
+      ..retroAutoEvery = const Duration(hours: 1)
+      ..retroDisplayHeight = (() => 1440);
+    model.preferences.retroHostAuto[launcher.game.titleId] = RetroAutoMemory(
+      gpu: 'RTX',
+      host: '1.2.0',
+      config: '',
+      scale: 8,
+      slow: {8},
+    );
+    launcher.session.reportsPerformance = true;
+    await launcher.start(status: recordedStatus());
+    expect(
+      (launcher.session.startArgs!['options']! as Map)['swanstation_GPU_ResolutionScale'],
+      '6',
+      reason: 'the scale it last used ran slow: the largest below it, within the 6x a 1440-line view needs',
+    );
+    final saved = Preferences.fromJson(jsonDecode(jsonEncode(model.preferences.toJson())) as Map<String, dynamic>);
+    expect(
+      saved.retroHostAuto[launcher.game.titleId]!.toJson(),
+      model.preferences.retroHostAuto[launcher.game.titleId]!.toJson(),
+    );
+  });
+
+  test('without gamePerformance there is no Auto, and the game starts as before', () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model
+      ..setRetroHostPs1(true)
+      ..retroAutoEvery = const Duration(hours: 1)
+      ..retroDisplayHeight = (() => 1080);
+    await launcher.start(status: recordedStatus());
+    expect((launcher.session.startArgs!['options']! as Map), isNot(contains('swanstation_GPU_ResolutionScale')));
+    model.openRetroMenu();
+    await pumpEventQueue();
+    (launcher.row('section-graphics').kind as ActionRow).run();
+    expect((launcher.row('resolution').kind as ChoiceRow).options.first, 'Native');
+  });
+
+  test('a kept resolution starts the game at it, with Auto offered but not chosen', () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model
+      ..setRetroHostPs1(true)
+      ..retroAutoEvery = const Duration(hours: 1)
+      ..retroDisplayHeight = (() => 1080);
+    launcher.session.reportsPerformance = true;
+    model.preferences.retroHostOptions['swanstation_GPU_ResolutionScale'] = '3';
+    await launcher.start(status: recordedStatus(selected: {'swanstation_GPU_ResolutionScale': 2}));
+    expect((launcher.session.startArgs!['options']! as Map)['swanstation_GPU_ResolutionScale'], '3');
+    expect(model.retroPlay!.auto, isNull);
+    model.openRetroMenu();
+    await pumpEventQueue();
+    (launcher.row('section-graphics').kind as ActionRow).run();
+    final choice = launcher.row('resolution').kind as ChoiceRow;
+    expect(choice.options.first, 'Auto (3x)', reason: 'offered, not chosen');
+    expect(choice.selected, 3);
   });
 
   test('the Graphics rows: what the host lists, sent together and kept', () async {

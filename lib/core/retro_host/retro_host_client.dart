@@ -288,6 +288,7 @@ class RetroHostClient implements RetroHostSession {
   /// have been let go.
   Future<int> get exited => _exited.future;
 
+  @override
   String get hostVersion => _hostVersion;
   List<String> get capabilities => _capabilities;
 
@@ -300,6 +301,9 @@ class RetroHostClient implements RetroHostSession {
   /// and may be sent one, in `start.options` or with `option`.
   @override
   bool get limitsPs2Resolution => _capabilities.contains(retroCapabilityPs2ResolutionLimits);
+
+  @override
+  bool get reportsPerformance => _capabilities.contains(retroCapabilityGamePerformance);
 
   /// Whether the host lists `saveStates`, so it takes `start.states` and the methods `saveState`
   /// and `loadState`.
@@ -427,7 +431,7 @@ class RetroHostClient implements RetroHostSession {
     if (RetroStatus.isFailureReport(map)) {
       return RetroStatus.failed(error: map['error']! as String, errorCode: map['errorCode']! as String);
     }
-    return RetroStatus.parse(map, ps2: canPlayPs2);
+    return RetroStatus.parse(map, ps2: canPlayPs2, performance: reportsPerformance);
   }
 
   static const _stopPoll = Duration(milliseconds: 250);
@@ -694,7 +698,7 @@ class RetroHostClient implements RetroHostSession {
           _lastStatusEnded = false;
           if (afterStop) _stopDeadline = null;
         } else {
-          final status = RetroStatus.parse(_object(result, 'status'), ps2: canPlayPs2);
+          final status = RetroStatus.parse(_object(result, 'status'), ps2: canPlayPs2, performance: reportsPerformance);
           if (status.ended && !_lastStatusEnded) _zeroRumble();
           _lastStatusEnded = status.ended;
           if (status.ended && afterStop) _stopDeadline = null;

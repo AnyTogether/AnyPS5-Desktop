@@ -7,7 +7,7 @@ import 'dart:ui' as ui show Image, PlatformDispatcher;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show Color, IconData, Icons;
-import 'package:flutter/widgets.dart' show GlobalKey;
+import 'package:flutter/widgets.dart' show GlobalKey, WidgetsBinding;
 import 'package:flutter/services.dart' show HardwareKeyboard, LogicalKeyboardKey, PlatformException;
 import 'package:path/path.dart' as p;
 
@@ -59,6 +59,7 @@ import '../core/package_install.dart';
 import '../core/power.dart';
 import '../core/prepare_queue.dart';
 import '../core/relinker_flags.dart';
+import '../core/retro_host/retro_auto_resolution.dart';
 import '../core/retro_host/retro_graphics.dart';
 import '../core/retro_host/retro_host_client.dart' show RetroHostClient, RetroHostEnd;
 import '../core/retro_host/retro_host_build.dart';
@@ -114,6 +115,7 @@ import 'engine_model.dart';
 import 'ffmpeg_model.dart';
 import 'fonts_model.dart';
 import 'media_model.dart';
+import 'retro_host/retro_auto_controller.dart';
 import 'retro_host/retro_game_menu.dart';
 import 'retro_host/retro_graphics_words.dart';
 import 'retro_host/retro_host_controls.dart';
@@ -185,6 +187,11 @@ class Preferences {
       if (json['retroHostOptions'] case final Map<dynamic, dynamic> entries)
         for (final MapEntry(:key, :value) in entries.entries)
           if (key is String && value is String) key: value,
+    }
+    ..retroHostAuto = {
+      if (json['retroHostAuto'] case final Map<dynamic, dynamic> games)
+        for (final MapEntry(key: game, value: memory) in games.entries)
+          if (game is String) game: ?RetroAutoMemory.fromJson(memory),
     }
     ..retroHostGameOptions = {
       if (json['retroHostGameOptions'] case final Map<dynamic, dynamic> games)
@@ -335,6 +342,10 @@ class Preferences {
   /// The SwanStation options the player chose in the game's menu, by key, given to every PS1 game
   /// the host starts (protocol.md "start": `options`).
   Map<String, String> retroHostOptions = {};
+
+  /// What the Auto Optimizer learned of each PS1 game's internal resolution on this PC, by the
+  /// game's title ID ([RetroAutoMemory]). Never sent anywhere.
+  Map<String, RetroAutoMemory> retroHostAuto = {};
 
   /// The core options the player chose in a game's menu that are kept for that game only
   /// (`retroGraphicsPerGameKeys`: PS1 widescreen), by the game's title ID, then by key.
@@ -533,6 +544,8 @@ class Preferences {
     if (retroHostMuted) 'retroHostMuted': true,
     if (retroHostOptions.isNotEmpty) 'retroHostOptions': retroHostOptions,
     if (retroHostGameOptions.isNotEmpty) 'retroHostGameOptions': retroHostGameOptions,
+    if (retroHostAuto.isNotEmpty)
+      'retroHostAuto': {for (final MapEntry(:key, :value) in retroHostAuto.entries) key: value.toJson()},
     // The first one under the old name too, for an older launcher started again.
     'gamesFolder': gamesFolders.firstOrNull,
     'toolkitFolder': toolkitFolder,
@@ -2828,6 +2841,16 @@ class AppModel extends ChangeNotifier {
   /// How often a PS1 game in the host is asked its `status`; tests ask by hand.
   @visibleForTesting
   Duration retroStatusEvery = const Duration(milliseconds: 500);
+
+  /// How often the Auto Optimizer judges a PS1 game's last status; tests judge by hand.
+  @visibleForTesting
+  Duration retroAutoEvery = RetroAutoRules.window;
+
+  /// The height in pixels of the view a game in the host is shown in, which caps the internal
+  /// resolution the Auto Optimizer chooses ([retroAutoDisplayNeed]).
+  @visibleForTesting
+  double Function() retroDisplayHeight = () =>
+      WidgetsBinding.instance.platformDispatcher.implicitView?.physicalSize.height ?? 0;
 
   /// A short message at the bottom of the screen, with a trophy level's badge before it when
   /// it says one was reached.

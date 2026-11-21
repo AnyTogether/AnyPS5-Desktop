@@ -114,6 +114,13 @@ class FakeRetroHostSession extends FakeFrameSource implements RetroHostSession {
   @override
   bool canSaveStates = false;
 
+  /// Whether the host lists `gamePerformance`; false, as a host before it, unless a test says.
+  @override
+  bool reportsPerformance = false;
+
+  @override
+  String hostVersion = '1.2.0';
+
   /// The `error` reply a call gets, by method, instead of its result.
   final callErrors = <String, RetroCallError>{};
 
