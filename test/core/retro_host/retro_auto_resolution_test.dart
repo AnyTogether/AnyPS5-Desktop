@@ -175,7 +175,7 @@ void main() {
     expect(feed(auto, List.filled(30, fast), from: s(170)), isNull, reason: '6x is past a 1080p display');
 
     final marked = optimizer(scale: 4, remembered: memory()..slow.add(6));
-    expect(feed(marked, List.filled(12, fast), from: s(20)), (8, s(75)), reason: '6x ran slow: skipped');
+    expect(feed(marked, List.filled(30, fast), from: s(20)), isNull, reason: '6x ran slow: it caps the climb');
     final busy = optimizer(scale: 2);
     expect(
       feed(busy, List.filled(30, status(speed: 1, work: 0.7)), from: s(20)),
@@ -184,6 +184,15 @@ void main() {
     );
     final unknown = optimizer(scale: 2);
     expect(feed(unknown, List.filled(30, status(speed: 1, work: null)), from: s(20)), isNull);
+  });
+
+  test('a pause between readings breaks their run', () {
+    final auto = optimizer();
+    final slow = status(speed: 0.6);
+    expect(auto.observe(s(20), slow), isNull);
+    auto.interrupted();
+    expect(auto.observe(s(300), slow), isNull, reason: 'one slow reading before the pause, one after');
+    expect(auto.observe(s(305), slow), 3);
   });
 
   test('slow at the smallest scale: the floor, where the optimizer stops', () {

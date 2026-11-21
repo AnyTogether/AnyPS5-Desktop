@@ -114,8 +114,8 @@ class RetroAutoResolution {
   /// The scales the host lists and the launcher offers, smallest first.
   final List<int> scales;
 
-  /// The largest scale worth choosing ([retroAutoDisplayNeed]).
-  final int need;
+  /// The largest scale worth choosing ([retroAutoDisplayNeed]); it follows the view.
+  int need;
 
   final RetroAutoMemory memory;
 
@@ -169,6 +169,13 @@ class RetroAutoResolution {
     return null;
   }
 
+  /// The game was paused (the menu opened) or was otherwise not played: the readings before do not
+  /// count with those after.
+  void interrupted() {
+    _readings.clear();
+    _lastReading = null;
+  }
+
   /// The game now draws at [now] (the change asked was taken, or the player's), from [at]: the
   /// readings start again after [RetroAutoRules.settle].
   void changed(Duration at, int now) {
@@ -220,10 +227,8 @@ class RetroAutoResolution {
 
   int? _up() {
     _readings.clear();
-    final higher = [
-      for (final other in scales)
-        if (other > scale && other <= need && !memory.slow.contains(other)) other,
-    ];
-    return higher.firstOrNull;
+    final next = scales.where((other) => other > scale).firstOrNull;
+    if (next == null || next > need || memory.slow.contains(next)) return null;
+    return next;
   }
 }

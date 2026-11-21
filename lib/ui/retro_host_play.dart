@@ -490,9 +490,20 @@ extension RetroHostPlaying on AppModel {
           game: preferences.retroHostGameOptions[game.titleId] ?? const {},
         ),
       ),
-      autoResolution: auto
-          ? '${RetroAutoResolution.startScale(_retroAutoScales, need: _retroDisplayNeed, memory: preferences.retroHostAuto[game.titleId])}'
-          : null,
+      autoResolution: auto ? () => '${_retroAutoStartScale(play)}' : null,
+    );
+  }
+
+  /// The scale [play] starts at on Auto ([RetroAutoResolution.startScale]), from what was learned
+  /// of the game with this host's build only: what another build's cores did proves nothing. The
+  /// GPU and the game's other graphics settings are known only from its statuses; the optimizer
+  /// checks them there and starts its memory again when they differ.
+  int _retroAutoStartScale(RetroPlay play) {
+    final memory = preferences.retroHostAuto[play.game.titleId];
+    return RetroAutoResolution.startScale(
+      _retroAutoScales,
+      need: _retroDisplayNeed,
+      memory: memory != null && memory.host == play.host.hostVersion ? memory : null,
     );
   }
 
@@ -511,10 +522,11 @@ extension RetroHostPlaying on AppModel {
       menu: play.menu,
       titleId: play.game.titleId,
       memories: preferences.retroHostAuto,
-      need: _retroDisplayNeed,
+      need: () => _retroDisplayNeed,
       saved: savePreferences,
       log: _padLog,
       every: retroAutoEvery,
+      clock: retroAutoClock(),
     )..start();
   }
 
@@ -864,15 +876,21 @@ extension RetroHostPlaying on AppModel {
   /// An internal resolution chosen in the menu: sent to the game, and kept for every later game of
   /// its console once the host took it. A PS1 game draws at it in a moment, a PS2 game from its
   /// next start.
-  /// A value chosen while on Auto turns Auto off, also the value Auto had chosen, which is then
-  /// kept without being sent again.
+  /// A value chosen while on Auto turns Auto off, once a change Auto already asked for is
+  /// answered, so the value chosen is the last one sent; the value the game then draws at is kept
+  /// without being sent again. When the host refuses the value, Auto goes on.
   Future<void> _chooseRetroResolution(RetroPlay play, String value) async {
-    final choice = play.menu.resolution;
-    if (choice == null) return;
-    final already = play.auto != null && choice.values[choice.selected].value == value;
-    if (!already && !await play.menu.chooseResolution(value) || _disposed) return;
-    play.auto?.dispose();
+    final auto = play.auto;
     play.auto = null;
+    await auto?.stop();
+    final choice = play.menu.resolution;
+    if (choice == null || _disposed) return;
+    final already = auto != null && choice.values[choice.selected].value == value;
+    if (!already && !await play.menu.chooseResolution(value)) {
+      if (auto != null && !_disposed && !play.over && play.auto == null) _startRetroAuto(play);
+      return;
+    }
+    if (_disposed) return;
     preferences.retroHostOptions[choice.key] = value;
     savePreferences();
     _changed();

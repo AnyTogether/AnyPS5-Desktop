@@ -203,16 +203,17 @@ class RetroHostGame extends ChangeNotifier {
   /// Waits for the host's greeting, then starts the game. Throws [StateError] when a game was
   /// already started on this host. A PS2 game's internal resolution goes only to a host that
   /// limits it ([limitsPs2Resolution]); an older host starts the game at LRPS2's own default.
-  /// [autoResolution], the PS1 internal resolution the Auto Optimizer starts at, goes only to a
-  /// host that measures how the game runs ([reportsPerformance]); without one the optimizer
-  /// cannot judge it, and the game starts at SwanStation's own default as before.
-  Future<void> start(RetroHostStartRequest request, {String? autoResolution}) {
+  /// [autoResolution] gives the PS1 internal resolution the Auto Optimizer starts at, asked once
+  /// the host has greeted the launcher (so it can use [hostVersion]), and only of a host that
+  /// measures how the game runs ([reportsPerformance]); without one the optimizer cannot judge it,
+  /// and the game starts at SwanStation's own default as before.
+  Future<void> start(RetroHostStartRequest request, {String Function()? autoResolution}) {
     if (_phase != RetroHostGamePhase.idle) throw StateError('A game was already started on this host.');
     _setPhase(RetroHostGamePhase.starting);
     return _starting = _startNow(request, autoResolution);
   }
 
-  Future<void> _startNow(RetroHostStartRequest request, String? autoResolution) async {
+  Future<void> _startNow(RetroHostStartRequest request, String Function()? autoResolution) async {
     try {
       await session.ready;
       if (_phase != RetroHostGamePhase.starting) return;
@@ -227,7 +228,7 @@ class RetroHostGame extends ChangeNotifier {
         ),
         _ when autoResolution != null && request.console == null && session.reportsPerformance => request.withOption(
           retroResolutionKeyPs1,
-          autoResolution,
+          autoResolution(),
         ),
         _ => request,
       };

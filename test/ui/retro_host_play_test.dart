@@ -22,6 +22,23 @@ import '../support/fake_process.dart';
 import '../support/ps1_launcher.dart';
 import 'retro_host/fake_retro_host_session.dart';
 
+/// A clock the test moves by hand.
+class _Clock implements Stopwatch {
+  @override
+  Duration elapsed = Duration.zero;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// The recorded real status at [scale], with the host's measurement of the game ([speed], or none
+/// yet) and its GPU, as a host with `gamePerformance` sends it.
+RetroStatus _measured(int scale, double? speed) => RetroStatus.parse({
+  ...recordedStatus(selected: {'swanstation_GPU_ResolutionScale': scale - 1}).toJson(),
+  'performance': speed == null ? null : {'speed': speed, 'work': 0.1, 'seconds': 5},
+  'gpu': {'renderer': 'RTX', 'vendor': 'NVIDIA', 'maxTexture': 16384},
+}, performance: true);
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Ps1Launcher launcher;
@@ -391,6 +408,52 @@ void main() {
     expect(model.preferences.retroHostOptions, isNot(contains('swanstation_GPU_ResolutionScale')));
     expect(model.retroPlay!.auto, isNotNull);
     expect((launcher.row('resolution').kind as ChoiceRow).selected, 0);
+  });
+
+  test('a value chosen while an Auto change is still being sent is the one the game keeps', () async {
+    launcher = Ps1Launcher();
+    final clock = _Clock();
+    final model = launcher.model
+      ..setRetroHostPs1(true)
+      ..retroAutoEvery = const Duration(hours: 1)
+      ..retroDisplayHeight = (() => 1080)
+      ..retroAutoClock = (() => clock);
+    launcher.session.reportsPerformance = true;
+    await launcher.start(status: _measured(4, null));
+    final session = launcher.session..callResults['option'] = true;
+    final auto = model.retroPlay!.auto!;
+    List<Object?> options() => [for (final call in session.calls.where((call) => call.$1 == 'option')) call.$2];
+    for (final seconds in [20, 25]) {
+      clock.elapsed = Duration(seconds: seconds);
+      session.nextStatus = _measured(4, 0.6);
+      await launcher.play.host.refresh();
+      if (seconds == 25) session.callGate = Completer<void>();
+      unawaited(auto.tick());
+      await pumpEventQueue();
+    }
+    expect(options(), [
+      {'key': 'swanstation_GPU_ResolutionScale', 'value': '3'},
+    ], reason: 'Auto lowers 4x to 3x; the host has not answered');
+
+    model.openRetroMenu();
+    await pumpEventQueue();
+    (launcher.row('section-graphics').kind as ActionRow).run();
+    final row = launcher.row('resolution').kind as ChoiceRow;
+    row.set(row.options.indexOf('4x'));
+    await pumpEventQueue();
+    expect(options(), hasLength(1), reason: "the player's 4x waits for Auto's change to be answered");
+
+    session.nextStatus = _measured(3, null);
+    final gate = session.callGate!;
+    session.callGate = null;
+    gate.complete();
+    await pumpEventQueue();
+    expect(options(), [
+      {'key': 'swanstation_GPU_ResolutionScale', 'value': '3'},
+      {'key': 'swanstation_GPU_ResolutionScale', 'value': '4'},
+    ], reason: "the player's value is sent last, so the game draws at it");
+    expect(model.preferences.retroHostOptions['swanstation_GPU_ResolutionScale'], '4');
+    expect(model.retroPlay!.auto, isNull);
   });
 
   test('Auto starts a game at what it learned of it', () async {

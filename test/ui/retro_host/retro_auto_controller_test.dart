@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -76,7 +77,7 @@ void main() {
     menu: menu,
     titleId: 'PS1-SCUS94228',
     memories: memories,
-    need: need,
+    need: () => need,
     saved: () => saves++,
     log: log.add,
     clock: clock,
@@ -160,6 +161,43 @@ void main() {
     await at(auto, 5, status(scale: 4, gpu: 'Radeon'));
     expect(memories['PS1-SCUS94228']!.slow, isEmpty, reason: 'another GPU: what was learned does not hold');
     expect(memories['PS1-SCUS94228']!.gpu, 'Radeon');
+  });
+
+  test('the menu opening breaks the run of readings', () async {
+    await started(status(scale: 4));
+    session.callResults['option'] = true;
+    final auto = controller();
+    await at(auto, 20, status(scale: 4, speed: 0.6));
+    await menu.open();
+    await at(auto, 25, status(scale: 4, speed: null));
+    await menu.close();
+    await at(auto, 300, status(scale: 4, speed: 0.6));
+    expect(options(), isEmpty, reason: 'one slow reading before the pause and one after');
+    await at(auto, 305, status(scale: 4, speed: 0.6));
+    expect(options(), hasLength(1));
+  });
+
+  test('stopping waits for a change already asked, and does not count it', () async {
+    await started(status(scale: 4));
+    session.callResults['option'] = true;
+    final auto = controller();
+    await at(auto, 20, status(scale: 4, speed: 0.6));
+    clock.elapsed = const Duration(seconds: 25);
+    session.nextStatus = status(scale: 4, speed: 0.6);
+    await game.refresh();
+    final gate = session.callGate = Completer<void>();
+    final ticking = auto.tick();
+    await pumpEventQueue();
+    var stopped = false;
+    final stopping = auto.stop().then((_) => stopped = true);
+    await pumpEventQueue();
+    expect(stopped, isFalse, reason: 'the change asked is not answered yet');
+    session.callGate = null;
+    gate.complete();
+    await stopping;
+    await ticking;
+    expect(memories['PS1-SCUS94228']!.scale, 4, reason: 'stopped: the change is not counted');
+    expect(log, isEmpty);
   });
 
   test('a host without gamePerformance is not judged', () async {

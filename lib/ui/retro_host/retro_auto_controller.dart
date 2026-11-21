@@ -30,9 +30,9 @@ class RetroAutoController {
   /// What the optimizer learned of each game, by title ID: the launcher's preferences.
   final Map<String, RetroAutoMemory> memories;
 
-  /// The largest scale worth choosing for the display the game is shown on
-  /// ([retroAutoDisplayNeed]).
-  final int need;
+  /// The largest scale worth choosing for the view the game is shown in now
+  /// ([retroAutoDisplayNeed]), asked at every judgement, as the window may be resized or moved.
+  final int Function() need;
 
   /// Called after [memories] changed, so they are saved.
   final void Function() saved;
@@ -46,41 +46,55 @@ class RetroAutoController {
   final Stopwatch _clock;
   Timer? _timer;
   RetroAutoResolution? _auto;
-  bool _changing = false;
+  Future<void>? _change;
+  bool _stopped = false;
 
   /// The optimizer judging the game now, once a status allowed one.
   RetroAutoResolution? get optimizer => _auto;
 
   /// Starts judging, from now.
-  void start() => _timer ??= Timer.periodic(every, (_) => unawaited(tick()));
+  void start() {
+    if (_stopped) return;
+    _timer ??= Timer.periodic(every, (_) => unawaited(tick()));
+  }
 
   /// Judges the game's last status once: a change the optimizer chooses is asked of the host, and
-  /// is the scale the game draws at once the host took it.
+  /// is the scale the game draws at once the host took it. While the menu is open the game is
+  /// paused, and the readings before it do not count with those after it.
   Future<void> tick() async {
+    if (_stopped || _change != null || !menu.game.reportsPerformance) return;
+    if (menu.isOpen) {
+      _auto?.interrupted();
+      return;
+    }
     final status = menu.game.status;
     final choice = menu.resolution;
-    if (_changing || status == null || choice == null || menu.isOpen || !menu.game.reportsPerformance) return;
+    if (status == null || choice == null) return;
     final scales = {for (final value in choice.values) ?value.scale: value.value};
     final current = choice.active.scale;
     if (current == null) return;
-    final auto = _optimizerFor(status, scales.keys.toList(), current);
+    final auto = _optimizerFor(status, scales.keys.toList(), current)..need = need();
     final change = auto.observe(_clock.elapsed, status);
-    if (change == null) return;
     final value = scales[change];
-    if (value == null) return;
-    _changing = true;
+    if (change == null || value == null) return;
+    final asked = _apply(auto, status, current, change, value);
+    _change = asked;
     try {
-      if (!await menu.chooseResolution(value)) return;
-      final reading = status.performance;
-      log?.call(
-        'auto resolution: ${current}x to ${change}x for $titleId '
-        '(speed ${reading?.speed}, work ${reading?.work})',
-      );
-      auto.changed(_clock.elapsed, change);
-      saved();
+      await asked;
     } finally {
-      _changing = false;
+      _change = null;
     }
+  }
+
+  Future<void> _apply(RetroAutoResolution auto, RetroStatus status, int current, int change, String value) async {
+    if (!await menu.chooseResolution(value) || _stopped) return;
+    final reading = status.performance;
+    log?.call(
+      'auto resolution: ${current}x to ${change}x for $titleId '
+      '(speed ${reading?.speed}, work ${reading?.work})',
+    );
+    auto.changed(_clock.elapsed, change);
+    saved();
   }
 
   /// The optimizer for what the game is measured with now: the one in use, or a new one when the
@@ -105,12 +119,22 @@ class RetroAutoController {
     );
     memories[titleId] = memory;
     saved();
-    final fresh = RetroAutoResolution(scales: scales, need: need, memory: memory, scale: current);
+    final fresh = RetroAutoResolution(scales: scales, need: need(), memory: memory, scale: current);
     if (auto != null) fresh.changed(_clock.elapsed, current);
     return _auto = fresh;
   }
 
+  /// Stops judging, and waits for a change already asked of the host, so a value the player
+  /// chooses next is chosen over the game's real scale and nothing the optimizer asked comes
+  /// after it.
+  Future<void> stop() async {
+    dispose();
+    await _change;
+  }
+
+  /// Stops judging; a change already asked is not counted when its reply comes.
   void dispose() {
+    _stopped = true;
     _timer?.cancel();
     _timer = null;
   }

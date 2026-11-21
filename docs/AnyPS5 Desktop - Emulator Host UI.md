@@ -438,11 +438,15 @@ player's value, and its Auto comes with a restart offer.
 
 **When it judges** (`RetroAutoResolution.observe`, `RetroAutoRules`).
 `RetroAutoController` hands it the game's last status every 5 seconds
-(`AppModel.retroAutoEvery`), so readings never overlap. A reading counts only
-20 seconds after the game started or its scale last changed (loading, shader
-compiles, the redraw), while the game plays (`performance` not null, `ready`,
-no `graphicsPending`, no `progressLabel`) and the menu is closed. A status
-that does not count breaks the run of readings.
+(`AppModel.retroAutoEvery`) and takes at most one reading per 5 seconds. The
+status is the last of the game's twice-a-second polls, so two readings may
+share up to half a second of the host's measurement; the rules judge several
+readings, never one. A reading counts only 20 seconds after the game started
+or its scale last changed (loading, shader compiles, the redraw), while the
+game plays (`performance` not null, `ready`, no `graphicsPending`, no
+`progressLabel`) and the menu is closed. The menu opening, or a status that
+does not count, breaks the run of readings (`RetroAutoResolution.interrupted`),
+so readings from before a pause never add up with those after it.
 
 **The rules.** The figures are the host's measurements on an RTX 4080 SUPER:
 one full-speed window reads 0.994 to 1.004, and Jak and Daxter at a scale
@@ -452,21 +456,26 @@ just too high read 0.956 to 0.990.
   seconds) whose mean is below 0.995. The scale left is marked slow for the
   game.
 - **Up one scale** after twelve readings (a minute) each at 0.995 or more
-  with `work` at most 0.5, never past the scale the view needs, a scale
-  marked slow, or one the host does not list. SwanStation emulates a frame
+  with `work` at most 0.5, to the next scale the host lists, unless that is
+  past what the view needs or marked slow: a slow scale caps the climb, so a
+  scale above one that ran slow is never tried. SwanStation emulates a frame
   inside `retro_run`, so its `work` is its share of the frame's time.
 - **The floor.** Slow at the smallest scale, nothing is lowered further and
   the optimizer stops for that game: the limit is not the resolution.
 - **The view's need** (`retroAutoDisplayNeed`): a PS1 picture is 240 lines,
   so the largest scale worth drawing is the view's height in pixels over 240,
   rounded up (5x at 1080 lines, 6x at 1440). `AppModel.retroDisplayHeight` is
-  the launcher view's physical height.
+  the launcher view's physical height, asked at every judgement, so a resized
+  window or another display caps the next climb.
 
 **The start.** `RetroAutoResolution.startScale` starts a game at the scale
 its memory last used, else 2x, at most the view's need and never a scale
-marked slow; `RetroHostGame.start` sends it as the start's
-`swanstation_GPU_ResolutionScale` only to a host that lists
-`gamePerformance`. An older host gets no resolution and starts at
+marked slow. `RetroHostGame.start` asks for it once the host has greeted the
+launcher, so a memory kept with another host version is not used, and sends
+it as the start's `swanstation_GPU_ResolutionScale` only to a host that lists
+`gamePerformance`. The GPU and the game's other graphics settings are known
+only from its statuses; when they differ from the memory's, the game has
+started at the memory's scale, and the rules judge it from there. An older host gets no resolution and starts at
 SwanStation's own default, as before.
 
 **What it remembers** (`Preferences.retroHostAuto`, by the game's title ID,
@@ -482,8 +491,11 @@ a new optimizer that settles first.
 **The row.** On a host that lists `gamePerformance`, a PS1 game's Internal
 resolution row starts with Auto (`retroResolutionAuto`, "Auto (2x)", naming
 the scale the game draws at). Choosing a value turns Auto off and keeps it in
-`Preferences.retroHostOptions` as before; choosing the value Auto already had
-keeps it without sending it again. Choosing Auto removes the kept value, so
+`Preferences.retroHostOptions` as before. A change Auto already asked for is
+answered first (`RetroAutoController.stop`), and a stopped controller does
+not count it, so the player's value is the last one sent and the game draws
+at it. Choosing the value the game draws at keeps it without sending it
+again; a value the host refuses leaves Auto on. Choosing Auto removes the kept value, so
 every game without one starts on Auto, and starts the optimizer at the scale
 the game draws at. Saying when Auto lowered a scale, and Auto for PS2, come
 later.
@@ -1076,14 +1088,16 @@ native memory as a real ring slot would be, so no host is started.
   checks that a status differing only in `performance` says nothing new, and
   drives the rules: the start scale, two slow readings and the Jak 4x half
   minute stepping down, Spyro's full-speed readings never doing so, a broken
-  run of readings, a minute of headroom stepping up within the view's need
-  and past a slow scale, the floor, and the memory's JSON and matching.
+  run of readings and a pause, a minute of headroom stepping up within the
+  view's need and stopping below a slow scale, the floor, and the memory's
+  JSON and matching.
 - [`retro_auto_controller_test.dart`](../test/ui/retro_host/retro_auto_controller_test.dart)
   runs the controller on a fake host with a clock moved by hand: a slow game
   lowered and its memory saved, a minute of headroom raising it within the
   view's need, a refused change not counted, nothing judged with the menu
-  open, another GPU starting the memory again, and nothing on a host without
-  `gamePerformance`.
+  open and the menu breaking the run of readings, `stop` waiting for a change
+  already asked and not counting it, another GPU starting the memory again,
+  and nothing on a host without `gamePerformance`.
 - [`retro_graphics_words_test.dart`](../test/ui/retro_host/retro_graphics_words_test.dart)
   checks each Graphics setting's title and line (widescreen's per console),
   the lines for a value not yet in effect, and the values' labels.
@@ -1168,8 +1182,9 @@ native memory as a real ring slot would be, so no host is started.
   chosen in only (a second PS1 game, `secondPs1`, starts without it, a choice
   kept for every game still reaches it, and the game's own value survives the
   preferences being saved and read back), Auto (the 2x start, the row with
-  Auto first, a hand-picked value turning it off and Auto chosen again, the
-  start at what the memory learned, no Auto without `gamePerformance`, and a
+  Auto first, a hand-picked value turning it off and Auto chosen again, a
+  value picked while Auto's change is still being sent sent after it and
+  kept, the start at what the memory learned, no Auto without `gamePerformance`, and a
   kept resolution starting the game with Auto offered but not chosen), options not shown and not sent, Close game keeping the host and the next game starting
   on it, the kept host shut down when the player leaves the PS1 games, after
   the idle limit and when another game starts, a kept host that crashed and a

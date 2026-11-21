@@ -2846,6 +2846,11 @@ class AppModel extends ChangeNotifier {
   @visibleForTesting
   Duration retroAutoEvery = RetroAutoRules.window;
 
+  /// The clock the Auto Optimizer times a PS1 game's play by, started with it; tests move one by
+  /// hand.
+  @visibleForTesting
+  Stopwatch Function() retroAutoClock = () => Stopwatch()..start();
+
   /// The height in pixels of the view a game in the host is shown in, which caps the internal
   /// resolution the Auto Optimizer chooses ([retroAutoDisplayNeed]).
   @visibleForTesting
