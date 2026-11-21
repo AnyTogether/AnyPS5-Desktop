@@ -403,6 +403,23 @@ class SdlLibrary implements SdlBackend {
         : ['$folder${separator}lib${separator}libSDL2-2.0.so.0', 'libSDL2-2.0.so.0', 'libSDL2.so'];
   }
 
+  /// The first of [paths] (else [candidates]) the system's loader opens, without starting
+  /// anything in it: SDL2's subsystems, which look for devices, are then started where an open
+  /// that hangs holds up nothing ([SdlIsolateBackend]). Null (and why, in [failure]) when none
+  /// loads.
+  static String? locate({List<String>? paths, void Function(String why)? failure}) {
+    for (final path in paths ?? candidates()) {
+      try {
+        DynamicLibrary.open(path);
+        return path;
+      } on Object {
+        continue;
+      }
+    }
+    failure?.call('SDL2 not found: ${(paths ?? candidates()).join(', ')}');
+    return null;
+  }
+
   /// SDL2 loaded and its controller subsystem started; null (and why, in [failure]) when the
   /// library is missing or will not start: the launcher then reads pads its older way.
   static SdlLibrary? load({List<String>? paths, void Function(String why)? failure}) {
