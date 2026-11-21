@@ -456,6 +456,59 @@ void main() {
     expect(model.retroPlay!.auto, isNull);
   });
 
+  test('choices made while an Auto change is being sent: only the last one made is acted on', () async {
+    for (final last in ['2x', 'Auto']) {
+      launcher = Ps1Launcher();
+      final clock = _Clock();
+      final model = launcher.model
+        ..setRetroHostPs1(true)
+        ..retroAutoEvery = const Duration(hours: 1)
+        ..retroDisplayHeight = (() => 1080)
+        ..retroAutoClock = (() => clock);
+      launcher.session.reportsPerformance = true;
+      await launcher.start(status: _measured(4, null));
+      final session = launcher.session..callResults['option'] = true;
+      final auto = model.retroPlay!.auto!;
+      List<Object?> options() => [
+        for (final call in session.calls.where((call) => call.$1 == 'option')) (call.$2! as Map)['value'],
+      ];
+      for (final seconds in [20, 25]) {
+        clock.elapsed = Duration(seconds: seconds);
+        session.nextStatus = _measured(4, 0.6);
+        await launcher.play.host.refresh();
+        if (seconds == 25) session.callGate = Completer<void>();
+        unawaited(auto.tick());
+        await pumpEventQueue();
+      }
+      model.openRetroMenu();
+      await pumpEventQueue();
+      (launcher.row('section-graphics').kind as ActionRow).run();
+      final row = launcher.row('resolution').kind as ChoiceRow;
+      row.set(row.options.indexOf('4x'));
+      await pumpEventQueue();
+      row.set(last == 'Auto' ? 0 : row.options.indexOf(last));
+      await pumpEventQueue();
+      session.nextStatus = _measured(3, null);
+      final gate = session.callGate!;
+      session.callGate = null;
+      gate.complete();
+      await pumpEventQueue();
+      if (last == '2x') {
+        expect(options(), ['3', '2'], reason: 'the 4x made before 2x is never sent');
+        expect(model.preferences.retroHostOptions['swanstation_GPU_ResolutionScale'], '2');
+        expect(model.retroPlay!.auto, isNull);
+      } else {
+        expect(options(), ['3'], reason: 'the 4x made before Auto is never sent');
+        expect(model.preferences.retroHostOptions, isNot(contains('swanstation_GPU_ResolutionScale')));
+        expect(model.retroPlay!.auto, isNotNull, reason: 'Auto, the last choice, goes on');
+        expect(model.retroPlay!.auto, isNot(same(auto)));
+      }
+      await model.closeRetroGame();
+      launcher.dispose();
+    }
+    launcher = Ps1Launcher();
+  });
+
   test('Auto starts a game at what it learned of it', () async {
     launcher = Ps1Launcher();
     final model = launcher.model

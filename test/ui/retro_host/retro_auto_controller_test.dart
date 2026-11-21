@@ -177,6 +177,28 @@ void main() {
     expect(options(), hasLength(1));
   });
 
+  test('the menu opening between two judgements breaks the run of readings too', () async {
+    await started(status(scale: 4));
+    session.callResults['option'] = true;
+    final auto = RetroAutoController(
+      menu: menu,
+      titleId: 'PS1-SCUS94228',
+      memories: memories,
+      need: () => 5,
+      saved: () => saves++,
+      every: const Duration(hours: 1),
+      clock: clock,
+    )..start();
+    addTearDown(auto.dispose);
+    await at(auto, 20, status(scale: 4, speed: 0.6));
+    await menu.open();
+    await menu.close();
+    await at(auto, 300, status(scale: 4, speed: 0.6));
+    expect(options(), isEmpty, reason: 'no judgement saw the menu open, yet it broke the run');
+    await at(auto, 305, status(scale: 4, speed: 0.6));
+    expect(options(), hasLength(1));
+  });
+
   test('stopping waits for a change already asked, and does not count it', () async {
     await started(status(scale: 4));
     session.callResults['option'] = true;

@@ -444,8 +444,9 @@ share up to half a second of the host's measurement; the rules judge several
 readings, never one. A reading counts only 20 seconds after the game started
 or its scale last changed (loading, shader compiles, the redraw), while the
 game plays (`performance` not null, `ready`, no `graphicsPending`, no
-`progressLabel`) and the menu is closed. The menu opening, or a status that
-does not count, breaks the run of readings (`RetroAutoResolution.interrupted`),
+`progressLabel`) and the menu is closed. The menu opening (the controller
+listens to the menu, so also between two judgements), or a status that does
+not count, breaks the run of readings (`RetroAutoResolution.interrupted`),
 so readings from before a pause never add up with those after it.
 
 **The rules.** The figures are the host's measurements on an RTX 4080 SUPER:
@@ -491,10 +492,14 @@ a new optimizer that settles first.
 **The row.** On a host that lists `gamePerformance`, a PS1 game's Internal
 resolution row starts with Auto (`retroResolutionAuto`, "Auto (2x)", naming
 the scale the game draws at). Choosing a value turns Auto off and keeps it in
-`Preferences.retroHostOptions` as before. A change Auto already asked for is
-answered first (`RetroAutoController.stop`), and a stopped controller does
-not count it, so the player's value is the last one sent and the game draws
-at it. Choosing the value the game draws at keeps it without sending it
+`Preferences.retroHostOptions` as before. Every choice in the row, Auto or a
+value, waits its turn behind the ones made before it
+(`RetroPlay.resolutionChoices`), and one that is no longer the last made when
+its turn comes, or after it waited for the host, sends and keeps nothing
+(`RetroPlay.resolutionChoice`). A change Auto already asked for is answered
+first (`RetroAutoController.stop`), and a stopped controller does not count
+it. So whatever the player chooses last is what the game draws at and what
+is kept, however fast the choices come. Choosing the value the game draws at keeps it without sending it
 again; a value the host refuses leaves Auto on. Choosing Auto removes the kept value, so
 every game without one starts on Auto, and starts the optimizer at the scale
 the game draws at. Saying when Auto lowered a scale, and Auto for PS2, come
@@ -1095,7 +1100,8 @@ native memory as a real ring slot would be, so no host is started.
   runs the controller on a fake host with a clock moved by hand: a slow game
   lowered and its memory saved, a minute of headroom raising it within the
   view's need, a refused change not counted, nothing judged with the menu
-  open and the menu breaking the run of readings, `stop` waiting for a change
+  open and the menu breaking the run of readings, also when it opens and
+  closes between two judgements, `stop` waiting for a change
   already asked and not counting it, another GPU starting the memory again,
   and nothing on a host without `gamePerformance`.
 - [`retro_graphics_words_test.dart`](../test/ui/retro_host/retro_graphics_words_test.dart)
@@ -1184,7 +1190,8 @@ native memory as a real ring slot would be, so no host is started.
   preferences being saved and read back), Auto (the 2x start, the row with
   Auto first, a hand-picked value turning it off and Auto chosen again, a
   value picked while Auto's change is still being sent sent after it and
-  kept, the start at what the memory learned, no Auto without `gamePerformance`, and a
+  kept, two choices made while it is sent with only the last acted on (2x,
+  or Auto), the start at what the memory learned, no Auto without `gamePerformance`, and a
   kept resolution starting the game with Auto offered but not chosen), options not shown and not sent, Close game keeping the host and the next game starting
   on it, the kept host shut down when the player leaves the PS1 games, after
   the idle limit and when another game starts, a kept host that crashed and a

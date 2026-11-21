@@ -52,10 +52,16 @@ class RetroAutoController {
   /// The optimizer judging the game now, once a status allowed one.
   RetroAutoResolution? get optimizer => _auto;
 
-  /// Starts judging, from now.
+  /// Starts judging, from now. The menu opening pauses the game, and breaks the run of readings
+  /// at once, between judgements too.
   void start() {
-    if (_stopped) return;
-    _timer ??= Timer.periodic(every, (_) => unawaited(tick()));
+    if (_stopped || _timer != null) return;
+    menu.addListener(_menuChanged);
+    _timer = Timer.periodic(every, (_) => unawaited(tick()));
+  }
+
+  void _menuChanged() {
+    if (menu.isOpen) _auto?.interrupted();
   }
 
   /// Judges the game's last status once: a change the optimizer chooses is asked of the host, and
@@ -134,6 +140,7 @@ class RetroAutoController {
 
   /// Stops judging; a change already asked is not counted when its reply comes.
   void dispose() {
+    if (_timer != null) menu.removeListener(_menuChanged);
     _stopped = true;
     _timer?.cancel();
     _timer = null;
