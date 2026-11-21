@@ -1,0 +1,1 @@
+Linux with an NVIDIA driver under Wayland: the launcher's window now runs through XWayland, so the home screen no longer freezes on an old picture after the window goes full screen or changes size. `ANYPS5_NATIVE_WAYLAND=1` keeps native Wayland, and `ANYPS5_IMPELLER=0` switches the launcher from Flutter's Impeller renderer to Skia for a driver that has trouble with it.
