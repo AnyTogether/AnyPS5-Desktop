@@ -11,6 +11,22 @@ section is copied into the release.
 
 Nothing yet.
 
+## 0.1.29
+
+- **Linux with an NVIDIA driver under Wayland: a way around the launcher freezing on an old
+  picture.** After the window went full screen or changed size, the home screen could stay frozen
+  on an earlier frame or the launcher could close. The cause is a bug in the Flutter version the
+  launcher is built with (flutter/flutter#191775 and flutter/flutter#195821), whose fix comes only
+  in a newer Flutter that is not safe with NVIDIA yet. So the launcher now goes around it: with
+  NVIDIA's driver under Wayland, its window runs through XWayland, as it does when you set
+  `GDK_BACKEND=x11` yourself, while the games it starts keep their own setting. A `GDK_BACKEND`
+  you set still wins, and without XWayland the launcher stays on Wayland. Through XWayland, the
+  cards over a game on KDE and other layer-shell desktops become notifications, as on GNOME, and
+  with fractional scaling the window may look softer. `ANYPS5_NATIVE_WAYLAND=1` keeps native
+  Wayland. `ANYPS5_IMPELLER=0` switches the launcher from Flutter's Impeller renderer to Skia, for
+  a driver that has trouble with it. It has not been tried on an NVIDIA machine yet. Thanks to
+  QguAr71, who reported it and answered every question about the hardware.
+
 ## 0.1.28
 
 - **PS1 games in the launcher's window look better from the start, and have a Graphics page.** The
