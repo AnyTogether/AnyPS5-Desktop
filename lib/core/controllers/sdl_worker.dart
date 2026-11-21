@@ -210,14 +210,14 @@ class SdlIsolateBackend implements SdlBackend {
     if (_done) return;
     _heard = true;
     switch (message) {
-      case SendPort port:
+      case final SendPort port:
         _commands = port;
       case SdlWorkerStarted(:final version):
         _version = version;
         _started = true;
       case SdlWorkerFailed(:final why):
         _fail(why, stalled: false);
-      case SdlFrame frame:
+      case final SdlFrame frame:
         _frame = frame;
     }
   }
