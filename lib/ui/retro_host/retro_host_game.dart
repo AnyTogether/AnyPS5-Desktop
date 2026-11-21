@@ -151,7 +151,8 @@ class RetroHostGame extends ChangeNotifier {
   RetroHostEnd? _hostEnd;
 
   Timer? _poll;
-  bool _polling = false;
+  Future<void>? _polling;
+  bool _pollAgain = false;
   bool _disposed = false;
   bool _hostEnded = false;
   bool _detached = false;
@@ -253,12 +254,33 @@ class RetroHostGame extends ChangeNotifier {
     await refresh();
   }
 
-  /// Asks `status` once and follows it: the aspect ratio, the first frame, and the game's end.
+  /// Asks `status` and follows it: the aspect ratio, the first frame, and the game's end.
   /// Listeners hear of it only when the status says something new: a game that plays on with the
-  /// same status, asked twice a second, rebuilds nothing.
-  Future<void> refresh() async {
-    if (!_gameLive || _polling) return;
-    _polling = true;
+  /// same status, asked twice a second, rebuilds nothing. One `status` is asked at a time; asked
+  /// while one is on its way, it is asked once more after it, and the call completes only then, so
+  /// what follows sees a status asked after the call (an `option` the host just took shows).
+  Future<void> refresh() {
+    if (!_gameLive) return Future.value();
+    final polling = _polling;
+    if (polling != null) {
+      _pollAgain = true;
+      return polling;
+    }
+    return _polling = _pollUntilCurrent();
+  }
+
+  Future<void> _pollUntilCurrent() async {
+    try {
+      do {
+        _pollAgain = false;
+        await _pollOnce();
+      } while (_pollAgain && _gameLive);
+    } finally {
+      _polling = null;
+    }
+  }
+
+  Future<void> _pollOnce() async {
     try {
       var asked = 0;
       final current = await _afterStateCall(() {
@@ -285,8 +307,6 @@ class RetroHostGame extends ChangeNotifier {
       }
     } on Object catch (error) {
       if (_gameLive) _end(failure: '$error');
-    } finally {
-      _polling = false;
     }
   }
 

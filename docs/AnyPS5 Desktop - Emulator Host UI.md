@@ -498,7 +498,10 @@ value, waits its turn behind the ones made before it
 its turn comes, or after it waited for the host, sends and keeps nothing
 (`RetroPlay.resolutionChoice`). A change Auto already asked for is answered
 first (`RetroAutoController.stop`), and a stopped controller does not count
-it. So whatever the player chooses last is what the game draws at and what
+it. `RetroHostGame.refresh`, which `setOption` asks once the host took an
+option, asks `status` once more when one is already on its way and completes
+only after that one, so the status the choice is then judged by is one the
+host gave after Auto's change was taken. So whatever the player chooses last is what the game draws at and what
 is kept, however fast the choices come. Choosing the value the game already
 has keeps it without sending it again, also right after Auto changed to it.
 When the host refuses a value, a game on Auto stays on Auto. A choice that

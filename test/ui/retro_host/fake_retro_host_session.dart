@@ -157,11 +157,21 @@ class FakeRetroHostSession extends FakeFrameSource implements RetroHostSession {
     return callResults[method];
   }
 
+  /// When set, `status` answers only once this completes, with the status it had when it was
+  /// asked, as a host's reply on its way says what was true when the host answered.
+  Completer<void>? statusGate;
+
+  /// How many times `status` was asked.
+  int statusAsked = 0;
+
   @override
   Future<RetroStatus?> status() async {
+    statusAsked++;
     final error = statusError;
     if (error != null) throw error;
-    return nextStatus;
+    final reply = nextStatus;
+    await statusGate?.future;
+    return reply;
   }
 
   /// `stop`: the game has ended, and `status` says so until `release`.
