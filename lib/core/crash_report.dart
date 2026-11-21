@@ -480,6 +480,7 @@ extension ReportSettings on GameSettings {
       if (tuning != null) 'Stick and mouse tuning changed',
       'Detailed logging ${trace == true ? 'on' : 'off'}',
       if (chosenRelinkerFlags.isNotEmpty) 'Relinker flags ${chosenRelinkerFlags.map((flag) => flag.option).join(' ')}',
+      if (intelConversion case final bool on) 'Convert for Intel CPUs ${on ? 'on' : 'off'}',
       if (customRelinkerOptions case final String text) 'Custom relinker options $text',
       if (launchOptions case final String text) 'Launch options $text',
     ].join(' · ');

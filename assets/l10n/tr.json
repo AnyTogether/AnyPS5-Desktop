@@ -1394,6 +1394,8 @@
   "sectionRelinker": "Yeniden oluşturma seçenekleri",
   "relinkerTraceImports": "Sistem kitaplığı çağrılarını izle",
   "relinkerTraceImportsDetail": "--trace-imports ekler, böylece ayrıntılı günlük oyunun sistem kitaplığı çağrılarını kaydedebilir. Bir sonraki yeniden oluşturmada geçerli olur (Kilidi yeniden aç).",
+  "relinkerToIntel": "Intel işlemciler için dönüştür",
+  "relinkerToIntelDetail": "--to-intel ekler: yalnızca AMD işlemcilerde olan komutları yeniden yazar (PS5'te AMD işlemci var), böylece oyun Intel işlemcide durmaz. İşlemcisi AMD olmayan bilgisayarlarda varsayılan olarak açıktır. Bir sonraki yeniden oluşturmada geçerli olur (Kilidi yeniden aç).",
   "relinkerFlagUnavailable": "Kullanılamıyor",
   "relinkerFlagUnavailableDetail": "Bu oyunun motoru bu seçeneği desteklemiyor, bu yüzden yeniden oluşturmada atlanır.",
   "sectionLaunch": "Başlatma",

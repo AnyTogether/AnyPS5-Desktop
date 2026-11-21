@@ -12,6 +12,7 @@ import 'game_presets.dart';
 import 'game_settings.dart';
 import 'profiles/profiles.dart';
 import 'host.dart';
+import 'host_cpu.dart';
 import 'installer.dart';
 import 'remote/mdns.dart';
 import 'remote/paired_devices.dart';
@@ -113,7 +114,7 @@ Future<int> runCli(
         toolkit: toolkit,
         root: arguments[2],
         resolution: settings.resolution,
-        relinkerFlags: settings.chosenRelinkerFlags,
+        relinkerFlags: settings.relinkerFlagsOn(HostCpu.current),
         customRelinkerOptions: settings.customRelinkerWords,
         onProgress: (step, fraction) {
           final percent = (fraction * 100).round();

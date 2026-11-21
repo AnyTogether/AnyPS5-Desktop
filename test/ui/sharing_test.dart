@@ -6,6 +6,7 @@ import 'package:anyps5_desktop/core/game_library.dart';
 import 'package:anyps5_desktop/core/game_process.dart';
 import 'package:anyps5_desktop/core/game_settings.dart';
 import 'package:anyps5_desktop/core/host.dart';
+import 'package:anyps5_desktop/core/host_cpu.dart';
 import 'package:anyps5_desktop/core/screenshots.dart';
 import 'package:anyps5_desktop/core/shared_settings.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
@@ -108,6 +109,7 @@ void main() {
           'shaderCache',
           'relinkerSection',
           'relinker---trace-imports',
+          'relinker---to-intel',
           'relinkerCustomOptions',
           'launchSection',
           'launchOptions',
@@ -165,6 +167,31 @@ void main() {
       expect(model.stateOf(orbit()), isNot(isA<Installing>()), reason: 'a choice does not rebuild by itself');
       (row('resetAdvanced').kind as ActionRow).run();
       expect(model.currentSettings(orbit()).relinkerFlags, isNull);
+    });
+
+    test('Convert for Intel CPUs: on by default on an Intel CPU, off by default on an AMD one', () {
+      addTearDown(() => HostCpu.current = const HostCpu(null));
+      makeFakeToolkit(fixture.toolkit, toIntel: true);
+      HostCpu.current = const HostCpu('GenuineIntel');
+      openGame(orbit());
+      (row('advanced').kind as ActionRow).run();
+      final option = row('relinker---to-intel');
+      expect(option.title, 'Convert for Intel CPUs');
+      expect(option.detail, contains('--to-intel'));
+      expect((option.kind as ToggleRow).value, isTrue, reason: 'the computer chooses it');
+      expect(model.currentSettings(orbit()).intelConversion, isNull);
+      (option.kind as ToggleRow).set(false);
+      expect(model.currentSettings(orbit()).intelConversion, isFalse);
+      expect((row('relinker---to-intel').kind as ToggleRow).value, isFalse);
+      expect(model.stateOf(orbit()), isNot(isA<Installing>()), reason: 'a choice does not rebuild by itself');
+      (row('relinker---to-intel').kind as ToggleRow).set(true);
+      expect(model.currentSettings(orbit()).intelConversion, isNull, reason: 'back to what the computer chooses');
+      (row('relinker---to-intel').kind as ToggleRow).set(false);
+      (row('resetAdvanced').kind as ActionRow).run();
+      expect(model.currentSettings(orbit()).intelConversion, isNull);
+
+      HostCpu.current = const HostCpu('AuthenticAMD');
+      expect((row('relinker---to-intel').kind as ToggleRow).value, isFalse);
     });
   });
 

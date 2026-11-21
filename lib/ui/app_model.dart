@@ -53,6 +53,7 @@ import '../core/game_settings.dart';
 import '../core/launch_resolution.dart';
 import '../core/gyro_aiming.dart';
 import '../core/host.dart';
+import '../core/host_cpu.dart';
 import '../core/installer.dart';
 import '../core/library_watch.dart';
 import '../core/package_install.dart';
@@ -3716,7 +3717,7 @@ class AppModel extends ChangeNotifier {
           knownSize: sizes[game.id],
           toolkit: kit,
           resolution: _unlockResolution(game, kit),
-          relinkerFlags: currentSettings(game).chosenRelinkerFlags,
+          relinkerFlags: currentSettings(game).relinkerFlagsOn(HostCpu.current),
           customRelinkerOptions: currentSettings(game).customRelinkerWords,
         );
       } on FileSystemException {
@@ -3965,7 +3966,7 @@ class AppModel extends ChangeNotifier {
       toolkit: kit,
       root: folder,
       resolution: _unlockResolution(game, kit),
-      relinkerFlags: currentSettings(game).chosenRelinkerFlags,
+      relinkerFlags: currentSettings(game).relinkerFlagsOn(HostCpu.current),
       customRelinkerOptions: currentSettings(game).customRelinkerWords,
       freeSpace: freeSpace,
       onProgress: (step, fraction) {
@@ -4104,7 +4105,7 @@ class AppModel extends ChangeNotifier {
               knownSize: sizes[game.id],
               toolkit: toolkitFor(game) ?? kit,
               resolution: _unlockResolution(game, toolkitFor(game) ?? kit),
-              relinkerFlags: currentSettings(game).chosenRelinkerFlags,
+              relinkerFlags: currentSettings(game).relinkerFlagsOn(HostCpu.current),
               customRelinkerOptions: currentSettings(game).customRelinkerWords,
             );
             return plan.space?.shortage(free: freeSpace(folder), folder: folder);
@@ -7368,6 +7369,7 @@ class AppModel extends ChangeNotifier {
               tuning: null,
               shaderCache: null,
               relinkerFlags: null,
+              intelConversion: null,
               customRelinkerOptions: null,
               launchOptions: null,
             ),
@@ -7447,7 +7449,7 @@ class AppModel extends ChangeNotifier {
             title: T.text(_relinkerFlagText(flag).title),
             detail: T.text(_relinkerFlagText(flag).detail),
             kind: ToggleRow(
-              settings.chosenRelinkerFlags.contains(flag),
+              settings.relinkerFlagsOn(HostCpu.current).contains(flag),
               (value) => change(settings.withRelinkerFlag(flag, value)),
             ),
           ),
@@ -7456,6 +7458,7 @@ class AppModel extends ChangeNotifier {
 
   static ({String title, String detail}) _relinkerFlagText(RelinkerFlag flag) => switch (flag) {
     RelinkerFlag.traceImports => (title: 'relinkerTraceImports', detail: 'relinkerTraceImportsDetail'),
+    RelinkerFlag.toIntel => (title: 'relinkerToIntel', detail: 'relinkerToIntelDetail'),
   };
 
   List<PanelRow> _gameRows(Game game) {
