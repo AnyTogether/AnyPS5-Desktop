@@ -52,8 +52,44 @@ class EngineModel {
   /// download it anyway.
   ToolkitPackage? unsigned;
 
-  /// Why the last download failed.
+  /// Why the last download failed, until the next one starts.
   String? error;
+
+  /// The package whose download failed last and how far it had come, until the next download
+  /// starts: the screens say so and offer it again, carrying on from the part kept.
+  ToolkitPackage? failed;
+  ToolkitProgress? failedAt;
+  ToolkitFailureKind? _failedKind;
+  ({bool allowUnverified, bool allowUnsigned, bool keepDefault})? _failedWith;
+
+  /// The failed download again, as it was asked for; what came is kept and the rest asked for.
+  Future<bool> retry() async {
+    final package = failed;
+    final asked = _failedWith;
+    if (package == null || asked == null) return false;
+    _keepDefault = asked.keepDefault;
+    return download(package, asked.allowUnverified, asked.allowUnsigned);
+  }
+
+  /// How far the failed download had come, in percent.
+  int get failedPercent => ((failedAt?.fraction ?? 0) * 100).floor();
+
+  /// What the screens say under a failed download: why it stopped, and that choosing it again
+  /// carries on (a network failure keeps what came; any other starts again).
+  String failedDetail() =>
+      T.format(_failedKind == ToolkitFailureKind.network ? 'engineFailedResume' : 'engineFailedAgain', [error ?? '']);
+
+  /// The row that offers the failed download again, null when none failed.
+  PanelRow? _failedRow() {
+    final package = failed;
+    if (package == null) return null;
+    return PanelRow(
+      id: 'engineDownload',
+      title: T.format('engineFailedTitle', [packageName(package), failedPercent]),
+      detail: failedDetail(),
+      kind: ActionRow(() => unawaited(retry())),
+    );
+  }
 
   GitHubReleases? get _source => app.services.engineReleases;
 
@@ -287,6 +323,8 @@ class EngineModel {
           detail: '${progressText()} · ${T.text('engineStop')}',
           kind: ActionRow(cancel),
         )
+      else if (_failedRow() case final PanelRow again)
+        again
       else if (unsigned case final ArmToolkitPackage waiting)
         PanelRow(
           id: 'engineDownload',
@@ -468,6 +506,10 @@ class EngineModel {
     downloading = package;
     progress = ToolkitProgress(ToolkitPhase.download, 0, package.size);
     error = null;
+    failed = null;
+    failedAt = null;
+    _failedKind = null;
+    _failedWith = null;
     app.refresh();
     var shown = -1;
     try {
@@ -510,7 +552,12 @@ class EngineModel {
           unsigned = package;
           app.show(T.text('engineUnsigned'));
         default:
+          // Said on the download's own row until the next try, not only in a toast that goes.
           error = failure.message;
+          failed = package;
+          failedAt = progress;
+          _failedKind = failure.kind;
+          _failedWith = (allowUnverified: allowUnverified, allowUnsigned: allowUnsigned, keepDefault: keepDefault);
           app.show(T.format('engineFailed', [failure.message]));
       }
       return false;
@@ -650,6 +697,8 @@ class EngineModel {
           detail: '${progressText()} · ${T.text('engineStop')}',
           kind: ActionRow(cancel),
         )
+      else if (_failedRow() case final PanelRow again)
+        again
       else if (unverified case final ToolkitPackage pending)
         PanelRow(
           id: 'engineDownload',

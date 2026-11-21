@@ -521,6 +521,9 @@ class _ToolkitStep extends StatelessWidget {
                   final String detail;
                   if (downloading != null) {
                     detail = engine.progressText();
+                  } else if (engine.failed != null) {
+                    // Why it stopped and that choosing it carries on, until the next try.
+                    detail = '${T.format('engineFailedCard', [engine.failedPercent])}\n${engine.error ?? ''}';
                   } else if (engine.unverified != null) {
                     detail = T.text('engineUnverified');
                   } else if (newest != null) {
