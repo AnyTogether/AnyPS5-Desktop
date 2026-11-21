@@ -131,6 +131,46 @@ void main() {
     expect(heard, 2);
   });
 
+  test('a status asked while one is on its way is asked again after it, and waits for that one', () async {
+    final at4 = RetroStatus.parse(jsonDecode(_protocolStatus) as Map<String, Object?>);
+    await started(status: at4);
+    final asked = session.statusAsked;
+    final gate = session.statusGate = Completer<void>();
+    final polling = game.refresh();
+    await pumpEventQueue();
+    final at2 = jsonDecode(_protocolStatus) as Map<String, Object?>;
+    final option =
+        (at2['options']! as Map<String, Object?>)['swanstation_GPU_ResolutionScale']! as Map<String, Object?>;
+    option['selected'] = 1;
+    option['activeValue'] = '2';
+    session.nextStatus = RetroStatus.parse(at2);
+    var done = false;
+    final again = game.refresh().then((_) => done = true);
+    await pumpEventQueue();
+    expect(session.statusAsked, asked + 1, reason: 'one status at a time');
+    session.statusGate = null;
+    gate.complete();
+    await again;
+    expect(done, isTrue);
+    expect(session.statusAsked, asked + 2, reason: 'asked once more after the one on its way');
+    expect(game.status!.options['swanstation_GPU_ResolutionScale']!.activeValue, '2');
+    await polling;
+  });
+
+  test("a host slower than the game's twice a second ask still answers each refresh", () async {
+    session.readyCompleter.complete();
+    session.nextStatus = RetroStatus.parse(jsonDecode(_protocolStatus) as Map<String, Object?>);
+    session.statusDelay = const Duration(milliseconds: 30);
+    final quick = RetroHostGame(session, statusEvery: const Duration(milliseconds: 5));
+    addTearDown(quick.dispose);
+    await quick.start(_request);
+    for (var call = 0; call < 3; call++) {
+      final asked = session.statusAsked;
+      await quick.refresh().timeout(const Duration(seconds: 2));
+      expect(session.statusAsked - asked, lessThanOrEqualTo(2), reason: 'the one on its way, then its own');
+    }
+  });
+
   test('a loading game that loads on with the same status tells no one until it is ready', () async {
     await started(status: fakeStatus(ready: false));
     var heard = 0;

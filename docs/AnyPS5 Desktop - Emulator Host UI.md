@@ -24,6 +24,8 @@ default, see "In the launcher" and "PS2 games").
 | [`lib/ui/retro_host/retro_host_controls.dart`](../lib/ui/retro_host/retro_host_controls.dart) | `RetroHostControls`: plays a `RetroHostGame` with the launcher's controllers, connects port 2 and forwards vibration. `RetroPadReader` is how it reads the controllers. |
 | [`lib/ui/retro_host/retro_game_menu.dart`](../lib/ui/retro_host/retro_game_menu.dart) | `RetroGameMenu`: the in-game menu's rows (discs, core options, volume) and what choosing them does. |
 | [`lib/core/retro_host/retro_resolution.dart`](../lib/core/retro_host/retro_resolution.dart) | `RetroResolutionChoice`: the internal resolution the menu offers for a status, each console's option key, and what the row says under it (see "Internal resolution"). |
+| [`lib/core/retro_host/retro_auto_resolution.dart`](../lib/core/retro_host/retro_auto_resolution.dart) | `RetroAutoResolution`, `RetroAutoRules` and `RetroAutoMemory`: the Auto Optimizer's rules for a PS1 game's internal resolution, judged from `status.performance`, and what it remembers of each game (see "Auto resolution"). |
+| [`lib/ui/retro_host/retro_auto_controller.dart`](../lib/ui/retro_host/retro_auto_controller.dart) | `RetroAutoController`: runs a `RetroAutoResolution` while a PS1 game plays on Auto, asks the host for the scale it chooses, and keeps its memory in the preferences (see "Auto resolution"). |
 | [`lib/core/retro_host/retro_graphics.dart`](../lib/core/retro_host/retro_graphics.dart) | `RetroGraphicsSetting` and `RetroGraphicsChoice`: the Graphics page's other settings (smooth textures, fix wobbly 3D, widescreen, sharper textures), the core options each value sets, what a status allows of them, the note every Graphics row shares (`RetroGraphicsNote`), and the values a game starts with when the player chose none (see "Graphics"). |
 | [`lib/ui/retro_host/retro_save_states.dart`](../lib/ui/retro_host/retro_save_states.dart) | `RetroSaveStates`: a game's save state slots as its states folder holds them, and saving into one (with a picture of the moment) and loading one, one at a time. |
 | [`lib/ui/retro_host/retro_state_picture.dart`](../lib/ui/retro_host/retro_state_picture.dart) | `retroStatePicture`: the small PNG of the game's picture kept beside a saved state. |
@@ -406,8 +408,109 @@ out of `start` on a host without `ps2ResolutionLimits`, and the client throws
 **Not in Settings yet.** Settings › Emulators has no resolution rows. A
 preference chosen there would be a value no host has judged, and whether a
 host limits PS2 is known only once it has greeted the launcher; the row in
-the game's menu needs neither. Settings rows and an automatic choice by
-graphics card come later (see "Graphics").
+the game's menu needs neither. Settings rows come later (see "Graphics"); a
+PS1 game's automatic choice is "Auto resolution".
+
+## Auto resolution
+
+A PS1 game whose player kept no internal resolution plays on **Auto**: the
+Auto Optimizer chooses the highest scale it keeps full speed at on this PC,
+from the host's measurement of each game (capability `gamePerformance`, host
+`docs/protocol.md` "status", on the host's `main` since
+AnyTogether/anyps5-retro-host#28; the client reads it, see the client doc's
+"Game speed"). The protocol lines it relies on:
+
+> `speed` is the frames in which the core handed over a picture [...]
+> divided by 5 × `timing.fps` [...] A game the host keeps up with is at 1,
+> give or take a frame or two [...] so a launcher judges a few windows, not
+> one.
+
+> `performance` is `null` until the game has played for 5 seconds since the
+> last of these: [...] the core applied an option (`activeValue` took the
+> value chosen) [...] So [...] the 5 seconds never mix two settings, and a
+> launcher that changes one waits 5 seconds for the result.
+
+**Why PS1 only.** SwanStation applies its resolution while the game runs, so
+a scale that turns out too slow is undone within seconds of play. LRPS2 reads
+`pcsx2_upscale_multiplier` only when the game starts (`restart` is `true`), so
+a PS2 step down would need the player to restart the game; PS2 keeps the
+player's value, and its Auto comes with a restart offer.
+
+**When it judges** (`RetroAutoResolution.observe`, `RetroAutoRules`).
+`RetroAutoController` hands it the game's last status every 5 seconds
+(`AppModel.retroAutoEvery`) and takes at most one reading per 5 seconds. The
+status is the last of the game's twice-a-second polls, so two readings may
+share up to half a second of the host's measurement; the rules judge several
+readings, never one. A reading counts only 20 seconds after the game started
+or its scale last changed (loading, shader compiles, the redraw), while the
+game plays (`performance` not null, `ready`, no `graphicsPending`, no
+`progressLabel`) and the menu is closed. The menu opening (the controller
+listens to the menu, so also between two judgements), or a status that does
+not count, breaks the run of readings (`RetroAutoResolution.interrupted`),
+so readings from before a pause never add up with those after it.
+
+**The rules.** The figures are the host's measurements on an RTX 4080 SUPER:
+one full-speed window reads 0.994 to 1.004, and Jak and Daxter at a scale
+just too high read 0.956 to 0.990.
+
+- **Down one scale** after two readings in a row below 0.95, or six (30
+  seconds) whose mean is below 0.995. The scale left is marked slow for the
+  game.
+- **Up one scale** after twelve readings (a minute) each at 0.995 or more
+  with `work` at most 0.5, to the next scale the host lists, unless that is
+  past what the view needs or marked slow: a slow scale caps the climb, so a
+  scale above one that ran slow is never tried. SwanStation emulates a frame
+  inside `retro_run`, so its `work` is its share of the frame's time.
+- **The floor.** Slow at the smallest scale, nothing is lowered further and
+  the optimizer stops for that game: the limit is not the resolution.
+- **The view's need** (`retroAutoDisplayNeed`): a PS1 picture is 240 lines,
+  so the largest scale worth drawing is the view's height in pixels over 240,
+  rounded up (5x at 1080 lines, 6x at 1440). `AppModel.retroDisplayHeight` is
+  the launcher view's physical height, asked at every judgement, so a resized
+  window or another display caps the next climb.
+
+**The start.** `RetroAutoResolution.startScale` starts a game at the scale
+its memory last used, else 2x, at most the view's need and never a scale
+marked slow. `RetroHostGame.start` asks for it once the host has greeted the
+launcher, so a memory kept with another host version is not used, and sends
+it as the start's `swanstation_GPU_ResolutionScale` only to a host that lists
+`gamePerformance`. The GPU and the game's other graphics settings are known
+only from its statuses; when they differ from the memory's, the game has
+started at the memory's scale, and the rules judge it from there. An older host gets no resolution and starts at
+SwanStation's own default, as before.
+
+**What it remembers** (`Preferences.retroHostAuto`, by the game's title ID,
+never sent anywhere): the graphics card that drew the game
+(`status.gpu.renderer`), the host's version (`welcome.hostVersion`, which
+names the cores it ships), the game's other graphics settings
+(`retroAutoConfig` over `retroGraphicsKeys`), the scale last used and the
+scales marked slow. When the card, the host or those settings differ from
+the memory's, it starts again with no scale marked slow, since what ran slow
+with others proves nothing now. Changing a Graphics setting mid-game starts
+a new optimizer that settles first.
+
+**The row.** On a host that lists `gamePerformance`, a PS1 game's Internal
+resolution row starts with Auto (`retroResolutionAuto`, "Auto (2x)", naming
+the scale the game draws at). Choosing a value turns Auto off and keeps it in
+`Preferences.retroHostOptions` as before. Every choice in the row, Auto or a
+value, waits its turn behind the ones made before it
+(`RetroPlay.resolutionChoices`), and one that is no longer the last made when
+its turn comes, or after it waited for the host, sends and keeps nothing
+(`RetroPlay.resolutionChoice`). A change Auto already asked for is answered
+first (`RetroAutoController.stop`), and a stopped controller does not count
+it. `RetroHostGame.refresh`, which `setOption` asks once the host took an
+option, completes once a `status` begun after the call was answered (asked
+while one is on its way, it waits for the one after it; the game's own twice
+a second ask never makes it wait longer), so the status the choice is then
+judged by is one the host gave after Auto's change was taken. So whatever the player chooses last is what the game draws at and what
+is kept, however fast the choices come. Choosing the value the game already
+has keeps it without sending it again, also right after Auto changed to it.
+When the host refuses a value, a game on Auto stays on Auto. A choice that
+fails is logged and does not hold up the next. Choosing Auto removes the kept
+value, so
+every game without one starts on Auto, and starts the optimizer at the scale
+the game draws at. Saying when Auto lowered a scale, and Auto for PS2, come
+later.
 
 ## Graphics
 
@@ -989,6 +1092,25 @@ native memory as a real ring slot would be, so no host is started.
   are neither shown nor sent; and `retroStartOptions` puts the kept values
   over the Graphics defaults, dropping a stereo or hardware fix kept from
   before, and sends PS1 widescreen only from the game's own kept values.
+- [`test/core/retro_host/retro_auto_resolution_test.dart`](../test/core/retro_host/retro_auto_resolution_test.dart)
+  reads the host's recorded statuses with `gamePerformance` (Spyro at full
+  speed, Jak and Daxter at 8x, copied from the host's message fixtures into
+  [`retro-host-performance-status.json`](../test/fixtures/retro-host-performance-status.json)
+  and [`retro-host-ps2-performance-status.json`](../test/fixtures/retro-host-ps2-performance-status.json)),
+  checks that a status differing only in `performance` says nothing new, and
+  drives the rules: the start scale, two slow readings and the Jak 4x half
+  minute stepping down, Spyro's full-speed readings never doing so, a broken
+  run of readings and a pause, a minute of headroom stepping up within the
+  view's need and stopping below a slow scale, the floor, and the memory's
+  JSON and matching.
+- [`retro_auto_controller_test.dart`](../test/ui/retro_host/retro_auto_controller_test.dart)
+  runs the controller on a fake host with a clock moved by hand: a slow game
+  lowered and its memory saved, a minute of headroom raising it within the
+  view's need, a refused change not counted, nothing judged with the menu
+  open and the menu breaking the run of readings, also when it opens and
+  closes between two judgements, `stop` waiting for a change
+  already asked and not counting it, another GPU starting the memory again,
+  and nothing on a host without `gamePerformance`.
 - [`retro_graphics_words_test.dart`](../test/ui/retro_host/retro_graphics_words_test.dart)
   checks each Graphics setting's title and line (widescreen's per console),
   the lines for a value not yet in effect, and the values' labels.
@@ -1072,7 +1194,13 @@ native memory as a real ring slot would be, so no host is started.
   the host draws without the GPU), PS1 widescreen kept for the game it was
   chosen in only (a second PS1 game, `secondPs1`, starts without it, a choice
   kept for every game still reaches it, and the game's own value survives the
-  preferences being saved and read back), options not shown and not sent, Close game keeping the host and the next game starting
+  preferences being saved and read back), Auto (the 2x start, the row with
+  Auto first, a hand-picked value turning it off and Auto chosen again, a
+  value picked while Auto's change is still being sent sent after it and
+  kept, two choices made while it is sent with only the last acted on (2x,
+  the 3x Auto's change left, or Auto), a refused value leaving the game on
+  Auto, the start at what the memory learned, no Auto without `gamePerformance`, and a
+  kept resolution starting the game with Auto offered but not chosen), options not shown and not sent, Close game keeping the host and the next game starting
   on it, the kept host shut down when the player leaves the PS1 games, after
   the idle limit and when another game starts, a kept host that crashed and a
   host that crashed during a game (both replaced by a new host for the next

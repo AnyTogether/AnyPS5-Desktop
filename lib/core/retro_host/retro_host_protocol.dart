@@ -80,6 +80,65 @@ const retroCapabilityPs2ResolutionLimits = 'ps2ResolutionLimits';
 /// methods `saveState` and `loadState` (protocol.md "saveState and loadState").
 const retroCapabilitySaveStates = 'saveStates';
 
+/// The capability that says how fast a game really runs and which GPU draws it: `status.performance`
+/// and `status.gpu` (protocol.md "status").
+const retroCapabilityGamePerformance = 'gamePerformance';
+
+/// How fast a game ran over its last few seconds of play (protocol.md "status", `performance`).
+class RetroPerformance {
+  const RetroPerformance({required this.speed, required this.work, required this.seconds});
+
+  /// The frames with a picture the core handed over, as a share of those the game should have
+  /// shown: 1 at full speed, give or take a frame or two, 0.5 at half speed.
+  final double speed;
+
+  /// The median time one frame took, as a share of a frame's time; null when no frame ended.
+  /// Above 1 the PC cannot keep up; for LRPS2 it includes waiting for its own threads.
+  final double? work;
+
+  /// The time measured.
+  final double seconds;
+
+  Map<String, Object?> toJson() => {'speed': speed, 'work': work, 'seconds': seconds};
+
+  static RetroPerformance parse(RetroFields f) {
+    final speed = f.number('speed');
+    if (speed < 0) throw const RetroProtocolError('status.performance.speed must not be negative.');
+    double? work;
+    if (!f.has('work')) throw const RetroProtocolError('status.performance.work is missing.');
+    if (f.map['work'] != null) {
+      work = f.number('work');
+      if (work < 0) throw const RetroProtocolError('status.performance.work must not be negative.');
+    }
+    return RetroPerformance(speed: speed, work: work, seconds: f.number('seconds', above: 0));
+  }
+
+  @override
+  String toString() => 'RetroPerformance(speed $speed, work $work, ${seconds}s)';
+}
+
+/// The OpenGL context a game is drawn in (protocol.md "status", `gpu`).
+class RetroGpu {
+  const RetroGpu({required this.renderer, required this.vendor, required this.maxTexture});
+
+  /// `GL_RENDERER`, naming the GPU and driver that draw the game, or `"?"`.
+  final String renderer;
+
+  /// `GL_VENDOR`, or `"?"`.
+  final String vendor;
+
+  /// `GL_MAX_TEXTURE_SIZE`.
+  final int maxTexture;
+
+  Map<String, Object?> toJson() => {'renderer': renderer, 'vendor': vendor, 'maxTexture': maxTexture};
+
+  static RetroGpu parse(RetroFields f) => RetroGpu(
+    renderer: f.string('renderer'),
+    vendor: f.string('vendor'),
+    maxTexture: f.integer('maxTexture', 0, RetroFields.maxSafeInteger),
+  );
+}
+
 /// The consoles `start.console` names and `status.console` gives (capability [retroCapabilityPs2]).
 abstract final class RetroConsole {
   static const ps1 = 'ps1';
@@ -244,6 +303,8 @@ class RetroStatus {
     this.cardUnreadable = false,
     this.discs,
     this.console,
+    this.performance,
+    this.gpu,
   });
 
   /// What the client reports from a host failure until the UI calls `release`.
@@ -259,7 +320,9 @@ class RetroStatus {
       options = const {},
       cardUnreadable = false,
       discs = null,
-      console = null;
+      console = null,
+      performance = null,
+      gpu = null;
 
   final bool ready;
   final bool ended;
@@ -283,6 +346,14 @@ class RetroStatus {
   /// [retroCapabilityPs2].
   final String? console;
 
+  /// How fast the game ran over its last seconds of play; null before that, while paused, in
+  /// lockstep, once ended, or from a host without [retroCapabilityGamePerformance].
+  final RetroPerformance? performance;
+
+  /// The OpenGL context the game is drawn in, once the host made one; null before that, for a game
+  /// drawn without one, or from a host without [retroCapabilityGamePerformance].
+  final RetroGpu? gpu;
+
   /// The most discs `status.discs.labels` may list.
   static const maxDiscs = 128;
 
@@ -299,11 +370,16 @@ class RetroStatus {
     'cardUnreadable': cardUnreadable,
     'discs': ?discs?.toJson(),
     'console': ?console,
+    if (performance != null || gpu != null) ...{'performance': performance?.toJson(), 'gpu': gpu?.toJson()},
   };
 
   /// Whether [other] says the same as this status, field by field, as protocol.md "status" writes
-  /// it (the order of the options too, which is the menu's order).
-  bool sameAs(RetroStatus other) => identical(this, other) || jsonEncode(toJson()) == jsonEncode(other.toJson());
+  /// it (the order of the options too, which is the menu's order), but for [performance]: the host
+  /// measures it again at every call, and only what judges it reads it.
+  bool sameAs(RetroStatus other) =>
+      identical(this, other) || jsonEncode(_withoutPerformance()) == jsonEncode(other._withoutPerformance());
+
+  Map<String, Object?> _withoutPerformance() => toJson()..remove('performance');
 
   /// The four fields protocol.md "Host failure" gives for a status the client made.
   Map<String, Object?> toFailureJson() => {'ready': ready, 'ended': ended, 'error': error, 'errorCode': errorCode};
@@ -317,8 +393,10 @@ class RetroStatus {
   /// allows. Unknown fields are ignored. A host's `errorCode` of `hostExited` or `hostHung`, which
   /// only the client may report, is read as `other` (protocol.md "status"). A host that lists
   /// [retroCapabilityPs2] ([ps2]) sends `console` in every status, `"ps1"` or `"ps2"`; any other
-  /// host's `console` is ignored.
-  static RetroStatus parse(Map<String, Object?> map, {bool ps2 = false}) {
+  /// host's `console` is ignored. A host that lists [retroCapabilityGamePerformance]
+  /// ([performance]) sends `performance` and `gpu`, each an object or null; any other host's are
+  /// ignored.
+  static RetroStatus parse(Map<String, Object?> map, {bool ps2 = false, bool performance = false}) {
     final f = RetroFields(map, 'status');
     final options = <String, RetroOption>{};
     final optionFields = f.object('options');
@@ -381,7 +459,14 @@ class RetroStatus {
       cardUnreadable: f.has('cardUnreadable') && f.boolean('cardUnreadable'),
       discs: discs,
       console: ps2 ? _console(f) : null,
+      performance: performance ? _nullable(f, 'performance', RetroPerformance.parse) : null,
+      gpu: performance ? _nullable(f, 'gpu', RetroGpu.parse) : null,
     );
+  }
+
+  static T? _nullable<T>(RetroFields f, String key, T Function(RetroFields) parse) {
+    if (!f.has(key)) throw RetroProtocolError('status.$key is missing.');
+    return f.map[key] == null ? null : parse(f.object(key));
   }
 
   static String _console(RetroFields f) {

@@ -114,6 +114,13 @@ class FakeRetroHostSession extends FakeFrameSource implements RetroHostSession {
   @override
   bool canSaveStates = false;
 
+  /// Whether the host lists `gamePerformance`; false, as a host before it, unless a test says.
+  @override
+  bool reportsPerformance = false;
+
+  @override
+  String hostVersion = '1.2.0';
+
   /// The `error` reply a call gets, by method, instead of its result.
   final callErrors = <String, RetroCallError>{};
 
@@ -150,11 +157,25 @@ class FakeRetroHostSession extends FakeFrameSource implements RetroHostSession {
     return callResults[method];
   }
 
+  /// When set, `status` answers only once this completes, with the status it had when it was
+  /// asked, as a host's reply on its way says what was true when the host answered.
+  Completer<void>? statusGate;
+
+  /// How many times `status` was asked.
+  int statusAsked = 0;
+
+  /// How long each `status` takes to answer.
+  Duration statusDelay = Duration.zero;
+
   @override
   Future<RetroStatus?> status() async {
+    statusAsked++;
     final error = statusError;
     if (error != null) throw error;
-    return nextStatus;
+    final reply = nextStatus;
+    await statusGate?.future;
+    if (statusDelay > Duration.zero) await Future<void>.delayed(statusDelay);
+    return reply;
   }
 
   /// `stop`: the game has ended, and `status` says so until `release`.
