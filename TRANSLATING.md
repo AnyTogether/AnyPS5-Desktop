@@ -22,6 +22,7 @@ The Windows/Linux launcher has these languages so far:
 | Hindi, Bengali, Bhojpuri, Arabic, Urdu | `hi`, `bn`, `bho`, `ar`, `ur` | VK |
 | Czech, Danish, Hungarian, Norwegian, Romanian, Swedish, Filipino, Malay | `cs`, `da`, `hu`, `no`, `ro`, `sv`, `fil`, `ms` | VK |
 | Simplified Chinese, Traditional Chinese, Korean, Khmer, Lao, Amharic | `zh-Hans`, `zh-Hant`, `ko`, `km`, `lo`, `am` | VK |
+| Polish | `pl` | QguAr71 |
 
 Arabic and Urdu read right to left: the launcher's screens are mirrored for them, and ← and → follow
 what the screen shows. A new file for another language written right to left (Persian, Hebrew) is
