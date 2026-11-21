@@ -457,7 +457,7 @@ void main() {
   });
 
   test('choices made while an Auto change is being sent: only the last one made is acted on', () async {
-    for (final last in ['2x', 'Auto']) {
+    for (final last in ['2x', '3x', 'Auto']) {
       launcher = Ps1Launcher();
       final clock = _Clock();
       final model = launcher.model
@@ -497,6 +497,10 @@ void main() {
         expect(options(), ['3', '2'], reason: 'the 4x made before 2x is never sent');
         expect(model.preferences.retroHostOptions['swanstation_GPU_ResolutionScale'], '2');
         expect(model.retroPlay!.auto, isNull);
+      } else if (last == '3x') {
+        expect(options(), ['3'], reason: "3x is the scale Auto's change left: kept, not sent again");
+        expect(model.preferences.retroHostOptions['swanstation_GPU_ResolutionScale'], '3');
+        expect(model.retroPlay!.auto, isNull);
       } else {
         expect(options(), ['3'], reason: 'the 4x made before Auto is never sent');
         expect(model.preferences.retroHostOptions, isNot(contains('swanstation_GPU_ResolutionScale')));
@@ -507,6 +511,27 @@ void main() {
       launcher.dispose();
     }
     launcher = Ps1Launcher();
+  });
+
+  test('a value the host refuses leaves a game on Auto', () async {
+    launcher = Ps1Launcher();
+    final model = launcher.model
+      ..setRetroHostPs1(true)
+      ..retroAutoEvery = const Duration(hours: 1)
+      ..retroDisplayHeight = (() => 1080);
+    launcher.session.reportsPerformance = true;
+    await launcher.start(status: _measured(2, null));
+    launcher.session.callResults['option'] = false;
+    model.openRetroMenu();
+    await pumpEventQueue();
+    (launcher.row('section-graphics').kind as ActionRow).run();
+    final row = launcher.row('resolution').kind as ChoiceRow;
+    row.set(row.options.indexOf('4x'));
+    await pumpEventQueue();
+    expect(launcher.session.calls.last.$2, {'key': 'swanstation_GPU_ResolutionScale', 'value': '4'});
+    expect(model.preferences.retroHostOptions, isNot(contains('swanstation_GPU_ResolutionScale')));
+    expect(model.retroPlay!.auto, isNotNull);
+    expect((launcher.row('resolution').kind as ChoiceRow).selected, 0);
   });
 
   test('Auto starts a game at what it learned of it', () async {

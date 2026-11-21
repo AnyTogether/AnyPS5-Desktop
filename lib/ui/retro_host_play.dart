@@ -852,11 +852,14 @@ extension RetroHostPlaying on AppModel {
 
   /// Runs [choose] once every internal resolution choice made before it is done, so choices reach
   /// the host in the order made; `latest` says whether it is still the last choice made, and a
-  /// choice that is not sends and keeps nothing.
+  /// choice that is not sends and keeps nothing. A choice that fails is written to the log and
+  /// does not hold up those after it.
   Future<void> _chooseRetroResolutionInTurn(RetroPlay play, Future<void> Function(bool Function() latest) choose) {
     final mine = ++play.resolutionChoice;
     bool latest() => play.resolutionChoice == mine && !_disposed;
-    return play.resolutionChoices = play.resolutionChoices.then((_) => choose(latest));
+    return play.resolutionChoices = play.resolutionChoices
+        .then((_) => choose(latest))
+        .catchError((Object error) => _padLog?.call('internal resolution choice failed: $error'));
   }
 
   /// A Graphics setting's row ([RetroGraphicsChoice]): its values in the setting's order, with what
@@ -894,26 +897,28 @@ extension RetroHostPlaying on AppModel {
   /// its console once the host took it. A PS1 game draws at it in a moment, a PS2 game from its
   /// next start.
   /// A value chosen while on Auto turns Auto off, once a change Auto already asked for is
-  /// answered, so the value chosen is the last one sent; the value the game then draws at is kept
-  /// without being sent again. When the host refuses the value, Auto goes on.
-  Future<void> _chooseRetroResolution(RetroPlay play, String value) =>
-      _chooseRetroResolutionInTurn(play, (latest) async {
-        if (!latest()) return;
-        final auto = play.auto;
-        play.auto = null;
-        await auto?.stop();
-        final choice = play.menu.resolution;
-        if (choice == null || !latest()) return;
-        final already = auto != null && choice.values[choice.selected].value == value;
-        if (!already && !await play.menu.chooseResolution(value)) {
-          if (auto != null && latest() && !play.over && play.auto == null) _startRetroAuto(play);
-          return;
-        }
-        if (_disposed) return;
-        preferences.retroHostOptions[choice.key] = value;
-        savePreferences();
-        _changed();
-      });
+  /// answered, so the value chosen is the last one sent. The value the game already has is kept
+  /// without being sent again. When the host refuses the value, a game on Auto stays on it.
+  Future<void> _chooseRetroResolution(RetroPlay play, String value) => _chooseRetroResolutionInTurn(play, (
+    latest,
+  ) async {
+    if (!latest()) return;
+    final auto = play.auto;
+    play.auto = null;
+    await auto?.stop();
+    final choice = play.menu.resolution;
+    if (choice == null || !latest()) return;
+    final already = choice.values[choice.selected].value == value;
+    if (!already && !await play.menu.chooseResolution(value)) {
+      final onAuto = !play.ps2 && play.host.reportsPerformance && !preferences.retroHostOptions.containsKey(choice.key);
+      if (onAuto && latest() && !play.over && play.auto == null) _startRetroAuto(play);
+      return;
+    }
+    if (_disposed) return;
+    preferences.retroHostOptions[choice.key] = value;
+    savePreferences();
+    _changed();
+  });
 
   /// The rows of one section's page: Volume and Mute first in Audio, then the section's options.
   /// An option that takes effect only when the game starts again says so; a chosen value not yet

@@ -499,8 +499,11 @@ its turn comes, or after it waited for the host, sends and keeps nothing
 (`RetroPlay.resolutionChoice`). A change Auto already asked for is answered
 first (`RetroAutoController.stop`), and a stopped controller does not count
 it. So whatever the player chooses last is what the game draws at and what
-is kept, however fast the choices come. Choosing the value the game draws at keeps it without sending it
-again; a value the host refuses leaves Auto on. Choosing Auto removes the kept value, so
+is kept, however fast the choices come. Choosing the value the game already
+has keeps it without sending it again, also right after Auto changed to it.
+When the host refuses a value, a game on Auto stays on Auto. A choice that
+fails is logged and does not hold up the next. Choosing Auto removes the kept
+value, so
 every game without one starts on Auto, and starts the optimizer at the scale
 the game draws at. Saying when Auto lowered a scale, and Auto for PS2, come
 later.
@@ -1191,7 +1194,8 @@ native memory as a real ring slot would be, so no host is started.
   Auto first, a hand-picked value turning it off and Auto chosen again, a
   value picked while Auto's change is still being sent sent after it and
   kept, two choices made while it is sent with only the last acted on (2x,
-  or Auto), the start at what the memory learned, no Auto without `gamePerformance`, and a
+  the 3x Auto's change left, or Auto), a refused value leaving the game on
+  Auto, the start at what the memory learned, no Auto without `gamePerformance`, and a
   kept resolution starting the game with Auto offered but not chosen), options not shown and not sent, Close game keeping the host and the next game starting
   on it, the kept host shut down when the player leaves the PS1 games, after
   the idle limit and when another game starts, a kept host that crashed and a
