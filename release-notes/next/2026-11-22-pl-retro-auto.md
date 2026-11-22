@@ -1,0 +1,1 @@
+- **Polish: the Auto internal resolution row is translated** ("Automatyczna (2x)"), as on the Mac.
