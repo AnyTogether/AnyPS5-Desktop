@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import 'package:anyps5_desktop/core/retro_host/retro_host_protocol.dart';
 import 'package:anyps5_desktop/core/retro_host/retro_host_session.dart';
-import 'package:anyps5_desktop/core/retro_host/retro_resolution.dart';
+import 'package:anyps5_desktop/core/retro_host/retro_graphics.dart';
 import 'package:anyps5_desktop/ui/retro_host/retro_game_menu.dart';
 import 'package:anyps5_desktop/ui/retro_host/retro_host_controls.dart';
 import 'package:anyps5_desktop/ui/retro_host/retro_host_game.dart';
@@ -133,7 +133,7 @@ void main() {
     expect(await menu.chooseResolution('1'), isTrue);
     expect(session.calls.single.$1, 'option');
     expect(session.calls.single.$2, {'key': 'swanstation_GPU_ResolutionScale', 'value': '1'});
-    expect(menu.resolution!.note, RetroResolutionNote.applying, reason: '4 is still the value in effect');
+    expect(menu.resolution!.note, RetroGraphicsNote.applying, reason: '4 is still the value in effect');
     session.callResults['option'] = false;
     expect(await menu.chooseResolution('2'), isFalse, reason: 'the host refused');
   });

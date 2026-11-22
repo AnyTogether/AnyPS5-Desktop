@@ -25,9 +25,9 @@ void main() {
     test('a game follows the default unless it chose; only full screen fades over the game', () {
       const settings = GameSettings();
       expect(settings.ownStartAnimation, isNull);
-      // Built-in display default is windowed: cover can show, but no layered fade over the game.
-      expect(settings.fullscreen, isFalse);
-      expect(settings.fadesCover, isFalse, reason: 'windowed: no layered fade');
+      // Built-in display default is full screen: the cover can fade over the game.
+      expect(settings.fullscreen, isTrue);
+      expect(settings.fadesCover, isTrue, reason: 'full screen: layered fade');
       expect(settings.copyWith(fullscreen: true).fadesCover, isTrue, reason: 'full screen and on by default');
       expect(settings.copyWith(fullscreen: true, startAnimation: false).fadesCover, isFalse);
       final following = settings.withDefaults(const DisplayDefaults(startAnimation: false));

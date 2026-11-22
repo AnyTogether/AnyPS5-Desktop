@@ -64,13 +64,14 @@ void main() {
   void type(String id, String text) => (row(id).kind as TextRow).set(text);
 
   group('the rows', () {
-    test('Custom relinker options after the trace switch, then Launch with Launch options, before Sharing', () {
+    test('Custom relinker options after the switches, then Launch with Launch options, before Sharing', () {
       openAdvanced(orbit());
       final ids = model.panelCategories().single.rows.map((row) => row.id).toList();
       final rebuild = ids.indexOf('relinkerSection');
-      expect(ids.sublist(rebuild, rebuild + 6), [
+      expect(ids.sublist(rebuild, rebuild + 7), [
         'relinkerSection',
         'relinker---trace-imports',
+        'relinker---to-intel',
         'relinkerCustomOptions',
         'launchSection',
         'launchOptions',

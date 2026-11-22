@@ -165,7 +165,7 @@ StickModifier = KEY:F24
   group('game settings', () {
     test('the default environment', () {
       expect(const GameSettings().environment(launcherLanguage: 19), {
-        'ANYPS5_FULLSCREEN': '0',
+        'ANYPS5_FULLSCREEN': '1',
         'ANYPS5_WINDOW_SIZE': '75',
         'ANYPS5_PRESENT_MODE': 'fifo',
         'ANYPS5_LANGUAGE': '19',
@@ -329,9 +329,9 @@ StickModifier = KEY:F24
   });
 
   group('display defaults', () {
-    test('the built-in defaults: windowed, a window of 75%, vertical sync on', () {
+    test('the built-in defaults: full screen, a window of 75%, vertical sync on', () {
       const defaults = DisplayDefaults();
-      expect(defaults.fullscreen, isFalse);
+      expect(defaults.fullscreen, isTrue);
       expect(defaults.windowSize, 75);
       expect(defaults.vsync, isTrue);
       expect(
@@ -411,7 +411,7 @@ StickModifier = KEY:F24
       final tearing = old('{"fullscreen":false,"windowSize":75,"vsync":false,"overlay":"off"}');
       expect(tearing.ownVsync, isFalse);
       expect(tearing.ownFullscreen, isNull);
-      // Unchanged after the update: with the built-in defaults each starts as it did.
+      // Migrated choices survive a current-format save and reload.
       for (final settings in [untouched, full, window, tearing]) {
         final text = jsonEncode(jsonDecode(jsonEncode(settings.toJson())));
         expect(
@@ -423,7 +423,7 @@ StickModifier = KEY:F24
       }
       expect(
         untouched.withDefaults(const DisplayDefaults()).environment(launcherLanguage: 1)['ANYPS5_FULLSCREEN'],
-        '0',
+        '1',
       );
       expect(
         full.withDefaults(const DisplayDefaults()).environment(launcherLanguage: 1)['ANYPS5_FULLSCREEN'],
@@ -442,10 +442,10 @@ StickModifier = KEY:F24
       expect(read('{"settingsVersion":${GameSettings.version},"fullscreen":true}').ownFullscreen, isTrue);
       final none = read('{"settingsVersion":${GameSettings.version}}');
       expect(none.ownFullscreen, isNull);
-      expect(none.fullscreen, isFalse, reason: 'no choice: windowed default');
+      expect(none.fullscreen, isTrue, reason: 'no choice: full-screen default');
       expect(read('{"overlay":"off"}').ownFullscreen, isNull);
       expect(read('{"fullscreen":true,"windowSize":75}').ownFullscreen, isTrue);
-      // Built-in windowed + size: treated as never chosen when both match the old built-in.
+      // Legacy windowed + old size: treated as never chosen when both match the old built-in.
       expect(read('{"fullscreen":false,"windowSize":75}').followsDisplayDefaults, isTrue);
       expect(read('{"fullscreen":false,"windowSize":60}').ownWindowSize, 60);
     });
@@ -471,7 +471,26 @@ StickModifier = KEY:F24
       File(file).writeAsStringSync('{"theme":1,"displayDefaults":{"fullscreen":true}}');
       expect(DisplayDefaults.load(file), const DisplayDefaults(fullscreen: true));
       File(file).writeAsStringSync('{"theme":1}');
-      expect(DisplayDefaults.load(file), const DisplayDefaults(), reason: 'no displayDefaults key: built-in');
+      expect(DisplayDefaults.load(file), const DisplayDefaults(), reason: 'an unversioned file with no choice follows Full Screen');
+      File(file).writeAsStringSync(
+        '{"displayDefaults":{"fullscreen":false,"windowSize":60,"vsync":true}}',
+      );
+      expect(DisplayDefaults.load(file), const DisplayDefaults(fullscreen: false, windowSize: 60));
+      File(file).writeAsStringSync(
+        '{"displayDefaults":{"fullscreen":false,"windowSize":75,"vsync":false,"startAnimation":false}}',
+      );
+      expect(
+        DisplayDefaults.load(file),
+        const DisplayDefaults(fullscreen: true, windowSize: 75, vsync: false, startAnimation: false),
+      );
+      File(file).writeAsStringSync(
+        '{"preferencesVersion":1,"displayDefaults":{"fullscreen":false,"windowSize":75,"vsync":false}}',
+      );
+      expect(
+        DisplayDefaults.load(file),
+        const DisplayDefaults(fullscreen: false, windowSize: 75, vsync: false),
+        reason: 'versioned preferences are read as written',
+      );
     });
   });
 

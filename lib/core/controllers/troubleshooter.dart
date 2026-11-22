@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import '../gamepad/linux_input_class.dart';
 import '../gamepad/linux_pads.dart';
 import '../host.dart';
 import 'pad_info.dart';
@@ -311,22 +312,15 @@ class HostProbe implements SystemProbe {
   Future<List<String>> unreadableControllers() async {
     if (system != HostSystem.linux) return const [];
     try {
-      final devices = LinuxPadSource.parseDevices(File('/proc/bus/input/devices').readAsStringSync());
+      // The controllers only (an accelerometer with a js node is none), each asked with
+      // access(2): opening a node starts its driver, which can hang in the kernel (issue #195).
+      final (devices, _) = LinuxPadSource.controllers();
       return [
         for (final device in devices)
-          if (!_readable('/dev/input/${device.event}')) device.name,
+          if (!LinuxInputClass.readable('/dev/input/${device.event}')) device.name,
       ];
     } on FileSystemException {
       return const [];
-    }
-  }
-
-  static bool _readable(String path) {
-    try {
-      File(path).openSync().closeSync();
-      return true;
-    } on FileSystemException {
-      return false;
     }
   }
 
@@ -336,15 +330,8 @@ class HostProbe implements SystemProbe {
     try {
       final nodes = Directory('/dev').listSync().where((entry) => RegExp(r'/hidraw\d+$').hasMatch(entry.path)).toList();
       if (nodes.isEmpty) return false;
-      for (final node in nodes) {
-        try {
-          File(node.path).openSync().closeSync();
-          return false;
-        } on FileSystemException {
-          continue;
-        }
-      }
-      return true;
+      // Asked with access(2), not opened: an open reaches the device's driver.
+      return !nodes.any((node) => LinuxInputClass.readable(node.path));
     } on FileSystemException {
       return false;
     }

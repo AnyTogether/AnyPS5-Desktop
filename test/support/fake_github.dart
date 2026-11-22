@@ -29,7 +29,7 @@ class FakeRelease {
 /// - `GET /api/repos/<repo>/releases/latest`, `/api/repos/<repo>/releases` and
 ///   `/api/repos/<repo>/releases/tags/<tag>`
 /// - `GET /download/<tag>/<name>`, a redirect to `/blob/<tag>/<name>` (GitHub sends release
-///   downloads on to another host), which honours `Range: bytes=N-`.
+///   downloads on to another host, at a signed address), which honours `Range: bytes=N-`.
 class FakeGitHub {
   FakeGitHub._(this._server, this.repository) {
     _server.listen(_handle);
@@ -48,9 +48,21 @@ class FakeGitHub {
   /// The next download of a file sends only this many bytes, then the connection drops.
   final Map<String, int> dropAfter = {};
 
+  /// Every download of a file sends only this many bytes, then the connection drops.
+  final Map<String, int> dropEvery = {};
+
   /// Downloads stop after this many bytes and wait until [release] is called.
   final Map<String, int> holdAfter = {};
   final List<void Function()> _held = [];
+
+  /// The next download of a file sends this many bytes, then nothing more on a connection that
+  /// stays open: a stalled storage host.
+  final Map<String, int> stallAfter = {};
+  final List<Socket> _stalled = [];
+
+  /// The next downloads of a file that ask for a range (a resume) are answered with these
+  /// statuses, one each, as the storage host answers a signed address that expired (403).
+  final Map<String, List<int>> refuseResume = {};
 
   /// Answers every download with the whole file, ignoring Range.
   bool ignoreRange = false;
@@ -70,7 +82,12 @@ class FakeGitHub {
     _held.clear();
   }
 
-  Future<void> close() => _server.close(force: true);
+  Future<void> close() {
+    for (final socket in _stalled) {
+      socket.destroy();
+    }
+    return _server.close(force: true);
+  }
 
   List<String> get downloads =>
       requests.where((request) => request.$1.startsWith('/blob/')).map((request) => request.$1).toList();
@@ -144,6 +161,10 @@ class FakeGitHub {
       final name = parts[3];
       var start = 0;
       final range = RegExp(r'^bytes=(\d+)-$').firstMatch(request.headers.value(HttpHeaders.rangeHeader) ?? '');
+      if (range != null && (refuseResume[name]?.isNotEmpty ?? false)) {
+        response.statusCode = refuseResume[name]!.removeAt(0);
+        return response.close();
+      }
       if (range != null && !ignoreRange) {
         start = int.parse(range.group(1)!);
         if (start >= bytes.length) {
@@ -161,8 +182,15 @@ class FakeGitHub {
       head.write('Connection: close\r\n\r\n');
       final socket = await response.detachSocket(writeHeaders: false);
       socket.add(utf8.encode(head.toString()));
-      final drop = dropAfter.remove(name);
+      final drop = dropAfter.remove(name) ?? dropEvery[name];
       final hold = holdAfter[name];
+      final stall = stallAfter.remove(name);
+      if (stall != null) {
+        socket.add(body.sublist(0, (stall - start).clamp(0, body.length)));
+        await socket.flush();
+        _stalled.add(socket);
+        return;
+      }
       if (drop != null) {
         socket.add(body.sublist(0, (drop - start).clamp(0, body.length)));
         await socket.flush();

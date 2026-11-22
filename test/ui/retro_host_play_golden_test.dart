@@ -128,11 +128,16 @@ void main() {
     launcher.model.openRetroMenu();
     await settle(tester);
     expect(find.text('Disc 2'), findsOneWidget);
-    for (final key in ['retroMenuAudio', 'retroMenuController', 'retroMenuConsole', 'retroMenuAdvanced']) {
+    for (final key in [
+      'retroMenuAudio',
+      'retroMenuGraphics',
+      'retroMenuController',
+      'retroMenuConsole',
+      'retroMenuAdvanced',
+    ]) {
       expect(find.text(T.text(key)), findsOneWidget, reason: key);
     }
-    expect(find.text('Internal Resolution Scale'), findsNothing, reason: "SwanStation's own title is not shown");
-    expect(find.text(T.text('retroResolution')), findsOneWidget, reason: 'the internal resolution after Audio');
+    expect(find.text(T.text('retroMenuGraphicsDetail')), findsOneWidget);
     expect(find.text(T.text('quickCloseGame')), findsOneWidget);
     await expectLater(shell, matchesGoldenFile('goldens/retro_host_menu_en.png'));
   });
@@ -150,11 +155,24 @@ void main() {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
     }
     model.openRetroMenu();
-    model.panelRow = model.panelCategories().single.rows.indexWhere((row) => row.id == 'resolution');
+    (model.panelCategories().single.rows.singleWhere((row) => row.id == 'section-graphics').kind as ActionRow).run();
     await settle(tester);
     expect(find.text(T.text('retroResolution')), findsOneWidget);
     expect(find.text(T.format('retroResolutionRefusedDetail', ['4x'])), findsOneWidget);
     await expectLater(shell, matchesGoldenFile('goldens/retro_host_menu_resolution_ps2_en.png'));
+  });
+
+  testWidgets("a PS1 game's Graphics page: resolution, smooth textures, fix wobbly 3D, widescreen", (tester) async {
+    await playing(tester, status: recordedStatus(selected: {'swanstation_GPU_PGXPEnable': 0}));
+    final model = launcher.model..openRetroMenu();
+    (model.panelCategories().single.rows.singleWhere((row) => row.id == 'section-graphics').kind as ActionRow).run();
+    await settle(tester);
+    for (final key in ['retroResolution', 'retroSmoothTextures', 'retroFixWobbly3d', 'retroWidescreen']) {
+      expect(find.text(T.text(key)), findsOneWidget, reason: key);
+    }
+    expect(find.text(T.text('retroWidescreenPs1Detail')), findsOneWidget);
+    expect(find.text('Texture Filtering'), findsNothing, reason: "SwanStation's own titles are not shown");
+    await expectLater(shell, matchesGoldenFile('goldens/retro_host_menu_graphics_en.png'));
   });
 
   /// Saves the game shown into [slots] as a player would, from its menu, with the host writing each

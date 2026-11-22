@@ -1,12 +1,13 @@
+import '../../core/retro_host/retro_graphics.dart';
 import '../../core/retro_host/retro_resolution.dart';
 
 /// Where a SwanStation option is shown. The host lists every option SwanStation lets the player
 /// change now (about fifty for a PS1 game, in SwanStation's order); the launcher groups them.
 enum RetroOptionSection {
-  /// The picture: SwanStation's `GPU`, `Display` and `TextureReplacements` options, and LRPS2's
-  /// resolution scale (`pcsx2_upscale_multiplier`). The in-game menu shows none of them as a
-  /// section: they are left for a Graphics page of their own. Only each console's internal
-  /// resolution has a row of its own on the menu's first page ([retroResolutionKey]).
+  /// The picture: SwanStation's `GPU` and `Display` options, and LRPS2's resolution scale,
+  /// anisotropic filtering and widescreen patch. The menu's Graphics page does not list them one by
+  /// one: it offers the internal resolution ([retroResolutionKey]) and a few settings that set them
+  /// ([retroGraphicsSettings]). The others are kept at the core's defaults.
   graphics,
 
   /// The sound: SwanStation's `Audio` options and Mute CD Audio. The menu adds the host's volume.
@@ -38,17 +39,31 @@ enum RetroOptionSection {
 /// - the CPU recompiler's debugging switches (`CPU_RecompilerICache`,
 ///   `CPU_RecompilerBlockLinking`, `CPU_FastmemMode`);
 /// - the light gun crosshair (`Controller_ShowCrosshair`): the host plugs in only DualShocks;
+/// - SwanStation's MSAA (`GPU_MSAA`), which does not work on the host: its shader needs OpenGL 4.0
+///   and the host makes the 3.3 context SwanStation asks for, so the core falls back to software
+///   and the game never starts;
+/// - SwanStation's accuracy and compatibility settings: the PGXP options but PGXP itself, the
+///   downsampling, the read-back renderer, the NTSC timings, interlacing, the display crop, 4:3 for
+///   24-bit display, and `Main_ApplyGameSettings`, which stays on so SwanStation's per-game list
+///   still turns enhancements off for the games they break;
 /// - LRPS2's VR (every `pcsx2_vr_...` key: `pcsx2_vr_mode` and its `pcsx2_vr_depth`), whose stereo
 ///   mode draws a picture for each eye side by side for a VR headset or a 3D display. AnyPS5 has
-///   no VR, and SwanStation no stereo option.
+///   no VR, and SwanStation no stereo option;
+/// - LRPS2's paraLLEl-GS options (every `pcsx2_pgs_...` key) and its software renderer's threads,
+///   for renderers the host never uses: it draws LRPS2 with GSdx on OpenGL and makes no Vulkan
+///   context;
+/// - LRPS2's other video options, its EE and VU options, its game patch hints but the widescreen
+///   patch, and its manual hardware fixes ("HW Hacks", which LRPS2 itself calls not recommended),
+///   as LRPS2 c0d39a5's `libretro/libretro_core_options.h` lists them. They stay at LRPS2's
+///   defaults, which defer to its game database.
 ///
 /// Keys are `swanstation_<Group>_<Name>`; a key of another form is [RetroOptionSection.advanced], as
-/// every other LRPS2 option of a PS2 game is (`pcsx2_...`), its BIOS (`pcsx2_bios`) included, but
-/// its resolution scale, which is [RetroOptionSection.graphics].
+/// every other LRPS2 option of a PS2 game is (`pcsx2_...`: its BIOS, fast boot, disc speed and the
+/// controllers), but those a Graphics row sets, which are [RetroOptionSection.graphics].
 RetroOptionSection? retroOptionSection(String key) {
   const prefix = 'swanstation_';
-  if (key == retroResolutionKeyPs2) return RetroOptionSection.graphics;
-  if (key.startsWith(_ps2Vr)) return null;
+  if (key == retroResolutionKeyPs2 || retroGraphicsKeys.contains(key)) return RetroOptionSection.graphics;
+  if (key.startsWith(_ps2Vr) || key.startsWith(_ps2Parallel) || _ps2Hidden.contains(key)) return null;
   if (!key.startsWith(prefix)) return RetroOptionSection.advanced;
   final name = key.substring(prefix.length);
   if (_hidden.contains(name) || name.startsWith('TextureReplacements_')) return null;
@@ -67,16 +82,37 @@ RetroOptionSection? retroOptionSection(String key) {
 bool retroOptionShown(String key) => retroOptionSection(key) != null;
 
 /// Whether a value kept for [key] goes to a game's `start`: one the in-game menu shows. A graphics
-/// option is kept back, since the launcher has no page yet where the player could see or change
-/// it, but for the console's internal resolution, which the menu's first page offers
-/// ([retroResolutionKey]). The two cores' options share one list of values the player chose, so
-/// LRPS2's (`pcsx2_...`) go to a [ps2] game only and every other to a PS1 game only. A PS2
-/// internal resolution still goes only to a host that limits it (`RetroHostGame.start`).
+/// option is kept back, since the player cannot see or change it, but for the console's internal
+/// resolution and the options the Graphics rows set ([retroGraphicsKeys]). A value kept for an
+/// option that is not shown is not sent either, also one an older launcher kept while it showed
+/// the option (LRPS2's stereo, a hardware fix). The two cores' options share one list of values
+/// the player chose, so LRPS2's (`pcsx2_...`) go to a [ps2] game only and every other to a PS1
+/// game only. A PS2 internal resolution still goes only to a host that limits it
+/// (`RetroHostGame.start`).
 bool retroOptionSent(String key, {bool ps2 = false}) {
   if (key.startsWith('pcsx2_') != ps2) return false;
-  if (key == retroResolutionKey(ps2: ps2)) return true;
+  if (key == retroResolutionKey(ps2: ps2) || retroGraphicsKeys.contains(key)) return true;
   final section = retroOptionSection(key);
   return section != null && section != RetroOptionSection.graphics;
+}
+
+/// The core options a game of [ps2]'s console starts with: the values the player kept for every
+/// game ([kept]) and for this game ([game]) that are sent ([retroOptionSent]), over the Graphics
+/// defaults for the settings the player did not choose ([retroGraphicsDefaults]). An option kept
+/// per game ([retroGraphicsPerGameKeys]) comes from [game] only, so a value kept for every game
+/// (by an older launcher) is not sent.
+Map<String, String> retroStartOptions(
+  Map<String, String> kept, {
+  required bool ps2,
+  Map<String, String> game = const {},
+}) {
+  final sent = {
+    for (final MapEntry(:key, :value) in kept.entries)
+      if (!retroGraphicsPerGameKeys.contains(key) && retroOptionSent(key, ps2: ps2)) key: value,
+    for (final MapEntry(:key, :value) in game.entries)
+      if (retroGraphicsPerGameKeys.contains(key) && retroOptionSent(key, ps2: ps2)) key: value,
+  };
+  return {...retroGraphicsDefaults(sent, ps2: ps2), ...sent};
 }
 
 /// An option's title without SwanStation's own " (Restart)": the menu says that under every option
@@ -90,6 +126,21 @@ String retroOptionTitle(String title) {
 }
 
 const _hidden = {
+  'GPU_MSAA',
+  'GPU_PGXPColorCorrection',
+  'GPU_PGXPDepthBuffer',
+  'GPU_PGXPPreserveProjFP',
+  'GPU_PGXPVertexCache',
+  'GPU_PGXPTolerance',
+  'GPU_PGXPDepthClearThreshold',
+  'GPU_PGXPCPU',
+  'GPU_DownsampleMode',
+  'GPU_UseSoftwareRendererForReadbacks',
+  'GPU_ForceNTSCTimings',
+  'GPU_DisableInterlacing',
+  'Display_CropMode',
+  'Display_Force4_3For24Bit',
+  'Main_ApplyGameSettings',
   'Display_ShowOSDMessages',
   'Display_ActiveStartOffset',
   'Display_ActiveEndOffset',
@@ -103,5 +154,55 @@ const _hidden = {
 };
 
 const _ps2Vr = 'pcsx2_vr_';
+
+const _ps2Parallel = 'pcsx2_pgs_';
+
+const _ps2Hidden = {
+  'pcsx2_renderer',
+  'pcsx2_native_scaling',
+  'pcsx2_deinterlace_mode',
+  'pcsx2_nointerlacing_hint',
+  'pcsx2_disable_interlace_offset',
+  'pcsx2_hw_download_mode',
+  'pcsx2_texture_filtering',
+  'pcsx2_trilinear_filtering',
+  'pcsx2_dithering',
+  'pcsx2_blending_accuracy',
+  'pcsx2_pcrtc_antiblur',
+  'pcsx2_pcrtc_screen_offsets',
+  'pcsx2_sw_renderer_threads',
+  'pcsx2_disable_shader_cache',
+  'pcsx2_vu_accurate_addsub',
+  'pcsx2_vu_exact_mul',
+  'pcsx2_vu_exact_div',
+  'pcsx2_vu0_softfloat',
+  'pcsx2_vu1_softfloat',
+  'pcsx2_mtvu',
+  'pcsx2_instant_vu1',
+  'pcsx2_ee_accurate_fpu',
+  'pcsx2_fpu_softfloat',
+  'pcsx2_ee_cycle_rate',
+  'pcsx2_ee_cpu',
+  'pcsx2_ee_cycle_skip',
+  'pcsx2_fastmem',
+  'pcsx2_game_enhancements_hint',
+  'pcsx2_uncapped_framerate_hint',
+  'pcsx2_enable_hw_hacks',
+  'pcsx2_cpu_sprite_size',
+  'pcsx2_cpu_sprite_level',
+  'pcsx2_software_clut_render',
+  'pcsx2_texture_inside_rt',
+  'pcsx2_disable_depth_conversion',
+  'pcsx2_framebuffer_conversion',
+  'pcsx2_disable_partial_invalidation',
+  'pcsx2_gpu_palette_conversion',
+  'pcsx2_preload_frame_data',
+  'pcsx2_half_pixel_offset',
+  'pcsx2_round_sprite',
+  'pcsx2_align_sprite',
+  'pcsx2_merge_sprite',
+  'pcsx2_unscaled_palette_draw',
+  'pcsx2_force_sprite_position',
+};
 
 const _console = {'CDROM_RegionCheck', 'CDROM_ReadSpeedup', 'CDROM_SeekSpeedup', 'CPU_Overclock'};

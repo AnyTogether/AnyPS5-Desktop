@@ -15,7 +15,8 @@ import 'package:path/path.dart' as p;
 /// later of the two by path.
 /// With [traceImports] it knows --trace-imports and libc.prx exports what the option needs; with
 /// [refuseTrace] it stops as the real one does for a game without libc.prx when given the option;
-/// with [refuseOption] it stops the same way whenever its arguments hold that option.
+/// with [refuseOption] it stops the same way whenever its arguments hold that option. With
+/// [toIntel] it knows --to-intel.
 String makeFakeToolkit(
   String folder, {
   String mode = 'ok',
@@ -25,6 +26,7 @@ String makeFakeToolkit(
   bool traceImports = false,
   bool refuseTrace = false,
   String? refuseOption,
+  bool toIntel = false,
 }) {
   Directory(p.join(folder, 'libs')).createSync(recursive: true);
   File(p.join(folder, 'libs', 'libkernel.prx')).writeAsStringSync('kernel library');
@@ -42,6 +44,7 @@ String makeFakeToolkit(
       '''
 #!/bin/sh
 ${traceImports ? '# knows --trace-imports' : '# plain'}
+${toIntel ? '# knows --to-intel' : ''}
 printf '%s\\n' "\$*" >> "$runsFile"
 ${refuseTrace ? 'case "\$*" in *--trace-imports*) echo "FAIL: --trace-imports requires libc.prx among the libraries" >&2; echo "Input: \$PWD/eboot.bin" >&2; exit 2;; esac' : ''}
 ${refuseOption != null ? 'case "\$*" in *$refuseOption*) echo "FAIL: unknown option $refuseOption" >&2; echo "Input: \$PWD/eboot.bin" >&2; exit 2;; esac' : ''}

@@ -246,6 +246,37 @@ void main() {
       expect(model.engine.unverified, isNull);
     });
 
+    test(
+      'a download that keeps failing is said on the card and in Settings, and choosing it again carries on',
+      () async {
+        github.releases.add(upstreamRelease('0.1.3', librarySize: 60000));
+        await toToolkitStep();
+        final archive = model.engine.latestPackage!.libraries.name;
+        github.dropEvery[archive] = 20000;
+        model.onboardingConfirm();
+        expect(model.engine.downloading?.version, '0.1.3');
+        await until(() => model.engine.downloading == null);
+        expect(model.toolkit, isNull);
+        // Not only a toast that goes: the download stays said, with how far it came and why.
+        expect(model.engine.failed?.version, '0.1.3');
+        expect(model.engine.error, contains('tried 4 times'));
+        final percent = model.engine.failedPercent;
+        expect(percent, greaterThan(0));
+        final again = model.engine.settingsRows().firstWhere((row) => row.id == 'engineDownload');
+        expect(again.title, 'Download of v0.1.3 stopped at $percent%');
+        expect(again.detail, '${model.engine.error} · select to carry on from there');
+        // Choosing the card again carries on from the part kept.
+        github.dropEvery.clear();
+        model.onboardingConfirm();
+        await until(() => model.toolkit != null);
+        expect(model.toolkit!.version, 'upstream-v0.1.3');
+        expect(model.engine.failed, isNull);
+        expect(model.engine.error, isNull);
+        expect(github.requests.where((request) => request.$1.endsWith('/$archive')).last.$2, 'bytes=20000-');
+        expect(model.onboardingChoice, 2, reason: 'next comes Start');
+      },
+    );
+
     test('settings: the engine in use, other versions to switch to or download, the old ones deleted', () async {
       github.releases.addAll([upstreamRelease('0.1.2'), upstreamRelease('0.1.1')]);
       await model.engine.check(quiet: true);

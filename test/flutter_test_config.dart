@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:anyps5_desktop/core/host_cpu.dart';
+import 'package:anyps5_desktop/core/toolkit_download.dart';
 import 'package:anyps5_desktop/ui/countries.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:flutter/services.dart';
@@ -11,10 +13,18 @@ import 'package:flutter_test/flutter_test.dart';
 /// compares them on macOS only and runs the whole suite on Linux with ANYPS5_SKIP_GOLDENS=1:
 /// the screens are still built and pumped, only the pixel comparison is left out.
 ///
+/// A download that fails on the way is tried again after a pause of seconds in the launcher;
+/// here after a few milliseconds, so that a test of a dropped connection does not wait.
+///
 /// The texts are read from assets/l10n first, as the launcher does before its first frame:
 /// straight from the folder, since asking the asset bundle needs the test binding, whose
 /// HttpClient answers every request with a 400 in the files that talk to fake servers.
+///
+/// The CPU is one that cannot be read, so a test unlocks a game the same way on an Intel and an
+/// AMD runner; the tests of RelinkerFlag.toIntel set the one they need.
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
+  AssetDownload.retryDelays = const [Duration(milliseconds: 5)];
+  HostCpu.current = const HostCpu(null);
   await T.load(bundle: _NoAssets(), tryOut: Directory('assets/l10n'));
   await Countries.load(file: File(Countries.asset));
   if (!autoUpdateGoldenFiles) {

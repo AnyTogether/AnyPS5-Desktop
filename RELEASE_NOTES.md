@@ -11,6 +11,94 @@ section is copied into the release.
 
 Nothing yet.
 
+## 0.1.29
+
+- **Linux with an NVIDIA driver under Wayland: a way around the launcher freezing on an old
+  picture.** After the window went full screen or changed size, the home screen could stay frozen
+  on an earlier frame or the launcher could close. The cause is a bug in the Flutter version the
+  launcher is built with (flutter/flutter#191775 and flutter/flutter#195821), whose fix comes only
+  in a newer Flutter that is not safe with NVIDIA yet. So the launcher now goes around it: with
+  NVIDIA's driver under Wayland, its window runs through XWayland, as it does when you set
+  `GDK_BACKEND=x11` yourself, while the games it starts keep their own setting. A `GDK_BACKEND`
+  you set still wins, and without XWayland the launcher stays on Wayland. Through XWayland, the
+  cards over a game on KDE and other layer-shell desktops become notifications, as on GNOME, and
+  with fractional scaling the window may look softer. `ANYPS5_NATIVE_WAYLAND=1` keeps native
+  Wayland. `ANYPS5_IMPELLER=0` switches the launcher from Flutter's Impeller renderer to Skia, for
+  a driver that has trouble with it. It has not been tried on an NVIDIA machine yet. Thanks to
+  QguAr71, who reported it and answered every question about the hardware.
+
+## 0.1.28
+
+- **PS1 games in the launcher's window look better from the start, and have a Graphics page.** The
+  game's menu (PS button) has a new Graphics row after Audio. Its page holds Internal resolution,
+  which moves there from the menu's first page and now also offers 6x and 8x for the strongest
+  graphics cards, Smooth textures (Off, Smooth or Extra smooth), Fix wobbly 3D and Widescreen. Each
+  lists only what the emulator offers. A choice is kept for later PS1 games, except Widescreen,
+  which is kept only for the game you turned it on in. A PS1 game now starts with wobbly 3D fixed
+  and the console's dithering removed; the dithering cannot be turned back on. Smooth textures and
+  Widescreen stay off unless you turn them on. Smooth textures also softens sprites and can leave
+  seams in 2D art, and Widescreen can make 2D games and drawn backgrounds look wrong. Settings that
+  do not work in the launcher or only trade accuracy are hidden, and a value an earlier version
+  saved for one is no longer used. That includes the per-game fixes switch on the Advanced page,
+  which is on again for everyone, so the emulator's own fixes for individual games always apply.
+  PS2 games get the same page (Internal resolution up to 8x, Sharper textures, on from the start,
+  and Widescreen) once an emulator host with a PS2 emulator (LRPS2) is released. Host 1.1.0 has
+  none, so PS2 discs still start in PCSX2. Thanks to B-Howell, who built this.
+- **Games now start in Full Screen by default.** A game with its own Display choice keeps it. A
+  Default display that was still the old Window at 75% moves to Full Screen, and a Window at another
+  size stays a window. Settings › Default display puts every game back in a window. Thanks to
+  Lenny4250gh, who built this.
+- **On Windows, the launcher no longer freezes while a game's window is busy.** When a game opened
+  its window and then went on loading, the launcher could stop answering for as long as the game
+  loaded, or until it was closed if the game hung, because it waited on that window to size it,
+  bring it to the front or take a screenshot. Now it only asks, and leaves a window that does not
+  answer alone: F11 still reaches it, and a screenshot of a covered game that is not answering
+  fails with the usual message. It has not been tried on a Windows machine yet. Reported by
+  Harris851.
+- **Downloads try again by themselves, and a stopped engine download stays on screen.** A download
+  of the engine, the PS1 emulator, ffmpeg or a launcher update that loses its connection, stalls
+  for 30 seconds or is refused by GitHub's file host now tries again up to four times, carrying on
+  from where it stopped. If it still fails, Settings › AnyPS5 engine says "Download of … stopped at
+  N%" with the reason, and selecting the row carries on from there. The first-start card says the
+  same, and choosing it carries on too. A file GitHub does not have, or one whose checksum is
+  wrong, is not asked for again. The new texts are in every language. Thanks to QguAr71, who
+  reported it.
+- **The launcher is in Polish.** Choose Polski in Settings › Behaviour › Language. A game whose
+  language follows the launcher's then starts in Polish. Thanks to QguAr71, who translated all of
+  it. The new Graphics page is in Polish too.
+- **Custom relinker options know the engine's two new options.** `--function-symbol-roots` can be
+  added and is passed as typed. `--to-avx` is chosen by the launcher, as `--to-intel` is, so typing
+  it says it is left to the launcher.
+- **The language files no longer list seven texts twice** (reporting a message and its reasons).
+  What the launcher shows does not change, and the translation check now catches a text listed
+  twice.
+
+## 0.1.27
+
+- **Save states for PS1 games in the launcher's window.** With emulator host 1.1.0, the PS button's
+  game menu has Save state and Load state: eight slots per game, each with the date and time it was
+  saved and a small picture of that moment. Saving over a slot asks first, and a state made by
+  another version of the emulator or from another game is refused with a plain message. Loading a
+  PS1 state also puts its memory card back to that moment. Each game keeps its states in its own
+  folder in the launcher's data folder, next to the memory cards, so two different games whose
+  discs have the same file name do not share their slots. They are for playing alone, and nothing
+  online uses them. Settings › Emulators downloads host 1.1.0. If you already have the PS1
+  emulator, select its row there to update it. Thanks to B-Howell, who built this.
+- **PS1 games in the launcher's window can be drawn sharper.** The game's menu (PS button) has a new
+  row after Audio, Internal resolution: Native, 2x, 3x or 4x. It lists only the values the emulator
+  can show, the choice is kept for later PS1 games, and the game changes in a moment. If the
+  emulator cannot show a value you saved, the game uses the largest one it can and the row says so.
+  The row shows only while the emulator draws on the graphics card, and higher values need a faster
+  graphics card. The PS1 emulator's other graphics settings are not in the menu yet. PS2 games get
+  the same row (Native, 2x or 4x) later: it stays hidden until an emulator host with a PS2 emulator
+  (LRPS2) is released. Host 1.1.0 has none, so PS2 discs still start in PCSX2. Thanks to B-Howell,
+  who built this.
+- **Better DualShock 3 advice in Settings › Controllers.** On Windows, a DualShock 3 that is plugged
+  in without DsHidMini is now flagged, an installed DsHidMini is recognised, and Bluetooth points to
+  BthPS3. On Linux, the tip says how to pair it over its cable, and no longer suggests a udev rule
+  it does not need.
+- **In Turkish, the PS1 game menu's Controller section is called Kontrolcü**, as on the Mac.
+
 ## 0.1.26
 
 - **Settings › Emulators can download the PS1 emulator.** With emulator games turned on, a new row

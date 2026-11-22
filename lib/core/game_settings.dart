@@ -7,6 +7,7 @@ import 'controls.dart';
 import 'custom_options.dart';
 import 'game_log.dart';
 import 'gyro_aiming.dart';
+import 'host_cpu.dart';
 import 'relinker_flags.dart';
 
 /// Where the performance overlay sits.
@@ -31,10 +32,13 @@ enum OverlayStyle { minimal, detailed }
 enum Upscaler { bilinear, fsr1 }
 
 /// Settings › Default Display: how a game starts that made no display choice of its own (Game
-/// Settings › Display, Window Size and Vertical Sync left at Default). The built-in values are
-/// the ones every game started with before there were defaults.
+/// Settings › Display, Window Size and Vertical Sync left at Default). Full screen is the current
+/// built-in default; legacy game files are migrated against the former windowed values below.
 class DisplayDefaults {
-  const DisplayDefaults({this.fullscreen = false, this.windowSize = 75, this.vsync = true, this.startAnimation = true});
+  /// Current preferences schema; versioned files keep their display defaults as written.
+  static const preferencesVersion = 1;
+
+  const DisplayDefaults({this.fullscreen = true, this.windowSize = 75, this.vsync = true, this.startAnimation = true});
 
   /// A value missing or of the wrong kind is the built-in one.
   factory DisplayDefaults.fromJson(Object? json) {
@@ -49,6 +53,23 @@ class DisplayDefaults {
     );
   }
 
+  /// Reads the display defaults from a launcher's preferences file.
+  ///
+  /// Older unversioned files without this setting relied on the former built-in Window default,
+  /// rather than recording a choice. The same applies to the old Window + 75% combination, while
+  /// a different window size is evidence that Window was deliberately selected.
+  factory DisplayDefaults.fromPreferences(Map<Object?, Object?> json) {
+    final saved = json['displayDefaults'];
+    final defaults = DisplayDefaults.fromJson(saved);
+    if ((json['preferencesVersion'] as num? ?? 0) >= preferencesVersion || saved is! Map) {
+      return defaults;
+    }
+    if (saved['fullscreen'] == false && defaults.windowSize == 75) {
+      return defaults.copyWith(fullscreen: true);
+    }
+    return defaults;
+  }
+
   static const minimumWindowSize = 30;
 
   /// The defaults the launcher saved in its preferences file (`displayDefaults`), for a game
@@ -57,7 +78,8 @@ class DisplayDefaults {
   static DisplayDefaults load(String preferencesFile) {
     try {
       final json = jsonDecode(File(preferencesFile).readAsStringSync());
-      return DisplayDefaults.fromJson(json is Map ? json['displayDefaults'] : null);
+      if (json is! Map) return const DisplayDefaults();
+      return DisplayDefaults.fromPreferences(json);
     } on Object {
       return const DisplayDefaults();
     }
@@ -125,6 +147,7 @@ class GameSettings {
     this.trace,
     this.gyro,
     this.relinkerFlags,
+    this.intelConversion,
     this.customRelinkerOptions,
     this.launchOptions,
   }) : ownFullscreen = fullscreen,
@@ -151,11 +174,10 @@ class GameSettings {
     var windowSize = (json['windowSize'] as num?)?.toInt();
     var vsync = json['vsync'] is bool ? json['vsync'] as bool : null;
     if ((json['settingsVersion'] as num? ?? 1) < version) {
-      // A file from before the defaults wrote every display key, changed or not: a value that
-      // is the old built-in one was most likely never chosen, so it follows the defaults (which
-      // start as those same values: nothing changes until they do). Windowed with a size of its
-      // own was chosen, though.
-      const builtIn = DisplayDefaults();
+      // Legacy files wrote every display key, even when unchanged. Their built-in values were
+      // Window, 75% and VSync on: treat those as unset so the new defaults can take effect. A
+      // windowed choice with a different size was deliberate and must remain the game's own.
+      const builtIn = DisplayDefaults(fullscreen: false);
       if (windowSize == builtIn.windowSize) windowSize = null;
       if (fullscreen == builtIn.fullscreen && windowSize == null) fullscreen = null;
       if (vsync == builtIn.vsync) vsync = null;
@@ -188,6 +210,7 @@ class GameSettings {
       relinkerFlags: json['relinkerFlags'] is List<dynamic>
           ? (json['relinkerFlags'] as List<dynamic>).whereType<String>().toList()
           : null,
+      intelConversion: json['intelConversion'] is bool ? json['intelConversion'] as bool : null,
       customRelinkerOptions: optionsText(json['customRelinkerOptions'], (text) => checkRelinkerOptions(text).ok),
       launchOptions: optionsText(json['launchOptions'], (text) => GameLaunchOptions.parse(text).$2 == null),
     );
@@ -289,14 +312,35 @@ class GameSettings {
   /// null is none. Read through [chosenRelinkerFlags]: only those the launcher knows are used.
   final List<String>? relinkerFlags;
 
-  /// The relinker options chosen for this game that the launcher knows, in the list's order.
+  /// The relinker options chosen for this game that the launcher knows, in the list's order;
+  /// without [RelinkerFlag.toIntel], which [intelConversion] chooses.
   List<RelinkerFlag> get chosenRelinkerFlags => [
     for (final flag in RelinkerFlag.values)
-      if (relinkerFlags?.contains(flag.option) ?? false) flag,
+      if (flag != RelinkerFlag.toIntel && (relinkerFlags?.contains(flag.option) ?? false)) flag,
   ];
 
-  /// These settings with [flag] switched [on] or off.
-  GameSettings withRelinkerFlag(RelinkerFlag flag, bool on) {
+  /// Advanced › Rebuild options › Convert for Intel CPUs ([RelinkerFlag.toIntel]): null follows
+  /// the computer, on where its CPU is not AMD's (HostCpu.needsIntelConversion); true or false
+  /// is the player's own choice for this game.
+  final bool? intelConversion;
+
+  /// The relinker options this game's next rebuild asks for on [cpu]: [chosenRelinkerFlags], with
+  /// [RelinkerFlag.toIntel] where [intelConversion] or the CPU wants it.
+  List<RelinkerFlag> relinkerFlagsOn(HostCpu cpu) {
+    final chosen = chosenRelinkerFlags;
+    final toIntel = intelConversion ?? cpu.needsIntelConversion;
+    return [
+      for (final flag in RelinkerFlag.values)
+        if (flag == RelinkerFlag.toIntel ? toIntel : chosen.contains(flag)) flag,
+    ];
+  }
+
+  /// These settings with [flag] switched [on] or off. For [RelinkerFlag.toIntel], the choice that
+  /// matches [cpu] (this computer's by default) is kept as none, so the game follows the computer.
+  GameSettings withRelinkerFlag(RelinkerFlag flag, bool on, {HostCpu? cpu}) {
+    if (flag == RelinkerFlag.toIntel) {
+      return copyWith(intelConversion: on == (cpu ?? HostCpu.current).needsIntelConversion ? null : on);
+    }
     final current = chosenRelinkerFlags;
     final chosen = [
       for (final candidate in RelinkerFlag.values)
@@ -347,6 +391,7 @@ class GameSettings {
     if (trace != null) 'trace': trace,
     if (gyro != null) 'gyro': gyro!.toJson(),
     if (relinkerFlags != null) 'relinkerFlags': relinkerFlags,
+    if (intelConversion != null) 'intelConversion': intelConversion,
     if (customRelinkerOptions != null) 'customRelinkerOptions': customRelinkerOptions,
     if (launchOptions != null) 'launchOptions': launchOptions,
   };
@@ -374,6 +419,7 @@ class GameSettings {
     Object? trace = _keep,
     Object? gyro = _keep,
     Object? relinkerFlags = _keep,
+    Object? intelConversion = _keep,
     Object? customRelinkerOptions = _keep,
     Object? launchOptions = _keep,
   }) => GameSettings(
@@ -396,6 +442,7 @@ class GameSettings {
     trace: identical(trace, _keep) ? this.trace : trace as bool?,
     gyro: identical(gyro, _keep) ? this.gyro : gyro as GyroAiming?,
     relinkerFlags: identical(relinkerFlags, _keep) ? this.relinkerFlags : relinkerFlags as List<String>?,
+    intelConversion: identical(intelConversion, _keep) ? this.intelConversion : intelConversion as bool?,
     customRelinkerOptions: identical(customRelinkerOptions, _keep)
         ? this.customRelinkerOptions
         : customRelinkerOptions as String?,

@@ -180,6 +180,12 @@ static void my_application_activate(GApplication* application) {
   layer_overlay_probe();
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
+  // ANYPS5_IMPELLER=0: Flutter's Skia renderer instead of Impeller (OpenGL ES), for a driver
+  // Impeller does not get on with. Flutter's own FLUTTER_ENGINE_SWITCHES are read only in debug
+  // and profile builds (engine_switches.cc), never in the release the launcher ships as.
+  if (g_strcmp0(g_getenv("ANYPS5_IMPELLER"), "0") == 0) {
+    fl_dart_project_set_enable_impeller(project, FALSE);
+  }
   fl_dart_project_set_dart_entrypoint_arguments(
       project, self->dart_entrypoint_arguments);
 

@@ -7,14 +7,20 @@ import 'package:path/path.dart' as p;
 
 import 'toolkit.dart';
 
-/// A relinker option a player can switch on for one game (Advanced › Rebuild options), used by
-/// the game's next rebuild. Only these ever reach the relinker: whatever else a settings file
-/// names is ignored. An option that chooses the platform, the target or a path, or that can give
-/// a broken game without saying so, does not belong here.
+/// A relinker option a player can switch on or off for one game (Advanced › Rebuild options),
+/// used by the game's next rebuild. Only these ever reach the relinker: whatever else a settings
+/// file names is ignored. An option that chooses the platform or a path, or that can give a broken
+/// game without saying so, does not belong here.
 enum RelinkerFlag {
   /// Passes each function import of the executable through libc.prx's call tracer, so that
   /// detailed logging (APS5_TRACE_CALLS) can record the game's system library calls.
-  traceImports('--trace-imports', 'TraceImport_nid_no_patch');
+  traceImports('--trace-imports', 'TraceImport_nid_no_patch'),
+
+  /// Rewrites the AMD-only instructions of the executable and its modules (MONITORX/MWAITX,
+  /// CLZERO, RDPRU, SSE4a) so that the game runs on an Intel CPU. On by default where the host
+  /// CPU needs it (HostCpu.needsIntelConversion), see GameSettings.intelConversion. A relinker
+  /// that stops with it runs again without it (Installer), as for any option here.
+  toIntel('--to-intel', null);
 
   const RelinkerFlag(this.option, this.libcExport);
 

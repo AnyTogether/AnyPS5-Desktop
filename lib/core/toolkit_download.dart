@@ -433,7 +433,24 @@ class GitHubReleases {
 
 /// Downloads one file into place: into [target].part first, carried on from where an earlier
 /// try stopped, then checked against [size] and [sha256] and renamed to [target].
+///
+/// A try that fails on the way (a dropped or stalled connection, or an answer another try may
+/// get past, such as the 403 the storage host gives once its signed address has expired) is
+/// tried again by itself, up to [attempts] times in all, after a short pause. Each try starts
+/// from [url], the release's own address, so GitHub's redirect is followed afresh and gives a
+/// new signed address, and asks only for what the part still lacks.
 abstract final class AssetDownload {
+  /// Tries of one download, the first one included.
+  static const defaultAttempts = 4;
+
+  /// The pauses before the second, third and later tries (the last one repeats). Tests make
+  /// them short.
+  static List<Duration> retryDelays = const [Duration(seconds: 1), Duration(seconds: 3), Duration(seconds: 8)];
+
+  /// How long a download may wait for the server's answer, or for its next bytes, before the
+  /// try is given up as stalled. Tests make it short.
+  static Duration stallTimeout = const Duration(seconds: 30);
+
   static Future<void> fetch(
     Uri url,
     String target, {
@@ -442,6 +459,7 @@ abstract final class AssetDownload {
     void Function(int received)? onProgress,
     DownloadCancel? cancel,
     HttpClient Function()? client,
+    int attempts = defaultAttempts,
   }) async {
     // A file finished by an earlier try that stopped later is kept when it still checks out.
     final done = File(target);
@@ -453,12 +471,26 @@ abstract final class AssetDownload {
     }
     final part = File('$target.part');
     part.parent.createSync(recursive: true);
-    var have = part.existsSync() ? part.lengthSync() : 0;
-    if (have > size) {
-      part.deleteSync();
-      have = 0;
+    for (var attempt = 1; ; attempt++) {
+      var have = part.existsSync() ? part.lengthSync() : 0;
+      if (have > size) {
+        part.deleteSync();
+        have = 0;
+      }
+      if (have >= size) break;
+      try {
+        await _receive(url, part, have, size, onProgress, cancel, client ?? HttpClient.new);
+        break;
+      } on _Transient catch (failure) {
+        if (attempt >= attempts) {
+          throw ToolkitFailure(
+            ToolkitFailureKind.network,
+            attempts > 1 ? '${failure.message} (tried $attempts times)' : failure.message,
+          );
+        }
+        await _pause(_delayAfter(attempt), cancel);
+      }
     }
-    if (have < size) await _receive(url, part, have, size, onProgress, cancel, client ?? HttpClient.new);
     onProgress?.call(size);
     cancel?._check();
     final length = part.lengthSync();
@@ -476,6 +508,42 @@ abstract final class AssetDownload {
     if (File(target).existsSync()) File(target).deleteSync();
     part.renameSync(target);
   }
+
+  /// The pause after try [attempt] failed.
+  static Duration _delayAfter(int attempt) =>
+      retryDelays.isEmpty ? Duration.zero : retryDelays[(attempt - 1).clamp(0, retryDelays.length - 1)];
+
+  /// Waits [delay] before the next try; the user stopping the download ends the wait at once.
+  static Future<void> _pause(Duration delay, DownloadCancel? cancel) async {
+    cancel?._check();
+    if (delay > Duration.zero) {
+      final woken = Completer<void>();
+      void wake() {
+        if (!woken.isCompleted) woken.complete();
+      }
+
+      final timer = Timer(delay, wake);
+      cancel?._listeners.add(wake);
+      try {
+        await woken.future;
+      } finally {
+        timer.cancel();
+        cancel?._listeners.remove(wake);
+      }
+    }
+    cancel?._check();
+  }
+
+  /// Whether an answer of the download host may be different on another try: the storage host's
+  /// refusals of a signed address that expired (401, 403, 410), a timeout, too many requests and
+  /// the server's own errors. A 404 is not: the file is not there.
+  static bool _passing(int status) =>
+      status == HttpStatus.unauthorized ||
+      status == HttpStatus.forbidden ||
+      status == HttpStatus.requestTimeout ||
+      status == HttpStatus.gone ||
+      status == HttpStatus.tooManyRequests ||
+      status >= 500;
 
   /// Where a redirect from [from] to [location] leads. One that leaves https is refused, so a file
   /// asked for over https is never fetched in the clear: GitHub's release downloads redirect only
@@ -504,6 +572,7 @@ abstract final class AssetDownload {
       ..idleTimeout = const Duration(seconds: 30);
     void stop() => client.close(force: true);
     cancel?._listeners.add(stop);
+    final stall = stallTimeout;
     try {
       cancel?._check();
       // Redirects are followed here, so that every hop is asked for the same range.
@@ -516,7 +585,8 @@ abstract final class AssetDownload {
           ..headers.set(HttpHeaders.userAgentHeader, 'AnyPS5-Desktop')
           ..headers.set(HttpHeaders.acceptHeader, 'application/octet-stream');
         if (have > 0) request.headers.set(HttpHeaders.rangeHeader, 'bytes=$have-');
-        final answer = await request.close();
+        // A server that takes the request and never answers is a stalled try, not a wait forever.
+        final answer = await request.close().timeout(stall);
         if (answer.isRedirect) {
           final next = answer.headers.value(HttpHeaders.locationHeader);
           await answer.drain<void>();
@@ -536,7 +606,7 @@ abstract final class AssetDownload {
         case HttpStatus.partialContent:
           await response.drain<void>();
           part.deleteSync();
-          throw ToolkitFailure(ToolkitFailureKind.network, 'the server sent another part of the file; try again');
+          throw _Transient('the server sent another part of the file');
         case HttpStatus.ok:
           // The server sent the whole file: start again.
           have = 0;
@@ -545,15 +615,16 @@ abstract final class AssetDownload {
           await response.drain<void>();
           // The part is as long as the server's file, or wrong; the checks after say which.
           if (part.lengthSync() != size) part.deleteSync();
-          if (!part.existsSync()) throw ToolkitFailure(ToolkitFailureKind.network, 'the download could not resume');
+          if (!part.existsSync()) throw _Transient('the download could not resume');
           return;
-        default:
+        case final status:
           await response.drain<void>();
-          throw ToolkitFailure(ToolkitFailureKind.network, 'the download answered ${response.statusCode}');
+          final message = 'the download answered $status';
+          throw _passing(status) ? _Transient(message) : ToolkitFailure(ToolkitFailureKind.network, message);
       }
       var received = have;
       try {
-        await for (final chunk in response.timeout(const Duration(seconds: 60))) {
+        await for (final chunk in response.timeout(stall)) {
           sink.add(chunk);
           received += chunk.length;
           if (received > size) throw ToolkitFailure(ToolkitFailureKind.checksum, 'the file is longer than expected');
@@ -566,17 +637,25 @@ abstract final class AssetDownload {
     } on ToolkitFailure {
       cancel?._check();
       rethrow;
+    } on TimeoutException {
+      cancel?._check();
+      throw _Transient('the download stalled: nothing came for ${stall.inSeconds} s');
     } on Object catch (error) {
       cancel?._check();
-      throw ToolkitFailure(ToolkitFailureKind.network, 'the download stopped: $error');
+      throw _Transient('the download stopped: $error');
     } finally {
       cancel?._listeners.remove(stop);
       client.close(force: true);
     }
-    if (part.lengthSync() < size) {
-      throw ToolkitFailure(ToolkitFailureKind.network, 'the download stopped early; try again to carry on');
-    }
+    if (part.lengthSync() < size) throw _Transient('the download stopped early');
   }
+}
+
+/// A network failure another try may get past: a dropped or stalled connection, or an answer
+/// that a fresh redirect may change. AssetDownload.fetch tries again; what it throws at last is
+/// a plain ToolkitFailure.
+final class _Transient extends ToolkitFailure {
+  _Transient(String message) : super(ToolkitFailureKind.network, message);
 }
 
 /// The signed sums of a release of a signing source: SHA256SUMS and SHA256SUMS.sig are

@@ -28,9 +28,11 @@ sensors to HTTPS pages only). The page is the macOS launcher's own file
 (`assets/browser_pad/index.html`, copied by `tool/sync_browser_pad.sh`).
 
 **Languages:** English, Turkish, German, Spanish, French, Portuguese, Indonesian, Russian,
-Japanese, Hindi, Bengali, Bhojpuri, Arabic and Urdu, one JSON file each in `assets/l10n`. Arabic
-and Urdu read right to left, but the screens are not mirrored yet. A new language is one more
-file there, no code: see [TRANSLATING.md](TRANSLATING.md).
+Japanese, Hindi, Bengali, Bhojpuri, Arabic, Urdu, Czech, Danish, Hungarian, Norwegian, Polish,
+Romanian, Swedish, Filipino, Malay, Simplified and Traditional Chinese, Korean, Khmer, Lao and
+Amharic, one JSON file each in `assets/l10n`. Arabic and Urdu read right to left, and the screens
+are mirrored for them. A new language is one more file there, no code: see
+[TRANSLATING.md](TRANSLATING.md).
 
 ## Install
 
@@ -523,6 +525,7 @@ use those once changed in the game.
 
 - **[Slick Daddy](https://github.com/slick-daddy)** tested the launchers and the website in depth and sent the detailed feedback behind many fixes: relink errors and full screen on Windows, the game's button that follows its state, the interface polish, and the website's settings, rate limits and pages.
 - **VK** translated the Windows/Linux launcher into German, Spanish, French, Portuguese, Indonesian, Russian, Japanese, Hindi, Bengali, Bhojpuri, Arabic, Urdu, Czech, Danish, Hungarian, Norwegian, Romanian, Swedish, Filipino, Malay, Simplified and Traditional Chinese, Korean, Khmer, Lao and Amharic, and tested it: default display settings, the stick sensitivity on Home, language switching and the nightly builds request came from VK's reports.
+- **[QguAr71](https://github.com/QguAr71)** translated the Windows/Linux launcher into Polish.
 
 Our code is written independently; where we followed someone's design or idea, it is named here.
 

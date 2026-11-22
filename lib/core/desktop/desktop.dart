@@ -377,3 +377,19 @@ bool windowIsFullscreen({
   }
   return clientWidth == window[2] - window[0] && clientHeight == window[3] - window[1];
 }
+
+/// How the launcher sizes and places a game's window on Windows (SWP_NOZORDER | SWP_NOACTIVATE |
+/// SWP_ASYNCWINDOWPOS): the request is posted to the game's thread, never waited for. A game
+/// often opens its window and then loads on that thread for many seconds before it pumps its
+/// messages; a plain SetWindowPos waits all that time, on the thread Flutter runs the launcher's
+/// Dart on, so the launcher stopped answering while the game loaded.
+const gameWindowPlacement = 0x0004 | 0x0010 | 0x4000;
+
+/// The threads whose input the launcher joins for a moment to bring a window in front on Windows:
+/// the window in front's and the target's, never its own, and never one whose window does not
+/// answer. Joined to a thread that does not pump its messages (a game still loading, or hung),
+/// the launcher's own thread waits with it.
+Set<int> threadsToJoin({required int ours, required Iterable<({int thread, bool answers})> windows}) => {
+  for (final window in windows)
+    if (window.thread != 0 && window.thread != ours && window.answers) window.thread,
+};
