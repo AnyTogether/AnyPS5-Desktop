@@ -97,7 +97,7 @@ void main() {
     await game.start(_request);
   }
 
-  /// Moves the clock to [seconds], the host's next status to [next], and judges it.
+  /// Moves the clock to [milliseconds], the host's next status to [next], and judges it.
   Future<void> atMilliseconds(RetroAutoController auto, int milliseconds, RetroStatus next) async {
     clock.elapsed = Duration(milliseconds: milliseconds);
     session.nextStatus = next;
@@ -105,6 +105,7 @@ void main() {
     await auto.tick();
   }
 
+  /// [atMilliseconds] at a whole number of [seconds].
   Future<void> at(RetroAutoController auto, int seconds, RetroStatus next) =>
       atMilliseconds(auto, seconds * 1000, next);
 
