@@ -88,6 +88,10 @@ class RecordingSession implements RetroHostSession {
   @override
   bool get limitsPs2Resolution => client.limitsPs2Resolution;
   @override
+  bool get reportsPerformance => client.reportsPerformance;
+  @override
+  String get hostVersion => client.hostVersion;
+  @override
   Stream<RetroRumble> get rumble => client.rumble;
   @override
   set inputFocus(bool focused) => client.inputFocus = focused;

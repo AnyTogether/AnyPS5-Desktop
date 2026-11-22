@@ -52,6 +52,14 @@ abstract interface class RetroHostSession implements RetroFrameSource {
   /// ([RetroHostStartRequest.states]) and saved and loaded with `saveState` and `loadState`.
   bool get canSaveStates;
 
+  /// Whether the host lists `gamePerformance`, so each `status` says how fast the game runs
+  /// (`performance`) and which GPU draws it (`gpu`).
+  bool get reportsPerformance;
+
+  /// The host's version from its greeting (`welcome.hostVersion`), which names the cores it ships;
+  /// empty before it greeted the launcher.
+  String get hostVersion;
+
   /// Asks the host to stop its game and exit.
   void shutdown();
 
@@ -106,6 +114,18 @@ class RetroHostStartRequest {
     system: system,
     saves: saves,
     options: {...options}..remove(key),
+    initialDisc: initialDisc,
+    console: console,
+    states: states,
+  );
+
+  /// This request with the option at [key] set to [value].
+  RetroHostStartRequest withOption(String key, String value) => RetroHostStartRequest(
+    core: core,
+    disc: disc,
+    system: system,
+    saves: saves,
+    options: {...options, key: value},
     initialDisc: initialDisc,
     console: console,
     states: states,

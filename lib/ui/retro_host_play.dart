@@ -62,6 +62,18 @@ class RetroPlay {
   /// The section of the menu shown, or null for the menu's first page.
   RetroOptionSection? menuSection;
 
+  /// The Auto Optimizer of the game's internal resolution, while it is on Auto: a PS1 game whose
+  /// player kept no resolution, on a host that measures how it runs.
+  RetroAutoController? auto;
+
+  /// The internal resolution choices made in the menu, Auto or a value, taken one at a time in
+  /// the order made ([RetroHostPlaying._chooseRetroResolutionInTurn]).
+  Future<void> resolutionChoices = Future.value();
+
+  /// How many internal resolution choices were made: a choice that is no longer the last one made
+  /// when its turn comes, or after it waited for the host, does nothing more.
+  int resolutionChoice = 0;
+
   /// The host's last `resolutionError` the log was given, so each one is logged once.
   String resolutionErrorLogged = '';
 
@@ -89,6 +101,7 @@ class RetroPlay {
   void release(VoidCallback listener) {
     if (_released) return;
     _released = true;
+    auto?.dispose();
     host.removeListener(listener);
     states.removeListener(listener);
     controls.dispose();
@@ -459,6 +472,8 @@ extension RetroHostPlaying on AppModel {
       states: saveStates,
     );
     retroPlay = play;
+    final auto = !ps2 && !preferences.retroHostOptions.containsKey(retroResolutionKeyPs1);
+    if (auto) _startRetroAuto(play);
     host.addListener(_retroChanged);
     saveStates.addListener(_retroChanged);
     unawaited(saveStates.refresh());
@@ -483,7 +498,44 @@ extension RetroHostPlaying on AppModel {
           game: preferences.retroHostGameOptions[game.titleId] ?? const {},
         ),
       ),
+      autoResolution: auto ? () => '${_retroAutoStartScale(play)}' : null,
     );
+  }
+
+  /// The scale [play] starts at on Auto ([RetroAutoResolution.startScale]), from what was learned
+  /// of the game with this host's build only: what another build's cores did proves nothing. The
+  /// GPU and the game's other graphics settings are known only from its statuses; the optimizer
+  /// checks them there and starts its memory again when they differ.
+  int _retroAutoStartScale(RetroPlay play) {
+    final memory = preferences.retroHostAuto[play.game.titleId];
+    return RetroAutoResolution.startScale(
+      _retroAutoScales,
+      need: _retroDisplayNeed,
+      memory: memory != null && memory.host == play.host.hostVersion ? memory : null,
+    );
+  }
+
+  /// The PS1 scales the Auto Optimizer may start a game at, before its host lists its own: those the
+  /// launcher offers (`retro_resolution.dart`), which every SwanStation the host draws with lists.
+  static const _retroAutoScales = [1, 2, 3, 4, 6, 8];
+
+  /// The largest PS1 scale the view the game is shown in needs.
+  int get _retroDisplayNeed => retroAutoDisplayNeed(retroDisplayHeight());
+
+  /// Puts [play]'s internal resolution on Auto: the optimizer judges it from now while the game
+  /// plays, and what it learns is kept and saved.
+  void _startRetroAuto(RetroPlay play) {
+    play.auto?.dispose();
+    play.auto = RetroAutoController(
+      menu: play.menu,
+      titleId: play.game.titleId,
+      memories: preferences.retroHostAuto,
+      need: () => _retroDisplayNeed,
+      saved: savePreferences,
+      log: _padLog,
+      every: retroAutoEvery,
+      clock: retroAutoClock(),
+    )..start();
   }
 
   /// The checks before a start of a signed release's host (protocol.md "Finding and checking the
@@ -761,20 +813,53 @@ extension RetroHostPlaying on AppModel {
   ];
 
   /// The Internal resolution row: the values the launcher offers that the host lists
-  /// ([RetroResolutionChoice.of]), or null when the menu offers none.
+  /// ([RetroResolutionChoice.of]), or null when the menu offers none. A PS1 game on a host that
+  /// measures how it runs also offers Auto first, which names the scale the Auto Optimizer chose.
   PanelRow? _retroResolutionRow(RetroPlay play) {
     final choice = play.menu.resolution;
     if (choice == null) return null;
+    final offersAuto = !play.ps2 && play.host.reportsPerformance;
+    final auto = offersAuto && play.auto != null;
     return PanelRow(
       id: 'resolution',
       title: T.text('retroResolution'),
       detail: retroResolutionDetail(choice),
       kind: ChoiceRow(
-        [for (final value in choice.values) retroResolutionLabel(value)],
-        choice.selected,
-        (index) => unawaited(_chooseRetroResolution(play, choice.values[index].value)),
+        [
+          if (offersAuto) T.format('retroResolutionAuto', [retroResolutionLabel(choice.active)]),
+          for (final value in choice.values) retroResolutionLabel(value),
+        ],
+        auto ? 0 : choice.selected + (offersAuto ? 1 : 0),
+        (index) => unawaited(
+          offersAuto && index == 0
+              ? _chooseRetroAuto(play)
+              : _chooseRetroResolution(play, choice.values[index - (offersAuto ? 1 : 0)].value),
+        ),
       ),
     );
+  }
+
+  /// Auto chosen for a PS1 game's internal resolution: the resolution kept for every game is let
+  /// go, so each game starts at what the Auto Optimizer learned of it, and this one is judged from
+  /// now at the scale it draws at.
+  Future<void> _chooseRetroAuto(RetroPlay play) => _chooseRetroResolutionInTurn(play, (latest) async {
+    if (play.auto != null || play.over || !latest()) return;
+    preferences.retroHostOptions.remove(retroResolutionKeyPs1);
+    _startRetroAuto(play);
+    savePreferences();
+    _changed();
+  });
+
+  /// Runs [choose] once every internal resolution choice made before it is done, so choices reach
+  /// the host in the order made; `latest` says whether it is still the last choice made, and a
+  /// choice that is not sends and keeps nothing. A choice that fails is written to the log and
+  /// does not hold up those after it.
+  Future<void> _chooseRetroResolutionInTurn(RetroPlay play, Future<void> Function(bool Function() latest) choose) {
+    final mine = ++play.resolutionChoice;
+    bool latest() => play.resolutionChoice == mine && !_disposed;
+    return play.resolutionChoices = play.resolutionChoices
+        .then((_) => choose(latest))
+        .catchError((Object error) => _padLog?.call('internal resolution choice failed: $error'));
   }
 
   /// A Graphics setting's row ([RetroGraphicsChoice]): its values in the setting's order, with what
@@ -811,13 +896,29 @@ extension RetroHostPlaying on AppModel {
   /// An internal resolution chosen in the menu: sent to the game, and kept for every later game of
   /// its console once the host took it. A PS1 game draws at it in a moment, a PS2 game from its
   /// next start.
-  Future<void> _chooseRetroResolution(RetroPlay play, String value) async {
-    final key = play.menu.resolution?.key;
-    if (key == null || !await play.menu.chooseResolution(value) || _disposed) return;
-    preferences.retroHostOptions[key] = value;
+  /// A value chosen while on Auto turns Auto off, once a change Auto already asked for is
+  /// answered, so the value chosen is the last one sent. The value the game already has is kept
+  /// without being sent again. When the host refuses the value, a game on Auto stays on it.
+  Future<void> _chooseRetroResolution(RetroPlay play, String value) => _chooseRetroResolutionInTurn(play, (
+    latest,
+  ) async {
+    if (!latest()) return;
+    final auto = play.auto;
+    play.auto = null;
+    await auto?.stop();
+    final choice = play.menu.resolution;
+    if (choice == null || !latest()) return;
+    final already = choice.values[choice.selected].value == value;
+    if (!already && !await play.menu.chooseResolution(value)) {
+      final onAuto = !play.ps2 && play.host.reportsPerformance && !preferences.retroHostOptions.containsKey(choice.key);
+      if (onAuto && latest() && !play.over && play.auto == null) _startRetroAuto(play);
+      return;
+    }
+    if (_disposed) return;
+    preferences.retroHostOptions[choice.key] = value;
     savePreferences();
     _changed();
-  }
+  });
 
   /// The rows of one section's page: Volume and Mute first in Audio, then the section's options.
   /// An option that takes effect only when the game starts again says so; a chosen value not yet

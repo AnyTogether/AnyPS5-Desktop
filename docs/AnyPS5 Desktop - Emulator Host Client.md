@@ -44,8 +44,24 @@ described in [The emulator host in the launcher's UI](<AnyPS5 Desktop - Emulator
 and throws `RetroProtocolError` for a field outside it. Unknown fields are
 ignored.
 `RetroStatus.sameAs` says whether two statuses hold the same values, field by
-field as `toJson` writes them, options in their order; the UI uses it to
-tell no one of a status that says nothing new.
+field as `toJson` writes them, options in their order, but for
+`performance`, which the host measures again at every call; the UI uses it to
+tell no one of a status that says nothing new, so a game asked twice a second
+does not redraw the launcher for its speed alone.
+
+- **Game speed: `performance` and `gpu`.** Read only from a host that lists
+  `gamePerformance` (`RetroHostClient.reportsPerformance`, on the host's
+  `main` since AnyTogether/anyps5-retro-host#28); another host's are ignored.
+  Each is an object or null, and missing is a protocol error. Protocol.md
+  "status": "`speed` is the frames in which the core handed over a picture
+  [...] divided by 5 × `timing.fps`", "`work` is the median time one
+  `retro_run` took, divided by a frame's time [...] `null` when no frame
+  ended in those 5 seconds", and `gpu` has "`renderer`, `vendor` and
+  `maxTexture`, from the OpenGL context the host made for the core".
+  `RetroPerformance` refuses a negative `speed` or `work` and a `seconds` not
+  above 0; `RetroGpu` refuses a negative `maxTexture`. The Auto Optimizer
+  reads them (UI doc "Auto resolution"). `RetroHostSession.hostVersion` gives
+  `welcome.hostVersion`, which its memory is kept with.
 
 - **`cardUnreadable`.** True when memory card 1's file is there but the host
   could not read it as a card, so this game's saves are not written anywhere.

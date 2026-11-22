@@ -151,7 +151,12 @@ class RetroHostGame extends ChangeNotifier {
   RetroHostEnd? _hostEnd;
 
   Timer? _poll;
-  bool _polling = false;
+  Future<void>? _polling;
+
+  /// How many `status` calls were begun; each caller of [refresh] waits for the first one begun
+  /// after its call ([_waiters], with the number of that call).
+  int _pollsBegun = 0;
+  final _waiters = <(int, Completer<void>)>[];
   bool _disposed = false;
   bool _hostEnded = false;
   bool _detached = false;
@@ -192,16 +197,28 @@ class RetroHostGame extends ChangeNotifier {
 
   bool get _gameLive => _phase == RetroHostGamePhase.loading || _phase == RetroHostGamePhase.playing;
 
+  /// Whether the host lists `gamePerformance`, so its statuses say how fast the game runs and the
+  /// Auto Optimizer can judge a PS1 game's internal resolution. False until the host has greeted
+  /// the launcher.
+  bool get reportsPerformance => session.reportsPerformance;
+
+  /// The host's version (`welcome.hostVersion`); empty until it has greeted the launcher.
+  String get hostVersion => session.hostVersion;
+
   /// Waits for the host's greeting, then starts the game. Throws [StateError] when a game was
   /// already started on this host. A PS2 game's internal resolution goes only to a host that
   /// limits it ([limitsPs2Resolution]); an older host starts the game at LRPS2's own default.
-  Future<void> start(RetroHostStartRequest request) {
+  /// [autoResolution] gives the PS1 internal resolution the Auto Optimizer starts at, asked once
+  /// the host has greeted the launcher (so it can use [hostVersion]), and only of a host that
+  /// measures how the game runs ([reportsPerformance]); without one the optimizer cannot judge it,
+  /// and the game starts at SwanStation's own default as before.
+  Future<void> start(RetroHostStartRequest request, {String Function()? autoResolution}) {
     if (_phase != RetroHostGamePhase.idle) throw StateError('A game was already started on this host.');
     _setPhase(RetroHostGamePhase.starting);
-    return _starting = _startNow(request);
+    return _starting = _startNow(request, autoResolution);
   }
 
-  Future<void> _startNow(RetroHostStartRequest request) async {
+  Future<void> _startNow(RetroHostStartRequest request, String Function()? autoResolution) async {
     try {
       await session.ready;
       if (_phase != RetroHostGamePhase.starting) return;
@@ -210,9 +227,16 @@ class RetroHostGame extends ChangeNotifier {
         _end(failure: 'The host does not list the $retroCapabilityPs2 capability.');
         return;
       }
-      final resolution = request.console == RetroConsole.ps2 && !session.limitsPs2Resolution
-          ? request.withoutOption(retroResolutionKeyPs2)
-          : request;
+      final resolution = switch (request) {
+        _ when request.console == RetroConsole.ps2 && !session.limitsPs2Resolution => request.withoutOption(
+          retroResolutionKeyPs2,
+        ),
+        _ when autoResolution != null && request.console == null && session.reportsPerformance => request.withOption(
+          retroResolutionKeyPs1,
+          autoResolution(),
+        ),
+        _ => request,
+      };
       final states = request.states != null && session.canSaveStates;
       await session.startGame((states ? resolution : resolution.withoutStates()).toArgs());
       _savesStates = states;
@@ -230,16 +254,48 @@ class RetroHostGame extends ChangeNotifier {
     _setPhase(RetroHostGamePhase.loading);
     if (!_focused) await _pauseForFocus();
     if (!_gameLive) return;
-    _poll = Timer.periodic(statusEvery, (_) => unawaited(refresh()));
+    _poll = Timer.periodic(statusEvery, (_) {
+      if (_polling == null) unawaited(refresh());
+    });
     await refresh();
   }
 
-  /// Asks `status` once and follows it: the aspect ratio, the first frame, and the game's end.
+  /// Asks `status` and follows it: the aspect ratio, the first frame, and the game's end.
   /// Listeners hear of it only when the status says something new: a game that plays on with the
-  /// same status, asked twice a second, rebuilds nothing.
-  Future<void> refresh() async {
-    if (!_gameLive || _polling) return;
-    _polling = true;
+  /// same status, asked twice a second, rebuilds nothing. One `status` is asked at a time. The
+  /// call completes once a `status` begun after it was answered, so what follows sees what the
+  /// host said after the call (an `option` the host just took shows); asked while one is on its
+  /// way, it waits for the one after it, and no later call makes it wait longer. The game's twice
+  /// a second ask is left out while one is on its way.
+  Future<void> refresh() {
+    if (!_gameLive) return Future.value();
+    final answered = Completer<void>();
+    _waiters.add((_pollsBegun + 1, answered));
+    _polling ??= _pollWhileWaited();
+    return answered.future;
+  }
+
+  Future<void> _pollWhileWaited() async {
+    try {
+      while (_gameLive && _waiters.isNotEmpty) {
+        final number = ++_pollsBegun;
+        await _pollOnce();
+        _waiters.removeWhere((waiter) {
+          if (waiter.$1 > number) return false;
+          waiter.$2.complete();
+          return true;
+        });
+      }
+    } finally {
+      _polling = null;
+      for (final waiter in _waiters) {
+        waiter.$2.complete();
+      }
+      _waiters.clear();
+    }
+  }
+
+  Future<void> _pollOnce() async {
     try {
       var asked = 0;
       final current = await _afterStateCall(() {
@@ -266,8 +322,6 @@ class RetroHostGame extends ChangeNotifier {
       }
     } on Object catch (error) {
       if (_gameLive) _end(failure: '$error');
-    } finally {
-      _polling = false;
     }
   }
 
