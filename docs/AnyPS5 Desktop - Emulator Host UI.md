@@ -442,7 +442,7 @@ player's value, and its Auto comes with a restart offer.
 the last (`RetroAutoRules.early`: a 5-second timer fires a little early or
 late, and throwing a reading away for a few milliseconds would halve them, as
 the first live run did). The status is the last of the game's twice-a-second
-polls, so two readings may share up to about a second of the host's
+polls, so two readings may share a second or two of the host's
 measurement; the rules judge several
 readings, never one. A reading counts only 20 seconds after the game started
 or its scale last changed (loading, shader compiles, the redraw), while the

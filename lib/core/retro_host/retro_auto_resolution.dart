@@ -19,8 +19,8 @@ abstract final class RetroAutoRules {
 
   /// How much sooner than [window] after the last reading the next may come: a timer every
   /// [window] fires a little early or late, and a reading thrown away for being a few milliseconds
-  /// early would halve the readings. Two readings then share at most this much of the host's
-  /// measurement.
+  /// early would halve the readings. With the status itself up to a poll old, two readings may
+  /// share a second or two of the host's measurement; the rules judge several readings, never one.
   static const early = Duration(seconds: 1);
 
   /// The time after the game starts or its resolution changes before readings count: loading,
@@ -158,9 +158,9 @@ class RetroAutoResolution {
 
   /// Takes [status] at [at] (the time since the game started) and returns the scale to change to,
   /// or null to keep this one. A reading counts only while the game plays and nothing is being
-  /// applied, [RetroAutoRules.settle] after the start or the last change, and once per
-  /// [RetroAutoRules.window], so readings
-  /// never overlap; anything else breaks the run of readings.
+  /// applied, [RetroAutoRules.settle] after the start or the last change, and about once per
+  /// [RetroAutoRules.window] (no sooner than [RetroAutoRules.early] before it); anything else
+  /// breaks the run of readings.
   int? observe(Duration at, RetroStatus status) {
     final performance = status.performance;
     if (_atFloor) return null;
