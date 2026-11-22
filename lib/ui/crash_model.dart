@@ -170,7 +170,7 @@ class CrashModel {
       platform: app.system == HostSystem.windows ? 'Windows' : 'Linux',
       privacy: privacy(),
       unlockedWith: app.records[game.id]?.toolkit,
-      engineNow: app.toolkitVersion,
+      engineNow: app.engineVersionFor(game),
       relinkerFlags: app.records[game.id]?.relinkerFlags ?? const [],
       customRelinkerOptions: app.records[game.id]?.customRelinkerOptions ?? const [],
       exitCode: last?.exitCode,
