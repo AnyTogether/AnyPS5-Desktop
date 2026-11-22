@@ -9,19 +9,32 @@ import 'retro_host_protocol.dart';
 
 /// The thresholds the optimizer judges by. Measured on full-speed games, one 5-second window reads
 /// 0.994 to 1.004 (a frame either way), so a step down needs two slow windows in a row or a slow
-/// half minute, never one window.
+/// half minute, never one window. A game also slows for a moment for reasons no resolution
+/// changes (a new scene's shaders, a disc read): Spyro the Dragon at 2x on an RTX 4080 SUPER read
+/// 0.983 then 0.836 once, with each frame taking 78% of its time at the median. So a step down
+/// needs the slowness to be steady, or the frames themselves to take longer than their time.
 abstract final class RetroAutoRules {
   /// The time measured by each reading the optimizer takes, as the host measures it.
   static const window = Duration(seconds: 5);
+
+  /// How much sooner than [window] after the last reading the next may come: a timer every
+  /// [window] fires a little early or late, and a reading thrown away for being a few milliseconds
+  /// early would halve the readings. Two readings then share at most this much of the host's
+  /// measurement.
+  static const early = Duration(seconds: 1);
 
   /// The time after the game starts or its resolution changes before readings count: loading,
   /// shader compiles and the redraw at the new scale.
   static const settle = Duration(seconds: 20);
 
-  /// Two readings in a row below this step down at once: the game plainly runs slow.
+  /// Two readings in a row below this, each with a frame taking at least [slowWork] of its time at
+  /// the median, step down at once: the PC cannot keep up with the game at this scale.
   static const slow = 0.95;
+  static const slowWork = 1.0;
 
-  /// Six readings (30 seconds) whose mean is below this step down: a small but steady loss.
+  /// Six readings (30 seconds) in a row, each below this, step down: a small but steady loss, as
+  /// Jak and Daxter at a scale just too high read 0.956 to 0.990 in every window. One slow moment
+  /// among full-speed readings is not steady.
   static const steady = 0.995;
   static const steadyReadings = 6;
 
@@ -161,7 +174,7 @@ class RetroAutoResolution {
       return null;
     }
     final last = _lastReading;
-    if (last != null && at - last < RetroAutoRules.window) return null;
+    if (last != null && at - last < RetroAutoRules.window - RetroAutoRules.early) return null;
     _lastReading = at;
     _readings.add(performance);
     if (_slow()) return _down();
@@ -188,14 +201,13 @@ class RetroAutoResolution {
 
   bool _slow() {
     final count = _readings.length;
-    if (count >= 2 &&
-        _readings[count - 1].speed < RetroAutoRules.slow &&
-        _readings[count - 2].speed < RetroAutoRules.slow) {
-      return true;
-    }
+    bool overloaded(RetroPerformance reading) =>
+        reading.speed < RetroAutoRules.slow && (reading.work ?? 0) >= RetroAutoRules.slowWork;
+    if (count >= 2 && overloaded(_readings[count - 1]) && overloaded(_readings[count - 2])) return true;
     if (count < RetroAutoRules.steadyReadings) return false;
-    final recent = _readings.sublist(count - RetroAutoRules.steadyReadings);
-    return recent.fold(0.0, (sum, reading) => sum + reading.speed) / recent.length < RetroAutoRules.steady;
+    return _readings
+        .sublist(count - RetroAutoRules.steadyReadings)
+        .every((reading) => reading.speed < RetroAutoRules.steady);
   }
 
   bool _headroom() {

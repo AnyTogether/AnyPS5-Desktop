@@ -33,9 +33,9 @@ class _Clock implements Stopwatch {
 
 /// The recorded real status at [scale], with the host's measurement of the game ([speed], or none
 /// yet) and its GPU, as a host with `gamePerformance` sends it.
-RetroStatus _measured(int scale, double? speed) => RetroStatus.parse({
+RetroStatus _measured(int scale, double? speed, {double work = 0.1}) => RetroStatus.parse({
   ...recordedStatus(selected: {'swanstation_GPU_ResolutionScale': scale - 1}).toJson(),
-  'performance': speed == null ? null : {'speed': speed, 'work': 0.1, 'seconds': 5},
+  'performance': speed == null ? null : {'speed': speed, 'work': work, 'seconds': 5},
   'gpu': {'renderer': 'RTX', 'vendor': 'NVIDIA', 'maxTexture': 16384},
 }, performance: true);
 
@@ -425,7 +425,7 @@ void main() {
     List<Object?> options() => [for (final call in session.calls.where((call) => call.$1 == 'option')) call.$2];
     for (final seconds in [20, 25]) {
       clock.elapsed = Duration(seconds: seconds);
-      session.nextStatus = _measured(4, 0.6);
+      session.nextStatus = _measured(4, 0.6, work: 1.5);
       await launcher.play.host.refresh();
       if (seconds == 25) session.callGate = Completer<void>();
       unawaited(auto.tick());
@@ -474,7 +474,7 @@ void main() {
       ];
       for (final seconds in [20, 25]) {
         clock.elapsed = Duration(seconds: seconds);
-        session.nextStatus = _measured(4, 0.6);
+        session.nextStatus = _measured(4, 0.6, work: 1.5);
         await launcher.play.host.refresh();
         if (seconds == 25) session.callGate = Completer<void>();
         unawaited(auto.tick());

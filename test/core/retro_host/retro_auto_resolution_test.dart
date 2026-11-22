@@ -123,7 +123,7 @@ void main() {
     expect(auto.observe(s(10), slow), isNull);
     expect(auto.observe(s(15), slow), isNull, reason: 'loading and shader compiles: not judged');
     expect(auto.observe(s(20), slow), isNull, reason: 'one slow reading is not enough');
-    expect(auto.observe(s(22), slow), isNull, reason: 'the next reading is 5 seconds on, not overlapping');
+    expect(auto.observe(s(22), slow), isNull, reason: 'the next reading is about 5 seconds on, not overlapping');
     expect(auto.observe(s(25), slow), 3);
     expect(auto.memory.slow, {4});
     auto.changed(s(25), 3);
@@ -136,7 +136,7 @@ void main() {
     final readings = [0.990, 0.983, 0.975, 0.956, 0.989, 0.988].map((speed) => status(speed: speed)).toList();
     final auto = optimizer();
     expect(feed(auto, readings.take(5).toList(), from: s(20)), isNull);
-    expect(auto.observe(s(45), readings.last), 3, reason: 'mean 0.980 under 0.995');
+    expect(auto.observe(s(45), readings.last), 3, reason: 'six readings in a row, each under 0.995');
     final steady = optimizer();
     expect(
       feed(
@@ -149,12 +149,42 @@ void main() {
     );
   });
 
+  test('a slow moment is not a slow scale: the live Spyro readings, and slow frames that took little time', () {
+    final dip = [
+      (1.0031, 0.1595),
+      (0.9997, 0.1673),
+      (0.9997, 0.2128),
+      (0.9997, 0.216),
+      (0.983, 0.2555),
+      (0.8359, 0.7844),
+      (0.9997, 0.17),
+      (0.9997, 0.17),
+    ].map((reading) => status(speed: reading.$1, work: reading.$2)).toList();
+    expect(
+      feed(optimizer(scale: 2), dip, from: s(55)),
+      isNull,
+      reason: 'Spyro at 2x on an RTX 4080 SUPER dipped once for a scene: the scale was not the cause',
+    );
+    final stalled = [status(speed: 0.6, work: 0.3), status(speed: 0.6, work: 0.3)];
+    expect(feed(optimizer(), stalled, from: s(20)), isNull, reason: 'frames that took little time: not the scale');
+  });
+
+  test("a timer's readings a few milliseconds early still count", () {
+    final auto = optimizer();
+    final slow = status(speed: 0.6, work: 1.5);
+    expect(auto.observe(const Duration(milliseconds: 20001), slow), isNull);
+    expect(auto.observe(const Duration(milliseconds: 24998), slow), 3, reason: 'a 5-second timer firing 3 ms early');
+    final fast = optimizer();
+    expect(fast.observe(s(20), slow), isNull);
+    expect(fast.observe(s(23), slow), isNull, reason: 'well inside the last reading: it would overlap it');
+  });
+
   test('anything but play breaks the run of readings', () {
-    final slow = status(speed: 0.6);
+    final slow = status(speed: 0.6, work: 1.5);
     for (final gap in [
       status(),
-      status(speed: 0.6, fields: {'graphicsPending': true}),
-      status(speed: 0.6, fields: {'progressLabel': 'Changing disc'}),
+      status(speed: 0.6, work: 1.5, fields: {'graphicsPending': true}),
+      status(speed: 0.6, work: 1.5, fields: {'progressLabel': 'Changing disc'}),
     ]) {
       final auto = optimizer();
       expect(auto.observe(s(20), slow), isNull);
@@ -188,7 +218,7 @@ void main() {
 
   test('a pause between readings breaks their run', () {
     final auto = optimizer();
-    final slow = status(speed: 0.6);
+    final slow = status(speed: 0.6, work: 1.5);
     expect(auto.observe(s(20), slow), isNull);
     auto.interrupted();
     expect(auto.observe(s(300), slow), isNull, reason: 'one slow reading before the pause, one after');
@@ -197,7 +227,7 @@ void main() {
 
   test('slow at the smallest scale: the floor, where the optimizer stops', () {
     final auto = optimizer(scale: 1);
-    final slow = status(speed: 0.5);
+    final slow = status(speed: 0.5, work: 1.5);
     expect(feed(auto, List.filled(10, slow), from: s(20)), isNull);
     expect(auto.atFloor, isTrue);
     expect(auto.memory.slow, isEmpty, reason: 'Native stays the scale to fall back to');

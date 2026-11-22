@@ -438,9 +438,12 @@ player's value, and its Auto comes with a restart offer.
 
 **When it judges** (`RetroAutoResolution.observe`, `RetroAutoRules`).
 `RetroAutoController` hands it the game's last status every 5 seconds
-(`AppModel.retroAutoEvery`) and takes at most one reading per 5 seconds. The
-status is the last of the game's twice-a-second polls, so two readings may
-share up to half a second of the host's measurement; the rules judge several
+(`AppModel.retroAutoEvery`) and takes one reading at least 4 seconds after
+the last (`RetroAutoRules.early`: a 5-second timer fires a little early or
+late, and throwing a reading away for a few milliseconds would halve them, as
+the first live run did). The status is the last of the game's twice-a-second
+polls, so two readings may share up to about a second of the host's
+measurement; the rules judge several
 readings, never one. A reading counts only 20 seconds after the game started
 or its scale last changed (loading, shader compiles, the redraw), while the
 game plays (`performance` not null, `ready`, no `graphicsPending`, no
@@ -451,11 +454,17 @@ so readings from before a pause never add up with those after it.
 
 **The rules.** The figures are the host's measurements on an RTX 4080 SUPER:
 one full-speed window reads 0.994 to 1.004, and Jak and Daxter at a scale
-just too high read 0.956 to 0.990.
+just too high read 0.956 to 0.990. A game also slows for a moment for
+reasons no resolution changes: Spyro the Dragon at 2x read 0.983 then 0.836
+once (a new scene), with each frame taking 78% of its time at the median,
+and a first version that judged the mean of six readings lowered it to Native
+and marked 2x slow for good.
 
-- **Down one scale** after two readings in a row below 0.95, or six (30
-  seconds) whose mean is below 0.995. The scale left is marked slow for the
-  game.
+- **Down one scale** after two readings in a row below 0.95 with `work` at
+  least 1 (the frames themselves take longer than their time: the PC cannot
+  keep up at this scale), or six readings (30 seconds) in a row each below
+  0.995 (a small but steady loss). The scale left is marked slow for the
+  game. One slow moment among full-speed readings does neither.
 - **Up one scale** after twelve readings (a minute) each at 0.995 or more
   with `work` at most 0.5, to the next scale the host lists, unless that is
   past what the view needs or marked slow: a slow scale caps the climb, so a
@@ -1098,8 +1107,10 @@ native memory as a real ring slot would be, so no host is started.
   [`retro-host-performance-status.json`](../test/fixtures/retro-host-performance-status.json)
   and [`retro-host-ps2-performance-status.json`](../test/fixtures/retro-host-ps2-performance-status.json)),
   checks that a status differing only in `performance` says nothing new, and
-  drives the rules: the start scale, two slow readings and the Jak 4x half
-  minute stepping down, Spyro's full-speed readings never doing so, a broken
+  drives the rules: the start scale, two overloaded readings and the Jak 4x
+  half minute stepping down, Spyro's full-speed readings and its live slow
+  moment never doing so, slow readings whose frames took little time not
+  doing so either, a timer's reading a few milliseconds early counting, a broken
   run of readings and a pause, a minute of headroom stepping up within the
   view's need and stopping below a slow scale, the floor, and the memory's
   JSON and matching.

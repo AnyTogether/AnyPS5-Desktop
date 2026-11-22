@@ -105,16 +105,16 @@ void main() {
     final auto = controller();
     await at(auto, 0, status(scale: 4, speed: null));
     expect(memories['PS1-SCUS94228']!.toJson(), {'gpu': 'RTX', 'host': '1.2.0', 'config': '', 'scale': 4});
-    await at(auto, 20, status(scale: 4, speed: 0.6));
+    await at(auto, 20, status(scale: 4, speed: 0.6, work: 1.5));
     expect(options(), isEmpty, reason: 'one slow reading is not enough, and the first 20 seconds are not judged');
-    await at(auto, 25, status(scale: 4, speed: 0.6));
+    await at(auto, 25, status(scale: 4, speed: 0.6, work: 1.5));
     expect(options(), [
       {'key': 'swanstation_GPU_ResolutionScale', 'value': '3'},
     ]);
     expect(memories['PS1-SCUS94228']!.slow, {4});
     expect(memories['PS1-SCUS94228']!.scale, 3);
     expect(saves, greaterThanOrEqualTo(2));
-    expect(log.single, 'auto resolution: 4x to 3x for PS1-SCUS94228 (speed 0.6, work 0.08)');
+    expect(log.single, 'auto resolution: 4x to 3x for PS1-SCUS94228 (speed 0.6, work 1.5)');
 
     await at(auto, 30, status(scale: 3, pending: true));
     await at(auto, 50, status(scale: 3, speed: 1));
@@ -141,14 +141,14 @@ void main() {
     await started(status(scale: 4));
     session.callResults['option'] = false;
     final auto = controller();
-    await at(auto, 20, status(scale: 4, speed: 0.6));
-    await at(auto, 25, status(scale: 4, speed: 0.6));
+    await at(auto, 20, status(scale: 4, speed: 0.6, work: 1.5));
+    await at(auto, 25, status(scale: 4, speed: 0.6, work: 1.5));
     expect(options(), hasLength(1));
     expect(memories['PS1-SCUS94228']!.scale, 4, reason: 'the host kept 4x');
     await menu.open();
     session.callResults['option'] = true;
-    await at(auto, 30, status(scale: 4, speed: 0.6));
-    await at(auto, 35, status(scale: 4, speed: 0.6));
+    await at(auto, 30, status(scale: 4, speed: 0.6, work: 1.5));
+    await at(auto, 35, status(scale: 4, speed: 0.6, work: 1.5));
     expect(options(), hasLength(1), reason: 'the menu is open: the game is paused');
   });
 
@@ -167,13 +167,13 @@ void main() {
     await started(status(scale: 4));
     session.callResults['option'] = true;
     final auto = controller();
-    await at(auto, 20, status(scale: 4, speed: 0.6));
+    await at(auto, 20, status(scale: 4, speed: 0.6, work: 1.5));
     await menu.open();
     await at(auto, 25, status(scale: 4, speed: null));
     await menu.close();
-    await at(auto, 300, status(scale: 4, speed: 0.6));
+    await at(auto, 300, status(scale: 4, speed: 0.6, work: 1.5));
     expect(options(), isEmpty, reason: 'one slow reading before the pause and one after');
-    await at(auto, 305, status(scale: 4, speed: 0.6));
+    await at(auto, 305, status(scale: 4, speed: 0.6, work: 1.5));
     expect(options(), hasLength(1));
   });
 
@@ -190,12 +190,12 @@ void main() {
       clock: clock,
     )..start();
     addTearDown(auto.dispose);
-    await at(auto, 20, status(scale: 4, speed: 0.6));
+    await at(auto, 20, status(scale: 4, speed: 0.6, work: 1.5));
     await menu.open();
     await menu.close();
-    await at(auto, 300, status(scale: 4, speed: 0.6));
+    await at(auto, 300, status(scale: 4, speed: 0.6, work: 1.5));
     expect(options(), isEmpty, reason: 'no judgement saw the menu open, yet it broke the run');
-    await at(auto, 305, status(scale: 4, speed: 0.6));
+    await at(auto, 305, status(scale: 4, speed: 0.6, work: 1.5));
     expect(options(), hasLength(1));
   });
 
@@ -203,9 +203,9 @@ void main() {
     await started(status(scale: 4));
     session.callResults['option'] = true;
     final auto = controller();
-    await at(auto, 20, status(scale: 4, speed: 0.6));
+    await at(auto, 20, status(scale: 4, speed: 0.6, work: 1.5));
     clock.elapsed = const Duration(seconds: 25);
-    session.nextStatus = status(scale: 4, speed: 0.6);
+    session.nextStatus = status(scale: 4, speed: 0.6, work: 1.5);
     await game.refresh();
     final gate = session.callGate = Completer<void>();
     final ticking = auto.tick();
@@ -226,8 +226,8 @@ void main() {
     session.reportsPerformance = false;
     await started(status(scale: 4));
     final auto = controller();
-    await at(auto, 20, status(scale: 4, speed: 0.5));
-    await at(auto, 25, status(scale: 4, speed: 0.5));
+    await at(auto, 20, status(scale: 4, speed: 0.5, work: 1.5));
+    await at(auto, 25, status(scale: 4, speed: 0.5, work: 1.5));
     expect(options(), isEmpty);
     expect(memories, isEmpty);
   });
