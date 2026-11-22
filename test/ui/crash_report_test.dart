@@ -175,6 +175,20 @@ void main() {
       expect(model.overlay, isNull);
     }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
 
+    test('a game with its own engine reports that engine as the one chosen now, not the default', () async {
+      // Desktop #119: the report named the default engine though the game ran on its own.
+      makeFakeToolkit(p.join(model.engine.store.root, '0.1.5'), version: 'upstream-v0.1.5');
+      model.engine.refresh();
+      model.saveSettings(orbit(), model.currentSettings(orbit()).copyWith(engine: '0.1.5'));
+      expect(model.toolkitVersion, isNot('upstream-v0.1.5'), reason: 'the default is another engine');
+      gameScript(crashScript);
+      await model.play(orbit(), asItIs: true);
+      await model.crash.pending;
+      final report = model.crash.current!.report!;
+      expect(report.engineNow, 'upstream-v0.1.5');
+      expect(report.text(), contains('Engine chosen for it now: upstream-v0.1.5'));
+    }, skip: Platform.isWindows ? 'the fake game is a shell script' : false);
+
     group('a dump without PlayGo chunk files', () {
       // Upstream's words when a title asks for a chunk ID and the dump has no playgo-chunk.dat and
       // no playgo-scenario.json (SILENT HILL: The Short Message on v0.1.4); the rule is the
