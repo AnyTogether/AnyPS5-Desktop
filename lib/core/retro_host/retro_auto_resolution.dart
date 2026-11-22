@@ -17,11 +17,12 @@ abstract final class RetroAutoRules {
   /// The time measured by each reading the optimizer takes, as the host measures it.
   static const window = Duration(seconds: 5);
 
-  /// How much sooner than [window] after the last reading the next may come: a timer every
-  /// [window] fires a little early or late, and a reading thrown away for being a few milliseconds
-  /// early would halve the readings. With the status itself up to a poll old, two readings may
-  /// share a second or two of the host's measurement; the rules judge several readings, never one.
-  static const early = Duration(seconds: 1);
+  /// How much sooner than [window] after the last reading the next may come: `Timer.periodic`'s
+  /// callbacks can come a little sooner or later than its duration, and a reading thrown away for
+  /// being a few milliseconds early would drop about every other one. With the status itself up to
+  /// a poll (half a second) old, two readings may share up to about a second of the host's
+  /// measurement; the rules judge several readings, never one.
+  static const early = Duration(milliseconds: 500);
 
   /// The time after the game starts or its resolution changes before readings count: loading,
   /// shader compiles and the redraw at the new scale.

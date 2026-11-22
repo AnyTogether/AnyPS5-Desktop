@@ -35,18 +35,26 @@ void main() {
               as Map)
           .cast<String, Object?>();
 
-  RetroStatus status({int scale = 2, double? speed = 1, double work = 0.08, String gpu = 'RTX', bool pending = false}) {
+  RetroStatus status({
+    int scale = 2,
+    double? speed = 1,
+    double work = 0.08,
+    String? gpu = 'RTX',
+    bool pending = false,
+    bool ready = true,
+  }) {
     final options = (spyro['options']! as Map).cast<String, Object?>();
     final resolution = (options['swanstation_GPU_ResolutionScale']! as Map).cast<String, Object?>();
     return RetroStatus.parse({
       ...spyro,
+      'ready': ready,
       'graphicsPending': pending,
       'options': {
         ...options,
         'swanstation_GPU_ResolutionScale': {...resolution, 'selected': scale - 1, 'activeValue': '$scale'},
       },
       'performance': speed == null ? null : {'speed': speed, 'work': work, 'seconds': 5},
-      'gpu': {'renderer': gpu, 'vendor': 'v', 'maxTexture': 16384},
+      'gpu': gpu == null ? null : {'renderer': gpu, 'vendor': 'v', 'maxTexture': 16384},
     }, performance: true);
   }
 
@@ -90,12 +98,15 @@ void main() {
   }
 
   /// Moves the clock to [seconds], the host's next status to [next], and judges it.
-  Future<void> at(RetroAutoController auto, int seconds, RetroStatus next) async {
-    clock.elapsed = Duration(seconds: seconds);
+  Future<void> atMilliseconds(RetroAutoController auto, int milliseconds, RetroStatus next) async {
+    clock.elapsed = Duration(milliseconds: milliseconds);
     session.nextStatus = next;
     await game.refresh();
     await auto.tick();
   }
+
+  Future<void> at(RetroAutoController auto, int seconds, RetroStatus next) =>
+      atMilliseconds(auto, seconds * 1000, next);
 
   List<Object?> options() => [for (final call in session.calls.where((call) => call.$1 == 'option')) call.$2];
 
@@ -104,6 +115,8 @@ void main() {
     session.callResults['option'] = true;
     final auto = controller();
     await at(auto, 0, status(scale: 4, speed: null));
+    expect(memories, isEmpty, reason: 'nothing measured yet');
+    await at(auto, 5, status(scale: 4));
     expect(memories['PS1-SCUS94228']!.toJson(), {'gpu': 'RTX', 'host': '1.2.0', 'config': '', 'scale': 4});
     await at(auto, 20, status(scale: 4, speed: 0.6, work: 1.5));
     expect(options(), isEmpty, reason: 'one slow reading is not enough, and the first 20 seconds are not judged');
@@ -161,6 +174,39 @@ void main() {
     await at(auto, 5, status(scale: 4, gpu: 'Radeon'));
     expect(memories['PS1-SCUS94228']!.slow, isEmpty, reason: 'another GPU: what was learned does not hold');
     expect(memories['PS1-SCUS94228']!.gpu, 'Radeon');
+  });
+
+  test("a GPU not yet known never takes the memory: the old card's slow scales stay with it", () async {
+    memories['PS1-SCUS94228'] = RetroAutoMemory(gpu: 'RTX', host: '1.2.0', config: '', scale: 4, slow: {6});
+    await started(status(scale: 4, ready: false, speed: null, gpu: null));
+    final auto = controller(need: 8);
+    await at(auto, 0, status(scale: 4, ready: false, speed: null, gpu: null));
+    expect(memories['PS1-SCUS94228']!.gpu, 'RTX', reason: 'loading: the GPU is not known yet');
+    await at(auto, 5, status(scale: 4, speed: null, gpu: 'Radeon'));
+    expect(memories['PS1-SCUS94228']!.gpu, 'RTX', reason: 'not measured yet');
+    await at(auto, 10, status(scale: 4, gpu: 'Radeon'));
+    expect(memories['PS1-SCUS94228']!.gpu, 'Radeon');
+    expect(
+      memories['PS1-SCUS94228']!.slow,
+      isEmpty,
+      reason: '6x ran slow on the RTX, which says nothing of the Radeon',
+    );
+  });
+
+  test("a timer's uneven ticks keep every reading: 5.01 then 4.99 seconds apart", () async {
+    await started(status(scale: 2));
+    session.callResults['option'] = true;
+    final auto = controller(need: 3);
+    var now = 20000;
+    for (var reading = 0; reading < 11; reading++) {
+      await atMilliseconds(auto, now, status(scale: 2));
+      now += reading.isEven ? 5010 : 4990;
+    }
+    expect(options(), isEmpty, reason: 'eleven readings of a minute of headroom');
+    await atMilliseconds(auto, now, status(scale: 2));
+    expect(options(), [
+      {'key': 'swanstation_GPU_ResolutionScale', 'value': '3'},
+    ], reason: 'the twelfth, 55 seconds after the first: none was dropped');
   });
 
   test('the menu opening breaks the run of readings', () async {

@@ -76,6 +76,10 @@ class RetroAutoController {
     final status = menu.game.status;
     final choice = menu.resolution;
     if (status == null || choice == null) return;
+    if (!status.ready || status.performance == null || status.gpu == null) {
+      _auto?.interrupted();
+      return;
+    }
     final scales = {for (final value in choice.values) ?value.scale: value.value};
     final current = choice.active.scale;
     if (current == null) return;
@@ -103,7 +107,9 @@ class RetroAutoController {
     saved();
   }
 
-  /// The optimizer for what the game is measured with now: the one in use, or a new one when the
+  /// The optimizer for what the game is measured with now, from a status that measured it: the
+  /// game shows its pictures, so the host has named the GPU that draws it, and a memory is never
+  /// matched against a GPU not yet known. It is the one in use, or a new one when the
   /// game's GPU, host or other graphics settings are not those its memory was measured with, so
   /// what was learned with others is not used. The first judges from the game's start; one that
   /// replaces it settles from now, as after a change.

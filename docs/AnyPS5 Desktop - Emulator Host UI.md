@@ -438,12 +438,12 @@ player's value, and its Auto comes with a restart offer.
 
 **When it judges** (`RetroAutoResolution.observe`, `RetroAutoRules`).
 `RetroAutoController` hands it the game's last status every 5 seconds
-(`AppModel.retroAutoEvery`) and takes one reading at least 4 seconds after
-the last (`RetroAutoRules.early`: a 5-second timer fires a little early or
-late, and throwing a reading away for a few milliseconds would halve them, as
-the first live run did). The status is the last of the game's twice-a-second
-polls, so two readings may share a second or two of the host's
-measurement; the rules judge several
+(`AppModel.retroAutoEvery`) and takes one reading at least 4.5 seconds after
+the last (`RetroAutoRules.early`: `Timer.periodic`'s callbacks come a little
+sooner or later than its duration, and throwing a reading away for a few
+milliseconds dropped about every other one in the first live run). The
+status is the last of the game's twice-a-second polls, so two readings may
+share up to about a second of the host's measurement; the rules judge several
 readings, never one. A reading counts only 20 seconds after the game started
 or its scale last changed (loading, shader compiles, the redraw), while the
 game plays (`performance` not null, `ready`, no `graphicsPending`, no
@@ -495,7 +495,11 @@ names the cores it ships), the game's other graphics settings
 (`retroAutoConfig` over `retroGraphicsKeys`), the scale last used and the
 scales marked slow. When the card, the host or those settings differ from
 the memory's, it starts again with no scale marked slow, since what ran slow
-with others proves nothing now. Changing a Graphics setting mid-game starts
+with others proves nothing now. The controller looks at the memory only from
+a status that measured the game (`ready`, `performance` and `gpu` given): the
+host lists the options from the core's start but names the GPU only once it
+draws, and a memory taken before that, with no GPU, would match any card and
+carry one card's slow scales to another. Changing a Graphics setting mid-game starts
 a new optimizer that settles first.
 
 **The row.** On a host that lists `gamePerformance`, a PS1 game's Internal
@@ -1118,7 +1122,9 @@ native memory as a real ring slot would be, so no host is started.
   runs the controller on a fake host with a clock moved by hand: a slow game
   lowered and its memory saved, a minute of headroom raising it within the
   view's need, a refused change not counted, nothing judged with the menu
-  open and the menu breaking the run of readings, also when it opens and
+  open, a GPU not yet known never taking the memory (the old card's slow
+  scales stay with it), a timer's uneven 5.01 and 4.99 second ticks keeping
+  every reading, the menu breaking the run of readings, also when it opens and
   closes between two judgements, `stop` waiting for a change
   already asked and not counting it, another GPU starting the memory again,
   and nothing on a host without `gamePerformance`.

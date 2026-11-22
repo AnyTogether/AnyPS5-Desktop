@@ -176,7 +176,7 @@ void main() {
     expect(auto.observe(const Duration(milliseconds: 24998), slow), 3, reason: 'a 5-second timer firing 3 ms early');
     final fast = optimizer();
     expect(fast.observe(s(20), slow), isNull);
-    expect(fast.observe(s(23), slow), isNull, reason: 'well inside the last reading: it would overlap it');
+    expect(fast.observe(s(24), slow), isNull, reason: 'a second early: it would overlap the last reading');
   });
 
   test('anything but play breaks the run of readings', () {
