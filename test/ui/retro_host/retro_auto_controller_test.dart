@@ -183,6 +183,8 @@ void main() {
     final auto = controller(need: 8);
     await at(auto, 0, status(scale: 4, ready: false, speed: null, gpu: null));
     expect(memories['PS1-SCUS94228']!.gpu, 'RTX', reason: 'loading: the GPU is not known yet');
+    await at(auto, 3, status(scale: 4, gpu: null));
+    expect(memories['PS1-SCUS94228']!.gpu, 'RTX', reason: 'measured, but the GPU is not named yet');
     await at(auto, 5, status(scale: 4, speed: null, gpu: 'Radeon'));
     expect(memories['PS1-SCUS94228']!.gpu, 'RTX', reason: 'not measured yet');
     await at(auto, 10, status(scale: 4, gpu: 'Radeon'));
