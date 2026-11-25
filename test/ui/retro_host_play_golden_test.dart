@@ -199,7 +199,11 @@ void main() {
       (model.panelCategories().single.rows.singleWhere((row) => row.id == 'saveState').kind as ActionRow).run();
       await tester.runAsync(() async {
         (model.panelCategories().single.rows[slot].kind as ActionRow).run();
-        for (var turn = 0; turn < 50 && !File(folder.picturePath(slot)).existsSync(); turn++) {
+        for (
+          var turn = 0;
+          turn < 250 && (!File(folder.picturePath(slot)).existsSync() || model.retroMenuShown);
+          turn++
+        ) {
           await Future<void>.delayed(const Duration(milliseconds: 20));
         }
         File(folder.statePath(slot)).setLastModifiedSync(at.add(Duration(minutes: slot)));
@@ -330,5 +334,35 @@ void main() {
     expect(find.text(T.format('retroHostInstalled', ['1.0.0'])), findsOneWidget);
     expect(find.text('Run PS1 games in the separate host'), findsOneWidget);
     await expectLater(shell, matchesGoldenFile('goldens/settings_emulators_host_release_en.png'));
+  });
+
+  testWidgets('settings: Emulators offering the PS2 emulator beside the installed PS1 emulator', (tester) async {
+    launcher = (await tester.runAsync(() => Ps1Launcher.withRelease(ps2: true, addPs2: false)))!;
+    final model = launcher.model..setRetroHostPs1(true);
+    model.open(Layer.settings);
+    model.selectCategory(model.panelCategories().indexWhere((category) => category.id == 'emulators'));
+    await pumpLauncher(tester, model);
+    expect(find.text(T.format('retroHostInstalled', ['1.1.0'])), findsOneWidget);
+    expect(find.text(T.text('retroHostPs2Download')), findsOneWidget);
+    expect(find.text('Run PS2 games in the separate host'), findsNothing);
+    await expectLater(shell, matchesGoldenFile('goldens/settings_emulators_host_ps2_offer_en.png'));
+  });
+
+  testWidgets('settings: Emulators with the PS2 emulator added, turned on, and its Remove row', (tester) async {
+    launcher = (await tester.runAsync(() => Ps1Launcher.withRelease(ps2: true)))!;
+    final model = launcher.model
+      ..setRetroHostPs1(true)
+      ..setRetroHostPs2(true);
+    model.open(Layer.settings);
+    model.selectCategory(model.panelCategories().indexWhere((category) => category.id == 'emulators'));
+    model.panelRow = model.panelCategories()[model.panelCategory].rows.indexWhere(
+      (row) => row.id == 'retro-host-ps2-remove',
+    );
+    await pumpLauncher(tester, model);
+    expect(find.text(T.format('retroHostPs2Installed', ['1.1.0'])), findsOneWidget);
+    expect(find.text(T.text('retroHostPs2Remove')), findsOneWidget);
+    await tester.ensureVisible(find.text(T.text('retroHostPs2Remove')));
+    await settle(tester);
+    await expectLater(shell, matchesGoldenFile('goldens/settings_emulators_host_ps2_release_en.png'));
   });
 }

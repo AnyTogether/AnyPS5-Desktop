@@ -31,7 +31,8 @@ default, see "In the launcher" and "PS2 games").
 | [`lib/ui/retro_host/retro_state_picture.dart`](../lib/ui/retro_host/retro_state_picture.dart) | `retroStatePicture`: the small PNG of the game's picture kept beside a saved state. |
 | [`lib/ui/retro_host/retro_option_sections.dart`](../lib/ui/retro_host/retro_option_sections.dart) | `RetroOptionSection` and `retroOptionSection`: which section of the menu each SwanStation and LRPS2 option belongs to, which are graphics options the Graphics rows stand for, and which are not shown; `retroStartOptions`: the options a game starts with. |
 | [`lib/core/retro_host/retro_host_install.dart`](../lib/core/retro_host/retro_host_install.dart) | `RetroHostInstall`: the host and SwanStation library a build runs, and whether it is checked before each start. |
-| [`lib/ui/retro_host/retro_host_download_model.dart`](../lib/ui/retro_host/retro_host_download_model.dart) | `RetroHostDownloadModel`: Settings › Emulators' row that downloads, updates and repairs the signed host, and what a failed check before a start leaves it saying. |
+| [`lib/ui/retro_host/retro_host_download_model.dart`](../lib/ui/retro_host/retro_host_download_model.dart) | `RetroHostDownloadModel`: Settings › Emulators' row that downloads, updates and repairs the signed host, moving the core packages the player added with it, and what a failed check before a start leaves it saying. `retroDownloadProgressRow` is the progress row both emulator downloads share. |
+| [`lib/ui/retro_host/retro_host_core_download_model.dart`](../lib/ui/retro_host/retro_host_core_download_model.dart) | `RetroHostCoreDownloadModel`: the PS2 emulator (LRPS2's core package) as a download of its own beside the host's row, added from the installed host's release and removed again. |
 | [`lib/core/retro_host/retro_keyboard.dart`](../lib/core/retro_host/retro_keyboard.dart) | `RetroKeyboard`: the keyboard as a PS1 controller, with the keys of a game's Controls. |
 | [`lib/ui/retro_host_play.dart`](../lib/ui/retro_host_play.dart) | `RetroPlay` and the `RetroHostPlaying` part of `AppModel`: the PS1 and PS2 settings and BIOS folders, starting a disc in the host, the commands while it plays, the menu's panel rows, closing. |
 | [`lib/ui/retro_host/retro_play_view.dart`](../lib/ui/retro_host/retro_play_view.dart) | `RetroPlayView`: the game over the whole window, with `RetroGameNotice` for the loading and error screens. |
@@ -676,6 +677,36 @@ puts it back (`RetroHostRelease.restore`). The next start checks the installed
 host anyway, and a missing host is offered for download again. The first host installed turns the setting
 below on, since the player asked for the emulator to play PS1 games with it.
 
+**The PS2 emulator.** LRPS2 is a download of its own
+(`RetroHostCoreDownloadModel`, `RetroHostDownloadModel.ps2`), since a player
+who plays only PS1 games should never download it. Its row sits right under
+the PS1 emulator's, and only while the installed host's release has an LRPS2
+package for this system ([Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>)
+"Core packages"): never for a host 1.0.0, never in a debug or test build that
+runs an unchecked host, and not before a host is installed.
+
+- Before it is added the row says **Download the PS2 emulator**, and that it
+  comes from the same signed release as the PS1 emulator, updates with it and
+  is checked before every game. Selecting it fetches the LRPS2 package of the
+  installed host's own release (the one tagged as the host's `.release-tag`)
+  and nothing else, shows the same progress row as the host's
+  (`retroDownloadProgressRow`), shuts the kept host down, adds the package
+  beside the host and says **PS2 emulator 1.1.0 is ready**. The first one
+  added turns **Run PS2 games in the separate host** on, as the first host
+  turns PS1 on. When GitHub has no release under the installed host's tag the
+  row says the PS2 emulator of this release could not be found, and to update
+  the PS1 emulator first.
+- Once added the row says **PS2 emulator 1.1.0**, the host's version, and that
+  it updates with the PS1 emulator; selecting it looks for a newer release of
+  both, as the host's row does. A host update installs LRPS2 from the new
+  release in the same step, and a new release without it removes it.
+- **Remove the PS2 emulator** (a destructive row under the PS2 BIOS folder)
+  deletes LRPS2's files once the kept host has exited. The PS2 setting, BIOS,
+  memory cards and save states stay, so adding it again plays on as before.
+- Adding and removing are refused while a game plays or starts ("Close the
+  game first, then add or remove the PS2 emulator"), no game starts while
+  they run, and the host is not downloaded meanwhile.
+
 **The setting.** Settings › Emulators › **Run PS1 games in the separate
 host** (`Preferences.retroHostPs1`) is off by default. The row shows only
 where a host is found (`AppModel.retroHostInstall`): the downloaded release
@@ -714,7 +745,7 @@ side to the launchers). Under the PS1 rows Settings › Emulators has PS2 rows
 made the same way (`_retroHostPs2SettingsRows`):
 
 - Where the host found has LRPS2 beside it (`RetroHostInstall.ps2Core`: a
-  signed release that ships `pcsx2_libretro`, or an unchecked host built with
+  signed host with the PS2 emulator added, or an unchecked host built with
   it), **Run PS2 games in the separate host** (`Preferences.retroHostPs2`),
   off by default. With it on a PS2 disc plays in the launcher's window instead
   of PCSX2, needs no PCSX2 (`playsInHost`), and **PS2 BIOS folder** opens
@@ -724,11 +755,14 @@ made the same way (`_retroHostPs2SettingsRows`):
   picked file checked as LRPS2's `IsBIOS` does and copied in; that is left
   out to keep the PS2 rows the PS1 rows' shape, and can follow if the
   maintainers want it.
-- Where the host has no LRPS2 (every signed release until the host ships it),
-  there are no PS2 rows at all, so Settings › Emulators is the PS1 one, and PS2
-  discs start in PCSX2. The setting does nothing then, even saved as on.
-- Turning the setting on or off scans the library again, and so does a
-  download that adds or drops LRPS2: a PS2 cue sheet is listed only while PS2
+  Under them is **Remove the PS2 emulator** for a signed host.
+- Where the host has no LRPS2 (the PS2 emulator not added, or a signed host
+  1.0.0, whose release has none), there are no PS2 rows but the PS2
+  emulator's download where its release has it, and PS2 discs start in
+  PCSX2. The setting does nothing then, even saved as on.
+- Turning the setting on or off scans the library again, and so do adding and
+  removing the PS2 emulator and a host update that drops it: a PS2 cue sheet
+  is listed only while PS2
   discs play in the host, since PCSX2 does not boot one
   ([Standalone emulator library](<AnyPS5 Desktop - Standalone Emulator Library.md>)
   "Discovery").
@@ -1385,18 +1419,27 @@ internal resolution on the Graphics page from the recorded LRPS2 status
 also on the first page's Graphics row; neither offered nor sent on one
 without), sharper textures on in every PS2 `start`, a stereo VR and its depth
 kept from before left out of `start`, and
-the signed release with LRPS2
-([`test/fixtures/retro_host_release_ps2`](../test/fixtures/retro_host_release_ps2/SHA256SUMS))
-and without it. It also downloads both from a fake GitHub, one after the other,
-and checks that a PS2 cue sheet (`Ps1Launcher.addPs2CueSheet` in
+the signed releases: 1.0.0 with no PS2 emulator to offer, and the 1.1.0 release
+with its LRPS2 package
+([`test/fixtures/retro_host_release_lrps2`](../test/fixtures/retro_host_release_lrps2/SHA256SUMS)),
+offered beside the host until it is added and then played on. From a fake
+GitHub it downloads the host alone, adds the PS2 emulator (only this system's
+LRPS2 files fetched), updates the host to a release with LRPS2 (moved) and
+then to one without it (removed), and checks that a PS2 cue sheet
+(`Ps1Launcher.addPs2CueSheet` in
 [`test/support/ps1_launcher.dart`](../test/support/ps1_launcher.dart)) is
-listed once the host gains LRPS2 and hidden again once a newer host without it
-is put in place, with the setting kept on throughout: the rescan of
-`RetroHostDownloadModel._lookAgain`. It replays the statuses in
+listed once LRPS2 is added and hidden again once it goes, with the setting
+kept on throughout: the rescan of `RetroHostDownloadModel.lookAgain`. It also
+removes the PS2 emulator and plays a PS1 game after, refuses adding it while a
+game plays, and says it is not available when the installed host's release is
+not on GitHub. It replays the statuses in
 [`test/support/ps2_host_recording.dart`](../test/support/ps2_host_recording.dart)
 (described in [Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>) "PS2 games").
 [`retro_host_play_golden_test.dart`](../test/ui/retro_host_play_golden_test.dart)
-draws the PS2 rows and the PS2 missing-BIOS screen.
+draws the PS2 rows, the PS2 emulator offered beside the installed PS1
+emulator (`settings_emulators_host_ps2_offer_en.png`), added with its Remove
+row (`settings_emulators_host_ps2_release_en.png`), and the PS2 missing-BIOS
+screen.
 
 ## Not yet
 
@@ -1419,9 +1462,11 @@ draws the PS2 rows and the PS2 missing-BIOS screen.
   memory card and loaded it after a restart; LRPS2 made each new card blank,
   and the games offered to format it. The launcher's own window, job object
   and Linux and macOS builds were not part of that run, and no signed host
-  release ships LRPS2 yet (host `docs/ps2.md` "Releases").
-- **No signed host release yet.** A release build offers the download, but
-  the host repository has published no signed release yet, so the row says so
+  release ships LRPS2 yet (host `docs/ps2.md` "Releases"). The PS2
+  emulator's download was tested only against the recorded 1.1.0 fixture
+  from host PR #22's packer, not a published release.
+- **Only host 1.0.0 is published.** A release build downloads it, and it
+  offers neither save states nor the PS2 emulator
   ([Emulator host client](<AnyPS5 Desktop - Emulator Host Client.md>), "Not yet").
 - **No phone pad.** A phone or browser pad (Remote Play's) does not play a
   PS1 game in the host, and does not move the launcher while the game's own

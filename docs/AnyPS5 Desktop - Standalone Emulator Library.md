@@ -24,9 +24,11 @@ run the host `ANYPS5_RETRO_HOST` names instead). Once a host is there,
 the first download. With it on, a PS1 disc plays in the launcher's own window
 through that host instead of DuckStation, and needs no DuckStation. Where the
 host has LRPS2, the PS2 core, beside it, **Run PS2 games in the separate host**
-and **PS2 BIOS folder** do the same for PS2 discs instead of PCSX2; a host
-without it, which every signed release is until the host ships LRPS2, shows no
-PS2 rows at all, and PS2 games stay in PCSX2. That path is
+and **PS2 BIOS folder** do the same for PS2 discs instead of PCSX2. LRPS2 is a
+download of its own, **Download the PS2 emulator**, offered beside the PS1
+emulator's row once the installed host's release has it, and removed again
+with **Remove the PS2 emulator**; without it there are no other PS2 rows, and
+PS2 games stay in PCSX2. That path is
 described in [The emulator host in the launcher](<AnyPS5 Desktop - Emulator Host UI.md>).
 
 ## Discovery
