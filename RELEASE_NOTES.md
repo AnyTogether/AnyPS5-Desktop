@@ -11,6 +11,39 @@ section is copied into the release.
 
 Nothing yet.
 
+## 0.1.30
+
+- **Linux: a device that hangs when opened no longer freezes the launcher.** On some HP laptops
+  (OMEN and others with the `hp_accel` freefall sensor) the accelerometer shows up as a joystick,
+  and opening it can hang inside the kernel for good. The launcher opened controller devices on its
+  interface thread, so the whole window froze, including a "convert for this computer" in progress.
+  Controllers are now looked for and opened in the background, accelerometers and other devices that
+  are no controller are left alone, and a device that does not answer is skipped instead of tried
+  again. If SDL2 gets stuck that way, the launcher switches to reading controllers directly.
+  Reported by QguAr71.
+- **PS1 games in the launcher's window can now choose their own resolution.** The Internal
+  resolution row on the game menu's Graphics page has a new first value, Auto, which shows the
+  resolution it picked, for example "Auto (2x)". A game you have not set a resolution for starts on
+  Auto at 2x. While you play, Auto raises the resolution one step after a minute with plenty of
+  spare power, up to what your screen can show. If the game slows down, it lowers the resolution
+  within half a minute. Auto remembers each game's resolution and never goes back to one that ran
+  slow, until you change your graphics card or the game's other graphics settings, or the emulator
+  is updated. Picking a value yourself turns Auto off and keeps that value, as before. It needs an
+  emulator version that reports how fast games run (anyps5-retro-host 1.2.0 or later). PS2 games
+  keep the resolution you pick, because they only change resolution when the game restarts.
+- **Games no longer stop with SIGILL on an Intel CPU.** The PS5 has an AMD processor, and games use
+  instructions only AMD processors have (MONITORX/MWAITX, CLZERO, RDPRU, SSE4a). The launcher now
+  relinks with `--to-intel` on any computer whose CPU is not AMD's, which rewrites them, as the
+  engine's own guide says to. **Advanced › Rebuild options › Convert for Intel CPUs** turns it off
+  or on for one game. A game already unlocked keeps its old build until you unlock it again. If the
+  relinker cannot convert a game, it is unlocked without the conversion and the unlock log says so.
+  Thanks to QguAr71, who found it with Astro Bot.
+- **Crash report: "Engine chosen for it now" names the game's own engine.** A game set to its own
+  engine in Game Settings had the launcher's default engine on that line, so a report could say
+  "chosen now upstream-v0.1.2" for a game that ran on upstream-v0.1.5. The line now shows the engine
+  the game itself is set to, and the default only for games without one. Reported by Davilone33.
+- **Polish: the Auto internal resolution row is translated** ("Automatyczna (2x)"), as on the Mac.
+
 ## 0.1.29
 
 - **Linux with an NVIDIA driver under Wayland: a way around the launcher freezing on an old
