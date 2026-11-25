@@ -831,9 +831,10 @@ class IssueDraft {
     required SystemInfo system,
     required ReportPrivacy privacy,
   }) {
-    final (:title, :what, :error, :lines) = _problemParts(problem, privacy);
+    final (:title, :what, :error, :lines, :thread) = _problemParts(problem, privacy);
     var shownError = error;
     final kept = [...lines];
+    final shownThread = [...?thread];
     while (true) {
       final leftOut = lines.length - kept.length;
       final log = [
@@ -845,6 +846,8 @@ class IssueDraft {
         IssueField('what', 'What the launcher noticed', what),
         IssueField('system', 'System', privacy.clean(system.line)),
         IssueField('versions', 'Version', 'Launcher ${problem.version} (${problem.platform})'),
+        if (thread != null)
+          IssueField('thread', threadLabel, shownThread.isEmpty ? threadNone : shownThread.join('\n')),
         IssueField('error', 'Uncaught error', shownError),
         IssueField('log', 'Last seconds', log.isEmpty ? '(none kept)' : log.join('\n')),
       ];
@@ -854,6 +857,9 @@ class IssueDraft {
       }
       if (kept.isNotEmpty) {
         kept.removeAt(0);
+      } else if (shownThread.length > 4) {
+        // The outermost frames go next: where it is stuck is at the top.
+        shownThread.removeLast();
       } else {
         shownError = '${shownError.substring(0, shownError.length * 3 ~/ 4)}…';
       }
@@ -867,7 +873,7 @@ class IssueDraft {
     required SystemInfo system,
     required ReportPrivacy privacy,
   }) {
-    final (:title, :what, :error, :lines) = _problemParts(problem, privacy);
+    final (:title, :what, :error, :lines, :thread) = _problemParts(problem, privacy);
     return [
       title,
       '',
@@ -875,6 +881,7 @@ class IssueDraft {
       privacy.clean(system.line),
       'Launcher ${problem.version} (${problem.platform})',
       '',
+      if (thread != null) ...['$threadLabel:', if (thread.isEmpty) threadNone else ...thread, ''],
       'Uncaught error:',
       error,
       '',
@@ -883,12 +890,27 @@ class IssueDraft {
     ].join('\n');
   }
 
-  static ({String title, String what, String error, List<String> lines}) _problemParts(
+  static const threadLabel = 'Interface thread while stuck';
+
+  /// A stall written before the watchdog sampled the interface's thread, or one it could not sample.
+  static const threadNone = 'Not sampled.';
+
+  /// What a stall's report says of it, the same words as the Mac launcher's.
+  static String stallRecovered(int seconds, String at) =>
+      'The interface did not answer for $seconds s from $at UTC, then recovered by itself.';
+
+  static String stallNeverRecovered(int seconds, String at) =>
+      'The interface stopped answering at $at UTC and had not recovered $seconds s later, when the watchdog last '
+      'looked before the launcher was closed.';
+
+  /// [thread] is null for a crash (no freeze to sample), its lines (none when it was not sampled)
+  /// for a stall.
+  static ({String title, String what, String error, List<String> lines, List<String>? thread}) _problemParts(
     LauncherProblem problem,
     ReportPrivacy privacy,
   ) {
     final at = problem.at.toUtc().toIso8601String().substring(0, 19).replaceFirst('T', ' ');
-    final seconds = problem.stalledFor?.inSeconds;
+    final seconds = problem.stalledFor?.inSeconds ?? 0;
     final (title, what) = switch (problem.kind) {
       LauncherProblemKind.crash when problem.whileClosing => (
         'Launcher crash while closing',
@@ -901,11 +923,11 @@ class IssueDraft {
       ),
       LauncherProblemKind.hang when problem.recovered => (
         'Launcher stopped responding (${seconds}s)',
-        'The interface did not answer for $seconds s from $at UTC, then went on.',
+        stallRecovered(seconds, at),
       ),
       LauncherProblemKind.hang => (
-        'Launcher stopped responding',
-        'The interface stopped answering at $at UTC and did not answer again (${seconds}s or more) before it was closed.',
+        'Launcher stopped responding (${seconds}s+, never recovered)',
+        stallNeverRecovered(seconds, at),
       ),
     };
     String cut(String line) => line.length > lineLimit ? '${line.substring(0, lineLimit)}…' : line;
@@ -917,6 +939,9 @@ class IssueDraft {
       what: what,
       error: error,
       lines: [for (final line in problem.lines) cut(privacy.clean(line))],
+      thread: problem.kind == LauncherProblemKind.hang
+          ? [for (final line in problem.thread ?? const <String>[]) cut(privacy.clean(line))]
+          : null,
     );
   }
 
