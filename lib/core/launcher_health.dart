@@ -676,7 +676,9 @@ class ThreadSampler {
     if (cpuMs == null || windowMs == null || windowMs <= 0) return '$at.';
     final used = cpuMs < 0 ? 0 : cpuMs;
     final doing = used * 2 >= windowMs ? 'busy on the CPU' : 'waiting, not on the CPU';
-    return '$at: $doing ($used ms of CPU time in the ${(windowMs / 1000).toStringAsFixed(1)} s before).';
+    // Tenths of a second rounded half up, as on the Mac: the same words for the same times.
+    final tenths = (windowMs + 50) ~/ 100;
+    return '$at: $doing ($used ms of CPU time in the ${tenths ~/ 10}.${tenths % 10} s before).';
   }
 
   /// The CPU time the thread has used, user and system, in ms.

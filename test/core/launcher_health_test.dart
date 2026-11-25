@@ -403,7 +403,7 @@ void main() {
     );
     expect(
       ThreadSampler.headline(sampledMs: 5000, cpuMs: 12, windowMs: 4250),
-      'Sampled 5 s into the freeze: waiting, not on the CPU (12 ms of CPU time in the 4.2 s before).',
+      'Sampled 5 s into the freeze: waiting, not on the CPU (12 ms of CPU time in the 4.3 s before).',
     );
     expect(ThreadSampler.headline(sampledMs: 5000), 'Sampled 5 s into the freeze.');
   });
