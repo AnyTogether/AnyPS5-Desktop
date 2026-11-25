@@ -3,7 +3,8 @@
 // its asset id (lib/core/audio/atrac9.dart). native/capture is the game's sound for Remote Play,
 // broadcasting and clips (WASAPI loopback on Windows; elsewhere it says there is none).
 // native/retro_host is the launcher's side of the emulator host's control stream and frame ring
-// (lib/core/retro_host/).
+// (lib/core/retro_host/). native/health reads the interface's thread for the stall watchdog
+// (lib/core/launcher_health.dart).
 import 'dart:io';
 
 import 'package:code_assets/code_assets.dart';
@@ -40,6 +41,11 @@ void main(List<String> args) async {
       libraries: [
         if (os == OS.linux) ...['pthread', 'dl'],
       ],
+    ).run(input: input, output: output);
+    await CBuilder.library(
+      name: 'anyps5_health',
+      assetName: 'core/launcher_health_native.dart',
+      sources: const ['native/health/anyps5_health.c'],
     ).run(input: input, output: output);
   });
 }

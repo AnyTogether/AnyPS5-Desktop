@@ -385,8 +385,8 @@ jobs:
           git -C "$RUNNER_TEMP/retro-host" fetch -q --depth 1 "$RETRO_HOST_REPOSITORY" "$RETRO_HOST_COMMIT"
           git -C "$RUNNER_TEMP/retro-host" checkout -q FETCH_HEAD
           echo "ANYPS5_RETRO_HOST_CHECKOUT=$RUNNER_TEMP/retro-host" >> "$GITHUB_ENV"
-      - name: Run the emulator host client's tests
-        run: flutter test test/core/retro_host
+      - name: Run the emulator host client's tests and the stall watchdog's thread sampler
+        run: flutter test test/core/retro_host test/core/thread_sampler_test.dart
         env:
           ANYPS5_SKIP_GOLDENS: 1
       - name: Name the build after the nightly

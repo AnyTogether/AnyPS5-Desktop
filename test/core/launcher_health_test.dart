@@ -334,4 +334,77 @@ void main() {
     expect(text, isNot(contains(r'C:\Users')), reason: 'the home folder too');
     expect(draft.url.toString().length, lessThanOrEqualTo(IssueDraft.maximumLength));
   });
+
+  test('a stall\'s report says how long it lasted, whether it recovered and what the interface thread did', () {
+    final thread = [
+      ThreadSampler.headline(sampledMs: 5100, cpuMs: 12, windowMs: 4000),
+      ThreadSampler.stackHeading,
+      '0  ntdll.dll +0x9d1b4',
+      r'1  anyps5_desktop.exe +0x1234 C:\Users\ada\x',
+    ];
+    final never = LauncherProblem(
+      kind: LauncherProblemKind.hang,
+      at: DateTime.utc(2026, 11, 21, 23, 9, 12),
+      version: '0.1.27',
+      platform: 'Windows',
+      stalledFor: const Duration(milliseconds: 20300),
+      thread: thread,
+    );
+    expect(LauncherProblem.fromJson(jsonDecode(jsonEncode(never.toJson())) as Map<String, dynamic>).thread, thread);
+    const system = SystemInfo(os: 'Windows 10 Pro 22H2 (Build 19045.6456)');
+    const privacy = ReportPrivacy(home: r'C:\Users\ada', names: ['ada']);
+    final draft = IssueDraft.launcherProblem(never, system: system, privacy: privacy);
+    expect(draft.title, 'Launcher stopped responding (20s+, never recovered)');
+    expect(
+      draft.url.queryParameters['what'],
+      'The interface stopped answering at 2026-11-21 23:09:12 UTC and had not recovered 20 s later, when the watchdog '
+      'last looked before the launcher was closed.',
+    );
+    final sample = draft.url.queryParameters['thread']!;
+    expect(
+      sample,
+      startsWith(
+        'Sampled 5 s into the freeze: waiting, not on the CPU (12 ms of CPU time in the 4.0 s before).\nStack:\n'
+        '0  ntdll.dll +0x9d1b4',
+      ),
+    );
+    expect(sample.toLowerCase(), isNot(contains('ada')), reason: 'cleaned like every field');
+    expect(draft.fields.map((field) => field.label).elementAt(3), 'Interface thread while stuck');
+    final whole = IssueDraft.launcherProblemText(never, system: system, privacy: privacy);
+    expect(whole, contains('Interface thread while stuck:\nSampled 5 s into the freeze'));
+    // A stall from before the watchdog sampled, and a crash, which has no freeze to sample.
+    final old = IssueDraft.launcherProblem(
+      LauncherProblem(
+        kind: LauncherProblemKind.hang,
+        at: DateTime.utc(2026, 11, 19, 19, 7, 2),
+        version: '0.1.27',
+        platform: 'Windows',
+        stalledFor: const Duration(seconds: 19),
+        recovered: true,
+      ),
+      system: system,
+      privacy: privacy,
+    );
+    expect(old.title, 'Launcher stopped responding (19s)');
+    expect(old.url.queryParameters['what'], endsWith('then recovered by itself.'));
+    expect(old.url.queryParameters['thread'], 'Not sampled.');
+    final crash = IssueDraft.launcherProblem(
+      LauncherProblem(kind: LauncherProblemKind.crash, at: DateTime.utc(2026), version: '0.1.27', platform: 'Windows'),
+      system: system,
+      privacy: privacy,
+    );
+    expect(crash.url.queryParameters.containsKey('thread'), isFalse);
+  });
+
+  test('the headline tells a busy thread from a waiting one', () {
+    expect(
+      ThreadSampler.headline(sampledMs: 5400, cpuMs: 3950, windowMs: 4000),
+      'Sampled 5 s into the freeze: busy on the CPU (3950 ms of CPU time in the 4.0 s before).',
+    );
+    expect(
+      ThreadSampler.headline(sampledMs: 5000, cpuMs: 12, windowMs: 4250),
+      'Sampled 5 s into the freeze: waiting, not on the CPU (12 ms of CPU time in the 4.2 s before).',
+    );
+    expect(ThreadSampler.headline(sampledMs: 5000), 'Sampled 5 s into the freeze.');
+  });
 }

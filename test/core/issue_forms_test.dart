@@ -102,7 +102,7 @@ void main() {
     );
     expect(
       draft.url.queryParameters['what'],
-      'The interface did not answer for 15 s from 2026-10-30 01:21:26 UTC, then went on.',
+      'The interface did not answer for 15 s from 2026-10-30 01:21:26 UTC, then recovered by itself.',
     );
     expect(draft.url.queryParameters['system'], 'Windows 11 Home 25H2 (Build 26200.6899)');
     expect(draft.linesLeftOut, 0);
