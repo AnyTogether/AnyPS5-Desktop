@@ -283,8 +283,11 @@ void main() {
       model.open(Layer.settings);
       final about = model.panelCategories().firstWhere((category) => category.id == 'about').rows;
       PanelRow aboutRow(String id) => about.firstWhere((row) => row.id == id);
-      expect(aboutRow('author').title, 'Made by');
-      expect((aboutRow('author').kind as InfoRow).text, 'Utku Halis');
+      expect(about.map((row) => row.id), isNot(contains('author')), reason: 'the owner is credited in the contributors block');
+      final credits = aboutRow('contributorsGrid');
+      expect(credits.title, 'Contributors');
+      expect((credits.kind as ContributorsGridRow).owner.login, 'Utku Halis');
+      expect((credits.kind as ContributorsGridRow).owner.htmlUrl, 'https://github.com/utkuhalis');
       expect(aboutRow('github').detail, 'github.com/AnyTogether/AnyPS5-Desktop');
       (aboutRow('github').kind as ActionRow).run();
       expect(fixture!.opened.last, Uri.parse('https://github.com/AnyTogether/AnyPS5-Desktop'));
