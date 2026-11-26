@@ -2520,5 +2520,8 @@
   "retroWidescreenPs1Detail": "បង្ហាញហ្គេម 3D បានច្រើនជាងមុនក្នុង 16:9។ ហ្គេម 2D និងផ្ទៃខាងក្រោយដែលគូរអាចមើលទៅខុស។",
   "retroWidescreenPs2Detail": "បង្ហាញហ្គេមក្នុង 16:9 ប្រសិនបើហ្គេមគាំទ្រ។",
   "retroSharperTextures": "វាយនភាពច្បាស់ជាង",
-  "retroSharperTexturesDetail": "រក្សាវាយនភាពឱ្យច្បាស់លើផ្ទៃដែលមើលពីមុំទ្រេត។"
+  "retroSharperTexturesDetail": "រក្សាវាយនភាពឱ្យច្បាស់លើផ្ទៃដែលមើលពីមុំទ្រេត។",
+  "settingsResetSection": "ស្ដារទាំងអស់",
+  "settingsResetSectionDetail": "កំណត់ការកំណត់នីមួយៗក្នុងផ្នែកនេះត្រឡប់ទៅលំនាំដើមវិញ។",
+  "settingsResetSectionDone": "ការកំណត់បានត្រឡប់ទៅលំនាំដើមវិញ"
 }

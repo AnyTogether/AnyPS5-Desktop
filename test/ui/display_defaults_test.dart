@@ -57,8 +57,8 @@ void main() {
     expect(category.title, T.text('displayDefaults'));
     expect(
       category.rows.map((row) => row.id),
-      ['defaultDisplay', 'defaultStartAnimation', 'defaultVsync'],
-      reason: 'full screen has no window size and keeps the start animation',
+      ['defaultDisplay', 'defaultStartAnimation', 'defaultVsync', 'reset-displayDefaults'],
+      reason: 'full screen has no window size and keeps the start animation; Restore all is last',
     );
     expect((row('defaultDisplay').kind as ChoiceRow).selected, 1);
     expect(model.preferences.displayDefaults.windowSize, 75);

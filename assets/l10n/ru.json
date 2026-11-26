@@ -2534,5 +2534,8 @@
   "retroWidescreenPs1Detail": "Показывает больше 3D-игры в формате 16:9. 2D-игры и нарисованные фоны могут выглядеть неправильно.",
   "retroWidescreenPs2Detail": "Показывает игру в формате 16:9, если игра это поддерживает.",
   "retroSharperTextures": "Чёткие текстуры",
-  "retroSharperTexturesDetail": "Сохраняет текстуры чёткими на поверхностях, видимых под углом."
+  "retroSharperTexturesDetail": "Сохраняет текстуры чёткими на поверхностях, видимых под углом.",
+  "settingsResetSection": "Восстановить все",
+  "settingsResetSectionDetail": "Возвращает каждую настройку этого раздела к значению по умолчанию.",
+  "settingsResetSectionDone": "Настройки восстановлены по умолчанию"
 }

@@ -2534,5 +2534,8 @@
   "retroWidescreenPs1Detail": "Ukáže víc z 3D hry v poměru 16:9. 2D hry a kreslená pozadí mohou vypadat špatně.",
   "retroWidescreenPs2Detail": "Ukáže hru v poměru 16:9, pokud to hra podporuje.",
   "retroSharperTextures": "Ostřejší textury",
-  "retroSharperTexturesDetail": "Udržuje textury ostré na plochách viděných pod úhlem."
+  "retroSharperTexturesDetail": "Udržuje textury ostré na plochách viděných pod úhlem.",
+  "settingsResetSection": "Obnovit vše",
+  "settingsResetSectionDetail": "Vrátí všechna nastavení v této části na výchozí hodnoty.",
+  "settingsResetSectionDone": "Nastavení obnovena na výchozí"
 }

@@ -2534,5 +2534,8 @@
   "retroWidescreenPs1Detail": "Menampilkan lebih banyak bagian game 3D dalam 16:9. Game 2D dan latar yang digambar bisa terlihat salah.",
   "retroWidescreenPs2Detail": "Menampilkan game dalam 16:9 jika game mendukungnya.",
   "retroSharperTextures": "Tekstur lebih tajam",
-  "retroSharperTexturesDetail": "Menjaga tekstur tetap tajam pada permukaan yang terlihat miring."
+  "retroSharperTexturesDetail": "Menjaga tekstur tetap tajam pada permukaan yang terlihat miring.",
+  "settingsResetSection": "Pulihkan semua",
+  "settingsResetSectionDetail": "Mengembalikan setiap pengaturan di bagian ini ke default-nya.",
+  "settingsResetSectionDone": "Pengaturan dikembalikan ke default"
 }

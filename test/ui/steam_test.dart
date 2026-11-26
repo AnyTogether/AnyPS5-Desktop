@@ -110,13 +110,21 @@ void main() {
   test('without Steam the category says so', () async {
     model.steam.find = () async => const [];
     await openSteam();
-    expect(rowIds(), ['steamMissing']);
+    expect(rowIds(), ['steamMissing', 'reset-steam']);
     expect(row('steamMissing').title, 'Not found on this PC');
   });
 
   test('Add to Steam writes AnyPS5 with its pictures; Update and Remove follow', () async {
     await openSteam();
-    expect(rowIds(), ['steamWhere', 'steamAccount', 'steamInSteam', 'steamGames', 'steamFullscreen', 'steamAdd']);
+    expect(rowIds(), [
+      'steamWhere',
+      'steamAccount',
+      'steamInSteam',
+      'steamGames',
+      'steamFullscreen',
+      'steamAdd',
+      'reset-steam',
+    ]);
     expect((row('steamInSteam').kind as InfoRow).text, 'Not added yet');
     choose('steamAdd');
     await until(() => model.steam.inSteam == 1);

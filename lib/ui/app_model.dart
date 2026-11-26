@@ -6626,9 +6626,128 @@ class AppModel extends ChangeNotifier {
     ];
   }
 
+  /// Settings › each section's Restore all: that section's preferences back to their defaults,
+  /// at once where they act on something running. Games folders, emulator programs, language,
+  /// profile name, Save Sync, sign-in and installed engines are left alone; Game Presets and
+  /// Shortcuts have their own reset rows. The macOS launcher's resetSettingsSection.
+  void resetSettingsSection(String section) {
+    switch (section) {
+      case 'appearance':
+        preferences
+          ..theme = LookStyle.cosmic.index
+          ..accent = null
+          ..customTheme = null
+          ..backdrop = 'theme'
+          ..backdropFile = null
+          ..menuMusicFile = null
+          ..gameArtwork = true
+          ..reducedMotion = false
+          ..reduceTransparency = false
+          ..glassTooSlow = false
+          ..glassTransparency = null
+          ..glassArtwork = false
+          ..launcherFullscreen = null
+          ..windowButtons = true;
+        glassFallback = false;
+        Motion.reduced = powerWatch.dimmed;
+        unawaited(applyLauncherWindow());
+        _publishLook();
+      case 'library':
+        preferences.prepareNewGames = true;
+        // Games folders stay: restoring those would empty the library.
+        if (preferences.retroLibrary) {
+          // As the switch does it, with Settings › Emulators keeping its own settings.
+          setRetroLibrary(false);
+        }
+        _stepPrepare();
+      case 'emulators':
+        // The emulator programs chosen and the host's downloads stay.
+        setShowRetroFolders(false);
+        setRetroHostPs1(false);
+        setRetroHostPs2(false);
+      case 'phone':
+        preferences
+          ..phoneServer = true
+          ..browserPlay = true
+          ..browserPlayAlways = false;
+        unawaited(startPhoneServer());
+        unawaited(browserPlay.update());
+      case 'general':
+        final checked = preferences.checkUpdates;
+        preferences
+          ..sounds = true
+          ..soundVolume = null
+          ..musicVolume = null
+          ..launcherVolume = null
+          ..controllerVibration = true
+          ..hideWhilePlaying = false
+          ..pauseOnMenu = true
+          ..showHiddenTrophies = false
+          ..checkUpdates = true
+          ..discordPresence = true
+          ..discordJoin = true
+          ..nowPlayingCard = true
+          ..nowPlayingShare = false;
+        haptics.enabled = true;
+        _applySound();
+        discord.update();
+        nowPlaying.update();
+        if (!checked) unawaited(updates.periodicCheck());
+      case 'steam':
+        steam.restoreDefaults();
+      case 'controllers':
+        preferences
+          ..controllerLight = null
+          ..confirmCircle = false
+          ..stickDeadzone = 0
+          ..assistPlayerOne = null;
+        controllers.applyLights();
+      case 'displayDefaults':
+        preferences.displayDefaults = const DisplayDefaults();
+      case 'power':
+        powerWatch.restoreDefaults();
+      case 'captures':
+        preferences
+          ..replayBuffer = false
+          ..replaySeconds = ReplayBuffer.defaultLength
+          ..screenshotsFolder = null
+          ..waylandRestoreToken = '';
+        unawaited(_stopReplay());
+      default:
+        return;
+    }
+    savePreferences();
+    // Rows that went with the old values (Glass's, a folder's): the focus stays on Restore all.
+    final at = _currentRows.indexWhere((row) => row.id == 'reset-$section');
+    if (at >= 0) panelRow = at;
+    show(T.text('settingsResetSectionDone'));
+  }
+
+  PanelRow _settingsSectionReset(String section) => PanelRow(
+    id: 'reset-$section',
+    title: T.text('settingsResetSection'),
+    detail: T.text('settingsResetSectionDetail'),
+    kind: ActionRow(() => resetSettingsSection(section), destructive: true),
+  );
+
+  /// Sections whose preferences Restore all puts back. Game Presets and Shortcuts have their own
+  /// reset row; the others show accounts, engines and status (About, AnyTogether, Profiles, …).
+  static const settingsSectionsWithReset = {
+    'appearance',
+    'library',
+    'emulators',
+    'phone',
+    'general',
+    'steam',
+    'controllers',
+    'displayDefaults',
+    'power',
+    'captures',
+  };
+
   List<PanelCategory> _settingsCategories() {
     final kit = toolkit;
-    return [
+    final sections = [
       PanelCategory(
         id: 'appearance',
         title: T.text('appearance'),
@@ -6984,6 +7103,17 @@ class AppModel extends ChangeNotifier {
           ),
         ],
       ),
+    ];
+    return [
+      for (final section in sections)
+        if (settingsSectionsWithReset.contains(section.id))
+          PanelCategory(
+            id: section.id,
+            title: section.title,
+            rows: [...section.rows, _settingsSectionReset(section.id)],
+          )
+        else
+          section,
     ];
   }
 

@@ -2534,5 +2534,8 @@
   "retroWidescreenPs1Detail": "以 16:9 顯示更多 3D 遊戲畫面。2D 遊戲和繪製的背景可能顯示不正常。",
   "retroWidescreenPs2Detail": "如果遊戲支援，以 16:9 顯示遊戲。",
   "retroSharperTextures": "更清晰的材質",
-  "retroSharperTexturesDetail": "讓斜著看到的表面上的材質保持清晰。"
+  "retroSharperTexturesDetail": "讓斜著看到的表面上的材質保持清晰。",
+  "settingsResetSection": "全部還原",
+  "settingsResetSectionDetail": "將此區段的每項設定還原為預設值。",
+  "settingsResetSectionDone": "設定已還原為預設值"
 }

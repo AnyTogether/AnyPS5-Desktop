@@ -2534,5 +2534,8 @@
   "retroWidescreenPs1Detail": "3D গেমের আরও বেশি অংশ 16:9-এ দেখায়। 2D গেম ও আঁকা পটভূমি ভুল দেখাতে পারে।",
   "retroWidescreenPs2Detail": "গেমটি সমর্থন করলে 16:9-এ দেখায়।",
   "retroSharperTextures": "আরও স্পষ্ট টেক্সচার",
-  "retroSharperTexturesDetail": "কোণ থেকে দেখা পৃষ্ঠে টেক্সচার স্পষ্ট রাখে।"
+  "retroSharperTexturesDetail": "কোণ থেকে দেখা পৃষ্ঠে টেক্সচার স্পষ্ট রাখে।",
+  "settingsResetSection": "সব পুনরুদ্ধার করুন",
+  "settingsResetSectionDetail": "এই বিভাগের প্রতিটি সেটিং তার ডিফল্টে ফিরিয়ে দেয়।",
+  "settingsResetSectionDone": "সেটিংস ডিফল্টে ফিরিয়ে আনা হয়েছে"
 }

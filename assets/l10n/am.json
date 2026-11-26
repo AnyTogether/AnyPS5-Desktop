@@ -2518,5 +2518,8 @@
   "retroWidescreenPs1Detail": "የ3D ጨዋታን በ16:9 የበለጠ ያሳያል። 2D ጨዋታዎችና የተሳሉ ዳራዎች የተሳሳቱ ሊመስሉ ይችላሉ።",
   "retroWidescreenPs2Detail": "ጨዋታው የሚደግፈው ከሆነ በ16:9 ያሳያል።",
   "retroSharperTextures": "የጠሩ ቴክስቸሮች",
-  "retroSharperTexturesDetail": "በማዕዘን በሚታዩ ገጽታዎች ላይ ቴክስቸሮችን ጥርት ያደርጋል።"
+  "retroSharperTexturesDetail": "በማዕዘን በሚታዩ ገጽታዎች ላይ ቴክስቸሮችን ጥርት ያደርጋል።",
+  "settingsResetSection": "ሁሉንም መልስ",
+  "settingsResetSectionDetail": "በዚህ ክፍል ያሉትን ሁሉንም ቅንብሮች ወደ ነባሪያቸው ይመልሳል።",
+  "settingsResetSectionDone": "ቅንብሮች ወደ ነባሪ ተመልሰዋል"
 }

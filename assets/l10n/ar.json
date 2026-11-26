@@ -2534,5 +2534,8 @@
   "retroWidescreenPs1Detail": "يعرض جزءًا أكبر من اللعبة ثلاثية الأبعاد بنسبة 16:9. قد تبدو الألعاب ثنائية الأبعاد والخلفيات المرسومة خاطئة.",
   "retroWidescreenPs2Detail": "يعرض اللعبة بنسبة 16:9 إذا كانت اللعبة تدعم ذلك.",
   "retroSharperTextures": "نسيج أوضح",
-  "retroSharperTexturesDetail": "يبقي النسيج واضحًا على الأسطح التي تُرى بزاوية."
+  "retroSharperTexturesDetail": "يبقي النسيج واضحًا على الأسطح التي تُرى بزاوية.",
+  "settingsResetSection": "استعادة الكل",
+  "settingsResetSectionDetail": "يعيد كل إعداد في هذا القسم إلى قيمته الافتراضية.",
+  "settingsResetSectionDone": "تمت استعادة الإعدادات الافتراضية"
 }

@@ -2517,5 +2517,8 @@
   "retroWidescreenPs1Detail": "3D गेम के 16:9 में अउरी देखावेला। 2D गेम आ बनावल बैकग्राउंड गलत लाग सकेला।",
   "retroWidescreenPs2Detail": "अगर गेम एकरा के सपोर्ट करे त 16:9 में देखावेला।",
   "retroSharperTextures": "साफ टेक्सचर",
-  "retroSharperTexturesDetail": "तिरछा देखाई देवे वाला सतह पर टेक्सचर के साफ राखेला।"
+  "retroSharperTexturesDetail": "तिरछा देखाई देवे वाला सतह पर टेक्सचर के साफ राखेला।",
+  "settingsResetSection": "सब वापस करीं",
+  "settingsResetSectionDetail": "एह सेक्शन के हर सेटिंग के ओकर डिफ़ॉल्ट पर लौटा देला।",
+  "settingsResetSectionDone": "सेटिंग्स डिफ़ॉल्ट पर लौट आइल"
 }
