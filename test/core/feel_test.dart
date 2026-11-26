@@ -76,6 +76,53 @@ void main() {
         repeater.stop();
       });
     });
+
+    test('a repeat that fires after a stall of the interface is dropped, not handed on', () {
+      fakeAsync((async) {
+        var clock = Duration.zero;
+        final seen = <String>[];
+        final repeater = HoldRepeater<String>(seen.add, now: () => clock);
+        // A tap: the press moves at once, then the interface freezes for a second before the
+        // release (queued behind the freeze) is read.
+        repeater.holdQuietly('right');
+        clock += const Duration(seconds: 1);
+        async.elapse(ms * 400);
+        expect(seen, isEmpty, reason: 'the late repeat must not move the selection');
+        repeater.stop();
+        async.elapse(const Duration(seconds: 1));
+        expect(seen, isEmpty);
+      });
+    });
+
+    test('after a stall a direction really still held starts repeating again', () {
+      fakeAsync((async) {
+        var clock = Duration.zero;
+        final seen = <String>[];
+        final repeater = HoldRepeater<String>(seen.add, now: () => clock);
+        repeater.holdQuietly('right');
+        clock += const Duration(seconds: 1);
+        async.elapse(ms * 400);
+        expect(seen, isEmpty);
+        // On time again: the wait began anew, so the first repeat comes 0.40 s later.
+        clock += ms * 400;
+        async.elapse(ms * 400);
+        expect(seen, ['right']);
+        repeater.stop();
+      });
+    });
+
+    test('a repeat a little late (under the stall limit) is still handed on', () {
+      fakeAsync((async) {
+        var clock = Duration.zero;
+        final seen = <String>[];
+        final repeater = HoldRepeater<String>(seen.add, now: () => clock);
+        repeater.holdQuietly('right');
+        clock += ms * 550;
+        async.elapse(ms * 400);
+        expect(seen, ['right']);
+        repeater.stop();
+      });
+    });
   });
 
   group('stick', () {
