@@ -175,8 +175,10 @@ void main() {
     List<String> categories() => [for (final category in model.panelCategories()) category.id];
     expect(categories(), isNot(contains('emulators')));
     final library = model.panelCategories().firstWhere((category) => category.id == 'library');
-    expect(library.rows.last.id, 'retroLibrary');
-    expect((library.rows.last.kind as ToggleRow).value, isFalse);
+    final retroRow = library.rows.firstWhere((row) => row.id == 'retroLibrary');
+    expect(retroRow.id, 'retroLibrary');
+    expect((retroRow.kind as ToggleRow).value, isFalse);
+    expect(library.rows.last.id, 'reset-library');
 
     model.setRetroLibrary(true);
     expect(model.preferences.retroLibrary, isTrue);

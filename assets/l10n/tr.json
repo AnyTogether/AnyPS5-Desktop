@@ -2536,5 +2536,8 @@
   "retroWidescreenPs1Detail": "3D oyunun daha fazlasını 16:9 olarak gösterir. 2D oyunlar ve çizilmiş arka planlar yanlış görünebilir.",
   "retroWidescreenPs2Detail": "Oyun destekliyorsa oyunu 16:9 olarak gösterir.",
   "retroSharperTextures": "Daha net dokular",
-  "retroSharperTexturesDetail": "Açılı görülen yüzeylerde dokuları net tutar."
+  "retroSharperTexturesDetail": "Açılı görülen yüzeylerde dokuları net tutar.",
+  "settingsResetSection": "Tümünü sıfırla",
+  "settingsResetSectionDetail": "Bu bölümdeki her ayarı varsayılanına döndürür.",
+  "settingsResetSectionDone": "Ayarlar varsayılana döndü"
 }
