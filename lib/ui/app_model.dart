@@ -20,6 +20,7 @@ import '../core/audio/audio_out.dart';
 import '../core/audio/interface_sounds.dart';
 import '../core/audio/theme_music.dart';
 import '../core/app_update.dart';
+import '../core/github_contributors.dart';
 import '../core/audio/tones.dart';
 import '../core/controllers/pad_info.dart';
 import '../core/controllers/troubleshooter.dart';
@@ -1115,7 +1116,7 @@ class PanelRow {
   /// a row with one and no [picture] holds the picture's place empty, so a list of them lines up.
   final double? pictureAspect;
 
-  bool get focusable => kind is! InfoRow;
+  bool get focusable => kind is! InfoRow && kind is! ContributorsGridRow;
 }
 
 sealed class RowKind {
@@ -1264,6 +1265,27 @@ class MediaRow extends RowKind {
 }
 
 /// A pad action's keys and mouse buttons; choosing it waits for a key.
+/// Settings › About credits block: the owner centred above, then other contributors in a row.
+class ContributorsGridRow extends RowKind {
+  const ContributorsGridRow({required this.owner, required this.people});
+  final ContributorChip owner;
+  final List<ContributorChip> people;
+}
+
+/// One face in [ContributorsGridRow]: avatar, how many commits, and the profile to open.
+class ContributorChip {
+  const ContributorChip({
+    required this.login,
+    required this.avatarUrl,
+    required this.htmlUrl,
+    required this.contributions,
+  });
+  final String login;
+  final String avatarUrl;
+  final String htmlUrl;
+  final int contributions;
+}
+
 class KeysRow extends RowKind {
   const KeysRow(this.sources, {required this.capturing, required this.capture});
   final List<String> sources;
@@ -2285,6 +2307,10 @@ class AppModel extends ChangeNotifier {
   /// The AnyPS5 engine downloaded from upstream: versions, the download, the one in use.
   late final EngineModel engine = EngineModel(this);
   late final LauncherUpdateModel updates = LauncherUpdateModel(this);
+
+  /// Settings › About: people who committed to this repository (from GitHub), owner first.
+  List<GithubContributor>? _contributors;
+  bool _contributorsLoading = false;
 
   /// The system fonts games get: the folder put together for them, the CJK download.
   late final FontsModel fonts = FontsModel(this);
@@ -7088,7 +7114,8 @@ class AppModel extends ChangeNotifier {
           ),
           ...updates.aboutRows(),
           ?updates.channelRow(),
-          PanelRow(id: 'author', title: T.text('madeBy'), kind: const InfoRow('Utku Halis')),
+          // Owner first (more prominent), then a floating grid of the other contributors.
+          ..._aboutPeopleRows(),
           PanelRow(
             id: 'github',
             title: 'GitHub',
@@ -7114,6 +7141,81 @@ class AppModel extends ChangeNotifier {
           )
         else
           section,
+    ];
+  }
+
+  /// Loads the repository's contributors once for Settings › About. Safe to call often.
+  /// Under `flutter test` the real GitHub call is skipped so FakeAsync is not left with a
+  /// pending HTTP timer.
+  void loadContributorsIfNeeded() {
+    if (_contributors != null || _contributorsLoading) return;
+    if (Platform.environment['FLUTTER_TEST'] == 'true') {
+      _contributors = const [];
+      return;
+    }
+    _contributorsLoading = true;
+    unawaited((() async {
+      final list = await GithubContributors().fetch();
+      _contributors = list;
+      _contributorsLoading = false;
+      refresh();
+    })());
+  }
+
+  /// One credits block (owner centred, then contributors), then a link to GitHub.
+  List<PanelRow> _aboutPeopleRows() {
+    loadContributorsIfNeeded();
+    final list = _contributors;
+    final open = services.openUrl;
+
+    GithubContributor? ownerFromApi;
+    final others = <GithubContributor>[];
+    if (list != null) {
+      for (final c in list) {
+        if (c.login.toLowerCase() == GithubContributors.ownerLogin) {
+          ownerFromApi = c;
+        } else {
+          others.add(c);
+        }
+      }
+    }
+
+    final ownerLogin = GithubContributors.ownerLogin;
+    final ownerName = GithubContributors.ownerName;
+    final owner = ContributorChip(
+      login: ownerName,
+      avatarUrl: ownerFromApi?.avatarUrl ?? '',
+      htmlUrl: ownerFromApi?.htmlUrl ?? 'https://github.com/$ownerLogin',
+      contributions: ownerFromApi?.contributions ?? 0,
+    );
+
+    return [
+      PanelRow(
+        id: 'contributorsGrid',
+        title: T.text('contributors'),
+        kind: ContributorsGridRow(
+          owner: owner,
+          people: [
+            for (final c in others.take(12))
+              ContributorChip(
+                login: c.login,
+                avatarUrl: c.avatarUrl,
+                htmlUrl: c.htmlUrl,
+                contributions: c.contributions,
+              ),
+          ],
+        ),
+      ),
+      PanelRow(
+        id: 'contributorsAll',
+        title: T.text('seeAllContributors'),
+        detail: 'github.com/${GithubContributors.defaultRepository}/graphs/contributors',
+        kind: ActionRow(
+          () => open?.call(
+            Uri.https('github.com', '${GithubContributors.defaultRepository}/graphs/contributors'),
+          ),
+        ),
+      ),
     ];
   }
 

@@ -840,6 +840,9 @@ class _RowView extends StatelessWidget {
         // Drawn whole by NowPlayingCard below, its buttons included.
         case MediaRow():
           return const SizedBox.shrink();
+        // Drawn whole by the contributors wrap below.
+        case ContributorsGridRow():
+          return const SizedBox.shrink();
         case TextRow():
           return SizedBox(
             width: 420 * scale,
@@ -862,6 +865,8 @@ class _RowView extends StatelessWidget {
             onPlayPause: onTap,
             onNext: () => onStep(1),
           )
+        : kind is ContributorsGridRow
+        ? _ContributorsGrid(kind: kind, model: model, scale: scale)
         : Row(
             children: [
               if (row.picture != null || row.pictureAspect != null) ...[
@@ -2756,6 +2761,159 @@ class _MeterBar extends StatelessWidget {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+
+
+
+/// Settings › About credits: owner centred on top, then contributors in a horizontal row
+/// (avatar beside name and commit count). Each face opens that person's GitHub profile.
+class _ContributorsGrid extends StatelessWidget {
+  const _ContributorsGrid({required this.kind, required this.model, required this.scale});
+
+  final ContributorsGridRow kind;
+  final AppModel model;
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) {
+    final open = model.services.openUrl;
+    void openUrl(String url) => open?.call(Uri.parse(url));
+
+    Widget avatar(String url, String name, double size) {
+      final letter = T.initial(name);
+      final fallback = ColoredBox(
+        color: const Color(0xFF2B3346),
+        child: Center(
+          child: Text(letter, style: AppText.display(size * 0.36, weight: FontWeight.w700)),
+        ),
+      );
+      if (url.isEmpty) return ClipOval(child: SizedBox.square(dimension: size, child: fallback));
+      return ClipOval(
+        child: Image.network(
+          url,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => SizedBox.square(dimension: size, child: fallback),
+        ),
+      );
+    }
+
+    final ownerSize = 72 * scale;
+    final chipSize = 44 * scale;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 12 * scale),
+      child: Column(
+        children: [
+          // Owner: centred, more weight.
+          Pressable(
+            onTap: open == null ? null : () => openUrl(kind.owner.htmlUrl),
+            pressScale: 0.97,
+            builder: (context, hovering) {
+              return Column(
+                children: [
+                  Text(
+                    T.text('madeBy'),
+                    style: AppText.display(13 * scale, weight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.55)),
+                  ),
+                  SizedBox(height: 10 * scale),
+                  Container(
+                    width: ownerSize,
+                    height: ownerSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: hovering ? 0.5 : 0.35),
+                          blurRadius: 14 * scale,
+                          offset: Offset(0, 5 * scale),
+                        ),
+                      ],
+                    ),
+                    child: avatar(kind.owner.avatarUrl, kind.owner.login, ownerSize),
+                  ),
+                  SizedBox(height: 10 * scale),
+                  Text(
+                    kind.owner.login,
+                    style: AppText.display(15 * scale, weight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.92)),
+                  ),
+                ],
+              );
+            },
+          ),
+          if (kind.people.isNotEmpty) ...[
+            SizedBox(height: 22 * scale),
+            Text(
+              T.text('contributors'),
+              style: AppText.display(12 * scale, weight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.45)),
+            ),
+            SizedBox(height: 14 * scale),
+            // Contributors: avatar to the left of name + commits, wrapped.
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 22 * scale,
+              runSpacing: 14 * scale,
+              children: [
+                for (final person in kind.people)
+                  Pressable(
+                    onTap: open == null ? null : () => openUrl(person.htmlUrl),
+                    pressScale: 0.97,
+                    builder: (context, hovering) {
+                      return AnimatedContainer(
+                        duration: Motion.focus,
+                        curve: Motion.settle,
+                        transform: Matrix4.translationValues(0, hovering ? -1.5 * scale : 0, 0),
+                        padding: EdgeInsets.symmetric(horizontal: 6 * scale, vertical: 4 * scale),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: chipSize,
+                              height: chipSize,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.3),
+                                    blurRadius: 8 * scale,
+                                    offset: Offset(0, 3 * scale),
+                                  ),
+                                ],
+                              ),
+                              child: avatar(person.avatarUrl, person.login, chipSize),
+                            ),
+                            SizedBox(width: 10 * scale),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  person.login,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppText.display(13 * scale, weight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.92)),
+                                ),
+                                SizedBox(height: 2 * scale),
+                                Text(
+                                  '${person.contributions} commits',
+                                  style: AppText.display(11 * scale, color: Colors.white.withValues(alpha: 0.48)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
