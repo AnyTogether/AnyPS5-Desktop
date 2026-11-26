@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_soloud/flutter_soloud.dart';
@@ -25,13 +26,63 @@ class SoloudAudio implements AudioOut {
     return _ready;
   }();
 
+  /// A WAV this big is a decoded theme song (tens of MB), not an interface sound.
+  static const _streamFrom = 1 << 20;
+
+  /// Where the decoded songs are written to be streamed, made when the first one is.
+  Directory? _songs;
+
+  /// The songs streamed from a file, by sound, so the file goes when the sound does.
+  final Map<AudioSource, File> _streamed = {};
+
   @override
   Future<Object?> loadWav(String name, Uint8List bytes) async {
     if (!await start()) return null;
+    // A song loaded whole into memory is decoded by the engine on the interface's thread: it
+    // froze the launcher for about a second the first time a game's song was needed. Streamed
+    // from a file the engine only reads its header, so the interface keeps drawing.
+    if (bytes.length >= _streamFrom) {
+      final streamed = await _stream(name, bytes);
+      if (streamed != null) return streamed;
+    }
     try {
       return await _soloud.loadMem(name, bytes);
     } on Object {
       return null;
+    }
+  }
+
+  /// [bytes] written to a temporary file and opened as a stream; null when it cannot be.
+  Future<AudioSource?> _stream(String name, Uint8List bytes) async {
+    File? file;
+    try {
+      var folder = _songs;
+      if (folder == null) {
+        // Songs a run before left behind (a crash) go; one still open elsewhere stays.
+        final stale = Directory('${Directory.systemTemp.path}${Platform.pathSeparator}anyps5-songs');
+        try {
+          if (stale.existsSync()) await stale.delete(recursive: true);
+        } on FileSystemException {
+          // Another launcher is playing from it.
+        }
+        folder = _songs = await stale.create(recursive: true);
+      }
+      file = File('${folder.path}${Platform.pathSeparator}$name');
+      await file.writeAsBytes(bytes);
+      final source = await _soloud.loadFile(file.path, mode: LoadMode.disk);
+      _streamed[source] = file;
+      return source;
+    } on Object {
+      if (file != null) unawaited(_remove(file));
+      return null;
+    }
+  }
+
+  static Future<void> _remove(File file) async {
+    try {
+      await file.delete();
+    } on FileSystemException {
+      // Still open, or already gone: the next run clears the folder.
     }
   }
 
@@ -78,7 +129,12 @@ class SoloudAudio implements AudioOut {
   @override
   void release(Object sound) {
     if (!_ready || sound is! AudioSource) return;
-    unawaited(_soloud.disposeSource(sound).catchError((Object _) {}));
+    final file = _streamed.remove(sound);
+    unawaited(
+      _soloud.disposeSource(sound).catchError((Object _) {}).whenComplete(() {
+        if (file != null) unawaited(_remove(file));
+      }),
+    );
   }
 }
 
