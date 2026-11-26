@@ -1,0 +1,5 @@
+- **Interface sounds are softer and deeper, closer to the PS5's.** Moving, selecting, going back,
+  a trophy, a call, the end of a row and the pointer arriving on something are now low and round:
+  F4, A4 and C5 with their octave below, a gentle rise instead of a tick and a soft fall, with almost
+  all of the sound under 1 kHz. They are no longer the macOS launcher's tones, which sat about two
+  octaves higher. The sounds keep their level, the volume setting and the Interface sounds switch.

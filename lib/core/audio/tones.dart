@@ -12,22 +12,31 @@ typedef Partial = (double frequency, double start, double length);
 
 /// Soft interface sounds, synthesized: a short tick for moving, a rising pair for selecting, a
 /// falling one for going back, a rising three for something finished and two trills for a call.
-/// The macOS launcher's tones (Sounds.swift), sample for sample.
+/// Shaped after the PS5's own: low and round, nearly everything under 1 kHz, built on F4 (349 Hz)
+/// with its octave below, a gentle rise and a soft fall, so no click and nothing sharp. They are no
+/// longer the macOS launcher's tones (Sounds.swift), which sat about two octaves higher.
 abstract final class Tones {
   static const sampleRate = 44100;
 
-  /// Each cue's partials and how fast they die away.
+  /// How long a partial takes to reach its full level, in seconds: a rounded rise, not a tick.
+  static const attack = 0.016;
+
+  /// How long the end of a partial takes to fall to silence, so it never stops with a click.
+  static const release = 0.012;
+
+  /// Each cue's partials and how fast they die away. The notes are F4 (349 Hz), A4 (440 Hz) and C5
+  /// (523 Hz); the quietest cue is an octave lower.
   static const recipes = <Cue, (List<Partial>, double)>{
-    Cue.move: ([(1320, 0.0, 0.045)], 70),
-    Cue.select: ([(880, 0.0, 0.07), (1320, 0.05, 0.1)], 32),
-    Cue.back: ([(990, 0.0, 0.06), (660, 0.045, 0.09)], 34),
-    Cue.unlocked: ([(660, 0.0, 0.12), (990, 0.09, 0.14), (1320, 0.18, 0.3)], 12),
+    Cue.move: ([(349, 0.0, 0.11)], 26),
+    Cue.select: ([(349, 0.0, 0.13), (523, 0.06, 0.2)], 15),
+    Cue.back: ([(523, 0.0, 0.12), (349, 0.06, 0.2)], 15),
+    Cue.unlocked: ([(349, 0.0, 0.2), (440, 0.12, 0.22), (523, 0.24, 0.6)], 6),
     // A friend calling: two soft trills.
-    Cue.ring: ([(988, 0.0, 0.11), (1319, 0.1, 0.11), (988, 0.2, 0.11), (1319, 0.3, 0.16)], 5),
-    // The end of a row: B3 and a fast decay, the quietest cue.
-    Cue.bump: ([(247, 0.0, 0.06)], 55),
+    Cue.ring: ([(440, 0.0, 0.16), (523, 0.14, 0.16), (440, 0.28, 0.16), (523, 0.42, 0.26)], 5),
+    // The end of a row: F3 and a fast decay, the quietest cue.
+    Cue.bump: ([(175, 0.0, 0.11)], 38),
     // The pointer on something new: the move tick, about 3 dB lower.
-    Cue.hover: ([(1320, 0.0, 0.045)], 70),
+    Cue.hover: ([(349, 0.0, 0.11)], 26),
   };
 
   /// How loud each cue is against the others (1 for the rest).
@@ -46,8 +55,9 @@ abstract final class Tones {
     return samples;
   }
 
-  /// Sine partials with a 4 ms attack and an exponential decay, plus a quieter octave that dies
-  /// away faster; 20 ms of silence after the last one ends.
+  /// Sine partials with a rounded [attack] and a soft [release], an exponential decay, the octave
+  /// below that dies away a little slower (the body) and a quiet octave above that dies away
+  /// faster; 20 ms of silence after the last one ends.
   static Float32List synthesize(List<Partial> partials, double decay, {int rate = sampleRate}) {
     final length = partials.isEmpty ? 0.1 : partials.map((partial) => partial.$2 + partial.$3).reduce(math.max);
     final frames = (rate * (length + 0.02)).floor();
@@ -58,9 +68,13 @@ abstract final class Tones {
       for (final (frequency, start, duration) in partials) {
         if (time < start || time >= start + duration) continue;
         final local = time - start;
-        final attack = math.min(1.0, local / 0.004);
-        sample += math.sin(2 * math.pi * frequency * local) * attack * math.exp(-local * decay) * 0.5;
-        sample += math.sin(4 * math.pi * frequency * local) * attack * math.exp(-local * decay * 1.6) * 0.12;
+        final rise = math.sin(math.pi / 2 * math.min(1.0, local / attack));
+        final shape = rise * rise * math.min(1.0, (duration - local) / release);
+        sample +=
+            (math.sin(2 * math.pi * frequency * local) * math.exp(-local * decay) * 0.46 +
+                math.sin(math.pi * frequency * local) * math.exp(-local * decay * 0.8) * 0.28 +
+                math.sin(4 * math.pi * frequency * local) * math.exp(-local * decay * 1.8) * 0.08) *
+            shape;
       }
       samples[frame] = sample;
     }
