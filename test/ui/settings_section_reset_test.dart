@@ -51,9 +51,8 @@ void main() {
         expect(resets, isEmpty, reason: category.id);
       }
     }
-    // Shortcuts and Game Presets keep their own reset rows.
+    // Shortcuts keeps its own reset row.
     expect(section('shortcuts').rows.map((row) => row.id), contains('shortcutsReset'));
-    expect(section('presets').rows.map((row) => row.id), contains('presetsReset'));
   });
 
   test('Behaviour comes back to its defaults; the language, the name and friends joining stay', () {
