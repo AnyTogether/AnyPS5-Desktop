@@ -2534,5 +2534,8 @@
   "retroWidescreenPs1Detail": "3Dゲームを16:9でより広く表示します。2Dゲームや描かれた背景はおかしく見えることがあります。",
   "retroWidescreenPs2Detail": "ゲームが対応していれば16:9で表示します。",
   "retroSharperTextures": "テクスチャをくっきり",
-  "retroSharperTexturesDetail": "斜めから見た面のテクスチャをくっきり保ちます。"
+  "retroSharperTexturesDetail": "斜めから見た面のテクスチャをくっきり保ちます。",
+  "settingsResetSection": "すべて元に戻す",
+  "settingsResetSectionDetail": "このセクションのすべての設定をデフォルトに戻します。",
+  "settingsResetSectionDone": "設定をデフォルトに戻しました"
 }

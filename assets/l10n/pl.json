@@ -2520,5 +2520,8 @@
   "retroWidescreenPs1Detail": "Pokazuje więcej gry 3D w proporcjach 16:9. Gry 2D i rysowane tła mogą wyglądać źle.",
   "retroWidescreenPs2Detail": "Pokazuje grę w proporcjach 16:9, jeśli gra to obsługuje.",
   "retroSharperTextures": "Ostrzejsze tekstury",
-  "retroSharperTexturesDetail": "Utrzymuje ostrość tekstur na powierzchniach widzianych pod kątem."
+  "retroSharperTexturesDetail": "Utrzymuje ostrość tekstur na powierzchniach widzianych pod kątem.",
+  "settingsResetSection": "Przywróć wszystko",
+  "settingsResetSectionDetail": "Przywraca domyślne wartości wszystkich ustawień w tej sekcji.",
+  "settingsResetSectionDone": "Przywrócono ustawienia domyślne"
 }

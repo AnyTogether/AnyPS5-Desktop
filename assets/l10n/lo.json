@@ -2520,5 +2520,8 @@
   "retroWidescreenPs1Detail": "ສະແດງເກມ 3D ໄດ້ຫຼາຍຂຶ້ນໃນ 16:9. ເກມ 2D ແລະ ພາບພື້ນຫຼັງທີ່ແຕ້ມອາດເບິ່ງຜິດ.",
   "retroWidescreenPs2Detail": "ສະແດງເກມໃນ 16:9 ຖ້າເກມຮອງຮັບ.",
   "retroSharperTextures": "ພື້ນຜິວຄົມຊັດຂຶ້ນ",
-  "retroSharperTexturesDetail": "ຮັກສາພື້ນຜິວໃຫ້ຄົມຊັດເທິງພື້ນທີ່ເບິ່ງຈາກມຸມອຽງ."
+  "retroSharperTexturesDetail": "ຮັກສາພື້ນຜິວໃຫ້ຄົມຊັດເທິງພື້ນທີ່ເບິ່ງຈາກມຸມອຽງ.",
+  "settingsResetSection": "ກູ້ຄືນທັງໝົດ",
+  "settingsResetSectionDetail": "ຕັ້ງຄ່າທຸກຢ່າງໃນພາກນີ້ກັບຄືນສູ່ຄ່າເລີ່ມຕົ້ນ.",
+  "settingsResetSectionDone": "ການຕັ້ງຄ່າກັບຄືນສູ່ຄ່າເລີ່ມຕົ້ນແລ້ວ"
 }

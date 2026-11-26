@@ -2534,5 +2534,8 @@
   "retroWidescreenPs1Detail": "Viser mer av et 3D-spill i 16:9. 2D-spill og tegnede bakgrunner kan se feil ut.",
   "retroWidescreenPs2Detail": "Viser spillet i 16:9 hvis spillet støtter det.",
   "retroSharperTextures": "Skarpere teksturer",
-  "retroSharperTexturesDetail": "Holder teksturer skarpe på flater som sees fra en vinkel."
+  "retroSharperTexturesDetail": "Holder teksturer skarpe på flater som sees fra en vinkel.",
+  "settingsResetSection": "Gjenopprett alle",
+  "settingsResetSectionDetail": "Setter alle innstillinger i denne delen tilbake til standard.",
+  "settingsResetSectionDone": "Innstillinger gjenopprettet til standard"
 }

@@ -2534,5 +2534,8 @@
   "retroWidescreenPs1Detail": "Arată mai mult dintr-un joc 3D în 16:9. Jocurile 2D și fundalurile desenate pot arăta greșit.",
   "retroWidescreenPs2Detail": "Arată jocul în 16:9 dacă jocul permite.",
   "retroSharperTextures": "Texturi mai clare",
-  "retroSharperTexturesDetail": "Păstrează texturile clare pe suprafețele văzute din unghi."
+  "retroSharperTexturesDetail": "Păstrează texturile clare pe suprafețele văzute din unghi.",
+  "settingsResetSection": "Restabilește tot",
+  "settingsResetSectionDetail": "Readuce fiecare setare din această secțiune la valoarea implicită.",
+  "settingsResetSectionDone": "Setări readuse la valorile implicite"
 }

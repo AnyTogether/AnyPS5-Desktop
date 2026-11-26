@@ -2534,5 +2534,8 @@
   "retroWidescreenPs1Detail": "Mas marami ang ipinapakita ng 3D na laro sa 16:9. Maaaring mali ang hitsura ng mga 2D na laro at iginuhit na background.",
   "retroWidescreenPs2Detail": "Ipinapakita ang laro sa 16:9 kung sinusuportahan ito ng laro.",
   "retroSharperTextures": "Mas matalas na texture",
-  "retroSharperTexturesDetail": "Pinananatiling matalas ang texture sa mga ibabaw na nakikita nang pahilis."
+  "retroSharperTexturesDetail": "Pinananatiling matalas ang texture sa mga ibabaw na nakikita nang pahilis.",
+  "settingsResetSection": "Ibalik lahat",
+  "settingsResetSectionDetail": "Ibinabalik ang bawat setting sa seksyong ito sa default nito.",
+  "settingsResetSectionDone": "Naibalik sa default ang mga setting"
 }

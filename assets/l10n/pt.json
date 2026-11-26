@@ -2534,5 +2534,8 @@
   "retroWidescreenPs1Detail": "Mostra mais de um jogo 3D em 16:9. Jogos 2D e fundos desenhados podem ficar errados.",
   "retroWidescreenPs2Detail": "Mostra o jogo em 16:9 se o jogo tiver suporte.",
   "retroSharperTextures": "Texturas mais nítidas",
-  "retroSharperTexturesDetail": "Mantém as texturas nítidas em superfícies vistas em ângulo."
+  "retroSharperTexturesDetail": "Mantém as texturas nítidas em superfícies vistas em ângulo.",
+  "settingsResetSection": "Restaurar tudo",
+  "settingsResetSectionDetail": "Volta cada configuração desta seção ao padrão.",
+  "settingsResetSectionDone": "Configurações restauradas para o padrão"
 }
