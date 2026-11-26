@@ -108,6 +108,16 @@ class SteamModel {
 
   void _count() => inSteam = _shortcuts?.ours().length ?? 0;
 
+  /// Settings › Steam › Restore all: the account signed in last, no shortcut per game, full
+  /// screen from Steam. The shortcuts already in Steam stay until Add to Steam writes them again.
+  void restoreDefaults() {
+    app.preferences
+      ..steamUser = null
+      ..steamGames = false
+      ..steamFullscreen = true;
+    _count();
+  }
+
   void chooseAccount(int index) {
     if (index < 0 || index >= accounts.length) return;
     final (install, user) = accounts[index];

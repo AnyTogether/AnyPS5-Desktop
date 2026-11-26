@@ -6626,8 +6626,10 @@ class AppModel extends ChangeNotifier {
     ];
   }
 
-  /// Settings › each section: puts that section's preferences back to their defaults. Folders,
-  /// language, profile name, sign-in and installed engines are left alone.
+  /// Settings › each section's Restore all: that section's preferences back to their defaults,
+  /// at once where they act on something running. Games folders, emulator programs, language,
+  /// profile name, Save Sync, sign-in and installed engines are left alone; Game Presets and
+  /// Shortcuts have their own reset rows. The macOS launcher's resetSettingsSection.
   void resetSettingsSection(String section) {
     switch (section) {
       case 'appearance':
@@ -6646,25 +6648,32 @@ class AppModel extends ChangeNotifier {
           ..glassArtwork = false
           ..launcherFullscreen = null
           ..windowButtons = true;
+        glassFallback = false;
         Motion.reduced = powerWatch.dimmed;
         unawaited(applyLauncherWindow());
         _publishLook();
       case 'library':
-        preferences
-          ..prepareNewGames = true
-          ..retroLibrary = false
-          ..showRetroFolders = false
-          ..retroHostPs1 = false
-          ..retroHostPs2 = false;
-        // Games folders and emulator paths stay: restoring those would empty the library.
-        rescan();
+        preferences.prepareNewGames = true;
+        // Games folders stay: restoring those would empty the library.
+        if (preferences.retroLibrary) {
+          // As the switch does it, with Settings › Emulators keeping its own settings.
+          setRetroLibrary(false);
+        }
+        _stepPrepare();
+      case 'emulators':
+        // The emulator programs chosen and the host's downloads stay.
+        setShowRetroFolders(false);
+        setRetroHostPs1(false);
+        setRetroHostPs2(false);
       case 'phone':
         preferences
           ..phoneServer = true
           ..browserPlay = true
           ..browserPlayAlways = false;
         unawaited(startPhoneServer());
+        unawaited(browserPlay.update());
       case 'general':
+        final checked = preferences.checkUpdates;
         preferences
           ..sounds = true
           ..soundVolume = null
@@ -6678,34 +6687,25 @@ class AppModel extends ChangeNotifier {
           ..discordPresence = true
           ..discordJoin = true
           ..nowPlayingCard = true
-          ..nowPlayingShare = false
-          ..friendsJoin = true;
+          ..nowPlayingShare = false;
         haptics.enabled = true;
         _applySound();
+        discord.update();
+        nowPlaying.update();
+        if (!checked) unawaited(updates.periodicCheck());
       case 'steam':
-        preferences
-          ..steamUser = null
-          ..steamGames = false
-          ..steamFullscreen = true;
+        steam.restoreDefaults();
       case 'controllers':
         preferences
           ..controllerLight = null
           ..confirmCircle = false
           ..stickDeadzone = 0
           ..assistPlayerOne = null;
-        _applyPadPreferences();
         controllers.applyLights();
       case 'displayDefaults':
         preferences.displayDefaults = const DisplayDefaults();
       case 'power':
-        preferences
-          ..powerProfiles = null
-          ..heatReader = false;
-      case 'presets':
-        setGamePresets(const GamePresets());
-        // setGamePresets already saves and notifies.
-        show(T.text('settingsResetSectionDone'));
-        return;
+        powerWatch.restoreDefaults();
       case 'captures':
         preferences
           ..replayBuffer = false
@@ -6713,12 +6713,13 @@ class AppModel extends ChangeNotifier {
           ..screenshotsFolder = null
           ..waylandRestoreToken = '';
         unawaited(_stopReplay());
-      case 'shortcuts':
-        preferences.shortcuts = ShortcutMap();
       default:
         return;
     }
     savePreferences();
+    // Rows that went with the old values (Glass's, a folder's): the focus stays on Restore all.
+    final at = _currentRows.indexWhere((row) => row.id == 'reset-$section');
+    if (at >= 0) panelRow = at;
     show(T.text('settingsResetSectionDone'));
   }
 
@@ -6729,11 +6730,12 @@ class AppModel extends ChangeNotifier {
     kind: ActionRow(() => resetSettingsSection(section), destructive: true),
   );
 
-  /// Sections whose preferences this restores. Others already have their own reset row (presets,
-  /// shortcuts) or only show accounts, engines and status (about, together, profiles, …).
-  static const _settingsSectionsWithReset = {
+  /// Sections whose preferences Restore all puts back. Game Presets and Shortcuts have their own
+  /// reset row; the others show accounts, engines and status (About, AnyTogether, Profiles, …).
+  static const settingsSectionsWithReset = {
     'appearance',
     'library',
+    'emulators',
     'phone',
     'general',
     'steam',
@@ -7104,7 +7106,7 @@ class AppModel extends ChangeNotifier {
     ];
     return [
       for (final section in sections)
-        if (_settingsSectionsWithReset.contains(section.id))
+        if (settingsSectionsWithReset.contains(section.id))
           PanelCategory(
             id: section.id,
             title: section.title,

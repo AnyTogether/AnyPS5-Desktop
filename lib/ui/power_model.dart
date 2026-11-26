@@ -111,6 +111,22 @@ class PowerModel {
     app.show(T.text('powerUndone'));
   }
 
+  /// Settings › Battery & Heat › Restore all: the built-in profiles at once, and the reader with
+  /// administrator rights stopped, without asking Windows for them again.
+  void restoreDefaults() {
+    final reader = app.preferences.heatReader;
+    app.preferences
+      ..powerProfiles = null
+      ..heatReader = false;
+    final before = policy.adjustment;
+    policy.profiles = const PowerProfiles();
+    _report(before, becameHot: false);
+    if (reader) {
+      windowsHeat?.stopReader(stopFile: readerStopFile);
+      take();
+    }
+  }
+
   void setProfiles(PowerProfiles next) {
     // On Windows, turning the heat profile on asks for the processor's temperature too.
     final askReader = !profiles.hot.on && next.hot.on && !app.preferences.heatReader && readerOffered;
