@@ -23,6 +23,7 @@ import 'core/controllers/troubleshooter.dart';
 import 'core/app_update.dart';
 import 'core/child_processes.dart';
 import 'core/ffmpeg_download.dart' show FfmpegBuild;
+import 'core/github_contributors.dart';
 import 'core/host.dart';
 import 'core/opened_files.dart';
 import 'core/launcher_health.dart';
@@ -165,6 +166,7 @@ Future<void> main(List<String> arguments) async {
       ))?.path,
       engineReleases: GitHubReleases(),
       launcherReleases: LauncherUpdates.source(),
+      contributors: GithubContributors(),
       audio: SoloudAudio.new,
       armEngineReleases: GitHubReleases(
         repository: ArmToolkitPackage.repository,
