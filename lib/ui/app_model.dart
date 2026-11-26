@@ -1116,7 +1116,7 @@ class PanelRow {
   /// a row with one and no [picture] holds the picture's place empty, so a list of them lines up.
   final double? pictureAspect;
 
-  bool get focusable => kind is! InfoRow && kind is! ContributorsGridRow;
+  bool get focusable => kind is! InfoRow;
 }
 
 sealed class RowKind {
@@ -1264,12 +1264,25 @@ class MediaRow extends RowKind {
   final void Function() next;
 }
 
-/// A pad action's keys and mouse buttons; choosing it waits for a key.
 /// Settings › About credits block: the owner centred above, then other contributors in a row.
+/// ← and → move between the faces ([selected]: 0 the owner, then [people] in order); choosing
+/// it opens the selected one's GitHub profile.
 class ContributorsGridRow extends RowKind {
-  const ContributorsGridRow({required this.owner, required this.people});
+  const ContributorsGridRow({
+    required this.owner,
+    required this.people,
+    required this.selected,
+    required this.select,
+    required this.open,
+  });
   final ContributorChip owner;
   final List<ContributorChip> people;
+  final int selected;
+  final void Function(int face) select;
+  final void Function(int face) open;
+
+  /// The owner, then the others: the order ← and → go through.
+  List<ContributorChip> get faces => [owner, ...people];
 }
 
 /// One face in [ContributorsGridRow]: avatar, how many commits, and the profile to open.
@@ -1286,6 +1299,7 @@ class ContributorChip {
   final int contributions;
 }
 
+/// A pad action's keys and mouse buttons; choosing it waits for a key.
 class KeysRow extends RowKind {
   const KeysRow(this.sources, {required this.capturing, required this.capture});
   final List<String> sources;
@@ -1334,6 +1348,7 @@ class LauncherServices {
     this.talkKeys,
     this.engineReleases,
     this.launcherReleases,
+    this.contributors,
     this.packageManager,
     this.hostGlibc,
     this.audio,
@@ -1507,6 +1522,10 @@ class LauncherServices {
   /// Where AnyPS5 Desktop's own releases are read from (GitHub, signed); none in tests without a
   /// fake.
   final GitHubReleases? launcherReleases;
+
+  /// Where Settings › About reads the launcher's contributors from (GitHub); none in tests
+  /// without a fake, which then show the owner alone.
+  final GithubContributors? contributors;
 
   /// The package manager that installed this copy (Scoop, pacman) or null; looked for on the
   /// computer by default (PackageInstall.detect).
@@ -2311,6 +2330,9 @@ class AppModel extends ChangeNotifier {
   /// Settings › About: people who committed to this repository (from GitHub), owner first.
   List<GithubContributor>? _contributors;
   bool _contributorsLoading = false;
+
+  /// The face the keys and the pad are on in About's credits: 0 the owner, then the others.
+  int _contributorFace = 0;
 
   /// The system fonts games get: the folder put together for them, the CJK download.
   late final FontsModel fonts = FontsModel(this);
@@ -7144,23 +7166,23 @@ class AppModel extends ChangeNotifier {
     ];
   }
 
-  /// Loads the repository's contributors once for Settings › About. Safe to call often.
-  /// Under `flutter test` the real GitHub call is skipped so FakeAsync is not left with a
-  /// pending HTTP timer.
+  /// Loads the launcher's contributors once for Settings › About (services.contributors; none
+  /// in tests without a fake). Safe to call often.
   void loadContributorsIfNeeded() {
-    if (_contributors != null || _contributorsLoading) return;
-    if (Platform.environment['FLUTTER_TEST'] == 'true') {
-      _contributors = const [];
-      return;
-    }
+    final source = services.contributors;
+    if (_contributors != null || _contributorsLoading || source == null) return;
     _contributorsLoading = true;
-    unawaited((() async {
-      final list = await GithubContributors().fetch();
-      _contributors = list;
-      _contributorsLoading = false;
-      refresh();
-    })());
+    unawaited(
+      source.fetch().then((list) {
+        _contributors = list;
+        _contributorsLoading = false;
+        if (!disposed) refresh();
+      }),
+    );
   }
+
+  /// How many contributors besides the owner About shows; See all on GitHub has the rest.
+  static const aboutContributorsShown = 12;
 
   /// One credits block (owner centred, then contributors), then a link to GitHub.
   List<PanelRow> _aboutPeopleRows() {
@@ -7188,6 +7210,12 @@ class AppModel extends ChangeNotifier {
       htmlUrl: ownerFromApi?.htmlUrl ?? 'https://github.com/$ownerLogin',
       contributions: ownerFromApi?.contributions ?? 0,
     );
+    final people = [
+      for (final c in others.take(aboutContributorsShown))
+        ContributorChip(login: c.login, avatarUrl: c.avatarUrl, htmlUrl: c.htmlUrl, contributions: c.contributions),
+    ];
+    final faces = [owner, ...people];
+    final selected = _contributorFace.clamp(0, faces.length - 1);
 
     return [
       PanelRow(
@@ -7195,15 +7223,15 @@ class AppModel extends ChangeNotifier {
         title: T.text('contributors'),
         kind: ContributorsGridRow(
           owner: owner,
-          people: [
-            for (final c in others.take(12))
-              ContributorChip(
-                login: c.login,
-                avatarUrl: c.avatarUrl,
-                htmlUrl: c.htmlUrl,
-                contributions: c.contributions,
-              ),
-          ],
+          people: people,
+          selected: selected,
+          select: (face) {
+            final next = face.clamp(0, faces.length - 1);
+            if (next == _contributorFace) return;
+            _contributorFace = next;
+            _changed();
+          },
+          open: (face) => open?.call(Uri.parse(faces[face.clamp(0, faces.length - 1)].htmlUrl)),
         ),
       ),
       PanelRow(
@@ -7211,9 +7239,7 @@ class AppModel extends ChangeNotifier {
         title: T.text('seeAllContributors'),
         detail: 'github.com/${GithubContributors.defaultRepository}/graphs/contributors',
         kind: ActionRow(
-          () => open?.call(
-            Uri.https('github.com', '${GithubContributors.defaultRepository}/graphs/contributors'),
-          ),
+          () => open?.call(Uri.https('github.com', '${GithubContributors.defaultRepository}/graphs/contributors')),
         ),
       ),
     ];
@@ -8381,6 +8407,11 @@ class AppModel extends ChangeNotifier {
           case MediaRow(:final previous, :final next):
             (delta < 0 ? previous : next)();
             sounds.play(Cue.move);
+          // About's credits: from face to face; past the first or the last, as any other row.
+          case ContributorsGridRow(:final faces, :final selected, :final select)
+              when selected + delta >= 0 && selected + delta < faces.length:
+            select(selected + delta);
+            sounds.play(Cue.move);
           default:
             if (overlay == Layer.settings && categories.length > 1) {
               final next = (panelCategory + delta).clamp(0, categories.length - 1);
@@ -8405,6 +8436,9 @@ class AppModel extends ChangeNotifier {
           case MediaRow(:final playPause):
             sounds.play(Cue.select);
             playPause();
+          case ContributorsGridRow(:final selected, :final open):
+            sounds.play(Cue.select);
+            open(selected);
           case KeysRow(:final capture):
             capture();
           case TextRow():
@@ -8472,6 +8506,12 @@ class AppModel extends ChangeNotifier {
     }
     // Now playing's card: ← and → are the previous and the next track at once, with no edit mode.
     if (row?.kind is MediaRow && (command == Command.left || command == Command.right)) return false;
+    // About's credits: ← and → go from face to face at once, and ← on the owner back to the
+    // sections' column.
+    if (row?.kind case ContributorsGridRow(:final faces, :final selected)
+        when (command == Command.left && selected > 0) || (command == Command.right && selected < faces.length - 1)) {
+      return false;
+    }
     switch (command) {
       case Command.select when editable:
         editingValue = row!.id;

@@ -840,7 +840,7 @@ class _RowView extends StatelessWidget {
         // Drawn whole by NowPlayingCard below, its buttons included.
         case MediaRow():
           return const SizedBox.shrink();
-        // Drawn whole by the contributors wrap below.
+        // Drawn whole by _ContributorsGrid, its faces included.
         case ContributorsGridRow():
           return const SizedBox.shrink();
         case TextRow():
@@ -865,8 +865,6 @@ class _RowView extends StatelessWidget {
             onPlayPause: onTap,
             onNext: () => onStep(1),
           )
-        : kind is ContributorsGridRow
-        ? _ContributorsGrid(kind: kind, model: model, scale: scale)
         : Row(
             children: [
               if (row.picture != null || row.pictureAspect != null) ...[
@@ -946,6 +944,14 @@ class _RowView extends StatelessWidget {
               value(),
             ],
           );
+
+    // About's credits: each face takes the focus itself, so the block has no fill of its own.
+    if (kind is ContributorsGridRow) {
+      return Padding(
+        padding: EdgeInsets.only(bottom: 6 * scale),
+        child: _ContributorsGrid(kind: kind, focused: focused, scale: scale, onTap: onTap, onHover: onHover),
+      );
+    }
 
     final view = Pressable(
       onTap: row.focusable ? onTap : null,
@@ -2766,22 +2772,29 @@ class _MeterBar extends StatelessWidget {
   }
 }
 
-
-
-
 /// Settings › About credits: owner centred on top, then contributors in a horizontal row
-/// (avatar beside name and commit count). Each face opens that person's GitHub profile.
+/// (avatar beside name and commit count). Each face opens that person's GitHub profile; the one
+/// the keys and the pad are on ([ContributorsGridRow.selected]) carries the row's focus fill.
 class _ContributorsGrid extends StatelessWidget {
-  const _ContributorsGrid({required this.kind, required this.model, required this.scale});
+  const _ContributorsGrid({
+    required this.kind,
+    required this.focused,
+    required this.scale,
+    required this.onTap,
+    required this.onHover,
+  });
 
   final ContributorsGridRow kind;
-  final AppModel model;
+
+  /// The row has the focus: the selected face shows it.
+  final bool focused;
   final double scale;
+  final VoidCallback onTap;
+  final VoidCallback onHover;
 
   @override
   Widget build(BuildContext context) {
-    final open = model.services.openUrl;
-    void openUrl(String url) => open?.call(Uri.parse(url));
+    final ink = LookScope.focusedInk(context);
 
     Widget avatar(String url, String name, double size) {
       final letter = T.initial(name);
@@ -2791,7 +2804,10 @@ class _ContributorsGrid extends StatelessWidget {
           child: Text(letter, style: AppText.display(size * 0.36, weight: FontWeight.w700)),
         ),
       );
-      if (url.isEmpty) return ClipOval(child: SizedBox.square(dimension: size, child: fallback));
+      if (url.isEmpty)
+        return ClipOval(
+          child: SizedBox.square(dimension: size, child: fallback),
+        );
       return ClipOval(
         child: Image.network(
           url,
@@ -2803,6 +2819,26 @@ class _ContributorsGrid extends StatelessWidget {
       );
     }
 
+    /// Face [index]: a click opens it, the pointer over it moves the focus there.
+    Widget face(int index, Widget Function(Color strong, Color soft, bool hovering) child) {
+      final selected = focused && kind.selected == index;
+      return _FaceFocus(
+        key: ValueKey('contributor-$index'),
+        focused: selected,
+        ink: ink,
+        scale: scale,
+        onTap: () {
+          kind.select(index);
+          onTap();
+        },
+        onHover: () {
+          kind.select(index);
+          onHover();
+        },
+        child: child,
+      );
+    }
+
     final ownerSize = 72 * scale;
     final chipSize = 44 * scale;
 
@@ -2811,40 +2847,37 @@ class _ContributorsGrid extends StatelessWidget {
       child: Column(
         children: [
           // Owner: centred, more weight.
-          Pressable(
-            onTap: open == null ? null : () => openUrl(kind.owner.htmlUrl),
-            pressScale: 0.97,
-            builder: (context, hovering) {
-              return Column(
-                children: [
-                  Text(
-                    T.text('madeBy'),
-                    style: AppText.display(13 * scale, weight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.55)),
+          face(
+            0,
+            (strong, soft, hovering) => Column(
+              children: [
+                Text(
+                  T.text('madeBy'),
+                  style: AppText.display(13 * scale, weight: FontWeight.w600, color: soft),
+                ),
+                SizedBox(height: 10 * scale),
+                Container(
+                  width: ownerSize,
+                  height: ownerSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: hovering ? 0.5 : 0.35),
+                        blurRadius: 14 * scale,
+                        offset: Offset(0, 5 * scale),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 10 * scale),
-                  Container(
-                    width: ownerSize,
-                    height: ownerSize,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: hovering ? 0.5 : 0.35),
-                          blurRadius: 14 * scale,
-                          offset: Offset(0, 5 * scale),
-                        ),
-                      ],
-                    ),
-                    child: avatar(kind.owner.avatarUrl, kind.owner.login, ownerSize),
-                  ),
-                  SizedBox(height: 10 * scale),
-                  Text(
-                    kind.owner.login,
-                    style: AppText.display(15 * scale, weight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.92)),
-                  ),
-                ],
-              );
-            },
+                  child: avatar(kind.owner.avatarUrl, kind.owner.login, ownerSize),
+                ),
+                SizedBox(height: 10 * scale),
+                Text(
+                  kind.owner.login,
+                  style: AppText.display(15 * scale, weight: FontWeight.w600, color: strong),
+                ),
+              ],
+            ),
           ),
           if (kind.people.isNotEmpty) ...[
             SizedBox(height: 22 * scale),
@@ -2859,61 +2892,129 @@ class _ContributorsGrid extends StatelessWidget {
               spacing: 22 * scale,
               runSpacing: 14 * scale,
               children: [
-                for (final person in kind.people)
-                  Pressable(
-                    onTap: open == null ? null : () => openUrl(person.htmlUrl),
-                    pressScale: 0.97,
-                    builder: (context, hovering) {
-                      return AnimatedContainer(
-                        duration: Motion.focus,
-                        curve: Motion.settle,
-                        transform: Matrix4.translationValues(0, hovering ? -1.5 * scale : 0, 0),
-                        padding: EdgeInsets.symmetric(horizontal: 6 * scale, vertical: 4 * scale),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: chipSize,
-                              height: chipSize,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.3),
-                                    blurRadius: 8 * scale,
-                                    offset: Offset(0, 3 * scale),
-                                  ),
-                                ],
-                              ),
-                              child: avatar(person.avatarUrl, person.login, chipSize),
-                            ),
-                            SizedBox(width: 10 * scale),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  person.login,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppText.display(13 * scale, weight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.92)),
-                                ),
-                                SizedBox(height: 2 * scale),
-                                Text(
-                                  '${person.contributions} commits',
-                                  style: AppText.display(11 * scale, color: Colors.white.withValues(alpha: 0.48)),
+                for (final (index, person) in kind.people.indexed)
+                  face(
+                    index + 1,
+                    (strong, soft, hovering) => AnimatedContainer(
+                      duration: Motion.focus,
+                      curve: Motion.settle,
+                      transform: Matrix4.translationValues(0, hovering ? -1.5 * scale : 0, 0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: chipSize,
+                            height: chipSize,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.3),
+                                  blurRadius: 8 * scale,
+                                  offset: Offset(0, 3 * scale),
                                 ),
                               ],
                             ),
-                          ],
-                        ),
-                      );
-                    },
+                            child: avatar(person.avatarUrl, person.login, chipSize),
+                          ),
+                          SizedBox(width: 10 * scale),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                person.login,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppText.display(13 * scale, weight: FontWeight.w600, color: strong),
+                              ),
+                              SizedBox(height: 2 * scale),
+                              Text(
+                                T.format(person.contributions == 1 ? 'contributorCommitsOne' : 'contributorCommits', [
+                                  T.number(person.contributions),
+                                ]),
+                                style: AppText.display(11 * scale, color: soft),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
               ],
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// One face of About's credits with the focus fill a row has (the white chip, Glass's bright
+/// ice), its words in the focused ink while it has it.
+class _FaceFocus extends StatelessWidget {
+  const _FaceFocus({
+    super.key,
+    required this.focused,
+    required this.ink,
+    required this.scale,
+    required this.onTap,
+    required this.onHover,
+    required this.child,
+  });
+
+  final bool focused;
+  final Color ink;
+  final double scale;
+  final VoidCallback onTap;
+  final VoidCallback onHover;
+  final Widget Function(Color strong, Color soft, bool hovering) child;
+
+  @override
+  Widget build(BuildContext context) {
+    final glass = LookScope.isGlass(context);
+    final padding = EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 8 * scale);
+    return Pressable(
+      onTap: onTap,
+      onHover: onHover,
+      pressScale: 0.97,
+      builder: (context, hovering) => TweenAnimationBuilder<double>(
+        tween: Tween(end: focused ? 1 : 0),
+        duration: Motion.focus,
+        curve: Motion.settle,
+        builder: (context, t, _) {
+          final strong = Color.lerp(Colors.white.withValues(alpha: 0.92), ink, t)!;
+          final soft = Color.lerp(Colors.white.withValues(alpha: 0.5), ink.withValues(alpha: 0.6), t)!;
+          final content = child(strong, soft, hovering);
+          if (glass) {
+            return IceSurface(
+              radius: 14 * scale,
+              focused: focused,
+              shadow: false,
+              sweep: true,
+              hover: hovering,
+              opacity: 0,
+              rim: 0,
+              sheen: false,
+              padding: padding,
+              child: content,
+            );
+          }
+          return Container(
+            padding: padding,
+            decoration: BoxDecoration(
+              color: Color.lerp(Colors.white.withValues(alpha: hovering ? 0.06 : 0), Colors.white, t),
+              borderRadius: BorderRadius.circular(14 * scale),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.22 * t),
+                  blurRadius: 16 * scale,
+                ),
+              ],
+            ),
+            child: content,
+          );
+        },
       ),
     );
   }
