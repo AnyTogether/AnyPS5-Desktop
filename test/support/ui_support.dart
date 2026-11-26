@@ -18,6 +18,7 @@ import 'package:anyps5_desktop/core/desktop/window_backdrop.dart';
 import 'package:anyps5_desktop/core/font_download.dart';
 import 'package:anyps5_desktop/core/game_deletion.dart';
 import 'package:anyps5_desktop/core/game_library.dart';
+import 'package:anyps5_desktop/core/github_contributors.dart';
 import 'package:anyps5_desktop/core/gamepad/pad_navigation.dart';
 import 'package:anyps5_desktop/core/host.dart';
 import 'package:anyps5_desktop/core/package_install.dart';
@@ -181,6 +182,7 @@ Fixture makeFixture({
   Future<String?> Function(String label, List<String> extensions)? pickFile,
   HostSystem system = HostSystem.linux,
   GitHubReleases? launcherReleases,
+  GithubContributors? contributors,
   PackageManager? packageManager,
   Future<void> Function(String executable, List<String> arguments)? startDetached,
   void Function(int code)? quit,
@@ -292,6 +294,7 @@ Fixture makeFixture({
       saveFileAs: saveFileAs,
       pickFile: pickFile,
       launcherReleases: launcherReleases,
+      contributors: contributors,
       // Not the test machine's own install: a package manager only when a test says so.
       packageManager: () => packageManager,
       startDetached: startDetached,

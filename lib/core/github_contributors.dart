@@ -27,12 +27,9 @@ class GithubContributor {
 
 /// Contributors of a GitHub repository, read from the public API the same way releases are.
 class GithubContributors {
-  GithubContributors({
-    Uri? api,
-    this.repository = defaultRepository,
-    HttpClient Function()? client,
-  })  : api = api ?? Uri.parse('https://api.github.com'),
-        _client = client ?? HttpClient.new;
+  GithubContributors({Uri? api, this.repository = defaultRepository, HttpClient Function()? client})
+    : api = api ?? Uri.parse('https://api.github.com'),
+      _client = client ?? HttpClient.new;
 
   static const defaultRepository = 'AnyTogether/AnyPS5-Desktop';
 
@@ -65,8 +62,7 @@ class GithubContributors {
       if (json is! List<dynamic>) return const [];
       return [
         for (final entry in json)
-          if (entry is Map<String, dynamic>)
-            GithubContributor.fromJson(entry),
+          if (entry is Map<String, dynamic>) GithubContributor.fromJson(entry),
       ].where((c) => c.login.isNotEmpty && !c.login.endsWith('[bot]')).toList();
     } on Object {
       return const [];
