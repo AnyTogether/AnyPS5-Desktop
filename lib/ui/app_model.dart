@@ -6626,9 +6626,126 @@ class AppModel extends ChangeNotifier {
     ];
   }
 
+  /// Settings › each section: puts that section's preferences back to their defaults. Folders,
+  /// language, profile name, sign-in and installed engines are left alone.
+  void resetSettingsSection(String section) {
+    switch (section) {
+      case 'appearance':
+        preferences
+          ..theme = LookStyle.cosmic.index
+          ..accent = null
+          ..customTheme = null
+          ..backdrop = 'theme'
+          ..backdropFile = null
+          ..menuMusicFile = null
+          ..gameArtwork = true
+          ..reducedMotion = false
+          ..reduceTransparency = false
+          ..glassTooSlow = false
+          ..glassTransparency = null
+          ..glassArtwork = false
+          ..launcherFullscreen = null
+          ..windowButtons = true;
+        Motion.reduced = powerWatch.dimmed;
+        unawaited(applyLauncherWindow());
+        _publishLook();
+      case 'library':
+        preferences
+          ..prepareNewGames = true
+          ..retroLibrary = false
+          ..showRetroFolders = false
+          ..retroHostPs1 = false
+          ..retroHostPs2 = false;
+        // Games folders and emulator paths stay: restoring those would empty the library.
+        rescan();
+      case 'phone':
+        preferences
+          ..phoneServer = true
+          ..browserPlay = true
+          ..browserPlayAlways = false;
+        unawaited(startPhoneServer());
+      case 'general':
+        preferences
+          ..sounds = true
+          ..soundVolume = null
+          ..musicVolume = null
+          ..launcherVolume = null
+          ..controllerVibration = true
+          ..hideWhilePlaying = false
+          ..pauseOnMenu = true
+          ..showHiddenTrophies = false
+          ..checkUpdates = true
+          ..discordPresence = true
+          ..discordJoin = true
+          ..nowPlayingCard = true
+          ..nowPlayingShare = false
+          ..friendsJoin = true;
+        haptics.enabled = true;
+        _applySound();
+      case 'steam':
+        preferences
+          ..steamUser = null
+          ..steamGames = false
+          ..steamFullscreen = true;
+      case 'controllers':
+        preferences
+          ..controllerLight = null
+          ..confirmCircle = false
+          ..stickDeadzone = 0
+          ..assistPlayerOne = null;
+        _applyPadPreferences();
+        controllers.applyLights();
+      case 'displayDefaults':
+        preferences.displayDefaults = const DisplayDefaults();
+      case 'power':
+        preferences
+          ..powerProfiles = null
+          ..heatReader = false;
+      case 'presets':
+        setGamePresets(const GamePresets());
+        // setGamePresets already saves and notifies.
+        show(T.text('settingsResetSectionDone'));
+        return;
+      case 'captures':
+        preferences
+          ..replayBuffer = false
+          ..replaySeconds = ReplayBuffer.defaultLength
+          ..screenshotsFolder = null
+          ..waylandRestoreToken = '';
+        unawaited(_stopReplay());
+      case 'shortcuts':
+        preferences.shortcuts = ShortcutMap();
+      default:
+        return;
+    }
+    savePreferences();
+    show(T.text('settingsResetSectionDone'));
+  }
+
+  PanelRow _settingsSectionReset(String section) => PanelRow(
+    id: 'reset-$section',
+    title: T.text('settingsResetSection'),
+    detail: T.text('settingsResetSectionDetail'),
+    kind: ActionRow(() => resetSettingsSection(section), destructive: true),
+  );
+
+  /// Sections whose preferences this restores. Others already have their own reset row (presets,
+  /// shortcuts) or only show accounts, engines and status (about, together, profiles, …).
+  static const _settingsSectionsWithReset = {
+    'appearance',
+    'library',
+    'phone',
+    'general',
+    'steam',
+    'controllers',
+    'displayDefaults',
+    'power',
+    'captures',
+  };
+
   List<PanelCategory> _settingsCategories() {
     final kit = toolkit;
-    return [
+    final sections = [
       PanelCategory(
         id: 'appearance',
         title: T.text('appearance'),
@@ -6984,6 +7101,17 @@ class AppModel extends ChangeNotifier {
           ),
         ],
       ),
+    ];
+    return [
+      for (final section in sections)
+        if (_settingsSectionsWithReset.contains(section.id))
+          PanelCategory(
+            id: section.id,
+            title: section.title,
+            rows: [...section.rows, _settingsSectionReset(section.id)],
+          )
+        else
+          section,
     ];
   }
 

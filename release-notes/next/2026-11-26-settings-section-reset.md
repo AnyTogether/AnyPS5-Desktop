@@ -1,0 +1,1 @@
+- **Restore all in each Settings section.** Appearance, Game Library, Phones, Behaviour (General), Steam, Controllers, Default Display, Battery & Heat, and Captures each gain a Restore all row that puts that section back to its defaults. Games folders, language, profile name, accounts and engines are left alone. Shortcuts and Game presets already had their own reset rows.
