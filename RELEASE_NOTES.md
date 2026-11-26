@@ -11,6 +11,31 @@ section is copied into the release.
 
 Nothing yet.
 
+## 0.1.31
+
+- **The PS2 emulator is a download of its own.** Settings › Emulators shows Download the PS2
+  emulator right under the PS1 emulator once the installed emulator host's release has one, so a
+  player who plays only PS1 games never downloads it. anyps5-retro-host 1.2.0 is the first signed
+  release with LRPS2: on an older host, select the PS1 emulator row to update it first. The PS2
+  emulator comes from the same signed release as the PS1 emulator, is checked with it before every
+  game, and updates with it. The first time it is added, Run PS2 games in the separate host turns
+  on, and PS2 discs from the emulator library play in the launcher's window. LRPS2 starts only with
+  a PS2 BIOS you dumped yourself, in the PS2 BIOS folder. Remove the PS2 emulator deletes it again
+  and keeps the PS2 BIOS, memory cards and save states. By B-Howell.
+- **Stall reports say how long the launcher froze and what it was doing.** While the launcher does
+  not answer, its report is updated every 5 seconds. One that recovered reads "did not answer for
+  19 s from ... then recovered by itself", and one that never did is titled "Launcher stopped
+  responding (20s+, never recovered)". A new field shows the interface thread at the 5-second mark:
+  whether it was busy on the CPU or waiting, its stack on Windows, and its state and system call on
+  Linux. Nothing is read from it while the launcher answers. Thanks to Harris851, whose reports
+  (issues #152 and #181) showed what was missing.
+- **Restore all in each Settings section.** Appearance, Game Library, Emulators, Phones, Behaviour
+  (General), Steam, Controllers, Default Display, Battery & Heat, and Captures each gain a Restore
+  all row that puts that section back to its defaults, at once for what is running (the clip
+  buffer, the power profiles, Discord). Games folders, emulator programs, language, profile name,
+  Save Sync, accounts and engines are left alone. Shortcuts and Game presets already had their own
+  reset rows. In every language, and on the Mac too. By Lenny4250gh.
+
 ## 0.1.30
 
 - **Linux: a device that hangs when opened no longer freezes the launcher.** On some HP laptops
