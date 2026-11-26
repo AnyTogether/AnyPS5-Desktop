@@ -21,6 +21,7 @@ import 'core/desktop/windows_desktop.dart';
 import 'core/controllers/pad_reader.dart';
 import 'core/controllers/troubleshooter.dart';
 import 'core/app_update.dart';
+import 'core/artwork_cache.dart';
 import 'core/child_processes.dart';
 import 'core/ffmpeg_download.dart' show FfmpegBuild;
 import 'core/github_contributors.dart';
@@ -59,6 +60,7 @@ late final AppLifecycleListener _exit;
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
   final paths = AppPaths.forSystem(HostSystem.current);
+  ArtworkCache.instance.folder = paths.artworkCache;
   final relayFile = LinkRelay.fileIn(paths.config);
   // A theme file opened while a launcher already runs goes to that one (as anyps5:// links do);
   // this one quits before it shows a window.

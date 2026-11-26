@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import '../core/artwork_cache.dart';
 import 'glass.dart';
 import 'strings.dart';
 import 'theme.dart';
@@ -1128,11 +1129,16 @@ class WithBackPill extends StatelessWidget {
 /// decoded away from the interface (FileImage), and the decoded picture stays in the image cache,
 /// so going back to a game shows it at once, without a disk read in the middle of a frame.
 class ArtworkImage extends StatelessWidget {
-  const ArtworkImage({super.key, required this.path, this.fit = BoxFit.cover, this.cacheWidth});
+  const ArtworkImage({super.key, required this.path, this.fit = BoxFit.cover, this.cacheWidth, this.background = false});
 
   final String path;
   final BoxFit fit;
   final int? cacheWidth;
+
+  /// A game's wide background (pic0.png): drawn from the lighter copy the [ArtworkCache] makes
+  /// away from the interface, and faded in once it is there. The original is never decoded
+  /// while a frame waits for it.
+  final bool background;
 
   /// Tests read the file on the spot: their fake clock never lets a file read in the
   /// background finish while a frame waits for it.
@@ -1160,19 +1166,50 @@ class ArtworkImage extends StatelessWidget {
 
   /// Decodes [path] ahead of time (the games beside the selected one), so its picture is ready
   /// when the selection gets there.
-  static void warm(BuildContext context, String? path, {int? cacheWidth}) {
+  ///
+  /// A [background] is decoded from its lighter copy, once that is made.
+  static void warm(BuildContext context, String? path, {int? cacheWidth, bool background = false}) {
     if (path == null) return;
+    if (background && ArtworkCache.instance.active) {
+      unawaited(
+        ArtworkCache.instance.ensure(path).then((shown) {
+          if (context.mounted) precacheImage(provider(shown, cacheWidth), context, onError: (_, _) {}).ignore();
+        }),
+      );
+      return;
+    }
     unawaited(precacheImage(provider(path, cacheWidth), context, onError: (_, _) {}));
   }
 
+  Widget _image(String file) => Image(
+    image: provider(file, cacheWidth),
+    fit: fit,
+    gaplessPlayback: true,
+    filterQuality: FilterQuality.medium,
+    errorBuilder: (context, error, stack) => const SizedBox.shrink(),
+  );
+
   @override
   Widget build(BuildContext context) {
-    return Image(
-      image: provider(path, cacheWidth),
-      fit: fit,
-      gaplessPlayback: true,
-      filterQuality: FilterQuality.medium,
-      errorBuilder: (context, error, stack) => const SizedBox.shrink(),
+    final cache = ArtworkCache.instance;
+    if (!background || !cache.active) return _image(path);
+    return ListenableBuilder(
+      listenable: cache,
+      builder: (context, _) {
+        final shown = cache.pathFor(path);
+        if (shown == null) {
+          // Not made yet: nothing is drawn (the theme shows through) and the copy is asked for.
+          unawaited(cache.ensure(path));
+          return const SizedBox.expand();
+        }
+        return TweenAnimationBuilder<double>(
+          key: ValueKey(shown),
+          tween: Tween(begin: 0, end: 1),
+          duration: const Duration(milliseconds: 300),
+          builder: (context, t, child) => Opacity(opacity: t, child: child),
+          child: _image(shown),
+        );
+      },
     );
   }
 }

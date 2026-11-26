@@ -72,7 +72,7 @@ class _CoverBody extends StatelessWidget {
               children: [
                 if (background != null)
                   game.background != null
-                      ? ArtworkImage(path: background, cacheWidth: 1920)
+                      ? ArtworkImage(path: background, cacheWidth: 1920, background: true)
                       // No wide artwork: the icon, enlarged and blurred.
                       : ImageFiltered(
                           imageFilter: ui.ImageFilter.blur(sigmaX: 36, sigmaY: 36, tileMode: TileMode.clamp),
