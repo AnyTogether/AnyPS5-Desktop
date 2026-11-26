@@ -2804,10 +2804,11 @@ class _ContributorsGrid extends StatelessWidget {
           child: Text(letter, style: AppText.display(size * 0.36, weight: FontWeight.w700)),
         ),
       );
-      if (url.isEmpty)
+      if (url.isEmpty) {
         return ClipOval(
           child: SizedBox.square(dimension: size, child: fallback),
         );
+      }
       return ClipOval(
         child: Image.network(
           url,
