@@ -416,6 +416,25 @@ void main() {
       await shoot(tester, 'glass_settings_tr');
     });
 
+    testWidgets('settings: the focused section\'s glow has room on its left, as on its right', (tester) async {
+      fixture = makeFixture(theme: 3);
+      final model = fixture.model;
+      model.open(Layer.settings);
+      model.panelSections = true;
+      await pumpLauncher(tester, model);
+      final tab = find.byKey(ValueKey('section-${model.panelCategories()[model.panelCategory].id}'));
+      final scroll = find.ancestor(of: tab, matching: find.byType(SingleChildScrollView)).first;
+      final room = tester.getTopLeft(tab).dx - tester.getTopLeft(scroll).dx;
+      expect(room, greaterThanOrEqualTo(14), reason: 'the scrolling box must not cut the glow on the left');
+      final column = find.ancestor(of: tab, matching: find.byType(OverflowBox)).first;
+      final scale = LayoutScale.of(tester.element(tab));
+      expect(
+        tester.getTopLeft(tab).dx - tester.getTopLeft(column).dx,
+        moreOrLessEquals(3 * scale),
+        reason: 'the tabs stay where they were',
+      );
+    });
+
     testWidgets('friends', (tester) async {
       fixture = makeFixture(theme: 3);
       final model = fixture.model;

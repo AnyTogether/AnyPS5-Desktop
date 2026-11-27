@@ -457,7 +457,10 @@ class _CategoryListState extends State<_CategoryList> {
     final scale = LayoutScale.of(context);
     final model = widget.model;
     final categories = widget.categories;
-    return RawScrollbar(
+    // The focus glow reaches past the tabs: as far to the left, in the panel's own margin, as the
+    // room the bar leaves on the right. The tabs stay where they are, at the top of the column.
+    final glow = 14 * scale;
+    final list = RawScrollbar(
       controller: _scroll,
       thumbVisibility: true,
       interactive: true,
@@ -475,7 +478,7 @@ class _CategoryListState extends State<_CategoryList> {
         child: SingleChildScrollView(
           controller: _scroll,
           // Room for the bar beside the tabs and their focus ring.
-          padding: EdgeInsetsDirectional.fromSTEB(3 * scale, 3 * scale, 14 * scale, 3 * scale),
+          padding: EdgeInsetsDirectional.fromSTEB(3 * scale + glow, 3 * scale, 14 * scale, 3 * scale),
           child: Column(
             children: [
               for (var index = 0; index < categories.length; index++)
@@ -494,6 +497,14 @@ class _CategoryListState extends State<_CategoryList> {
             ],
           ),
         ),
+      ),
+    );
+    return LayoutBuilder(
+      builder: (context, box) => OverflowBox(
+        alignment: AlignmentDirectional.topEnd,
+        minWidth: box.maxWidth + glow,
+        maxWidth: box.maxWidth + glow,
+        child: list,
       ),
     );
   }
