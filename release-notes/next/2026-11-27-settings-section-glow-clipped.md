@@ -1,0 +1,1 @@
+- **The glow around the focused Settings section is no longer cut off on its left.** With a controller on the section list, the glow spread freely on the right but was clipped by the list's edge on the left. The list now has room for it on both sides, and the tabs stay where they were.
