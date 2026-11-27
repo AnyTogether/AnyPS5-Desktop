@@ -20,30 +20,34 @@ double rms(Iterable<double> samples) {
 
 void main() {
   group('Tones', () {
-    test('every cue is as long as its partials and 20 ms more, as on the Mac', () {
+    test('every cue is as long as its partials and 20 ms more', () {
       expect(
         {for (final cue in Cue.values) cue: Tones.render(cue).length},
         {
-          Cue.move: 2866,
-          Cue.select: 7497,
-          Cue.back: 6835,
-          Cue.unlocked: 22050,
-          Cue.ring: 21168,
-          Cue.bump: 3528,
-          Cue.hover: 2866,
+          Cue.move: 5733,
+          Cue.select: 12348,
+          Cue.back: 12348,
+          Cue.unlocked: 37926,
+          Cue.ring: 30869,
+          Cue.bump: 5733,
+          Cue.hover: 5733,
         },
       );
     });
 
-    test('the Mac sample values: a sine with a 4 ms attack and a fast decay', () {
+    test('the sample values: F4 with its octave below and above, a rounded 16 ms rise, a fast decay', () {
       final move = Tones.render(Cue.move);
       expect(move[0], 0);
-      // 1 ms in: a quarter of the attack, 1320 Hz and its octave.
-      const time = 44 / 44100;
+      // 10 ms in: 349 Hz, the octave below it (the body) and the octave above it (a trace).
+      const time = 441 / 44100;
+      final rise = math.sin(math.pi / 2 * time / 0.016);
       final expected =
-          math.sin(2 * math.pi * 1320 * time) * (time / 0.004) * math.exp(-time * 70) * 0.5 +
-          math.sin(4 * math.pi * 1320 * time) * (time / 0.004) * math.exp(-time * 70 * 1.6) * 0.12;
-      expect(move[44], closeTo(expected, 1e-6));
+          (math.sin(2 * math.pi * 349 * time) * math.exp(-time * 26) * 0.46 +
+              math.sin(math.pi * 349 * time) * math.exp(-time * 26 * 0.8) * 0.28 +
+              math.sin(4 * math.pi * 349 * time) * math.exp(-time * 26 * 1.8) * 0.08) *
+          rise *
+          rise;
+      expect(move[441], closeTo(expected, 1e-6));
     });
 
     test('no cue clips, each rises within its attack, dies away and ends in silence', () {
@@ -52,18 +56,47 @@ void main() {
         final peak = samples.map((sample) => sample.abs()).reduce(math.max);
         expect(peak, lessThan(1), reason: '$cue');
         expect(peak, greaterThan(0.2), reason: '$cue');
-        // The first 4 ms stay under the attack's line.
-        for (var frame = 0; frame < 176; frame++) {
-          expect(samples[frame].abs(), lessThanOrEqualTo(0.62 * 2 * frame / 176 + 1e-6), reason: '$cue at $frame');
+        // The first 16 ms stay under the attack's line: a rounded rise, no click.
+        const frames = 705;
+        for (var frame = 0; frame < frames; frame++) {
+          final rise = math.sin(math.pi / 2 * frame / frames);
+          expect(
+            samples[frame].abs(),
+            lessThanOrEqualTo(0.82 * (Tones.gains[cue] ?? 1) * rise * rise + 1e-6),
+            reason: '$cue at $frame',
+          );
         }
         // The last 20 ms are silent.
         final tail = samples.sublist(samples.length - 880);
         expect(tail.every((sample) => sample == 0), isTrue, reason: '$cue');
-        // The first partial alone, before the next one starts: its second half is quieter.
-        final (partials, _) = Tones.recipes[cue]!;
-        final alone = partials.length > 1 ? partials[1].$2 : partials.first.$3;
-        final half = (alone * 44100 / 2).floor();
-        expect(rms(samples.sublist(half, half * 2)), lessThan(rms(samples.sublist(0, half)) * 0.9), reason: '$cue');
+        // Each cue is quieter in its second half than in its first.
+        final half = samples.length ~/ 2;
+        expect(rms(samples.sublist(half)), lessThan(rms(samples.sublist(0, half)) * 0.9), reason: '$cue');
+      }
+    });
+
+    test('soft and deep like the PS5: almost all of every cue is under 1 kHz, none above 2 kHz', () {
+      for (final cue in Cue.values) {
+        final samples = Tones.render(cue);
+        var total = 0.0;
+        var low = 0.0;
+        var high = 0.0;
+        // A direct Fourier sum over the bins from 50 Hz to 4 kHz in 25 Hz steps.
+        for (var frequency = 50.0; frequency <= 4000; frequency += 25) {
+          var re = 0.0;
+          var im = 0.0;
+          for (var frame = 0; frame < samples.length; frame++) {
+            final angle = 2 * math.pi * frequency * frame / Tones.sampleRate;
+            re += samples[frame] * math.cos(angle);
+            im += samples[frame] * math.sin(angle);
+          }
+          final power = re * re + im * im;
+          total += power;
+          if (frequency < 1000) low += power;
+          if (frequency >= 2000) high += power;
+        }
+        expect(low / total, greaterThan(0.97), reason: '$cue');
+        expect(high / total, lessThan(0.001), reason: '$cue');
       }
     });
 
@@ -74,9 +107,9 @@ void main() {
       expect(bytes.getUint16(22, Endian.little), 2);
       expect(bytes.getUint32(24, Endian.little), 44100);
       expect(bytes.getUint16(34, Endian.little), 16);
-      expect(bytes.getUint32(40, Endian.little), 7497 * 4);
-      expect(wav.length, 44 + 7497 * 4);
-      for (var frame = 0; frame < 7497; frame += 97) {
+      expect(bytes.getUint32(40, Endian.little), 12348 * 4);
+      expect(wav.length, 44 + 12348 * 4);
+      for (var frame = 0; frame < 12348; frame += 97) {
         expect(bytes.getInt16(44 + frame * 4, Endian.little), bytes.getInt16(46 + frame * 4, Endian.little));
       }
     });
