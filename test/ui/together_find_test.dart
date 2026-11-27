@@ -4,9 +4,11 @@ import 'package:anyps5_desktop/core/together/account.dart';
 import 'package:anyps5_desktop/core/together/discover.dart';
 import 'package:anyps5_desktop/core/together/share_play.dart';
 import 'package:anyps5_desktop/ui/app_model.dart' hide GameState;
+import 'package:anyps5_desktop/ui/components.dart' show LayoutScale;
 import 'package:anyps5_desktop/ui/launcher.dart';
 import 'package:anyps5_desktop/ui/strings.dart';
 import 'package:anyps5_desktop/ui/together_model.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_together.dart';
@@ -175,6 +177,20 @@ void main() {
   });
 
   group('behaviour', () {
+    testWidgets('the few sections stay at the top of their column, where they were', (tester) async {
+      fixture = makeFixture();
+      model = fixture.model;
+      signedIn();
+      board();
+      model.open(Layer.findPlayers);
+      await pumpLauncher(tester, model);
+      final tab = find.byKey(ValueKey('section-${model.panelCategories().first.id}'));
+      final column = find.ancestor(of: tab, matching: find.byType(OverflowBox)).first;
+      final scale = LayoutScale.of(tester.element(tab));
+      expect(tester.getTopLeft(tab).dy - tester.getTopLeft(column).dy, moreOrLessEquals(3 * scale));
+      expect(tester.getTopLeft(tab).dx - tester.getTopLeft(column).dx, moreOrLessEquals(3 * scale));
+    });
+
     test('Friends offers Find players; a game\'s settings post for it; a parent\'s settings can keep it off', () {
       fixture = makeFixture();
       model = fixture.model;

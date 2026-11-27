@@ -426,6 +426,13 @@ void main() {
       final scroll = find.ancestor(of: tab, matching: find.byType(SingleChildScrollView)).first;
       final room = tester.getTopLeft(tab).dx - tester.getTopLeft(scroll).dx;
       expect(room, greaterThanOrEqualTo(14), reason: 'the scrolling box must not cut the glow on the left');
+      final column = find.ancestor(of: tab, matching: find.byType(OverflowBox)).first;
+      final scale = LayoutScale.of(tester.element(tab));
+      expect(
+        tester.getTopLeft(tab).dx - tester.getTopLeft(column).dx,
+        moreOrLessEquals(3 * scale),
+        reason: 'the tabs stay where they were',
+      );
     });
 
     testWidgets('friends', (tester) async {

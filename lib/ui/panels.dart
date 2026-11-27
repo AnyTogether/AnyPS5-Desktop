@@ -458,7 +458,7 @@ class _CategoryListState extends State<_CategoryList> {
     final model = widget.model;
     final categories = widget.categories;
     // The focus glow reaches past the tabs: as far to the left, in the panel's own margin, as the
-    // room the bar leaves on the right. The tabs stay where they are.
+    // room the bar leaves on the right. The tabs stay where they are, at the top of the column.
     final glow = 14 * scale;
     final list = RawScrollbar(
       controller: _scroll,
@@ -501,7 +501,7 @@ class _CategoryListState extends State<_CategoryList> {
     );
     return LayoutBuilder(
       builder: (context, box) => OverflowBox(
-        alignment: AlignmentDirectional.centerEnd,
+        alignment: AlignmentDirectional.topEnd,
         minWidth: box.maxWidth + glow,
         maxWidth: box.maxWidth + glow,
         child: list,
