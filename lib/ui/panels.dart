@@ -511,16 +511,20 @@ class _CategoryTab extends StatelessWidget {
   final String title;
   final bool selected;
 
-  /// The controller's focus is here (the sections' column): the ring around it.
+  /// The controller's focus is here (the sections' column): the ring around it. In Glass there is
+  /// no ring and no glow: the tab wears what the mouse's hover gives it.
   final bool focused;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final scale = LayoutScale.of(context);
+    final glass = LookScope.isGlass(context);
     return Padding(
       padding: EdgeInsets.only(bottom: 6 * scale),
-      child: FocusRing(focused: focused, radius: 12 * scale, width: 2.5 * scale, child: _tab(context, scale)),
+      child: glass
+          ? _tab(context, scale)
+          : FocusRing(focused: focused, radius: 12 * scale, width: 2.5 * scale, child: _tab(context, scale)),
     );
   }
 
@@ -530,26 +534,30 @@ class _CategoryTab extends StatelessWidget {
       return Pressable(
         onTap: onTap,
         pressScale: 0.985,
-        builder: (context, hovering) => IceSurface(
-          radius: 12 * scale,
-          shadow: false,
-          hover: hovering,
-          opacity: selected ? 0.3 : 0,
-          rim: selected ? 0.8 : (hovering ? 0.3 : 0),
-          sheen: selected || hovering,
-          width: double.infinity,
-          padding: EdgeInsets.symmetric(horizontal: 18 * scale, vertical: 13 * scale),
-          child: Text(
-            title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: AppText.display(
-              18 * scale,
-              weight: selected ? FontWeight.w600 : FontWeight.w400,
-              color: Colors.white.withValues(alpha: selected ? 1 : (hovering ? 0.9 : 0.72)),
+        builder: (context, hovering) {
+          // The controller's focus looks like the mouse's hover.
+          final lit = hovering || focused;
+          return IceSurface(
+            radius: 12 * scale,
+            shadow: false,
+            hover: lit,
+            opacity: selected ? 0.3 : 0,
+            rim: selected ? 0.8 : (lit ? 0.3 : 0),
+            sheen: selected || lit,
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(horizontal: 18 * scale, vertical: 13 * scale),
+            child: Text(
+              title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppText.display(
+                18 * scale,
+                weight: selected ? FontWeight.w600 : FontWeight.w400,
+                color: Colors.white.withValues(alpha: selected ? 1 : (lit ? 0.9 : 0.72)),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       );
     }
     return Pressable(

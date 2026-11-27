@@ -8,7 +8,7 @@ import 'package:anyps5_desktop/core/together/profiles.dart';
 import 'package:anyps5_desktop/core/trophies.dart';
 import 'package:anyps5_desktop/ui/app_model.dart';
 import 'package:anyps5_desktop/ui/background.dart';
-import 'package:anyps5_desktop/ui/components.dart' show LayoutScale;
+import 'package:anyps5_desktop/ui/components.dart' show FocusRing, LayoutScale;
 import 'package:anyps5_desktop/ui/glass.dart';
 import 'package:anyps5_desktop/ui/home.dart';
 import 'package:anyps5_desktop/ui/launcher.dart';
@@ -414,6 +414,24 @@ void main() {
       expect(find.text('Cam'), findsOneWidget);
       expect(find.text('Şeffaflığı azalt'), findsOneWidget);
       await shoot(tester, 'glass_settings_tr');
+    });
+
+    testWidgets('settings: the section a controller is on has no ring or glow, only the hover look', (tester) async {
+      fixture = makeFixture(theme: 3);
+      final model = fixture.model;
+      model.open(Layer.settings);
+      model.panelSections = true;
+      await pumpLauncher(tester, model);
+      final tab = find.byKey(ValueKey('section-${model.panelCategories()[model.panelCategory].id}'));
+      expect(find.descendant(of: tab, matching: find.byType(FocusRing)), findsNothing);
+      final surface = tester.widget<IceSurface>(find.descendant(of: tab, matching: find.byType(IceSurface)));
+      expect(surface.hover, isTrue, reason: 'the controller\'s focus is drawn as the mouse\'s hover');
+      expect(surface.focused, isFalse, reason: 'no bright chip and no glow');
+      model.panelSections = false;
+      model.refresh();
+      await tester.pump();
+      final resting = tester.widget<IceSurface>(find.descendant(of: tab, matching: find.byType(IceSurface)));
+      expect(resting.hover, isFalse);
     });
 
     testWidgets('friends', (tester) async {

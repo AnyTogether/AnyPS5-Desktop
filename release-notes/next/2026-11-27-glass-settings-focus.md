@@ -1,0 +1,1 @@
+- **In the Glass look, the Settings section a controller is on no longer glows.** The section list showed the controller's focus as a ring with an icy glow around the tab. The tab now looks the way it does when the mouse is over it, and the other looks keep their ring.
