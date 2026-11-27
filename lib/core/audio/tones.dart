@@ -13,8 +13,8 @@ typedef Partial = (double frequency, double start, double length);
 /// Soft interface sounds, synthesized: a short tick for moving, a rising pair for selecting, a
 /// falling one for going back, a rising three for something finished and two trills for a call.
 /// Shaped after the PS5's own: low and round, nearly everything under 1 kHz, built on F4 (349 Hz)
-/// with its octave below, a gentle rise and a soft fall, so no click and nothing sharp. They are no
-/// longer the macOS launcher's tones (Sounds.swift), which sat about two octaves higher.
+/// with its octave below, a gentle rise and a soft fall, so no click and nothing sharp. The macOS
+/// launcher's tones (Sounds.swift), sample for sample.
 abstract final class Tones {
   static const sampleRate = 44100;
 
