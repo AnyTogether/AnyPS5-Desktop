@@ -69,6 +69,89 @@ class ArtworkCache extends ChangeNotifier {
     unawaited(_work());
   }
 
+  /// Drops a remembered path when the file on disk no longer matches the one the copy was made
+  /// from (size or modification time changed). A library scan calls this so a picture replaced
+  /// while the launcher was running is re-copied instead of showing the old one until the next
+  /// start.
+  void forgetIfSourceChanged(String source) {
+    final done = _ready[source];
+    if (done == null || folder == null) return;
+    try {
+      final file = File(source);
+      final stat = file.statSync();
+      if (stat.type != FileSystemEntityType.file) {
+        _ready.remove(source);
+        return;
+      }
+      final key = _key(source, stat);
+      final expected = p.join(folder!, 'bg-$key.png');
+      if (done != source && done != expected) {
+        _ready.remove(source);
+        return;
+      }
+      // Was shown as itself (small enough then). If the header now says it needs a lighter copy,
+      // drop the answer so the next ensure or queue makes one.
+      if (done == source) {
+        final raf = file.openSync();
+        try {
+          final header = raf.readSync(33);
+          if (header.length < 33) return;
+          for (var i = 0; i < 8; i++) {
+            if (header[i] != PngReader.signature[i]) return;
+          }
+          final view = ByteData.sublistView(header);
+          if (view.getUint32(8) != 13) return;
+          if (String.fromCharCodes(header, 12, 16) != 'IHDR') return;
+          final pngWidth = view.getUint32(16);
+          final depth = header[24];
+          final interlace = header[28];
+          if (interlace != 0) return;
+          if (pngWidth > width || depth != 8) _ready.remove(source);
+        } finally {
+          raf.closeSync();
+        }
+      }
+    } on Object {
+      // Leave the remembered path if the file cannot be read.
+    }
+  }
+
+  /// Deletes lighter copies that no current game's background maps to, after a library scan.
+  /// Copies of removed games, or of pictures that were replaced (new key), do not stay in the
+  /// cache forever.
+  void purgeUnused(Iterable<String?> sources) {
+    final target = folder;
+    if (target == null) return;
+    final dir = Directory(target);
+    if (!dir.existsSync()) return;
+    final keep = <String>{};
+    for (final source in sources) {
+      if (source == null) continue;
+      try {
+        final file = File(source);
+        final stat = file.statSync();
+        if (stat.type != FileSystemEntityType.file) continue;
+        keep.add('bg-${_key(source, stat)}.png');
+      } on Object {
+        // Skip a source that cannot be read.
+      }
+    }
+    for (final entity in dir.listSync()) {
+      if (entity is! File) continue;
+      final name = p.basename(entity.path);
+      if (name.startsWith('bg-') && name.endsWith('.png') && !keep.contains(name)) {
+        try {
+          entity.deleteSync();
+        } on Object {
+          // Best-effort: a file still open or already gone is left.
+        }
+      }
+    }
+  }
+
+  String _key(String source, FileStat stat) =>
+      sha1.convert('v1|$source|${stat.size}|${stat.modified.millisecondsSinceEpoch}|$width'.codeUnits).toString();
+
   Future<void> _work() async {
     if (_working) return;
     _working = true;
@@ -107,11 +190,32 @@ class ArtworkCache extends ChangeNotifier {
       final key = sha1.convert('v1|$source|${stat.size}|${stat.modified.millisecondsSinceEpoch}|$width'.codeUnits);
       final copy = File(p.join(folder, 'bg-$key.png'));
       if (copy.existsSync() && copy.lengthSync() > 0) return copy.path;
+
+      // Only the PNG signature and IHDR (33 bytes) are needed to know if the picture is already
+      // small enough; a 4K file is not read in full only to be left alone.
+      final raf = file.openSync();
+      try {
+        final header = raf.readSync(33);
+        if (header.length < 33) return source;
+        for (var i = 0; i < 8; i++) {
+          if (header[i] != PngReader.signature[i]) return source;
+        }
+        final view = ByteData.sublistView(header);
+        if (view.getUint32(8) != 13) return source; // IHDR data length
+        if (String.fromCharCodes(header, 12, 16) != 'IHDR') return source;
+        final pngWidth = view.getUint32(16);
+        final depth = header[24];
+        final interlace = header[28];
+        if (interlace != 0) return source;
+        // Small and plain enough to be decoded cheaply as it is.
+        if (pngWidth <= width && depth == 8) return source;
+      } finally {
+        raf.closeSync();
+      }
+
       final bytes = file.readAsBytesSync();
       final png = PngReader.read(bytes);
       if (png == null) return source;
-      // Small and plain enough to be decoded cheaply as it is.
-      if (png.width <= width && png.depth == 8) return source;
       final scaled = png.scaled(width);
       final encoded = PngEncoder.rgba(scaled.width, scaled.height, scaled.rgba);
       Directory(folder).createSync(recursive: true);
@@ -149,13 +253,13 @@ class PngReader {
   final Uint8List? _palette;
   final Uint8List _data;
 
-  static const _signature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+  static const signature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
   /// The PNG in [bytes], or null when it is not one this reads.
   static PngReader? read(Uint8List bytes) {
     if (bytes.length < 33) return null;
     for (var i = 0; i < 8; i++) {
-      if (bytes[i] != _signature[i]) return null;
+      if (bytes[i] != signature[i]) return null;
     }
     final view = ByteData.sublistView(bytes);
     var offset = 8;

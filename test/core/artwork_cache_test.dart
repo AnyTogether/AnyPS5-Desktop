@@ -179,4 +179,29 @@ void main() {
       expect(cache.pathFor('a.png'), 'a.png');
     });
   });
+
+  test('forgetIfSourceChanged drops a path when the file on disk has a new key', () async {
+    final source = picture('pic0.png', PngEncoder.rgba(40, 20, _rgba(40, 20, (x, y) => [10, 10, 10])));
+    final folder = p.join(temp.path, 'cache');
+    final cache = ArtworkCache(folder: folder, width: 10);
+    final first = await cache.ensure(source.path);
+    expect(cache.pathFor(source.path), first);
+    source.writeAsBytesSync(PngEncoder.rgba(40, 24, _rgba(40, 24, (x, y) => [200, 10, 10])));
+    cache.forgetIfSourceChanged(source.path);
+    expect(cache.pathFor(source.path), isNull);
+  });
+
+  test('purgeUnused deletes copies that no current source maps to', () async {
+    final kept = picture('kept.png', PngEncoder.rgba(40, 20, _rgba(40, 20, (x, y) => [1, 2, 3])));
+    final gone = picture('gone.png', PngEncoder.rgba(40, 20, _rgba(40, 20, (x, y) => [4, 5, 6])));
+    final folder = p.join(temp.path, 'cache');
+    final cache = ArtworkCache(folder: folder, width: 10);
+    final keptCopy = await cache.ensure(kept.path);
+    final goneCopy = await cache.ensure(gone.path);
+    expect(File(keptCopy).existsSync(), isTrue);
+    expect(File(goneCopy).existsSync(), isTrue);
+    cache.purgeUnused([kept.path]);
+    expect(File(keptCopy).existsSync(), isTrue);
+    expect(File(goneCopy).existsSync(), isFalse);
+  });
 }
