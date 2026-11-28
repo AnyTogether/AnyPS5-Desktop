@@ -1,0 +1,1 @@
+- **A game's background drifts smoothly again.** The slow zoom of the selected game's picture had started to move in small steps, like a stuttering video, since the picture is drawn from its lighter copy. The picture is now drawn by itself while it zooms, as it was before, and is only faded in when it had to wait for its copy.

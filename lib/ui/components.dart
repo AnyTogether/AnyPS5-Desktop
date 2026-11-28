@@ -1128,7 +1128,7 @@ class WithBackPill extends StatelessWidget {
 /// A game's picture from its file, decoded at about the size it is shown. The file is read and
 /// decoded away from the interface (FileImage), and the decoded picture stays in the image cache,
 /// so going back to a game shows it at once, without a disk read in the middle of a frame.
-class ArtworkImage extends StatelessWidget {
+class ArtworkImage extends StatefulWidget {
   const ArtworkImage({super.key, required this.path, this.fit = BoxFit.cover, this.cacheWidth, this.background = false});
 
   final String path;
@@ -1136,8 +1136,8 @@ class ArtworkImage extends StatelessWidget {
   final int? cacheWidth;
 
   /// A game's wide background (pic0.png): drawn from the lighter copy the [ArtworkCache] makes
-  /// away from the interface, and faded in once it is there. The original is never decoded
-  /// while a frame waits for it.
+  /// away from the interface, and faded in when it had to wait for that copy. The original is
+  /// never decoded while a frame waits for it.
   final bool background;
 
   /// Tests read the file on the spot: their fake clock never lets a file read in the
@@ -1181,9 +1181,20 @@ class ArtworkImage extends StatelessWidget {
     unawaited(precacheImage(provider(path, cacheWidth), context, onError: (_, _) {}));
   }
 
+  @override
+  State<ArtworkImage> createState() => _ArtworkImageState();
+}
+
+class _ArtworkImageState extends State<ArtworkImage> {
+  /// Set while the picture waits for its copy and until its fade-in is over. Only then is
+  /// anything wrapped around the image: a background that drifts (GameArtwork scales it every
+  /// frame) must be drawn by the image alone. With an opacity layer between the scale and the
+  /// image the drift moved in whole-pixel steps instead of smoothly.
+  bool _fading = false;
+
   Widget _image(String file) => Image(
-    image: provider(file, cacheWidth),
-    fit: fit,
+    image: ArtworkImage.provider(file, widget.cacheWidth),
+    fit: widget.fit,
     gaplessPlayback: true,
     filterQuality: FilterQuality.medium,
     errorBuilder: (context, error, stack) => const SizedBox.shrink(),
@@ -1192,20 +1203,27 @@ class ArtworkImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cache = ArtworkCache.instance;
-    if (!background || !cache.active) return _image(path);
+    if (!widget.background || !cache.active) return _image(widget.path);
     return ListenableBuilder(
       listenable: cache,
       builder: (context, _) {
-        final shown = cache.pathFor(path);
+        final shown = cache.pathFor(widget.path);
         if (shown == null) {
           // Not made yet: nothing is drawn (the theme shows through) and the copy is asked for.
-          unawaited(cache.ensure(path));
+          _fading = true;
+          unawaited(cache.ensure(widget.path));
           return const SizedBox.expand();
         }
+        // The copy was there already: the image as it is, with nothing around it.
+        if (!_fading) return _image(shown);
         return TweenAnimationBuilder<double>(
           key: ValueKey(shown),
           tween: Tween(begin: 0, end: 1),
           duration: const Duration(milliseconds: 300),
+          // Once faded in the wrapper goes away (the image is in the image cache, so it shows at once).
+          onEnd: () {
+            if (mounted) setState(() => _fading = false);
+          },
           builder: (context, t, child) => Opacity(opacity: t, child: child),
           child: _image(shown),
         );
