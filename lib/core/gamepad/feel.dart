@@ -17,6 +17,11 @@ abstract final class KeyRepeat {
   /// Repeats at [interval] before the pace picks up.
   static const fastAfter = 6;
 
+  /// How late a repeat may fire before it is taken for a stall of the interface and dropped. A
+  /// frozen interface cannot read the key's release (or the stick's return) queued behind it, so
+  /// the timer ran out first and moved the selection once more for a press that had ended.
+  static const stall = Duration(milliseconds: 200);
+
   /// The wait before repeat number [repeat] (1 is the first) since the move before it.
   static Duration delayBefore(int repeat) => repeat <= 1 ? firstDelay : (repeat <= fastAfter ? interval : fastInterval);
 
@@ -35,9 +40,14 @@ abstract final class KeyRepeat {
 /// Repeats a held command on [KeyRepeat]'s pace; the pad's navigator and the keyboard each hold
 /// one. [repeating] is true while a repeat is being handed on.
 class HoldRepeater<C extends Object> {
-  HoldRepeater(this.onCommand);
+  HoldRepeater(this.onCommand, {Duration Function()? now}) : _now = now ?? _monotonic;
 
   final void Function(C command) onCommand;
+
+  /// A clock that only goes forward, which tests replace; fake timers do not move the real one.
+  final Duration Function() _now;
+  static final Stopwatch _clock = Stopwatch()..start();
+  static Duration _monotonic() => _clock.elapsed;
 
   C? _held;
   Object? _by;
@@ -80,9 +90,17 @@ class HoldRepeater<C extends Object> {
 
   void _schedule() {
     final wait = _repeats == 0 && _firstDelay != null ? _firstDelay! : KeyRepeat.delayBefore(_repeats + 1);
+    final due = _now() + wait;
     _timer = Timer(wait, () {
       final held = _held;
       if (held == null) return;
+      // The interface stalled (a freeze, a long frame) and this fired long after it was due: the
+      // release that ended the hold may be waiting just behind it. Nothing moves; the wait
+      // starts over, and a direction really still held goes on repeating after it.
+      if (_now() - due > KeyRepeat.stall) {
+        _schedule();
+        return;
+      }
       _repeats++;
       _repeating = true;
       try {

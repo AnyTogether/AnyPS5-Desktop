@@ -124,5 +124,9 @@ class AppPaths {
   String retroStates(String game, {bool ps2 = false}) => p.join(config, 'retro', 'states', ps2 ? 'ps2' : 'ps1', game);
 
   String logFile(String titleId) => p.join(logs, '$titleId.log');
+
+  /// The lighter copies of the games' wide backgrounds (ArtworkCache).
+  String get artworkCache => p.join(cache, 'Artwork');
+
   String shaderCache(String slug) => p.join(cache, slug, 'shader_cache');
 }

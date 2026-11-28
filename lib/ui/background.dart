@@ -262,7 +262,7 @@ class _GameArtworkState extends State<GameArtwork> with SingleTickerProviderStat
             alignment: Alignment.topRight,
             child: child,
           ),
-          child: ArtworkImage(path: widget.path, cacheWidth: GameArtwork.cacheWidth),
+          child: ArtworkImage(path: widget.path, cacheWidth: GameArtwork.cacheWidth, background: true),
         ),
         const DecoratedBox(
           decoration: BoxDecoration(
@@ -307,7 +307,7 @@ class _GameArtworkState extends State<GameArtwork> with SingleTickerProviderStat
                 children: [
                   ColorFiltered(
                     colorFilter: ColorFilter.matrix(GlassRecipe.saturation),
-                    child: ArtworkImage(path: widget.path, cacheWidth: GlassRecipe.artworkWidth),
+                    child: ArtworkImage(path: widget.path, cacheWidth: GlassRecipe.artworkWidth, background: true),
                   ),
                   const CustomPaint(painter: _IceTint()),
                 ],

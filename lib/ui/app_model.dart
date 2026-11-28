@@ -45,6 +45,7 @@ import '../core/gamepad/pad_gate.dart';
 import '../core/gamepad/pad_navigation.dart';
 import '../core/gamepad/shortcuts.dart';
 import '../core/game_deletion.dart' show Trash;
+import '../core/artwork_cache.dart';
 import '../core/game_library.dart';
 import '../core/game_log.dart';
 import '../core/game_process.dart';
@@ -3349,6 +3350,17 @@ class AppModel extends ChangeNotifier {
     _forgetDiskFacts();
     // A game being deleted stays out of the library until its files are gone or came back.
     games = deletion.visible(found);
+    // Backgrounds replaced while the launcher was running: drop the remembered path so the new
+    // file is re-copied instead of showing the old one until the next start. Then drop copies
+    // that no current game maps to, and queue the ones still needed.
+    final backgrounds = [for (final game in games) game.background];
+    for (final source in backgrounds) {
+      if (source != null) ArtworkCache.instance.forgetIfSourceChanged(source);
+    }
+    ArtworkCache.instance.purgeUnused(backgrounds);
+    // The backgrounds' lighter copies are made one by one in the background, the selected game's
+    // first (ArtworkCache.ensure asks for it as soon as it is drawn).
+    ArtworkCache.instance.queue(backgrounds);
     records.clear();
     trophies.clear();
     for (final game in games) {

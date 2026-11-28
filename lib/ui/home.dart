@@ -85,6 +85,7 @@ class Backdrop extends StatelessWidget {
             context,
             model.games[near].background,
             cacheWidth: glass ? GlassRecipe.artworkWidth : GameArtwork.cacheWidth,
+            background: true,
           );
         }
       }
