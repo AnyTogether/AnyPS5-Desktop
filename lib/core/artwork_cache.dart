@@ -45,6 +45,25 @@ class ArtworkCache extends ChangeNotifier {
   /// null while it is still being made (see [ensure]).
   String? pathFor(String source) => active ? _ready[source] : source;
 
+  /// Clears remembered paths and the queue. Tests use this so one case does not leave state
+  /// for the next, and so they can drive [ensure] without spinning an isolate.
+  @visibleForTesting
+  void clearForTest() {
+    _ready.clear();
+    _waiting.clear();
+    _pending.clear();
+    _working = false;
+  }
+
+  /// Marks [source] as ready with [shown] without running the lighten isolate. For widget tests
+  /// that only care about the fade-in path.
+  @visibleForTesting
+  void markReadyForTest(String source, String shown) {
+    _ready[source] = shown;
+    _waiting.remove(source)?.complete(shown);
+    notifyListeners();
+  }
+
   /// Makes sure the copy of [source] is being made, before the pictures that were only queued.
   /// Completes with the file to draw, whatever happens.
   Future<String> ensure(String source) {

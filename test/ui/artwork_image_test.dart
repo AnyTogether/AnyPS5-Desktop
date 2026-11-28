@@ -18,13 +18,17 @@ void main() {
   setUp(() {
     temp = Directory.systemTemp.createTempSync('anyps5-artwork-image');
     picture = File(p.join(temp.path, 'pic0.png'))..writeAsBytesSync(PngEncoder.rgba(4, 2, Uint8List(4 * 2 * 4)));
-    ArtworkCache.instance.folder = p.join(temp.path, 'cache');
+    ArtworkCache.instance
+      ..folder = p.join(temp.path, 'cache')
+      ..clearForTest();
     ArtworkImage.readSynchronously = true;
   });
 
   tearDown(() {
     ArtworkImage.readSynchronously = false;
-    ArtworkCache.instance.folder = null;
+    ArtworkCache.instance
+      ..folder = null
+      ..clearForTest();
     temp.deleteSync(recursive: true);
   });
 
@@ -34,7 +38,8 @@ void main() {
   );
 
   testWidgets('a background whose copy is ready is drawn by the image alone', (tester) async {
-    await tester.runAsync(() => ArtworkCache.instance.ensure(picture.path));
+    // Avoid the lighten isolate: mark the path ready as the real cache would after a copy.
+    ArtworkCache.instance.markReadyForTest(picture.path, picture.path);
     await tester.pumpWidget(background());
     expect(find.byType(Image), findsOneWidget);
     expect(find.byType(Opacity), findsNothing);
@@ -44,10 +49,13 @@ void main() {
   testWidgets('a background that waited for its copy fades in, then is the image alone again', (tester) async {
     await tester.pumpWidget(background());
     expect(find.byType(Image), findsNothing);
-    await tester.runAsync(() => ArtworkCache.instance.ensure(picture.path));
+
+    // Copy becomes ready after the first build (the waiting path).
+    ArtworkCache.instance.markReadyForTest(picture.path, picture.path);
     await tester.pump();
     expect(find.byType(Image), findsOneWidget);
     expect(find.byType(Opacity), findsOneWidget);
+
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pump();
     expect(find.byType(Image), findsOneWidget);
